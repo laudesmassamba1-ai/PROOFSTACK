@@ -1,4 +1,14 @@
-import { BarChart3, CreditCard, FolderKanban, LoaderCircle, LogOut, Settings } from "lucide-react";
+import {
+  BarChart3,
+  CreditCard,
+  FolderKanban,
+  Globe2,
+  LoaderCircle,
+  LogOut,
+  PackageOpen,
+  Route as RouteIcon,
+  Settings,
+} from "lucide-react";
 import { Navigate, NavLink, Outlet, useLocation } from "react-router";
 import { Wordmark } from "../components/brand/Logo.js";
 import { API_BASE } from "../lib/api.js";
@@ -56,7 +66,7 @@ export function AppLayout() {
   return (
     <div className="app-shell">
       <div className="mx-auto flex max-w-[1440px] flex-col lg:flex-row">
-        <aside className="border-b border-line bg-surface lg:min-h-screen lg:w-[248px] lg:shrink-0 lg:border-b-0 lg:border-r">
+        <aside className="border-b border-line bg-surface lg:min-h-screen lg:w-[264px] lg:shrink-0 lg:border-b-0 lg:border-r">
           <div className="flex items-center justify-between px-4 py-4 lg:px-5">
             <NavLink to="/" aria-label="PROOFSTACK home">
               <Wordmark size={12} variant="onLight" />
@@ -76,14 +86,14 @@ export function AppLayout() {
             >
               {session.workspaces.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.name} · {item.role}
+                  {item.name}
                 </option>
               ))}
             </select>
           </div>
 
           <nav
-            className="flex gap-1 overflow-x-auto px-4 pb-4 lg:flex-col lg:px-3"
+            className="flex flex-wrap gap-1 px-3 pb-3 lg:flex-col lg:flex-nowrap lg:px-3 lg:pb-4"
             aria-label="Dashboard"
           >
             <NavLink to="/app" end className="app-nav-link whitespace-nowrap">
@@ -92,6 +102,15 @@ export function AppLayout() {
             <NavLink to="/app/projects" className="app-nav-link whitespace-nowrap">
               <FolderKanban size={16} /> Projects
             </NavLink>
+            <NavLink to="/app/modules/world" className="app-nav-link whitespace-nowrap">
+              <Globe2 size={16} /> WORLD
+            </NavLink>
+            <NavLink to="/app/modules/flow" className="app-nav-link whitespace-nowrap">
+              <RouteIcon size={16} /> FLOW
+            </NavLink>
+            <NavLink to="/app/modules/exit" className="app-nav-link whitespace-nowrap">
+              <PackageOpen size={16} /> EXIT
+            </NavLink>
             <NavLink to="/app/billing" className="app-nav-link whitespace-nowrap">
               <CreditCard size={16} /> Billing
             </NavLink>
@@ -99,6 +118,21 @@ export function AppLayout() {
               <Settings size={16} /> Settings
             </NavLink>
           </nav>
+
+          {/* Mobile has no persistent footer: keep the account reachable instead of hiding it. */}
+          <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-3 lg:hidden">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">{session.user?.name}</p>
+              <p className="truncate text-xs text-muted">{session.user?.email}</p>
+            </div>
+            <button
+              type="button"
+              className="app-btn shrink-0"
+              onClick={() => void session.signOut()}
+            >
+              <LogOut size={14} /> Sign out
+            </button>
+          </div>
 
           <div className="mt-auto hidden px-5 py-5 lg:block">
             <p className="truncate text-sm font-medium">{session.user?.name}</p>
@@ -116,7 +150,7 @@ export function AppLayout() {
           </div>
         </aside>
 
-        <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
+        <main className="min-w-0 flex-1 px-3 py-5 sm:px-6 sm:py-6 lg:px-10 lg:py-8">
           <Outlet />
         </main>
       </div>

@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { moduleIdSchema } from "./statuses.js";
 import { moneySchema, periodSchema } from "./money.js";
+import { moduleIdSchema } from "./statuses.js";
 
 /**
  * Billing vocabulary. The *behaviour* of these state machines lives in
@@ -40,13 +40,25 @@ export type SubscriptionState = z.infer<typeof subscriptionStateSchema>;
  * States that grant paid entitlements. Anything not listed here gets the FREE
  * entitlement set — the engine never infers access from a UI hint or a redirect.
  */
-export const ENTITLED_SUBSCRIPTION_STATES: readonly SubscriptionState[] = ["TRIALING", "ACTIVE", "CANCEL_AT_PERIOD_END"];
+export const ENTITLED_SUBSCRIPTION_STATES: readonly SubscriptionState[] = [
+  "TRIALING",
+  "ACTIVE",
+  "CANCEL_AT_PERIOD_END",
+];
 
 export function grantsPaidAccess(state: SubscriptionState): boolean {
   return ENTITLED_SUBSCRIPTION_STATES.includes(state);
 }
 
-export const PROVIDER_KINDS = ["saspay", "sandbox", "stripe", "paystack", "flutterwave", "fedapay", "cinetpay"] as const;
+export const PROVIDER_KINDS = [
+  "saspay",
+  "sandbox",
+  "stripe",
+  "paystack",
+  "flutterwave",
+  "fedapay",
+  "cinetpay",
+] as const;
 export const providerKindSchema = z.enum(PROVIDER_KINDS);
 export type ProviderKind = z.infer<typeof providerKindSchema>;
 
@@ -118,7 +130,7 @@ export const planSchema = z
             /** Display currency for marketing pages; charging uses `amount`. */
             featured: z.boolean().default(false),
           })
-          .strict(),
+          .strict()
       )
       .default([]),
     /** A plan may define only the keys it changes; missing keys inherit the FREE set. */
@@ -163,7 +175,9 @@ export const webhookEventSchema = z
     receivedAt: z.string(),
     signatureValid: z.boolean(),
     processedAt: z.string().optional(),
-    processingState: z.enum(["RECEIVED", "IGNORED_DUPLICATE", "PROCESSED", "REJECTED", "FAILED_RETRYABLE"]).default("RECEIVED"),
+    processingState: z
+      .enum(["RECEIVED", "IGNORED_DUPLICATE", "PROCESSED", "REJECTED", "FAILED_RETRYABLE"])
+      .default("RECEIVED"),
     /** Raw body is never stored verbatim; a digest is enough for forensics. */
     bodyDigest: z.string(),
     error: z.string().optional(),

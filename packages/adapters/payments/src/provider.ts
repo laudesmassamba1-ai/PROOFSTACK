@@ -1,5 +1,5 @@
-import type { Money } from "@proofstack/core";
 import type { PaymentState, ProviderKind } from "@proofstack/contracts";
+import type { Money } from "@proofstack/core";
 
 /**
  * The provider boundary.
@@ -127,7 +127,7 @@ export class PaymentProviderError extends Error {
     readonly status: number,
     readonly code: string,
     readonly retryable: boolean,
-    readonly details?: Record<string, unknown>,
+    readonly details?: Record<string, unknown>
   ) {
     super(message);
     this.name = "PaymentProviderError";

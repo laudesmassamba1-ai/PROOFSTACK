@@ -21,7 +21,12 @@ export interface CurrencyMeta {
 }
 
 const CURRENCIES: readonly CurrencyMeta[] = [
-  { code: "XOF", exponent: 0, name: "West African CFA franc", locales: ["fr-BJ", "fr-CG", "fr-SN", "fr-CI"] },
+  {
+    code: "XOF",
+    exponent: 0,
+    name: "West African CFA franc",
+    locales: ["fr-BJ", "fr-CG", "fr-SN", "fr-CI"],
+  },
   { code: "XAF", exponent: 0, name: "Central African CFA franc", locales: ["fr-CM", "fr-GA"] },
   { code: "NGN", exponent: 2, name: "Nigerian naira", locales: ["en-NG"] },
   { code: "GHS", exponent: 2, name: "Ghanaian cedi", locales: ["en-GH"] },

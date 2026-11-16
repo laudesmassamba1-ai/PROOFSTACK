@@ -17,14 +17,14 @@ request leaves the machine.
 They solve different problems and are configured separately. You can use one, two, or
 all three.
 
-| Shape | What it is | What it is for |
-|---|---|---|
-| **MCP servers** | PROOFSTACK acts as a Model Context Protocol **client**. It connects to servers you configure and their tools become the agent's tools. | Give the agent hands: read a repo, query a database, open a PR. |
-| **AI providers** | An OpenAI-compatible chat-completions endpoint. | Give the agent a brain: Perch, OpenAI, Ollama, vLLM, LM Studio. |
-| **CLI agents** | An external agent invoked as an argv array, prompt on stdin. | Hand a failing run to the agent your team already uses. |
+| Shape            | What it is                                                                                                                             | What it is for                                                  |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| **MCP servers**  | PROOFSTACK acts as a Model Context Protocol **client**. It connects to servers you configure and their tools become the agent's tools. | Give the agent hands: read a repo, query a database, open a PR. |
+| **AI providers** | An OpenAI-compatible chat-completions endpoint.                                                                                        | Give the agent a brain: Perch, OpenAI, Ollama, vLLM, LM Studio. |
+| **CLI agents**   | An external agent invoked as an argv array, prompt on stdin.                                                                           | Hand a failing run to the agent your team already uses.         |
 
-The distinction matters. An MCP server gives the agent *capabilities*; a provider gives
-it *reasoning*; a CLI agent is *someone else's agent* that you delegate to. Mixing them
+The distinction matters. An MCP server gives the agent _capabilities_; a provider gives
+it _reasoning_; a CLI agent is _someone else's agent_ that you delegate to. Mixing them
 up is how people end up with a "AI integration" that is a hardcoded API call to one
 vendor.
 
@@ -40,7 +40,9 @@ import type { ProofstackConfig } from "@proofstack/contracts";
 const config: ProofstackConfig = {
   project: { name: "Acme checkout", baseUrl: "https://staging.acme.test" },
   environment: "staging",
-  modules: { /* … */ },
+  modules: {
+    /* … */
+  },
   enabledModules: ["world", "flow", "exit"],
 
   ai: {
@@ -50,7 +52,7 @@ const config: ProofstackConfig = {
     providers: [
       {
         name: "local",
-        baseUrl: "http://localhost:11434",   // Ollama; /v1 is added automatically
+        baseUrl: "http://localhost:11434", // Ollama; /v1 is added automatically
         model: "qwen3-coder:30b",
         default: true,
       },
@@ -58,7 +60,7 @@ const config: ProofstackConfig = {
         name: "perch",
         baseUrl: "https://api.perchai.app/v1",
         model: "roost-pro",
-        apiKeyEnvVar: "PERCH_API_KEY",       // the NAME, never the key
+        apiKeyEnvVar: "PERCH_API_KEY", // the NAME, never the key
       },
     ],
 
@@ -69,7 +71,7 @@ const config: ProofstackConfig = {
         transport: "stdio",
         command: ["npx", "-y", "@modelcontextprotocol/server-filesystem", "./src"],
         autoConnect: true,
-        allowTools: ["read_file", "list_directory"],   // empty = every tool
+        allowTools: ["read_file", "list_directory"], // empty = every tool
         denyTools: ["write_file"],
       },
       {
@@ -106,31 +108,31 @@ export default config;
 
 **`ai.providers[]`**
 
-| Field | Meaning |
-|---|---|
-| `name` | Unique. Used by `--provider`. |
-| `kind` | `"openai-compatible"` (the only shape today). |
-| `baseUrl` | `https://host` or `https://host/v1` both work; `/v1` is added when missing. |
-| `model` | Model name as the endpoint expects it. |
-| `apiKeyEnvVar` | **Name** of the environment variable holding the key. Never the key. |
-| `headers` | Extra headers. Values may contain `${ENV_VAR}`. |
-| `maxTokens`, `temperature`, `timeoutMs` | Per-request limits. |
-| `default` | Exactly one provider may be default. |
+| Field                                   | Meaning                                                                     |
+| --------------------------------------- | --------------------------------------------------------------------------- |
+| `name`                                  | Unique. Used by `--provider`.                                               |
+| `kind`                                  | `"openai-compatible"` (the only shape today).                               |
+| `baseUrl`                               | `https://host` or `https://host/v1` both work; `/v1` is added when missing. |
+| `model`                                 | Model name as the endpoint expects it.                                      |
+| `apiKeyEnvVar`                          | **Name** of the environment variable holding the key. Never the key.        |
+| `headers`                               | Extra headers. Values may contain `${ENV_VAR}`.                             |
+| `maxTokens`, `temperature`, `timeoutMs` | Per-request limits.                                                         |
+| `default`                               | Exactly one provider may be default.                                        |
 
 **`ai.mcpServers[]`**
 
-| Field | Meaning |
-|---|---|
-| `name` | Unique. Namespaces the tools. |
-| `transport` | `"stdio"` or `"http"`. |
-| `command` | stdio only. **argv array**; the first element is the executable. |
-| `url` | http only. The MCP endpoint. |
-| `env` | Environment for the child process. Values may contain `${ENV_VAR}`. |
-| `headers` | http only. Values may contain `${ENV_VAR}`. |
-| `allowTools` | Empty means every tool the server exposes. |
-| `denyTools` | Always refused, even if listed in `allowTools`. |
-| `autoConnect` | Connect when a session starts. |
-| `timeoutMs` | Per-request deadline. A hung server cannot hang the CLI. |
+| Field         | Meaning                                                             |
+| ------------- | ------------------------------------------------------------------- |
+| `name`        | Unique. Namespaces the tools.                                       |
+| `transport`   | `"stdio"` or `"http"`.                                              |
+| `command`     | stdio only. **argv array**; the first element is the executable.    |
+| `url`         | http only. The MCP endpoint.                                        |
+| `env`         | Environment for the child process. Values may contain `${ENV_VAR}`. |
+| `headers`     | http only. Values may contain `${ENV_VAR}`.                         |
+| `allowTools`  | Empty means every tool the server exposes.                          |
+| `denyTools`   | Always refused, even if listed in `allowTools`.                     |
+| `autoConnect` | Connect when a session starts.                                      |
+| `timeoutMs`   | Per-request deadline. A hung server cannot hang the CLI.            |
 
 **`ai.agents[]`** — `command` (argv), `promptDelivery` (`stdin` or `arg`), `env`,
 `cwd`, `timeoutMs`, `allowFileWrites`.
@@ -188,13 +190,13 @@ PROOFSTACK implements the Model Context Protocol as a **client**, over both tran
 
 Implemented methods:
 
-| Method | Notes |
-|---|---|
-| `initialize` | Handshake; the server's `protocolVersion`, `capabilities` and `instructions` are read from its reply. |
-| `notifications/initialized` | Sent after a successful handshake, as the spec requires. |
-| `tools/list`, `tools/call` | Tools are namespaced `mcp__<server>__<tool>` and sanitised to the character set function-calling APIs accept. |
-| `resources/list`, `resources/read` | Available to the agent; text content is flattened. |
-| `prompts/list` | Listed and reported. |
+| Method                             | Notes                                                                                                         |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `initialize`                       | Handshake; the server's `protocolVersion`, `capabilities` and `instructions` are read from its reply.         |
+| `notifications/initialized`        | Sent after a successful handshake, as the spec requires.                                                      |
+| `tools/list`, `tools/call`         | Tools are namespaced `mcp__<server>__<tool>` and sanitised to the character set function-calling APIs accept. |
+| `resources/list`, `resources/read` | Available to the agent; text content is flattened.                                                            |
+| `prompts/list`                     | Listed and reported.                                                                                          |
 
 Deliberate behaviours:
 
@@ -229,11 +231,11 @@ spend money and mutate state. Every limit is enforced in code.
 
 ### Autonomy levels
 
-| Level | Read-only tools | State-changing tools |
-|---|---|---|
-| `read` *(default)* | run | **refused** |
-| `propose` | run | run only if an approval handler says yes |
-| `write` | run | run |
+| Level              | Read-only tools | State-changing tools                     |
+| ------------------ | --------------- | ---------------------------------------- |
+| `read` _(default)_ | run             | **refused**                              |
+| `propose`          | run             | run only if an approval handler says yes |
+| `write`            | run             | run                                      |
 
 ### How a tool's effect is decided
 
@@ -282,14 +284,14 @@ the database" is a document with bad data in it.
 
 One adapter covers every OpenAI-compatible endpoint. Only `baseUrl` and `model` change.
 
-| Provider | `baseUrl` | `apiKeyEnvVar` |
-|---|---|---|
-| Perch | `https://api.perchai.app/v1` | `PERCH_API_KEY` |
-| OpenAI | `https://api.openai.com/v1` | `OPENAI_API_KEY` |
-| Ollama (local) | `http://localhost:11434` | *(none)* |
-| vLLM (local) | `http://localhost:8000/v1` | *(none)* |
-| LM Studio (local) | `http://localhost:1234/v1` | *(none)* |
-| Together | `https://api.together.xyz/v1` | `TOGETHER_API_KEY` |
+| Provider          | `baseUrl`                     | `apiKeyEnvVar`     |
+| ----------------- | ----------------------------- | ------------------ |
+| Perch             | `https://api.perchai.app/v1`  | `PERCH_API_KEY`    |
+| OpenAI            | `https://api.openai.com/v1`   | `OPENAI_API_KEY`   |
+| Ollama (local)    | `http://localhost:11434`      | _(none)_           |
+| vLLM (local)      | `http://localhost:8000/v1`    | _(none)_           |
+| LM Studio (local) | `http://localhost:1234/v1`    | _(none)_           |
+| Together          | `https://api.together.xyz/v1` | `TOGETHER_API_KEY` |
 
 A local model needs no key and no account. That is the cheapest way to try this: run
 Ollama, point `baseUrl` at it, and the agent works with no external service.

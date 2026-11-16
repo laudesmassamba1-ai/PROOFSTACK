@@ -22,13 +22,9 @@ export interface SubtleCryptoLike {
     keyMaterial: Uint8Array,
     algorithm: { name: "HMAC"; hash: "SHA-256" },
     extractable: boolean,
-    keyUsages: readonly ("sign" | "verify")[],
+    keyUsages: readonly ("sign" | "verify")[]
   ): Promise<CryptoKeyLike>;
-  sign(
-    algorithm: { name: "HMAC" },
-    key: CryptoKeyLike,
-    data: Uint8Array,
-  ): Promise<ArrayBuffer>;
+  sign(algorithm: { name: "HMAC" }, key: CryptoKeyLike, data: Uint8Array): Promise<ArrayBuffer>;
 }
 
 export interface CryptoLike {

@@ -112,7 +112,11 @@ function classifyByName(error: Error): ErrorCategory {
   const message = error.message.toLowerCase();
   if (name === "TimeoutError" || message.includes("timeout")) return "TIMEOUT";
   if (name === "AbortError") return "TIMEOUT";
-  if (message.includes("enotfound") || message.includes("econnrefused") || message.includes("fetch failed"))
+  if (
+    message.includes("enotfound") ||
+    message.includes("econnrefused") ||
+    message.includes("fetch failed")
+  )
     return "NETWORK";
   if (message.includes("429") || message.includes("rate limit")) return "RATE_LIMITED";
   if (name === "TypeError" && message.includes("undefined")) return "INTERNAL";

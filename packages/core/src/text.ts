@@ -31,7 +31,10 @@ export function hasCombiningMarks(value: string): boolean {
 
 /** Remove diacritics. Lossy by design; never used for equality, only for slugs. */
 export function stripDiacritics(value: string): string {
-  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").normalize("NFC");
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .normalize("NFC");
 }
 
 const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
@@ -104,7 +107,8 @@ export function textDirection(value: string): "rtl" | "ltr" | "neutral" {
   for (const ch of value) {
     const cp = ch.codePointAt(0) ?? 0;
     for (const [lo, hi] of RTL_RANGES) if (cp >= lo && cp <= hi) return "rtl";
-    if (/\p{Script=Latin}|\p{Script=Cyrillic}|\p{Script=Han}|\p{Script=Hiragana}/u.test(ch)) return "ltr";
+    if (/\p{Script=Latin}|\p{Script=Cyrillic}|\p{Script=Han}|\p{Script=Hiragana}/u.test(ch))
+      return "ltr";
   }
   return "neutral";
 }
@@ -167,12 +171,12 @@ export function suspiciousHomoglyphs(value: string): string[] {
 
 /** Strip the characters that must never reach a database or a CSV cell. */
 export function sanitizeControlChars(value: string): string {
-  // eslint-disable-next-line no-control-regex
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: the pattern's purpose is to detect control characters
   return value.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "");
 }
 
 export function containsControlChars(value: string): boolean {
-  // eslint-disable-next-line no-control-regex
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: the pattern's purpose is to detect control characters
   return /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value);
 }
 

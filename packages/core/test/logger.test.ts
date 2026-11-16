@@ -1,9 +1,19 @@
+import { Logger, MemorySink, maskValue, redactKey } from "@proofstack/core";
 import { describe, expect, it } from "vitest";
-import { MemorySink, Logger, maskValue, redactKey } from "@proofstack/core";
 
 describe("structured logging with redaction", () => {
   it("recognises sensitive field names in any casing or nesting", () => {
-    for (const key of ["apiKey", "api_key", "SIGNING_SECRET", "authorization", "client-secret", "otp", "cvv", "msisdn", "email"]) {
+    for (const key of [
+      "apiKey",
+      "api_key",
+      "SIGNING_SECRET",
+      "authorization",
+      "client-secret",
+      "otp",
+      "cvv",
+      "msisdn",
+      "email",
+    ]) {
       expect(redactKey(key)).toBe(true);
     }
     for (const key of ["runId", "durationMs", "profile", "status"]) {
@@ -40,7 +50,10 @@ describe("structured logging with redaction", () => {
   it("truncates oversized strings and caps nesting instead of dumping a dataset", () => {
     const sink = new MemorySink();
     const log = new Logger({ sinks: [sink] });
-    log.info("big", { payload: "x".repeat(5000), deep: { a: { b: { c: { d: { e: "too deep" } } } } } });
+    log.info("big", {
+      payload: "x".repeat(5000),
+      deep: { a: { b: { c: { d: { e: "too deep" } } } } },
+    });
     const fields = sink.records[0]!.fields as Record<string, unknown>;
     expect(String(fields.payload).length).toBeLessThan(700);
     expect(fields.deep).toBeDefined();

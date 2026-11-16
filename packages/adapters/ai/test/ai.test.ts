@@ -1,22 +1,22 @@
-import { describe, expect, it } from "vitest";
-import { createServer, type Server } from "node:http";
 import { mkdtemp, writeFile } from "node:fs/promises";
+import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { describe, expect, it } from "vitest";
 import {
-  CliAgent,
-  OpenAiCompatibleProvider,
+  type AgentTool,
   agentSystemPrompt,
   buildAgentArgv,
+  type ChatMessage,
+  CliAgent,
   connectMcp,
   expandEnv,
   filterTools,
+  type McpTool,
   namespacedToolName,
+  OpenAiCompatibleProvider,
   runAgent,
   summarizeRunForAgent,
-  type AgentTool,
-  type ChatMessage,
-  type McpTool,
 } from "../src/index.js";
 
 /**
@@ -190,7 +190,7 @@ describe("MCP client (real stdio transport)", () => {
          const msg = JSON.parse(line);
          if (msg.method === "initialize") process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result: { protocolVersion: "2025-06-18", capabilities: {}, serverInfo: { name: "bare", version: "0" } } }) + "\\n");
        });`,
-      "utf8",
+      "utf8"
     );
     const client = await connectMcp({
       name: "bare",
@@ -211,7 +211,11 @@ describe("MCP client (real stdio transport)", () => {
     const dir = await mkdtemp(join(tmpdir(), "proofstack-mcp-"));
     const path = join(dir, "silent.mjs");
     // Reads stdin and never replies.
-    await writeFile(path, `import { createInterface } from "node:readline"; createInterface({ input: process.stdin });`, "utf8");
+    await writeFile(
+      path,
+      `import { createInterface } from "node:readline"; createInterface({ input: process.stdin });`,
+      "utf8"
+    );
 
     await expect(
       connectMcp({
@@ -219,7 +223,7 @@ describe("MCP client (real stdio transport)", () => {
         transport: "stdio",
         command: [process.execPath, path],
         timeoutMs: 400,
-      }),
+      })
     ).rejects.toThrow(/did not answer initialize/);
   });
 
@@ -230,14 +234,17 @@ describe("MCP client (real stdio transport)", () => {
         transport: "stdio",
         command: ["definitely-not-a-real-binary-xyz"],
         timeoutMs: 2_000,
-      }),
+      })
     ).rejects.toThrow(/exited|ENOENT|not accepting input/);
   });
 });
 
 // ------------------------------------------------------------------ a real HTTP provider
 
-async function withServer<T>(handler: Parameters<typeof createServer>[1], fn: (url: string) => Promise<T>): Promise<T> {
+async function withServer<T>(
+  handler: Parameters<typeof createServer>[1],
+  fn: (url: string) => Promise<T>
+): Promise<T> {
   const server: Server = createServer(handler);
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
@@ -256,13 +263,18 @@ describe("OpenAI-compatible provider", () => {
       (req, res) => {
         seenPath = req.url ?? "";
         res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({ model: "m", choices: [{ message: { role: "assistant", content: "hi" }, finish_reason: "stop" }] }));
+        res.end(
+          JSON.stringify({
+            model: "m",
+            choices: [{ message: { role: "assistant", content: "hi" }, finish_reason: "stop" }],
+          })
+        );
       },
       async (base) => {
         const provider = new OpenAiCompatibleProvider({ name: "p", baseUrl: base, model: "m" });
         const response = await provider.chat({ messages: [{ role: "user", content: "hello" }] });
         expect(response.message.content).toBe("hi");
-      },
+      }
     );
     expect(seenPath).toBe("/v1/chat/completions");
   });
@@ -276,9 +288,13 @@ describe("OpenAI-compatible provider", () => {
         res.end(JSON.stringify({ choices: [{ message: { content: "ok" } }] }));
       },
       async (base) => {
-        const provider = new OpenAiCompatibleProvider({ name: "p", baseUrl: `${base}/v1`, model: "m" });
+        const provider = new OpenAiCompatibleProvider({
+          name: "p",
+          baseUrl: `${base}/v1`,
+          model: "m",
+        });
         await provider.chat({ messages: [{ role: "user", content: "x" }] });
-      },
+      }
     );
     expect(seenPath).toBe("/v1/chat/completions");
   });
@@ -295,14 +311,17 @@ describe("OpenAI-compatible provider", () => {
                   role: "assistant",
                   content: "",
                   tool_calls: [
-                    { id: "call_1", function: { name: "read_file", arguments: '{"path":"a.txt"}' } },
+                    {
+                      id: "call_1",
+                      function: { name: "read_file", arguments: '{"path":"a.txt"}' },
+                    },
                   ],
                 },
                 finish_reason: "tool_calls",
               },
             ],
             usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
-          }),
+          })
         );
       },
       async (base) => {
@@ -313,7 +332,7 @@ describe("OpenAI-compatible provider", () => {
         expect(response.message.toolCalls![0]!.arguments).toEqual({ path: "a.txt" });
         expect(response.usage?.totalTokens).toBe(15);
         expect(response.finishReason).toBe("tool_calls");
-      },
+      }
     );
   });
 
@@ -330,15 +349,15 @@ describe("OpenAI-compatible provider", () => {
                 },
               },
             ],
-          }),
+          })
         );
       },
       async (base) => {
         const provider = new OpenAiCompatibleProvider({ name: "p", baseUrl: base, model: "m" });
         await expect(provider.chat({ messages: [{ role: "user", content: "x" }] })).rejects.toThrow(
-          /invalid JSON for tool arguments/,
+          /invalid JSON for tool arguments/
         );
-      },
+      }
     );
   });
 
@@ -350,11 +369,13 @@ describe("OpenAI-compatible provider", () => {
       },
       async (base) => {
         const provider = new OpenAiCompatibleProvider({ name: "p", baseUrl: base, model: "m" });
-        await expect(provider.chat({ messages: [{ role: "user", content: "x" }] })).rejects.toMatchObject({
+        await expect(
+          provider.chat({ messages: [{ role: "user", content: "x" }] })
+        ).rejects.toMatchObject({
           category: "RATE_LIMITED",
           retryable: true,
         });
-      },
+      }
     );
   });
 });
@@ -364,7 +385,11 @@ describe("OpenAI-compatible provider", () => {
 function echoTool(): AgentTool {
   return {
     effect: "read",
-    definition: { name: "echo", description: "echo", parameters: { type: "object", properties: {} } },
+    definition: {
+      name: "echo",
+      description: "echo",
+      parameters: { type: "object", properties: {} },
+    },
     async run(args) {
       return `echoed ${JSON.stringify(args)}`;
     },
@@ -374,7 +399,11 @@ function echoTool(): AgentTool {
 function writeTool(): AgentTool {
   return {
     effect: "write",
-    definition: { name: "write_file", description: "write", parameters: { type: "object", properties: {} } },
+    definition: {
+      name: "write_file",
+      description: "write",
+      parameters: { type: "object", properties: {} },
+    },
     async run() {
       return "wrote";
     },
@@ -408,7 +437,11 @@ describe("agent loop guards", () => {
   it("executes a read-only tool and feeds the result back", async () => {
     const result = await runAgent({
       chat: scriptedChat([
-        { role: "assistant", content: "", toolCalls: [{ id: "c1", name: "echo", arguments: { a: 1 } }] },
+        {
+          role: "assistant",
+          content: "",
+          toolCalls: [{ id: "c1", name: "echo", arguments: { a: 1 } }],
+        },
         { role: "assistant", content: "I echoed it." },
       ]),
       tools: [echoTool()],
@@ -424,7 +457,11 @@ describe("agent loop guards", () => {
   it("refuses a write tool under the default read autonomy", async () => {
     const result = await runAgent({
       chat: scriptedChat([
-        { role: "assistant", content: "", toolCalls: [{ id: "c1", name: "write_file", arguments: {} }] },
+        {
+          role: "assistant",
+          content: "",
+          toolCalls: [{ id: "c1", name: "write_file", arguments: {} }],
+        },
       ]),
       tools: [writeTool()],
       systemPrompt: "sys",
@@ -439,7 +476,11 @@ describe("agent loop guards", () => {
     const approved: string[] = [];
     const result = await runAgent({
       chat: scriptedChat([
-        { role: "assistant", content: "", toolCalls: [{ id: "c1", name: "write_file", arguments: {} }] },
+        {
+          role: "assistant",
+          content: "",
+          toolCalls: [{ id: "c1", name: "write_file", arguments: {} }],
+        },
         { role: "assistant", content: "written" },
       ]),
       tools: [writeTool()],
@@ -458,7 +499,11 @@ describe("agent loop guards", () => {
   it("does not run a write tool when the operator declines", async () => {
     const result = await runAgent({
       chat: scriptedChat([
-        { role: "assistant", content: "", toolCalls: [{ id: "c1", name: "write_file", arguments: {} }] },
+        {
+          role: "assistant",
+          content: "",
+          toolCalls: [{ id: "c1", name: "write_file", arguments: {} }],
+        },
       ]),
       tools: [writeTool()],
       systemPrompt: "sys",
@@ -471,14 +516,22 @@ describe("agent loop guards", () => {
 
   it("treats a tool with no declared effect as a write", async () => {
     const undeclared: AgentTool = {
-      definition: { name: "mystery", description: "?", parameters: { type: "object", properties: {} } },
+      definition: {
+        name: "mystery",
+        description: "?",
+        parameters: { type: "object", properties: {} },
+      },
       async run() {
         return "ran";
       },
     };
     const result = await runAgent({
       chat: scriptedChat([
-        { role: "assistant", content: "", toolCalls: [{ id: "c1", name: "mystery", arguments: {} }] },
+        {
+          role: "assistant",
+          content: "",
+          toolCalls: [{ id: "c1", name: "mystery", arguments: {} }],
+        },
       ]),
       tools: [undeclared],
       systemPrompt: "sys",
@@ -511,7 +564,11 @@ describe("agent loop guards", () => {
 
   it("stops when the token budget is exhausted", async () => {
     const expensive = async () => ({
-      message: { role: "assistant" as const, content: "", toolCalls: [{ id: "c", name: "echo", arguments: {} }] },
+      message: {
+        role: "assistant" as const,
+        content: "",
+        toolCalls: [{ id: "c", name: "echo", arguments: {} }],
+      },
       usage: { totalTokens: 5_000 },
     });
     const result = await runAgent({
@@ -606,7 +663,13 @@ describe("AI helpers", () => {
     const summary = summarizeRunForAgent({
       id: "run_1",
       status: "FAILED",
-      moduleRuns: [{ module: "world", status: "FAILED", totals: { passed: 1, failed: 2, warnings: 0, errors: 0, skipped: 0 } }],
+      moduleRuns: [
+        {
+          module: "world",
+          status: "FAILED",
+          totals: { passed: 1, failed: 2, warnings: 0, errors: 0, skipped: 0 },
+        },
+      ],
       findings,
     });
     expect(summary).toContain("Run run_1 — status FAILED");
@@ -624,10 +687,14 @@ describe("external CLI agent", () => {
       `let data = "";
        process.stdin.on("data", (c) => (data += c));
        process.stdin.on("end", () => process.stdout.write("got: " + data.trim()));`,
-      "utf8",
+      "utf8"
     );
 
-    const agent = new CliAgent({ name: "fixture", command: [process.execPath, script], timeoutMs: 20_000 });
+    const agent = new CliAgent({
+      name: "fixture",
+      command: [process.execPath, script],
+      timeoutMs: 20_000,
+    });
     const result = await agent.run("hello agent");
     expect(result.exitCode).toBe(0);
     expect(result.answer).toBe("got: hello agent");
@@ -638,7 +705,11 @@ describe("external CLI agent", () => {
     const script = join(dir, "fail.mjs");
     await writeFile(script, `process.stderr.write("it failed"); process.exit(3);`, "utf8");
 
-    const agent = new CliAgent({ name: "fixture", command: [process.execPath, script], timeoutMs: 20_000 });
+    const agent = new CliAgent({
+      name: "fixture",
+      command: [process.execPath, script],
+      timeoutMs: 20_000,
+    });
     const result = await agent.run("x");
     expect(result.exitCode).toBe(3);
     expect(result.stderr).toContain("it failed");

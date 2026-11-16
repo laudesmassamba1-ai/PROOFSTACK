@@ -1,9 +1,9 @@
 packages:
-  - 'packages/*'
-  - 'packages/modules/*'
-  - 'packages/adapters/*'
-  - 'apps/*'
-  - 'tooling/*'
+  - "packages/*"
+  - "packages/modules/*"
+  - "packages/adapters/*"
+  - "apps/*"
+  - "tooling/*"
 
 # pnpm >= 10 blocks dependency lifecycle scripts unless explicitly allowed here.
 # Only these four legitimately need a postinstall step (native binary linking).
@@ -15,5 +15,5 @@ allowBuilds:
   unrs-resolver: true
 
 minimumReleaseAgeExclude:
-  - '@cloudflare/workers-types@5.20261116.1'
+  - "@cloudflare/workers-types@5.20261116.1"
   - hono@4.13.19

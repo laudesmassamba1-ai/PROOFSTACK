@@ -114,6 +114,10 @@ export type EnvironmentKind = z.infer<typeof environmentKindSchema>;
  * unless the operator explicitly opts in. This is a contract-level rule, not a UI
  * convention, so the CLI and the API both enforce it.
  */
-export const PRODUCTION_GUARDED_MODES = ["live_charge", "destructive_export", "real_payout"] as const;
+export const PRODUCTION_GUARDED_MODES = [
+  "live_charge",
+  "destructive_export",
+  "real_payout",
+] as const;
 export const productionGuardedModeSchema = z.enum(PRODUCTION_GUARDED_MODES);
 export type ProductionGuardedMode = z.infer<typeof productionGuardedModeSchema>;

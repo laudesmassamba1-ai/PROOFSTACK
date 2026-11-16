@@ -11,9 +11,7 @@ export const moneySchema = z
       .string()
       .length(3)
       .refine((v) => isKnownCurrency(v), { message: "unknown currency code" }),
-    minor: z
-      .string()
-      .regex(/^-?\d+$/, "minor units must be an integer string"),
+    minor: z.string().regex(/^-?\d+$/, "minor units must be an integer string"),
   })
   .strict();
 

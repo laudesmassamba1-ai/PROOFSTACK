@@ -10,7 +10,11 @@ import { defineConfig } from "vite";
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
-    port: (process.env.DEV_PORT ? Number(process.env.DEV_PORT) : (process.env.PORT ? Number(process.env.PORT) : 5173)),
+    port: process.env.DEV_PORT
+      ? Number(process.env.DEV_PORT)
+      : process.env.PORT
+        ? Number(process.env.PORT)
+        : 5173,
     strictPort: true,
     host: true,
   },

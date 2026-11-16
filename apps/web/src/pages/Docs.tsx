@@ -1,7 +1,7 @@
-import { Link } from "react-router";
 import { CircleCheck, CircleDashed, Terminal } from "lucide-react";
-import { Section, SectionHeading } from "../layouts/BrandLayout.js";
+import { Link } from "react-router";
 import { useI18n } from "../i18n/index.js";
+import { Section, SectionHeading } from "../layouts/BrandLayout.js";
 
 /**
  * This page describes the build that exists today, not the roadmap. Each entry is
@@ -9,19 +9,53 @@ import { useI18n } from "../i18n/index.js";
  * cannot mistake an intention for a feature.
  */
 const NOW = [
-  { title: "Execution engine", body: "Scheduling, parallelism, timeouts, cancellation, retry policy, fingerprints, evidence refs, contract-validated TestRun output. 16 engine tests." },
-  { title: "Money, time and Unicode core", body: "BigInt minor units with ISO 4217 exponents, IANA zone + DST wall-clock resolution, grapheme/RTL/collation primitives, secret-redacting logger. 48 tests." },
-  { title: "WORLD module", body: "8 locale profiles, fixture expansion, HTTP target driver, synthetic driver, storage-integrity comparison. Detection logic exercised against deliberately buggy targets." },
-  { title: "Plan and entitlement definitions", body: "Four plans, sparse entitlement maps resolved against the FREE baseline, derived yearly saving, prepaid-only flag driven by provider capability." },
-  { title: "Provider research", body: "SasPay OpenAPI 3.1 spec fetched and stored in Docs/research; capability matrix written from it, including what it does not support." },
+  {
+    title: "Execution engine and three modules",
+    body: "Scheduling, parallelism, timeouts, cancellation, retry policy, fingerprints and evidence refs. WORLD (8 locale profiles), FLOW (checkout and webhook scenarios) and EXIT (schema, integrity, round trip) run from one TestRun contract.",
+  },
+  {
+    title: "Money, time and Unicode core",
+    body: "BigInt minor units with ISO 4217 exponents, IANA zone + DST wall-clock resolution, grapheme/RTL/collation primitives, secret-redacting logger.",
+  },
+  {
+    title: "CLI and reports",
+    body: "init, doctor, validate, test, report, projects, login/logout, sync and ai. JSON, JUnit XML, HTML and text output; exit codes are a contract (0 pass, 1 defect, 2 harness error, 3 cancelled).",
+  },
+  {
+    title: "SaaS API and database",
+    body: "Hono on Node 22 SQLite and Cloudflare Workers/D1 from one schema. Accounts, workspaces, projects, run ingestion, reports, API keys, entitlements, checkout, receipts and signed webhooks.",
+  },
+  {
+    title: "Dashboard and billing",
+    body: "Authenticated overview, projects, module views, settings and a billing page that reads verified payment state. The sandbox provider exercises the full lifecycle without moving money.",
+  },
+  {
+    title: "Provider research",
+    body: "SasPay OpenAPI 3.1 spec fetched and stored in Docs/research; capability matrix written from it, including what it does not support (refunds, automatic recurring charges).",
+  },
 ];
 
 const PENDING = [
-  { title: "CLI (`proofstack …`)", body: "Command surface and config loader are specified in the contracts; implementation is the next build phase." },
-  { title: "API + D1 schema", body: "Workers/Hono/Drizzle/Better Auth with tenant-scoped authorisation and webhook ingestion." },
-  { title: "Dashboard", body: "Authenticated application shell, projects, module views, billing portal." },
-  { title: "FLOW browser execution", body: "Playwright journeys through the CLI, plus the SasPay adapter against real sandbox credentials." },
-  { title: "EXIT connectors", body: "Export readers and the round-trip differ." },
+  {
+    title: "Playwright browser journeys",
+    body: "WORLD and FLOW currently drive HTTP endpoints and fixtures. A browser form driver and screenshots-on-failure evidence are not implemented.",
+  },
+  {
+    title: "Cloudflare deployment",
+    body: "wrangler.toml and the D1 code path exist, but no D1 database has been provisioned and no deployment has been performed.",
+  },
+  {
+    title: "Email delivery",
+    body: "No provider is configured, so verification, password reset and teammate invitations are absent rather than faked.",
+  },
+  {
+    title: "Operator console",
+    body: "Plans and prices are code-backed today. An admin interface for pricing, subscriptions, refunds and webhook history is not built.",
+  },
+  {
+    title: "Dashboard translation",
+    body: "Marketing pages and account forms are bilingual. The authenticated dashboard is English-only and says so in Settings.",
+  },
 ];
 
 export function Docs() {
@@ -32,7 +66,9 @@ export function Docs() {
         <SectionHeading eyebrow={t("nav.docs")} title={t("docs.title")} lede={t("docs.lede")} />
         <div className="brand-panel mt-8 flex flex-wrap items-center gap-3 p-4">
           <Terminal size={15} className="text-brand-mint" />
-          <code className="text-[0.8rem] text-white/74">pnpm install && pnpm build && pnpm test</code>
+          <code className="text-[0.8rem] text-white/74">
+            pnpm install && pnpm build && pnpm test
+          </code>
           <span className="ml-auto text-[0.76rem] text-white/38">Node 22 LTS · pnpm 12</span>
         </div>
       </Section>
@@ -65,9 +101,12 @@ export function Docs() {
               ))}
             </ul>
             <p className="mt-6 text-[0.82rem] text-white/40">
-              Progress is tracked in <code className="text-white/60">docs/DEVELOPMENT_STATUS.md</code> in the repository.
+              Progress is tracked in{" "}
+              <code className="text-white/60">docs/DEVELOPMENT_STATUS.md</code> in the repository.
             </p>
-            <Link to="/changelog" className="btn btn-ghost mt-6">{t("nav.changelog")}</Link>
+            <Link to="/changelog" className="btn btn-ghost mt-6">
+              {t("nav.changelog")}
+            </Link>
           </div>
         </div>
       </Section>

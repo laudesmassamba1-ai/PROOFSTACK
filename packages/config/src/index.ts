@@ -1,12 +1,12 @@
-import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
-  proofstackConfigSchema,
-  validateConfig,
   type ConfigValidationIssue,
   type ProofstackConfig,
+  proofstackConfigSchema,
+  validateConfig,
 } from "@proofstack/contracts";
 import { ProofstackError } from "@proofstack/core";
 
@@ -219,7 +219,12 @@ export function starterConfig(projectName: string, baseUrl: string): ProofstackC
       flow: {
         enabled: true,
         paymentMode: "simulated",
-        scenarios: ["checkout_success", "checkout_declined", "webhook_duplicate", "webhook_invalid_signature"],
+        scenarios: [
+          "checkout_success",
+          "checkout_declined",
+          "webhook_duplicate",
+          "webhook_invalid_signature",
+        ],
       },
       exit: {
         enabled: true,

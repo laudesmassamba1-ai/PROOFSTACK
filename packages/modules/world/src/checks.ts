@@ -1,19 +1,19 @@
 import type { LocaleProfileData, ProofstackConfig } from "@proofstack/contracts";
 import {
-  Money,
   currencyMeta,
   detectScripts,
   graphemeLength,
+  Money,
   numberSeparators,
   parseLocalizedDecimal,
   resolveWallClock,
   textDirection,
   unicodeEquals,
 } from "@proofstack/core";
-import type { TestSuiteDef, TestCaseDef } from "@proofstack/engine";
+import type { TestCaseDef, TestSuiteDef } from "@proofstack/engine";
+import { parseWithAnyPattern, toAsciiDigits } from "./dateformat.js";
 import { buildFixtures, type Fixture, type FixtureCategory } from "./fixtures.js";
 import type { ProductFields, ProductUnderTest } from "./harness.js";
-import { parseWithAnyPattern, toAsciiDigits } from "./dateformat.js";
 
 /**
  * WORLD checks.
@@ -45,7 +45,9 @@ export function buildWorldSuites(options: WorldCheckOptions): TestSuiteDef[] {
       ...(options.maxPerCategory === undefined ? {} : { maxPerCategory: options.maxPerCategory }),
     });
     const cases: TestCaseDef[] = fixtures
-      .filter((f) => (options.only && options.only.length > 0 ? matchesOnly(f, options.only) : true))
+      .filter((f) =>
+        options.only && options.only.length > 0 ? matchesOnly(f, options.only) : true
+      )
       .map((fixture) => worldCase(fixture, profile, options));
 
     suites.push({
@@ -60,10 +62,17 @@ export function buildWorldSuites(options: WorldCheckOptions): TestSuiteDef[] {
 }
 
 function matchesOnly(fixture: Fixture, only: readonly string[]): boolean {
-  return only.some((pattern) => fixture.id.includes(pattern) || fixture.profile === pattern || fixture.category === pattern);
+  return only.some(
+    (pattern) =>
+      fixture.id.includes(pattern) || fixture.profile === pattern || fixture.category === pattern
+  );
 }
 
-function worldCase(fixture: Fixture, profile: LocaleProfileData, options: WorldCheckOptions): TestCaseDef {
+function worldCase(
+  fixture: Fixture,
+  profile: LocaleProfileData,
+  options: WorldCheckOptions
+): TestCaseDef {
   const target = options.target;
   return {
     id: fixture.id,
@@ -73,7 +82,10 @@ function worldCase(fixture: Fixture, profile: LocaleProfileData, options: WorldC
     severity: severityFor(fixture),
     suiteId: `world:${profile.id}`,
     profile: profile.id,
-    skip: target === undefined ? 'no product target configured (modules.world.target.kind is "none")' : undefined,
+    skip:
+      target === undefined
+        ? 'no product target configured (modules.world.target.kind is "none")'
+        : undefined,
     execute: async (ctx) => {
       if (!target) return; // unreachable: the case is skipped
 
@@ -94,7 +106,12 @@ function worldCase(fixture: Fixture, profile: LocaleProfileData, options: WorldC
         label: `submit verdict for ${fixture.field}`,
         kind: "payload",
         mediaType: "application/json",
-        text: JSON.stringify({ sent: fixture.value, accepted: verdict.accepted, errors: verdict.errors, stored: verdict.stored }),
+        text: JSON.stringify({
+          sent: fixture.value,
+          accepted: verdict.accepted,
+          errors: verdict.errors,
+          stored: verdict.stored,
+        }),
       });
 
       if (fixture.expectation === "accept") {
@@ -179,17 +196,30 @@ async function collationCase(
   fixture: Fixture,
   profile: LocaleProfileData,
   target: ProductUnderTest,
-  ctx: import("@proofstack/engine").TestContext,
+  ctx: import("@proofstack/engine").TestContext
 ): Promise<void> {
   if (!target.capabilities.sorted || !target.sorted) {
-    ctx.skip("the product exposes no sort endpoint, so collation cannot be observed (capabilities.sorted=false)");
+    ctx.skip(
+      "the product exposes no sort endpoint, so collation cannot be observed (capabilities.sorted=false)"
+    );
     return;
   }
   const [a, b] = fixture.value.split("|");
-  const sorted = await target.sorted({ profile: profile.id, field: fixture.field, values: [b as string, a as string] });
+  const sorted = await target.sorted({
+    profile: profile.id,
+    field: fixture.field,
+    values: [b as string, a as string],
+  });
   const indexA = sorted.indexOf(a as string);
   const indexB = sorted.indexOf(b as string);
-  const observed = indexA === -1 || indexB === -1 ? "missing" : indexA < indexB ? "lt" : indexA > indexB ? "gt" : "eq";
+  const observed =
+    indexA === -1 || indexB === -1
+      ? "missing"
+      : indexA < indexB
+        ? "lt"
+        : indexA > indexB
+          ? "gt"
+          : "eq";
   ctx.check(observed === fixture.expected, {
     description: `${profile.id} collates "${a}" vs "${b}"`,
     expected: fixture.expected,
@@ -204,7 +234,7 @@ async function resolveStored(
   target: ProductUnderTest,
   echoed: ProductFields | undefined,
   recordId: string | undefined,
-  field: string,
+  field: string
 ): Promise<string | undefined> {
   if (echoed && typeof echoed[field] === "string") return echoed[field];
   if (recordId && target.readback) {
@@ -233,11 +263,15 @@ function compareStored(fixture: Fixture, profile: LocaleProfileData, stored: str
             : `direction changed: submitted ${textDirection(fixture.expected ?? "")}, stored ${textDirection(stored)}`,
       };
     case "digits":
-      if (fixture.category === "currency") return compareAmount(stored, fixture.expected as string, profile);
+      if (fixture.category === "currency")
+        return compareAmount(stored, fixture.expected as string, profile);
       if (fixture.category === "datetime") return compareInstant(stored, fixture, profile);
       return compareDigits(stored, fixture.expected as string);
     default:
-      return { equal: false, explanation: `unknown fixture tolerance: ${String(fixture.tolerance)}` };
+      return {
+        equal: false,
+        explanation: `unknown fixture tolerance: ${String(fixture.tolerance)}`,
+      };
   }
 }
 
@@ -255,7 +289,11 @@ function compareDigits(stored: string, expected: string): Comparison {
   };
 }
 
-function compareAmount(stored: string, expectedMinor: string, profile: LocaleProfileData): Comparison {
+function compareAmount(
+  stored: string,
+  expectedMinor: string,
+  profile: LocaleProfileData
+): Comparison {
   const separators = numberSeparators(profile.id);
   const code = profile.currency;
   const candidates = [
@@ -290,7 +328,8 @@ function compareInstant(stored: string, fixture: Fixture, profile: LocaleProfile
   const parsedDirect = Date.parse(stored);
   if (Number.isFinite(parsedDirect)) {
     const iso = new Date(parsedDirect).toISOString();
-    if (accepted.some((value) => Math.abs(Date.parse(value) - Date.parse(iso)) < 1000)) return { equal: true };
+    if (accepted.some((value) => Math.abs(Date.parse(value) - Date.parse(iso)) < 1000))
+      return { equal: true };
     return {
       equal: false,
       rendered: iso,
@@ -306,8 +345,15 @@ function compareInstant(stored: string, fixture: Fixture, profile: LocaleProfile
     };
   }
   const resolution = resolveWallClock(zone, parsed.wall);
-  const instants = resolution.kind === "unique" ? [resolution.instant] : resolution.kind === "ambiguous" ? resolution.instants : [resolution.nearestAfter];
-  const match = instants.some((ms) => accepted.some((value) => Math.abs(ms - Date.parse(value)) < 60_000));
+  const instants =
+    resolution.kind === "unique"
+      ? [resolution.instant]
+      : resolution.kind === "ambiguous"
+        ? resolution.instants
+        : [resolution.nearestAfter];
+  const match = instants.some((ms) =>
+    accepted.some((value) => Math.abs(ms - Date.parse(value)) < 60_000)
+  );
   return {
     equal: match,
     rendered: new Date(instants[0] as number).toISOString(),
@@ -318,7 +364,8 @@ function compareInstant(stored: string, fixture: Fixture, profile: LocaleProfile
 }
 
 function severityFor(fixture: Fixture): "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "INFO" {
-  if (fixture.category === "currency") return fixture.expectation === "reject" ? "HIGH" : "CRITICAL";
+  if (fixture.category === "currency")
+    return fixture.expectation === "reject" ? "HIGH" : "CRITICAL";
   if (fixture.category === "identity") return fixture.expectation === "accept" ? "HIGH" : "MEDIUM";
   if (fixture.category === "phone") return "HIGH";
   if (fixture.category === "datetime") return "HIGH";
@@ -338,7 +385,16 @@ function describe(fixture: Fixture, profile: LocaleProfileData): string {
  */
 export function preview(value: string, max = 48): string {
   const visible = value
-    .replace(/[\u0000-\u001f\u007f]/g, (ch) => `\\u${ch.codePointAt(0)!.toString(16).padStart(4, "0")}`)
-    .replace(/\u202e|\u200e|\u200f/g, (ch) => `< bidi U+${ch.codePointAt(0)!.toString(16).toUpperCase()} >`);
-  return visible.length > max ? `${visible.slice(0, max)}… (${graphemeLength(value)} graphemes)` : visible;
+    .replace(
+      // biome-ignore lint/suspicious/noControlCharactersInRegex: detecting control characters is the check itself
+      /[\u0000-\u001f\u007f]/g,
+      (ch) => `\\u${ch.codePointAt(0)!.toString(16).padStart(4, "0")}`
+    )
+    .replace(
+      /\u202e|\u200e|\u200f/g,
+      (ch) => `< bidi U+${ch.codePointAt(0)!.toString(16).toUpperCase()} >`
+    );
+  return visible.length > max
+    ? `${visible.slice(0, max)}… (${graphemeLength(value)} graphemes)`
+    : visible;
 }

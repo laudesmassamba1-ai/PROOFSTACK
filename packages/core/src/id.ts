@@ -1,6 +1,6 @@
-import { sha256Hex } from "./hash.js";
 import { webcrypto } from "./crypto.js";
 import { ProofstackError } from "./errors.js";
+import { sha256Hex } from "./hash.js";
 
 /**
  * Identifier helpers.
@@ -35,7 +35,10 @@ export function shortId(length = 16): string {
  * randomness). Used for reproducible fixtures and for idempotency keys so a retry
  * of the same intent reuses the same key instead of moving money twice.
  */
-export async function deterministicId(namespace: string, parts: readonly string[]): Promise<string> {
+export async function deterministicId(
+  namespace: string,
+  parts: readonly string[]
+): Promise<string> {
   const digest = await sha256Hex([namespace, ...parts].join("\u0000"));
   return [
     digest.slice(0, 8),

@@ -1,6 +1,6 @@
+import type { PaymentState } from "@proofstack/contracts";
 import type { Money } from "@proofstack/core";
 import { hmacSha256Hex, sha256Hex, timingSafeEqualHex } from "@proofstack/core";
-import type { PaymentState } from "@proofstack/contracts";
 import type {
   CheckoutInput,
   CheckoutResult,
@@ -32,7 +32,7 @@ export class SandboxProvider implements PaymentProvider {
       outcome?: "success" | "declined" | "pending" | "cancelled" | "expired";
       /** Simulated verification latency in ms. */
       latencyMs?: number;
-    } = {},
+    } = {}
   ) {}
 
   getCapabilities(): PaymentCapabilities {
@@ -59,8 +59,19 @@ export class SandboxProvider implements PaymentProvider {
     };
   }
 
-  async createCheckout(input: CheckoutInput & { flow: "hosted" | "push" }): Promise<CheckoutResult> {
-    const scripted = (input.metadata["x-proofstack-outcome"] as "success" | "declined" | "pending" | "cancelled" | "expired" | undefined) ?? this.options.outcome ?? "pending";
+  async createCheckout(
+    input: CheckoutInput & { flow: "hosted" | "push" }
+  ): Promise<CheckoutResult> {
+    const scripted =
+      (input.metadata["x-proofstack-outcome"] as
+        | "success"
+        | "declined"
+        | "pending"
+        | "cancelled"
+        | "expired"
+        | undefined) ??
+      this.options.outcome ??
+      "pending";
     const existing = this.seenIdempotency.get(input.idempotencyKey);
     if (existing) {
       const replay = this.transactions.get(existing);
@@ -77,7 +88,16 @@ export class SandboxProvider implements PaymentProvider {
     }
 
     const id = `sbx_${(await sha256Hex(input.idempotencyKey)).slice(0, 20)}`;
-    const state: PaymentState = scripted === "success" ? "SUCCEEDED" : scripted === "pending" ? "PENDING" : scripted === "declined" ? "FAILED" : scripted === "cancelled" ? "CANCELLED" : "EXPIRED";
+    const state: PaymentState =
+      scripted === "success"
+        ? "SUCCEEDED"
+        : scripted === "pending"
+          ? "PENDING"
+          : scripted === "declined"
+            ? "FAILED"
+            : scripted === "cancelled"
+              ? "CANCELLED"
+              : "EXPIRED";
     const transaction: SandboxTransaction = {
       id,
       flow: input.flow,
@@ -97,23 +117,34 @@ export class SandboxProvider implements PaymentProvider {
       flow: input.flow,
       state,
       checkoutUrl: `http://localhost:5173/sandbox/checkout/${id}`,
-      instructions: "Sandbox checkout: open the URL and choose an outcome to drive the state machine.",
+      instructions:
+        "Sandbox checkout: open the URL and choose an outcome to drive the state machine.",
       providerStatus: transaction.providerStatus,
     };
   }
 
   /** Sandbox control surface: lets a test or the demo page settle a payment. */
-  settle(providerReference: string, outcome: "success" | "declined" | "cancelled" | "expired"): void {
+  settle(
+    providerReference: string,
+    outcome: "success" | "declined" | "cancelled" | "expired"
+  ): void {
     const transaction = this.transactions.get(providerReference);
     if (!transaction) throw new Error(`sandbox: unknown transaction ${providerReference}`);
     transaction.state =
-      outcome === "success" ? "SUCCEEDED" : outcome === "declined" ? "FAILED" : outcome === "cancelled" ? "CANCELLED" : "EXPIRED";
+      outcome === "success"
+        ? "SUCCEEDED"
+        : outcome === "declined"
+          ? "FAILED"
+          : outcome === "cancelled"
+            ? "CANCELLED"
+            : "EXPIRED";
     transaction.providerStatus = outcome.toUpperCase();
     transaction.terminal = true;
   }
 
   async verifyTransaction(providerReference: string): Promise<VerifiedTransaction> {
-    if (this.options.latencyMs) await new Promise((resolve) => setTimeout(resolve, this.options.latencyMs));
+    if (this.options.latencyMs)
+      await new Promise((resolve) => setTimeout(resolve, this.options.latencyMs));
     const transaction = this.transactions.get(providerReference);
     if (!transaction) throw new Error(`sandbox: unknown transaction ${providerReference}`);
     return {
@@ -128,7 +159,10 @@ export class SandboxProvider implements PaymentProvider {
     };
   }
 
-  async verifyWebhook(input: { body: string; headers: Record<string, string> }): Promise<VerifiedWebhook> {
+  async verifyWebhook(input: {
+    body: string;
+    headers: Record<string, string>;
+  }): Promise<VerifiedWebhook> {
     return verifyHmacWebhook(input, SandboxProvider.SECRET, "sandbox");
   }
 
@@ -146,7 +180,11 @@ export class SandboxProvider implements PaymentProvider {
   }
 
   /** Build a correctly signed webhook payload so tests exercise the real verifier. */
-  async signWebhook(event: string, data: Record<string, unknown>, timestampSeconds = Math.floor(Date.now() / 1000)): Promise<{ body: string; headers: Record<string, string> }> {
+  async signWebhook(
+    event: string,
+    data: Record<string, unknown>,
+    timestampSeconds = Math.floor(Date.now() / 1000)
+  ): Promise<{ body: string; headers: Record<string, string> }> {
     const body = JSON.stringify({ event, data });
     const signature = await hmacSha256Hex(SandboxProvider.SECRET, `${timestampSeconds}.${body}`);
     return {
@@ -184,16 +222,18 @@ export async function verifyHmacWebhook(
   input: { body: string; headers: Record<string, string> },
   secret: string,
   provider: "saspay" | "sandbox",
-  nowSeconds = Math.floor(Date.now() / 1000),
+  nowSeconds = Math.floor(Date.now() / 1000)
 ): Promise<VerifiedWebhook> {
   const signature = findHeader(input.headers, "x-webhook-signature");
   const timestamp = findHeader(input.headers, "x-webhook-timestamp");
   const eventHeader = findHeader(input.headers, "x-webhook-event");
 
-  if (!signature || !timestamp) return { valid: false, reason: "missing signature or timestamp header" };
+  if (!signature || !timestamp)
+    return { valid: false, reason: "missing signature or timestamp header" };
   const seconds = Number(timestamp);
   if (!Number.isFinite(seconds)) return { valid: false, reason: "timestamp is not a unix integer" };
-  if (Math.abs(nowSeconds - seconds) > 300) return { valid: false, reason: "timestamp outside the 300 second window" };
+  if (Math.abs(nowSeconds - seconds) > 300)
+    return { valid: false, reason: "timestamp outside the 300 second window" };
 
   const expected = await hmacSha256Hex(secret, `${timestamp}.${input.body}`);
   if (!timingSafeEqualHex(expected.toLowerCase(), signature.toLowerCase())) {
@@ -211,7 +251,9 @@ export async function verifyHmacWebhook(
 
   const data = (parsed.data ?? {}) as Record<string, unknown>;
   const eventId =
-    typeof data.id === "string" ? `${provider}:${type}:${data.id}` : `${provider}:${type}:${await sha256Hex(input.body)}`;
+    typeof data.id === "string"
+      ? `${provider}:${type}:${data.id}`
+      : `${provider}:${type}:${await sha256Hex(input.body)}`;
 
   const event: WebhookEvent = {
     provider,

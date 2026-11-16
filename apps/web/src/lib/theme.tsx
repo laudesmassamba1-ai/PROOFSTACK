@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
 
 /**
  * Theme state. Marketing surfaces are always dark (that is the brand identity);
@@ -46,7 +46,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       setTheme: setThemeState,
       toggle: () => setThemeState((current) => (current === "dark" ? "light" : "dark")),
     }),
-    [theme],
+    [theme]
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

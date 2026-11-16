@@ -5,7 +5,7 @@ import type { ModuleProvider, SuiteInput, TestSuiteDef } from "@proofstack/engin
 import { buildWorldSuites } from "./checks.js";
 import { FIXTURE_CATEGORIES, type FixtureCategory } from "./fixtures.js";
 import type { ProductUnderTest } from "./harness.js";
-import { PROFILES, PROFILE_VERSION } from "./profiles/base.js";
+import { PROFILE_VERSION, PROFILES } from "./profiles/base.js";
 
 export const WORLD_VERSION = "0.1.0";
 
@@ -45,7 +45,7 @@ export function createWorldProvider(options: WorldProviderOptions = {}): ModuleP
 export function resolveProfiles(
   config: ProofstackConfig,
   options: WorldProviderOptions,
-  requested?: string[],
+  requested?: string[]
 ): LocaleProfileData[] {
   const base = options.profiles ?? PROFILES;
   const wanted = requested && requested.length > 0 ? requested : config.modules.world.profiles;

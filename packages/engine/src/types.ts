@@ -74,7 +74,7 @@ export interface TestContext {
       severity?: Severity;
       code?: string;
       detail?: string;
-    },
+    }
   ): void;
   /** Convenience wrapper: fail when two values differ. */
   equal(actual: unknown, expected: unknown, description: string, target?: string): void;
@@ -85,7 +85,12 @@ export interface TestContext {
   /** Stop the case as SKIPPED with a reason surfaced in the report. */
   skip(reason: string): never;
   /** Attach text evidence (log excerpt, payload, diff) to the case. */
-  attachText(input: { label: string; kind?: Evidence["kind"]; text: string; mediaType?: string }): Promise<Evidence>;
+  attachText(input: {
+    label: string;
+    kind?: Evidence["kind"];
+    text: string;
+    mediaType?: string;
+  }): Promise<Evidence>;
   /** Attach binary evidence (screenshot) through the configured store. */
   attachBytes(input: {
     label: string;
@@ -141,6 +146,8 @@ export interface EngineOptions {
   providers: ModuleProvider[];
   /** Restrict which providers participate; defaults to config.enabledModules. */
   only?: ModuleId[];
+  /** Case filter (`--only`): substring match on case id, name, suite, profile or module. */
+  onlyCases?: string[];
   profiles?: string[];
   clock?: Clock;
   logger?: Logger;

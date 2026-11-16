@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from "react";
 import {
   ArrowUpRight,
   Boxes,
@@ -10,6 +9,7 @@ import {
   Timer,
   Unplug,
 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { useI18n } from "../../i18n/index.js";
 import { usePrefersReducedMotion } from "../../lib/theme.js";
@@ -96,28 +96,48 @@ export function ModuleShowcase() {
                 <Boxes size={20} className="tile-ink" />
               </span>
               <div>
-                <h3 className="text-[1.05rem] font-semibold">One shared execution engine</h3>
-                <p className="mt-1.5 text-[0.88rem] leading-relaxed text-[#4a5a72]">
-                  Project, environment, suite, case, run, assertion, finding, evidence, report. The same eleven entities
-                  carry a locale fixture, a checkout journey and an export round trip — which is why one CLI, one SDK and
-                  one dashboard can serve all three modules.
+                <h3 className="text-[1.05rem] font-semibold">{t("mkt.engine.title")}</h3>
+                <p className="tile-body mt-1.5 text-[0.88rem] leading-relaxed">
+                  {t("mkt.engine.body")}
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2 font-mono text-[0.72rem] text-[#1b2f77]">
-                  {["PENDING", "RUNNING", "PASSED", "FAILED", "WARNING", "SKIPPED", "ERROR"].map((status) => (
-                    <span key={status} className="rounded-md bg-[#eef1f8] px-2 py-1">
-                      {status}
-                    </span>
-                  ))}
+                  {["PENDING", "RUNNING", "PASSED", "FAILED", "WARNING", "SKIPPED", "ERROR"].map(
+                    (status) => (
+                      <span key={status} className="rounded-md bg-[#eef1f8] px-2 py-1">
+                        {status}
+                      </span>
+                    )
+                  )}
                 </div>
               </div>
             </div>
           </div>
 
           <div className="grid gap-5 sm:grid-cols-2">
-            <MiniTile icon={<FileBarChart2 size={18} className="tile-ink" />} label="Reports" note="JSON · JUnit · HTML" style={{ transform: depth(1.8) }} />
-            <MiniTile icon={<ShieldCheck size={18} className="tile-ink" />} label="Validation" note="schema + checksums" style={{ transform: depth(2.2) }} />
-            <MiniTile icon={<Plug size={18} className="tile-ink" />} label="Integrations" note="GitHub Actions, CI" style={{ transform: depth(1.4) }} />
-            <MiniTile icon={<Timer size={18} className="tile-ink" />} label="Automation" note="timeouts, retries" style={{ transform: depth(2) }} />
+            <MiniTile
+              icon={<FileBarChart2 size={18} className="tile-ink" />}
+              label={t("mkt.tile.reports")}
+              note={t("mkt.tile.reports.note")}
+              style={{ transform: depth(1.8) }}
+            />
+            <MiniTile
+              icon={<ShieldCheck size={18} className="tile-ink" />}
+              label={t("mkt.tile.validation")}
+              note={t("mkt.tile.validation.note")}
+              style={{ transform: depth(2.2) }}
+            />
+            <MiniTile
+              icon={<Plug size={18} className="tile-ink" />}
+              label={t("mkt.tile.integrations")}
+              note={t("mkt.tile.integrations.note")}
+              style={{ transform: depth(1.4) }}
+            />
+            <MiniTile
+              icon={<Timer size={18} className="tile-ink" />}
+              label={t("mkt.tile.automation")}
+              note={t("mkt.tile.automation.note")}
+              style={{ transform: depth(2) }}
+            />
           </div>
         </div>
       </div>
@@ -144,18 +164,23 @@ function Tile({
   raised?: boolean;
   style?: React.CSSProperties;
 }) {
+  const { t } = useI18n();
   return (
     <div className="tile p-5" style={style}>
       <div className="flex items-center justify-between">
         <span className="tile-chip flex size-11 items-center justify-center">{icon}</span>
-        {raised ? <span className="rounded-full bg-[#eef1f8] px-2.5 py-1 font-mono text-[0.66rem] text-[#1b2f77]">core</span> : null}
+        {raised ? (
+          <span className="rounded-full bg-[#eef1f8] px-2.5 py-1 font-mono text-[0.66rem] text-[#1b2f77]">
+            {t("mkt.engine.core")}
+          </span>
+        ) : null}
       </div>
       <h3 className="mt-4 text-[1.15rem] font-semibold tracking-tight">{title}</h3>
-      <p className="text-[0.78rem] uppercase tracking-[0.14em] text-[#68778a]">{subtitle}</p>
-      <p className="mt-3 text-[0.86rem] leading-relaxed text-[#4a5a72]">{body}</p>
+      <p className="tile-mono text-[0.78rem] uppercase tracking-[0.14em]">{subtitle}</p>
+      <p className="tile-body mt-3 text-[0.86rem] leading-relaxed">{body}</p>
       <Link
         to={to}
-        className="mt-4 inline-flex items-center gap-1.5 text-[0.84rem] font-medium text-[#315FC8] hover:underline"
+        className="tile-link mt-4 inline-flex items-center gap-1.5 text-[0.84rem] font-medium hover:underline"
       >
         {openLabel} <ArrowUpRight size={15} />
       </Link>
@@ -179,7 +204,7 @@ function MiniTile({
       <span className="tile-chip flex size-9 shrink-0 items-center justify-center">{icon}</span>
       <div className="min-w-0">
         <p className="truncate text-[0.86rem] font-semibold">{label}</p>
-        <p className="truncate font-mono text-[0.7rem] text-[#68778a]">{note}</p>
+        <p className="tile-mono truncate font-mono text-[0.7rem]">{note}</p>
       </div>
     </div>
   );

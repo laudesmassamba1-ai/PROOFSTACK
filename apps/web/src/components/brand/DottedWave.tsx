@@ -84,27 +84,27 @@ export function DottedWave({ className, step = 16, intensity = 1, bias = 0.62 }:
         const nx = width === 0 ? 0 : x / width;
         // The band sweeps from a thin thread on the left to a luminous wall on the
         // right, which is what makes the reference read as motion rather than texture.
-        const amplitude = height * (0.06 + 0.26 * Math.pow(nx, 1.5));
+        const amplitude = height * (0.06 + 0.26 * nx ** 1.5);
         const centre =
           height * 0.5 +
           amplitude * Math.sin(nx * 3.4 + phase) -
           height * 0.16 * Math.sin(nx * 1.35 - phase * 0.45);
-        const thickness = height * (0.035 + 0.13 * Math.pow(nx, 2.2));
+        const thickness = height * (0.035 + 0.13 * nx ** 2.2);
 
         for (let r = 0; r <= rows; r++) {
           const y = r * step;
           const distance = Math.abs(y - centre) / thickness;
           if (distance > 1) continue;
           const falloff = 1 - distance;
-          const density = 0.22 + 0.78 * Math.pow(nx, 2);
-          const a = Math.pow(falloff, 2.4) * density * intensity;
+          const density = 0.22 + 0.78 * nx ** 2;
+          const a = falloff ** 2.4 * density * intensity;
           if (a < 0.05) continue;
           dots.push({
             x,
             y: y + 3.5 * Math.sin(nx * 7 + r * 0.42 + phase) * falloff,
-            r: 0.55 + 1.35 * Math.pow(falloff, 1.4) * density,
+            r: 0.55 + 1.35 * falloff ** 1.4 * density,
             a: Math.min(1, a * 1.35),
-            hue: Math.min(1, Math.pow(distance, 1.2) * 0.7 + nx * 0.4),
+            hue: Math.min(1, distance ** 1.2 * 0.7 + nx * 0.4),
             glow: falloff > 0.72 && nx > 0.55 ? 1 : 0,
           });
         }
@@ -114,7 +114,8 @@ export function DottedWave({ className, step = 16, intensity = 1, bias = 0.62 }:
     const paint = (): void => {
       context.clearRect(0, 0, width, height);
       for (const dot of dots) {
-        const colour = dot.hue < 0.5 ? mix(CYAN, MINT, dot.hue * 2) : mix(MINT, PALE, (dot.hue - 0.5) * 2);
+        const colour =
+          dot.hue < 0.5 ? mix(CYAN, MINT, dot.hue * 2) : mix(MINT, PALE, (dot.hue - 0.5) * 2);
         if (dot.glow) {
           context.globalAlpha = dot.a * 0.16;
           context.fillStyle = colour;
@@ -157,7 +158,7 @@ export function DottedWave({ className, step = 16, intensity = 1, bias = 0.62 }:
       (entries) => {
         visible = entries.some((entry) => entry.isIntersecting);
       },
-      { threshold: 0.01 },
+      { threshold: 0.01 }
     );
     observer.observe(canvas);
 
@@ -181,5 +182,5 @@ export function DottedWave({ className, step = 16, intensity = 1, bias = 0.62 }:
     };
   }, [bias, intensity, reduced, step]);
 
-  return <canvas ref={canvasRef} className={className} aria-hidden="true" />;
+  return <canvas ref={canvasRef} className={className} aria-hidden="true" tabIndex={-1} />;
 }

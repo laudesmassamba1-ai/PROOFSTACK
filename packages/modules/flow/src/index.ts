@@ -50,7 +50,7 @@ export function createFlowProvider(options: FlowProviderOptions = {}): ModulePro
  */
 export function defaultFlowTarget(
   config: ProofstackConfig,
-  tokenProvider?: () => string | undefined,
+  tokenProvider?: () => string | undefined
 ): PaymentUnderTest | undefined {
   const target = new HttpPaymentTarget({
     config,

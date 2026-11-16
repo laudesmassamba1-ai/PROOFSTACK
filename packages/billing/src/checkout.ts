@@ -1,4 +1,4 @@
-import { Money, ProofstackError, deterministicId, iso, sha256Hex, uuid } from "@proofstack/core";
+import type { PaymentProvider } from "@proofstack/adapter-payments";
 import type {
   BillingPeriod,
   Invoice,
@@ -6,9 +6,9 @@ import type {
   Plan,
   ProviderKind,
 } from "@proofstack/contracts";
-import type { PaymentProvider } from "@proofstack/adapter-payments";
-import { assertPaymentTransition, assertSubscriptionTransition } from "./machines.js";
+import { deterministicId, iso, Money, ProofstackError, sha256Hex, uuid } from "@proofstack/core";
 import { FREE_PLAN_KEY } from "./entitlements.js";
+import { assertPaymentTransition, assertSubscriptionTransition } from "./machines.js";
 import { findPlan, findPrice } from "./plans.js";
 import type { Customer, PaymentIntent, Subscription } from "./records.js";
 import type { BillingStore } from "./store.js";
@@ -77,7 +77,7 @@ export class CheckoutService {
   constructor(
     private readonly store: BillingStore,
     private readonly provider: PaymentProvider,
-    private readonly clock: () => Date = () => new Date(),
+    private readonly clock: () => Date = () => new Date()
   ) {}
 
   /** Step 1 — nothing downstream runs if the price cannot be proven. */
@@ -174,7 +174,7 @@ export class CheckoutService {
       subscription.id,
       plan.key,
       input.period,
-      now,
+      now
     );
 
     const existing = await this.store.findIntentByIdempotencyKey(idempotencyKey);
@@ -275,7 +275,7 @@ export class CheckoutService {
    */
   async finalize(
     intentId: string,
-    options: { source: "return" | "webhook" | "reconciliation" } = { source: "reconciliation" },
+    options: { source: "return" | "webhook" | "reconciliation" } = { source: "reconciliation" }
   ): Promise<FinalizeResult> {
     const now = this.clock();
     const intent = await this.store.getIntent(intentId);
@@ -316,7 +316,10 @@ export class CheckoutService {
     }
 
     const expected = Money.of(intent.currency, BigInt(intent.amountMinor));
-    if (verified.amount.currency !== expected.currency || verified.amount.minor !== expected.minor) {
+    if (
+      verified.amount.currency !== expected.currency ||
+      verified.amount.minor !== expected.minor
+    ) {
       // Quarantine: the money is real, the intent is not. Never auto-credit a mismatch.
       intent.quarantined = true;
       intent.updatedAt = iso(now);
@@ -372,7 +375,11 @@ export class CheckoutService {
             : "PAST_DUE";
       if (nextState !== subscription.state) {
         assertSubscriptionTransition(subscription.state, nextState);
-        await this.store.saveSubscription({ ...subscription, state: nextState, updatedAt: iso(now) });
+        await this.store.saveSubscription({
+          ...subscription,
+          state: nextState,
+          updatedAt: iso(now),
+        });
       }
       await this.store.appendAudit({
         id: uuid(),
@@ -463,7 +470,7 @@ export class CheckoutService {
     intent: PaymentIntent,
     plan: Plan,
     subscription: Subscription,
-    now: Date,
+    now: Date
   ): Promise<Invoice> {
     const existing = await this.store.findInvoiceByIntent(intent.id);
     if (existing) return existing;
@@ -511,7 +518,7 @@ export class CheckoutService {
     subscriptionId: string,
     planKey: string,
     period: BillingPeriod,
-    now: Date,
+    now: Date
   ): Promise<string> {
     const seed = `${workspaceId}|${subscriptionId}|${planKey}|${period}|${periodKey(now)}`;
     const digest = await sha256Hex(seed);
@@ -523,7 +530,7 @@ export class CheckoutService {
     input: StartCheckoutInput,
     customer: Customer,
     plan: Plan,
-    now: Date,
+    now: Date
   ): Promise<Subscription> {
     if (input.existingSubscriptionId) {
       const existing = await this.store.getSubscription(input.existingSubscriptionId);
@@ -635,7 +642,11 @@ export class CheckoutService {
       workspaceId: input.workspaceId,
       actor: "billing",
       action: "trial.started",
-      detail: { planKey: plan.key, trialDays: plan.trialDays, trialEndsAt: subscription.trialEndsAt },
+      detail: {
+        planKey: plan.key,
+        trialDays: plan.trialDays,
+        trialEndsAt: subscription.trialEndsAt,
+      },
       at: iso(now),
     });
     return subscription;

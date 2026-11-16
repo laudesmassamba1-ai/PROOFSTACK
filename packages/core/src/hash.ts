@@ -55,7 +55,7 @@ export async function hmacSha256(secret: string, message: string): Promise<Uint8
     enc.encode(secret),
     { name: "HMAC", hash: "SHA-256" },
     false,
-    ["sign"],
+    ["sign"]
   );
   const sig = await webcrypto().subtle.sign({ name: "HMAC" }, key, enc.encode(message));
   return new Uint8Array(sig);

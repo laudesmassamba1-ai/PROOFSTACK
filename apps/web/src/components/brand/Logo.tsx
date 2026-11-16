@@ -38,7 +38,11 @@ export function Mark({ size = 34, variant = "default", className, title }: MarkP
       {/* three faces, one solid */}
       <path d="M20 4.5 34.2 12.4 20 20.3 5.8 12.4Z" fill={colors.top} />
       <path d="M5.8 12.4 20 20.3v15.2L5.8 27.6Z" fill={colors.left} />
-      <path d="M34.2 12.4 20 20.3v15.2l14.2-7.9Z" fill={colors.right} opacity={variant === "mono" ? 0.75 : 0.92} />
+      <path
+        d="M34.2 12.4 20 20.3v15.2l14.2-7.9Z"
+        fill={colors.right}
+        opacity={variant === "mono" ? 0.75 : 0.92}
+      />
       {/* verification notch across the top face */}
       <path
         d="M12.6 12.9 17.4 16.2 27.1 10.4"
@@ -59,7 +63,12 @@ interface WordmarkProps {
   variant?: LogoVariant;
 }
 
-export function Wordmark({ className, size = 18, showMark = true, variant = "default" }: WordmarkProps) {
+export function Wordmark({
+  className,
+  size = 18,
+  showMark = true,
+  variant = "default",
+}: WordmarkProps) {
   return (
     <span className={`inline-flex items-center gap-3 ${className ?? ""}`}>
       {showMark ? <Mark size={Math.round(size * 1.55)} variant={variant} /> : null}
@@ -81,13 +90,12 @@ export function Wordmark({ className, size = 18, showMark = true, variant = "def
 export function HeroLockup({ size = 64 }: { size?: number }) {
   const letters = "PROOFSTACK".split("");
   return (
-    <span className="inline-flex items-end gap-4">
-      <Mark size={Math.round(size * 0.9)} className="rise" />
+    <span className="inline-flex max-w-full items-end gap-3 sm:gap-4">
+      <Mark size={Math.round(size * 0.9)} className="rise hero-mark" />
       <span
-        aria-label="PROOFSTACK"
-        role="heading"
-        style={{ fontSize: size, lineHeight: 1 }}
-        className="wordmark inline-flex"
+        aria-hidden="true"
+        style={{ "--hero-size": `${size}px` } as React.CSSProperties}
+        className="wordmark hero-wordmark inline-flex"
       >
         {letters.map((letter, index) => (
           <span

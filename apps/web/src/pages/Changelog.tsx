@@ -1,5 +1,5 @@
-import { Section, SectionHeading } from "../layouts/BrandLayout.js";
 import { useI18n } from "../i18n/index.js";
+import { Section, SectionHeading } from "../layouts/BrandLayout.js";
 
 const RELEASES = [
   {
@@ -16,9 +16,10 @@ const RELEASES = [
       "Brand identity, design tokens, dotted-wave hero, modular product visuals, English and French interfaces",
     ],
     known: [
-      "No CLI, API, dashboard or database yet: the marketing site is the first deliverable of the build",
-      "FLOW and EXIT are specified in the contracts but their engines are not implemented yet",
-      "SasPay adapter is designed from the fetched OpenAPI spec; no credentials exist in this environment, so no live payment code path has been executed",
+      "No deployment has been performed: the API is verified on Node 22 SQLite, not on a provisioned D1 database",
+      "WORLD and FLOW drive HTTP targets; Playwright browser journeys are not implemented yet",
+      "SasPay live payments are untested without credentials; the sandbox provider exercises the lifecycle",
+      "The authenticated dashboard is English-only; no email provider is configured, so verification and invitations are absent",
     ],
   },
 ];
@@ -27,12 +28,18 @@ export function Changelog() {
   const { t } = useI18n();
   return (
     <Section>
-      <SectionHeading eyebrow={t("nav.changelog")} title={t("changelog.title")} lede="Only releases that exist. Nothing here is a plan." />
+      <SectionHeading
+        eyebrow={t("nav.changelog")}
+        title={t("changelog.title")}
+        lede="Only releases that exist. Nothing here is a plan."
+      />
       <div className="mt-10 space-y-8">
         {RELEASES.map((release) => (
           <article key={release.tag} className="brand-panel p-6">
             <header className="flex flex-wrap items-baseline gap-3">
-              <h3 className="font-mono text-[1.05rem] font-semibold text-brand-mint">{release.tag}</h3>
+              <h3 className="font-mono text-[1.05rem] font-semibold text-brand-mint">
+                {release.tag}
+              </h3>
               <span className="text-[0.82rem] text-white/42">{release.date}</span>
               <span className="text-[0.9rem] text-white/70">{release.title}</span>
             </header>
@@ -48,13 +55,17 @@ export function Changelog() {
 function Block({ title, items, tone }: { title: string; items: string[]; tone: "mint" | "amber" }) {
   return (
     <div className="mt-5">
-      <h4 className={`text-[0.74rem] uppercase tracking-[0.16em] ${tone === "mint" ? "text-brand-mint" : "text-[#e9b45a]"}`}>
+      <h4
+        className={`text-[0.74rem] uppercase tracking-[0.16em] ${tone === "mint" ? "text-brand-mint" : "text-[#e9b45a]"}`}
+      >
         {title}
       </h4>
       <ul className="mt-3 space-y-2">
         {items.map((item) => (
           <li key={item} className="flex gap-3 text-[0.86rem] leading-relaxed text-white/58">
-            <span className={`mt-2 size-1.5 shrink-0 rounded-full ${tone === "mint" ? "bg-brand-emerald" : "bg-[#e9b45a]"}`} />
+            <span
+              className={`mt-2 size-1.5 shrink-0 rounded-full ${tone === "mint" ? "bg-brand-emerald" : "bg-[#e9b45a]"}`}
+            />
             <span>{item}</span>
           </li>
         ))}

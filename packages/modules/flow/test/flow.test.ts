@@ -1,18 +1,18 @@
-import { describe, expect, it } from "vitest";
-import { FixedClock, Logger } from "@proofstack/core";
 import { proofstackConfigSchema } from "@proofstack/contracts";
+import { FixedClock, Logger } from "@proofstack/core";
 import { runEngine } from "@proofstack/engine";
+import { describe, expect, it } from "vitest";
 import {
-  SCENARIO_EXPECTATIONS,
   buildSignedWebhook,
-  createFlowProvider,
-  looksPaid,
-  statusesAgree,
-  verifySignedWebhook,
   type CheckoutRequest,
   type CheckoutResponse,
+  createFlowProvider,
+  looksPaid,
   type OrderState,
   type PaymentUnderTest,
+  SCENARIO_EXPECTATIONS,
+  statusesAgree,
+  verifySignedWebhook,
   type WebhookDelivery,
 } from "../src/index.js";
 
@@ -70,17 +70,24 @@ function fakeProduct(options: FakeProductOptions = {}): PaymentUnderTest {
     async checkout(input: CheckoutRequest): Promise<CheckoutResponse> {
       const existing = orders.get(input.orderReference);
       if (existing && !options.duplicateOnRetry) {
-        return { accepted: true, orderId: existing.id, paymentId: payments.get(input.orderReference), state: existing.status };
+        return {
+          accepted: true,
+          orderId: existing.id,
+          paymentId: payments.get(input.orderReference),
+          state: existing.status,
+        };
       }
       orderSeq += 1;
       const id = `ord_${orderSeq}`;
       // A sandbox gateway settles a success scenario immediately; the webhook
       // scenarios below start from an unpaid order and are settled by the webhook.
-      const status = "pending";
+      const _status = "pending";
       // A sandbox settles a success scenario immediately. The "broken" flags make the
       // fixture misbehave in the specific way each defect test needs.
       const settled =
-        input.scenario === "checkout_success" && !options.inconsistentStatus && !options.neverConfirm
+        input.scenario === "checkout_success" &&
+        !options.inconsistentStatus &&
+        !options.neverConfirm
           ? "paid"
           : "pending";
       // The reported state is what the API tells the client, which may lie about the
@@ -108,13 +115,23 @@ function fakeProduct(options: FakeProductOptions = {}): PaymentUnderTest {
       };
     },
 
-    async deliverWebhook(input: { body: string; headers: Record<string, string> }): Promise<WebhookDelivery> {
-      const verified = await verifySignedWebhook({ secret: SECRET, body: input.body, headers: input.headers });
+    async deliverWebhook(input: {
+      body: string;
+      headers: Record<string, string>;
+    }): Promise<WebhookDelivery> {
+      const verified = await verifySignedWebhook({
+        secret: SECRET,
+        body: input.body,
+        headers: input.headers,
+      });
       if (!verified.valid && !options.acceptForgedWebhook) {
         return { status: 401, body: "invalid signature" };
       }
 
-      const parsed = JSON.parse(input.body) as { event: string; data: { id: string; status: string; reference: string } };
+      const parsed = JSON.parse(input.body) as {
+        event: string;
+        data: { id: string; status: string; reference: string };
+      };
       const reference = parsed.data.reference;
 
       if (seenWebhooks.has(input.body)) {
@@ -186,7 +203,11 @@ describe("FLOW harness primitives", () => {
       event: "payment.success",
       data: { id: "txn_1", status: "SUCCESS" },
     });
-    const verdict = await verifySignedWebhook({ secret: SECRET, body: signed.body, headers: signed.headers });
+    const verdict = await verifySignedWebhook({
+      secret: SECRET,
+      body: signed.body,
+      headers: signed.headers,
+    });
     expect(verdict.valid).toBe(true);
   });
 
@@ -196,7 +217,11 @@ describe("FLOW harness primitives", () => {
       event: "payment.success",
       data: { id: "txn_1" },
     });
-    const verdict = await verifySignedWebhook({ secret: SECRET, body: signed.body, headers: signed.headers });
+    const verdict = await verifySignedWebhook({
+      secret: SECRET,
+      body: signed.body,
+      headers: signed.headers,
+    });
     expect(verdict.valid).toBe(false);
     expect(verdict.reason).toBe("signature mismatch");
   });
@@ -204,7 +229,11 @@ describe("FLOW harness primitives", () => {
   it("rejects a re-serialised body, which is why the raw body is used", async () => {
     const signed = await buildSignedWebhook({ secret: SECRET, event: "x", data: { id: "1" } });
     const reserialised = JSON.stringify(JSON.parse(signed.body), null, 2);
-    const verdict = await verifySignedWebhook({ secret: SECRET, body: reserialised, headers: signed.headers });
+    const verdict = await verifySignedWebhook({
+      secret: SECRET,
+      body: reserialised,
+      headers: signed.headers,
+    });
     expect(verdict.valid).toBe(false);
   });
 
@@ -277,7 +306,9 @@ describe("FLOW catches real defects", () => {
   });
 
   it("fails when a forged webhook is accepted", async () => {
-    const run = await runFlow(fakeProduct({ acceptForgedWebhook: true }), ["webhook_invalid_signature"]);
+    const run = await runFlow(fakeProduct({ acceptForgedWebhook: true }), [
+      "webhook_invalid_signature",
+    ]);
     const testCase = caseFor(run, "flow/webhook_invalid_signature");
     expect(testCase.status).toBe("FAILED");
     expect(testCase.failure?.code).toBe("forged_webhook_accepted");

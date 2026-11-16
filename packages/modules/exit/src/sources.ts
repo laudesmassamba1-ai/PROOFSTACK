@@ -1,15 +1,15 @@
-import { readFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import { ProofstackError } from "@proofstack/core";
 import {
   digestArtifact,
-  parseCsv,
-  parseJsonRecords,
-  readZipEntries,
   type ExportArtifact,
   type ExportFormat,
   type ExportSource,
+  parseCsv,
+  parseJsonRecords,
+  readZipEntries,
 } from "./data.js";
 
 const exec = promisify(execFile);
@@ -83,7 +83,8 @@ export class HttpExportSource implements ExportSource {
         });
       }
       const buffer = new Uint8Array(await response.arrayBuffer());
-      const fileName = fileNameFrom(response.headers.get("content-disposition")) ?? `export.${format}`;
+      const fileName =
+        fileNameFrom(response.headers.get("content-disposition")) ?? `export.${format}`;
       return await toArtifact(buffer, format, fileName);
     } finally {
       clearTimeout(timeout);
@@ -188,7 +189,10 @@ export class CommandExportSource implements ExportSource {
 
     if (this.options.manifestPath) {
       try {
-        artifact.manifest = JSON.parse(await readFile(this.options.manifestPath, "utf8")) as Record<string, unknown>;
+        artifact.manifest = JSON.parse(await readFile(this.options.manifestPath, "utf8")) as Record<
+          string,
+          unknown
+        >;
       } catch {
         // Optional: the manifest case reports the absence.
       }
@@ -208,7 +212,7 @@ export class CommandExportSource implements ExportSource {
 export async function toArtifact(
   bytes: Uint8Array,
   format: ExportFormat,
-  fileName: string,
+  fileName: string
 ): Promise<ExportArtifact> {
   const sha256 = await digestArtifact(bytes);
   const artifact: ExportArtifact = { format, fileName, bytes, sha256 };

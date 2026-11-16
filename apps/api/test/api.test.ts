@@ -632,6 +632,26 @@ describe("run ingestion", () => {
       code: "corrupted_transformation",
     });
 
+    const workspaceRuns = await json<{ items: { id: string; projectName: string }[] }>(
+      await h.request(`/api/v1/runs?workspaceId=${paid.workspaceId}`, { cookie: paid.cookie })
+    );
+    expect(workspaceRuns.items[0]).toMatchObject({ id: "run_abc", projectName: "Shop" });
+
+    const moduleFindings = await json<{ items: { module: string }[] }>(
+      await h.request(`/api/v1/findings?workspaceId=${paid.workspaceId}&module=world`, {
+        cookie: paid.cookie,
+      })
+    );
+    expect(moduleFindings.items).toHaveLength(1);
+    expect(moduleFindings.items[0]?.module).toBe("world");
+
+    const otherModule = await json<{ items: unknown[] }>(
+      await h.request(`/api/v1/findings?workspaceId=${paid.workspaceId}&module=exit`, {
+        cookie: paid.cookie,
+      })
+    );
+    expect(otherModule.items).toHaveLength(0);
+
     const html = await h.request(
       `/api/v1/reports/${accepted.reportId}?workspaceId=${paid.workspaceId}&format=html`,
       { cookie: paid.cookie }

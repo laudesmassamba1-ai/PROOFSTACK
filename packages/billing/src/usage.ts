@@ -1,11 +1,11 @@
-import { deterministicId, iso, type Clock, systemClock } from "@proofstack/core";
 import type { EntitlementKey, UsageEvent, UsageEventKind } from "@proofstack/contracts";
+import { type Clock, deterministicId, iso, systemClock } from "@proofstack/core";
 import {
   checkEntitlement,
-  resolveEntitlements,
   type EffectiveEntitlements,
   type EntitlementCheck,
   type EntitlementDecision,
+  resolveEntitlements,
 } from "./entitlements.js";
 import type { BillingStore } from "./store.js";
 
@@ -65,19 +65,19 @@ export interface MeterResult {
 export class UsageMeter {
   constructor(
     private readonly store: BillingStore,
-    private readonly clock: Clock = systemClock,
+    private readonly clock: Clock = systemClock
   ) {}
 
   /** Read-only view of what a workspace has used this period. */
   async snapshot(
     workspaceId: string,
-    at: Date = new Date(this.clock.now()),
+    at: Date = new Date(this.clock.now())
   ): Promise<{ entitlements: EffectiveEntitlements; usage: Record<string, number> }> {
     const entitlements = await resolveEntitlements(this.store, workspaceId, at);
     const usage = await this.store.usageByKind(
       workspaceId,
       entitlements.periodStart,
-      entitlements.periodEnd,
+      entitlements.periodEnd
     );
     return { entitlements, usage };
   }
@@ -104,7 +104,7 @@ export class UsageMeter {
     const usage = await this.store.usageByKind(
       input.workspaceId,
       entitlements.periodStart,
-      entitlements.periodEnd,
+      entitlements.periodEnd
     );
 
     const kind = input.kind ?? usageKindFor(input.check.key);
@@ -139,7 +139,7 @@ export class UsageMeter {
     const usage = await this.store.usageByKind(
       input.workspaceId,
       entitlements.periodStart,
-      entitlements.periodEnd,
+      entitlements.periodEnd
     );
     const limitKey = USAGE_LIMIT_KEYS[input.kind];
     const used = usage[input.kind] ?? 0;
@@ -157,9 +157,7 @@ export class UsageMeter {
     }
 
     const event: UsageEvent = {
-      id: await deterministicId("usage", [
-        `${input.workspaceId}:${input.kind}:${input.subjectId}`,
-      ]),
+      id: await deterministicId("usage", [`${input.workspaceId}:${input.kind}:${input.subjectId}`]),
       workspaceId: input.workspaceId,
       ...(input.projectId ? { projectId: input.projectId } : {}),
       kind: input.kind,

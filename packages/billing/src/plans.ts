@@ -1,4 +1,4 @@
-import { planSchema, type EntitlementKey, type Plan, type PlanSeed } from "@proofstack/contracts";
+import { type EntitlementKey, type Plan, type PlanSeed, planSchema } from "@proofstack/contracts";
 
 /**
  * Plan definitions.
@@ -213,7 +213,11 @@ export interface PlanPrice {
   minor: bigint;
 }
 
-export function findPrice(planKey: string, currency: string, period: "monthly" | "yearly"): PlanPrice | undefined {
+export function findPrice(
+  planKey: string,
+  currency: string,
+  period: "monthly" | "yearly"
+): PlanPrice | undefined {
   const plan = findPlan(planKey);
   if (!plan) return undefined;
   const price = plan.prices.find((p) => p.period === period && p.amount.currency === currency);
@@ -224,7 +228,12 @@ export function findPrice(planKey: string, currency: string, period: "monthly" |
 export function pricesFor(planKey: string): PlanPrice[] {
   const plan = findPlan(planKey);
   if (!plan) return [];
-  return plan.prices.map((p) => ({ id: p.id, period: p.period, currency: p.amount.currency, minor: BigInt(p.amount.minor) }));
+  return plan.prices.map((p) => ({
+    id: p.id,
+    period: p.period,
+    currency: p.amount.currency,
+    minor: BigInt(p.amount.minor),
+  }));
 }
 
 /** Currencies a given plan can actually be charged in. */

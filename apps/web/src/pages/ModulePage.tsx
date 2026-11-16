@@ -1,7 +1,7 @@
+import { CircleAlert, CircleCheck, Terminal } from "lucide-react";
 import { Link } from "react-router";
-import { CircleCheck, CircleAlert, Terminal } from "lucide-react";
-import { Section, SectionHeading } from "../layouts/BrandLayout.js";
 import { useI18n } from "../i18n/index.js";
+import { Section, SectionHeading } from "../layouts/BrandLayout.js";
 
 export type ModuleName = "world" | "flow" | "exit";
 
@@ -22,15 +22,38 @@ const CONTENT: Record<ModuleName, ModuleContent> = {
     name: "world",
     tag: "Global compatibility",
     headline: "Reach every user, not every ASCII table",
-    lede:
-      "WORLD generates international synthetic fixtures, submits them to your product, and compares what came back. It separates two failures people usually merge: refusing a valid value, and accepting an invalid one.",
+    lede: "WORLD generates international synthetic fixtures, submits them to your product, and compares what came back. It separates two failures people usually merge: refusing a valid value, and accepting an invalid one.",
     checks: [
-      { label: "Identity data", detail: "Accented names, multiple surnames, 200-character names, non-Latin scripts, combining sequences, RTL display names, bidi-control and homoglyph spoofing." },
-      { label: "Phone numbers", detail: "Per-country validity from libphonenumber metadata, E.164 normalisation, national leading zeros, and the Benin 8→10 digit plan change." },
-      { label: "Addresses", detail: "Country-specific line counts, alphanumeric postcodes, and the countries that have no postcode system at all — where requiring one is a defect." },
-      { label: "Currency", detail: "ISO 4217 exponents (XOF has no subunit, JOD has three decimals), locale separators including U+202F and Arabic-Indic digits, precision loss, and values beyond Number.MAX_SAFE_INTEGER." },
-      { label: "Dates and time", detail: "Declared input formats, calendar-impossible dates (30 February), leap years, spring-forward gaps, fall-back ambiguity, and zone-correct instants." },
-      { label: "Sorting", detail: "Collation expectations per locale, asserted against the product's own ordered output when it exposes one." },
+      {
+        label: "Identity data",
+        detail:
+          "Accented names, multiple surnames, 200-character names, non-Latin scripts, combining sequences, RTL display names, bidi-control and homoglyph spoofing.",
+      },
+      {
+        label: "Phone numbers",
+        detail:
+          "Per-country validity from libphonenumber metadata, E.164 normalisation, national leading zeros, and the Benin 8→10 digit plan change.",
+      },
+      {
+        label: "Addresses",
+        detail:
+          "Country-specific line counts, alphanumeric postcodes, and the countries that have no postcode system at all — where requiring one is a defect.",
+      },
+      {
+        label: "Currency",
+        detail:
+          "ISO 4217 exponents (XOF has no subunit, JOD has three decimals), locale separators including U+202F and Arabic-Indic digits, precision loss, and values beyond Number.MAX_SAFE_INTEGER.",
+      },
+      {
+        label: "Dates and time",
+        detail:
+          "Declared input formats, calendar-impossible dates (30 February), leap years, spring-forward gaps, fall-back ambiguity, and zone-correct instants.",
+      },
+      {
+        label: "Sorting",
+        detail:
+          "Collation expectations per locale, asserted against the product's own ordered output when it exposes one.",
+      },
     ],
     implemented: [
       "8 versioned locale profiles: en-US, en-GB, fr-FR, fr-BJ, fr-CG, ar-EG, ja-JP, pt-BR",
@@ -53,13 +76,28 @@ const CONTENT: Record<ModuleName, ModuleContent> = {
     name: "flow",
     tag: "Transaction reliability",
     headline: "Prove the money path, including its worst days",
-    lede:
-      "FLOW drives a journey — cart, checkout, payment selection, confirmation — and then attacks it: declined, cancelled, timed-out, duplicated, delayed, out-of-order and forged webhooks. It reports the state the transaction actually reached, never the state the browser was redirected to.",
+    lede: "FLOW drives a journey — cart, checkout, payment selection, confirmation — and then attacks it: declined, cancelled, timed-out, duplicated, delayed, out-of-order and forged webhooks. It reports the state the transaction actually reached, never the state the browser was redirected to.",
     checks: [
-      { label: "Journeys", detail: "Navigation, form submission, product selection, cart, checkout, payment selection, confirmation, cancellation, refund workflow." },
-      { label: "Payment scenarios", detail: "Sandbox success and decline, cancellation, timeout, missing confirmation, duplicate order, refund, inconsistent state." },
-      { label: "Webhook hardening", detail: "Signature verification, timestamp age, duplicate delivery, idempotency, ordering, invalid payload, retry behaviour." },
-      { label: "State truth", detail: "The provider's verified transaction status is authoritative. A redirect, a delay or a query parameter can never activate anything." },
+      {
+        label: "Journeys",
+        detail:
+          "Navigation, form submission, product selection, cart, checkout, payment selection, confirmation, cancellation, refund workflow.",
+      },
+      {
+        label: "Payment scenarios",
+        detail:
+          "Sandbox success and decline, cancellation, timeout, missing confirmation, duplicate order, refund, inconsistent state.",
+      },
+      {
+        label: "Webhook hardening",
+        detail:
+          "Signature verification, timestamp age, duplicate delivery, idempotency, ordering, invalid payload, retry behaviour.",
+      },
+      {
+        label: "State truth",
+        detail:
+          "The provider's verified transaction status is authoritative. A redirect, a delay or a query parameter can never activate anything.",
+      },
     ],
     implemented: [
       "Provider-independent PaymentProvider contract",
@@ -79,13 +117,27 @@ flow/checkout/declined  FAILED   subscription activated on PENDING`,
     name: "exit",
     tag: "Data portability",
     headline: "An export is a promise until it round-trips",
-    lede:
-      "EXIT reads an export as a customer would: CSV, JSON, or a ZIP with a manifest. It validates schema, relationships, encodings, precision and file integrity, then imports the data back and diffs the result against the synthetic original.",
+    lede: "EXIT reads an export as a customer would: CSV, JSON, or a ZIP with a manifest. It validates schema, relationships, encodings, precision and file integrity, then imports the data back and diffs the result against the synthetic original.",
     checks: [
-      { label: "Schema", detail: "Missing fields, invalid types, null handling, encoding, numeric precision, date transformations, ids, unique constraints." },
-      { label: "Relationships", detail: "Parent-child integrity, missing references, duplicates, orphans, referential consistency." },
-      { label: "File integrity", detail: "Presence, count, size, SHA-256 checksums, manifest references." },
-      { label: "Round trip", detail: "Original → export → re-import, with field-level diffs for missing records, changed values, altered dates, broken references and missing attachments." },
+      {
+        label: "Schema",
+        detail:
+          "Missing fields, invalid types, null handling, encoding, numeric precision, date transformations, ids, unique constraints.",
+      },
+      {
+        label: "Relationships",
+        detail:
+          "Parent-child integrity, missing references, duplicates, orphans, referential consistency.",
+      },
+      {
+        label: "File integrity",
+        detail: "Presence, count, size, SHA-256 checksums, manifest references.",
+      },
+      {
+        label: "Round trip",
+        detail:
+          "Original → export → re-import, with field-level diffs for missing records, changed values, altered dates, broken references and missing attachments.",
+      },
     ],
     implemented: [
       "RFC 4180 CSV reader/writer with formula-injection guard",
@@ -111,9 +163,15 @@ export function ModulePage({ name }: { name: ModuleName }) {
   return (
     <>
       <Section>
-        <p className="eyebrow">{label} · {content.tag}</p>
-        <h1 className="mt-3 text-[2.2rem] leading-[1.1] tracking-tight sm:text-[3rem]">{content.headline}</h1>
-        <p className="mt-5 max-w-[68ch] text-[1rem] leading-relaxed text-white/58">{content.lede}</p>
+        <p className="eyebrow">
+          {label} · {content.tag}
+        </p>
+        <h1 className="mt-3 text-[2.2rem] leading-[1.1] tracking-tight sm:text-[3rem]">
+          {content.headline}
+        </h1>
+        <p className="mt-5 max-w-[68ch] text-[1rem] leading-relaxed text-white/58">
+          {content.lede}
+        </p>
         <p className="mt-6 max-w-[60ch] text-[0.95rem] italic text-white/44">
           {t(`question.${name}` as const)}
         </p>
@@ -147,7 +205,9 @@ export function ModulePage({ name }: { name: ModuleName }) {
           </figure>
 
           <div>
-            <h2 className="text-[1.3rem] font-semibold tracking-tight">Build status of this module</h2>
+            <h2 className="text-[1.3rem] font-semibold tracking-tight">
+              Build status of this module
+            </h2>
             <ul className="mt-5 space-y-3">
               {content.implemented.map((item) => (
                 <li key={item} className="flex gap-3 text-[0.88rem] text-white/70">
@@ -170,7 +230,9 @@ export function ModulePage({ name }: { name: ModuleName }) {
                     {other.toUpperCase()}
                   </Link>
                 ))}
-              <Link to="/pricing" className="btn btn-primary">{t("nav.pricing")}</Link>
+              <Link to="/pricing" className="btn btn-primary">
+                {t("nav.pricing")}
+              </Link>
             </div>
           </div>
         </div>

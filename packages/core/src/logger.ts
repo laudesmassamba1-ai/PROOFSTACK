@@ -58,7 +58,10 @@ function scrub(node: unknown, depth = 0, seen = new WeakSet<object>()): unknown 
   if (typeof node === "bigint") return `${node}n`;
   if (typeof node === "number") return Number.isFinite(node) ? node : String(node);
   if (typeof node === "boolean") return node;
-  if (typeof node === "string") return maskValue(node.length > MAX_STRING ? `${node.slice(0, MAX_STRING)}…[truncated ${node.length}]` : node);
+  if (typeof node === "string")
+    return maskValue(
+      node.length > MAX_STRING ? `${node.slice(0, MAX_STRING)}…[truncated ${node.length}]` : node
+    );
   if (node instanceof Error) {
     return { name: node.name, message: maskValue(node.message), stack: undefined };
   }
@@ -97,7 +100,11 @@ export class Logger {
   }
 
   child(fields: Record<string, unknown>): Logger {
-    const next = new Logger({ level: LOG_LEVELS.find((l) => LEVEL_ORDER[l] === this.level), sinks: this.sinks, now: this.now });
+    const next = new Logger({
+      level: LOG_LEVELS.find((l) => LEVEL_ORDER[l] === this.level),
+      sinks: this.sinks,
+      now: this.now,
+    });
     next.base = { ...this.base, ...fields };
     return next;
   }

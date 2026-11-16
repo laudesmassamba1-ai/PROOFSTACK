@@ -1,6 +1,6 @@
-import { ProofstackError, iso, sha256Hex, uuid } from "@proofstack/core";
-import type { WebhookEventRecord } from "@proofstack/contracts";
 import type { PaymentProvider, WebhookEvent } from "@proofstack/adapter-payments";
+import type { WebhookEventRecord } from "@proofstack/contracts";
+import { iso, ProofstackError, sha256Hex, uuid } from "@proofstack/core";
 import type { CheckoutService } from "./checkout.js";
 import type { BillingStore } from "./store.js";
 
@@ -35,7 +35,7 @@ export class WebhookProcessor {
     private readonly store: BillingStore,
     private readonly provider: PaymentProvider,
     private readonly checkout: CheckoutService,
-    private readonly clock: () => Date = () => new Date(),
+    private readonly clock: () => Date = () => new Date()
   ) {}
 
   async handle(input: { body: string; headers: Record<string, string> }): Promise<WebhookOutcome> {
@@ -82,7 +82,10 @@ export class WebhookProcessor {
         processedAt: iso(now),
         error: "no transaction reference in payload",
       });
-      return { status: 200, body: { ok: true, eventId: event.eventId, result: "ignored_no_reference" } };
+      return {
+        status: 200,
+        body: { ok: true, eventId: event.eventId, result: "ignored_no_reference" },
+      };
     }
 
     const intent = await this.store.findIntentByProviderReference(reference);
@@ -124,7 +127,12 @@ export class WebhookProcessor {
         });
         return {
           status: 200,
-          body: { ok: true, eventId: event.eventId, intentId: intent.id, result: "unmapped_status" },
+          body: {
+            ok: true,
+            eventId: event.eventId,
+            intentId: intent.id,
+            result: "unmapped_status",
+          },
         };
       }
       // Anything else is retryable: keep the event so a replay can finish the work.

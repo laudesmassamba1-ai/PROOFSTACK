@@ -3,11 +3,11 @@ import type { TestCaseDef, TestSuiteDef } from "@proofstack/engine";
 import {
   checkFieldType,
   compareRecords,
-  findDuplicates,
-  findOrphans,
   type ExportArtifact,
   type ExportFormat,
   type ExportSource,
+  findDuplicates,
+  findOrphans,
   type RoundTripTarget,
 } from "./data.js";
 
@@ -39,7 +39,10 @@ export function buildExitSuites(options: ExitCheckOptions): TestSuiteDef[] {
   const exitConfig = options.config.modules.exit;
   const source = options.source;
 
-  const skip = source === undefined ? 'no export source configured (modules.exit.exportSource is unset)' : undefined;
+  const skip =
+    source === undefined
+      ? "no export source configured (modules.exit.exportSource is unset)"
+      : undefined;
 
   const cases: TestCaseDef[] = [];
 
@@ -59,7 +62,11 @@ export function buildExitSuites(options: ExitCheckOptions): TestSuiteDef[] {
         await ctx.attachText({
           label: `${format} export digest`,
           kind: "checksum",
-          text: JSON.stringify({ fileName: first.fileName, bytes: first.bytes.length, sha256: first.sha256 }),
+          text: JSON.stringify({
+            fileName: first.fileName,
+            bytes: first.bytes.length,
+            sha256: first.sha256,
+          }),
         });
 
         ctx.check(first.bytes.length > 0, {
@@ -107,7 +114,9 @@ export function buildExitSuites(options: ExitCheckOptions): TestSuiteDef[] {
         const artifact = await source.fetch(format);
         const records = artifact.records;
         if (!records) {
-          ctx.skip(`the ${format} export could not be parsed into records, so schema checks do not apply`);
+          ctx.skip(
+            `the ${format} export could not be parsed into records, so schema checks do not apply`
+          );
           return;
         }
 
@@ -154,7 +163,11 @@ export function buildExitSuites(options: ExitCheckOptions): TestSuiteDef[] {
         await ctx.attachText({
           label: "schema conformance summary",
           kind: "metadata",
-          text: JSON.stringify({ records: records.length, declared: declared.length, typeFailures }, null, 2),
+          text: JSON.stringify(
+            { records: records.length, declared: declared.length, typeFailures },
+            null,
+            2
+          ),
         });
       },
     });
@@ -205,7 +218,7 @@ export function buildExitSuites(options: ExitCheckOptions): TestSuiteDef[] {
             });
           } else {
             ctx.skip(
-              `relationship ${relationship.child} → ${relationship.parent} spans two tables, which a single-file export cannot express; use a ZIP export with a manifest`,
+              `relationship ${relationship.child} → ${relationship.parent} spans two tables, which a single-file export cannot express; use a ZIP export with a manifest`
             );
           }
         }
@@ -262,7 +275,7 @@ export function buildExitSuites(options: ExitCheckOptions): TestSuiteDef[] {
     suiteId: "exit:portability",
     skip:
       source === undefined
-        ? 'no export source configured (modules.exit.exportSource is unset)'
+        ? "no export source configured (modules.exit.exportSource is unset)"
         : options.roundTrip === undefined
           ? "no round-trip target configured (modules.exit.roundTrip.value is unset)"
           : undefined,
@@ -286,7 +299,9 @@ export function buildExitSuites(options: ExitCheckOptions): TestSuiteDef[] {
       });
 
       if (!imported.datasetId) {
-        ctx.skip("the import target did not return a dataset id, so the imported rows cannot be read back");
+        ctx.skip(
+          "the import target did not return a dataset id, so the imported rows cannot be read back"
+        );
         return;
       }
 
@@ -321,7 +336,10 @@ export function buildExitSuites(options: ExitCheckOptions): TestSuiteDef[] {
             ? "0 differences"
             : `${comparison.differences.length} difference(s), e.g. ${comparison.differences
                 .slice(0, 3)
-                .map((d) => `${d.recordKey}.${d.field}: ${JSON.stringify(d.original)} → ${JSON.stringify(d.roundTripped)} (${d.kind})`)
+                .map(
+                  (d) =>
+                    `${d.recordKey}.${d.field}: ${JSON.stringify(d.original)} → ${JSON.stringify(d.roundTripped)} (${d.kind})`
+                )
                 .join("; ")}`,
         code: "round_trip_field_changed",
         severity: "CRITICAL",
@@ -342,7 +360,7 @@ export function buildExitSuites(options: ExitCheckOptions): TestSuiteDef[] {
             differences: comparison.differences.slice(0, 50),
           },
           null,
-          2,
+          2
         ),
       });
     },
@@ -357,7 +375,7 @@ export function buildExitSuites(options: ExitCheckOptions): TestSuiteDef[] {
     suiteId: "exit:portability",
     skip:
       source === undefined
-        ? 'no export source configured (modules.exit.exportSource is unset)'
+        ? "no export source configured (modules.exit.exportSource is unset)"
         : !formats.includes("zip")
           ? "zip is not in modules.exit.formats"
           : undefined,
@@ -391,13 +409,18 @@ export function buildExitSuites(options: ExitCheckOptions): TestSuiteDef[] {
       }
 
       const missing = declared
-        .map((entry) => (typeof entry === "string" ? entry : String((entry as { name?: string }).name ?? "")))
+        .map((entry) =>
+          typeof entry === "string" ? entry : String((entry as { name?: string }).name ?? "")
+        )
         .filter((name) => name && !names.has(name));
 
       ctx.check(missing.length === 0, {
         description: "every file the manifest declares is present in the zip",
         expected: "all manifest files present",
-        actual: missing.length === 0 ? "all present" : `${missing.length} missing: ${missing.slice(0, 5).join(", ")}`,
+        actual:
+          missing.length === 0
+            ? "all present"
+            : `${missing.length} missing: ${missing.slice(0, 5).join(", ")}`,
         code: "zip_manifest_missing_files",
         severity: "CRITICAL",
       });

@@ -48,7 +48,7 @@ this surface.
 - Any resulting tool call still goes through the autonomy gate (T1.3), so an injected
   instruction that does produce a tool call is refused unless the operator allowed it.
 
-**Residual risk.** A model can be persuaded to *say* something wrong. That is a
+**Residual risk.** A model can be persuaded to _say_ something wrong. That is a
 correctness problem, not a security one, and the mitigation is that the agent's output
 is a report a human reads, not an action.
 
@@ -75,10 +75,10 @@ treat an npm package you `npx`.
 
 **Controls.** The autonomy gate (`executeCall` in `agent.ts`):
 
-| Tool effect | `read` | `propose` | `write` |
-|---|---|---|---|
-| `read` | runs | runs | runs |
-| `write` | **refused** | needs approval | runs |
+| Tool effect | `read`      | `propose`      | `write` |
+| ----------- | ----------- | -------------- | ------- |
+| `read`      | runs        | runs           | runs    |
+| `write`     | **refused** | needs approval | runs    |
 
 - A tool's effect is `read` **only** when the server annotates it
   `readOnlyHint: true`. Everything else is `write`.
@@ -214,22 +214,22 @@ after 2 seconds. The promise always resolves, with `timedOut: true`.
 
 ## 5. Controls summary
 
-| Control | Where | Default |
-|---|---|---|
-| AI disabled | `ai.enabled` | `false` |
-| Autonomy gate | `agent.ts` `executeCall` | `read` |
-| Unannotated tool = write | `runtime.ts` `toolsFromServer` | enforced |
-| No approval without a terminal | `cli/index.ts` `commandAi` | enforced |
-| `write` refused in production | `contracts/config.ts` `validateConfig` | enforced |
-| Turn ceiling | `ai.maxTurns` | 8 |
-| Token budget | `ai.maxTokensPerSession` | 200,000 |
-| Request deadline | `timeoutMs` per server/provider | 30s / 120s |
-| argv, never shell | `spawn(..., { shell: false })` | enforced |
-| Prompt on stdin | `promptDelivery` | `stdin` |
-| Keys from env only | `apiKeyEnvVar` | enforced |
-| Key-shaped value rejected | `validateConfig` | enforced |
-| Agent file writes | `allowFileWrites` | `false` |
-| Tool allow/deny lists | `allowTools` / `denyTools` | deny wins |
+| Control                        | Where                                  | Default    |
+| ------------------------------ | -------------------------------------- | ---------- |
+| AI disabled                    | `ai.enabled`                           | `false`    |
+| Autonomy gate                  | `agent.ts` `executeCall`               | `read`     |
+| Unannotated tool = write       | `runtime.ts` `toolsFromServer`         | enforced   |
+| No approval without a terminal | `cli/index.ts` `commandAi`             | enforced   |
+| `write` refused in production  | `contracts/config.ts` `validateConfig` | enforced   |
+| Turn ceiling                   | `ai.maxTurns`                          | 8          |
+| Token budget                   | `ai.maxTokensPerSession`               | 200,000    |
+| Request deadline               | `timeoutMs` per server/provider        | 30s / 120s |
+| argv, never shell              | `spawn(..., { shell: false })`         | enforced   |
+| Prompt on stdin                | `promptDelivery`                       | `stdin`    |
+| Keys from env only             | `apiKeyEnvVar`                         | enforced   |
+| Key-shaped value rejected      | `validateConfig`                       | enforced   |
+| Agent file writes              | `allowFileWrites`                      | `false`    |
+| Tool allow/deny lists          | `allowTools` / `denyTools`             | deny wins  |
 
 ---
 

@@ -10,7 +10,9 @@ export function Footer() {
       <div className="mx-auto grid max-w-[1240px] gap-10 px-5 py-14 md:grid-cols-[1.4fr_1fr_1fr_1fr] lg:px-8">
         <div>
           <Wordmark size={14} />
-          <p className="mt-4 max-w-[34ch] text-[0.86rem] leading-relaxed text-white/48">{t("footer.tagline")}</p>
+          <p className="mt-4 max-w-[34ch] text-[0.86rem] leading-relaxed text-white/48">
+            {t("footer.tagline")}
+          </p>
         </div>
         <FooterColumn
           title={t("footer.product")}
@@ -34,8 +36,8 @@ export function Footer() {
         <FooterColumn
           title={t("footer.company")}
           items={[
-            { to: "/security", label: "Trust" },
-            { to: "/docs", label: "CLI & SDK" },
+            { to: "/security", label: t("mkt.footer.trust") },
+            { to: "/docs", label: t("mkt.footer.cli") },
             { to: "/signin", label: t("nav.signin") },
           ]}
         />
@@ -55,7 +57,10 @@ function FooterColumn({ title, items }: { title: string; items: { to: string; la
       <ul className="mt-4 space-y-2.5">
         {items.map((item) => (
           <li key={`${item.to}-${item.label}`}>
-            <Link to={item.to} className="text-[0.88rem] text-white/68 transition-colors hover:text-white">
+            <Link
+              to={item.to}
+              className="text-[0.88rem] text-white/68 transition-colors hover:text-white"
+            >
               {item.label}
             </Link>
           </li>

@@ -316,7 +316,11 @@ export function Billing() {
         />
         <Metric
           label="Status"
-          value={<StatusBadge status={sub.state} />}
+          value={
+            <StatusBadge
+              status={sub.entitled ? sub.state : sub.state === "NONE" ? "FREE" : sub.state}
+            />
+          }
           hint={
             sub.cancelAtPeriodEnd
               ? "Cancels at period end"
@@ -370,28 +374,30 @@ export function Billing() {
         title="Usage this period"
         description="Metered once per subject: a retried upload or a re-run of the same id counts once."
       >
-        <table className="app-table">
-          <thead>
-            <tr>
-              <th>Counter</th>
-              <th className="text-right">Used</th>
-              <th className="text-right">Limit</th>
-              <th>Billing treatment</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.usage.map((counter) => (
-              <tr key={counter.key}>
-                <td>{counter.label}</td>
-                <td className="text-right tabular-nums">{counter.used}</td>
-                <td className="text-right tabular-nums">
-                  {counter.limit === -1 ? "unlimited" : counter.limit}
-                </td>
-                <td className="text-xs text-muted">{counter.counted.replaceAll("_", " ")}</td>
+        <div className="overflow-x-auto">
+          <table className="app-table">
+            <thead>
+              <tr>
+                <th>Counter</th>
+                <th className="text-right">Used</th>
+                <th className="text-right">Limit</th>
+                <th>Billing treatment</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {data.usage.map((counter) => (
+                <tr key={counter.key}>
+                  <td>{counter.label}</td>
+                  <td className="text-right tabular-nums">{counter.used}</td>
+                  <td className="text-right tabular-nums">
+                    {counter.limit === -1 ? "unlimited" : counter.limit}
+                  </td>
+                  <td className="text-xs text-muted">{counter.counted.replaceAll("_", " ")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </Card>
 
       <Card
@@ -448,42 +454,44 @@ export function Billing() {
         {data.payments.length === 0 ? (
           <p className="px-5 py-6 text-sm text-muted">No payment attempts yet.</p>
         ) : (
-          <table className="app-table">
-            <thead>
-              <tr>
-                <th>Created</th>
-                <th>Plan</th>
-                <th className="text-right">Amount</th>
-                <th>State</th>
-                <th>Credited</th>
-                <th>Reference</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.payments.map((payment) => (
-                <tr key={payment.id}>
-                  <td className="whitespace-nowrap text-xs">{formatDate(payment.createdAt)}</td>
-                  <td>
-                    {payment.planKey}
-                    <span className="ml-1 text-xs text-muted">/ {payment.period}</span>
-                  </td>
-                  <td className="text-right tabular-nums">
-                    {formatMinor(payment.amount.minor, payment.amount.currency)}
-                  </td>
-                  <td>
-                    <StatusBadge status={payment.state} />
-                    {payment.failureReason ? (
-                      <span className="ml-2 text-xs text-muted">{payment.failureReason}</span>
-                    ) : null}
-                  </td>
-                  <td className="text-xs">{payment.credited ? "yes" : "no"}</td>
-                  <td className="app-mono text-xs text-muted">
-                    {payment.providerReference ?? "—"}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="app-table">
+              <thead>
+                <tr>
+                  <th>Created</th>
+                  <th>Plan</th>
+                  <th className="text-right">Amount</th>
+                  <th>State</th>
+                  <th>Credited</th>
+                  <th>Reference</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {data.payments.map((payment) => (
+                  <tr key={payment.id}>
+                    <td className="whitespace-nowrap text-xs">{formatDate(payment.createdAt)}</td>
+                    <td>
+                      {payment.planKey}
+                      <span className="ml-1 text-xs text-muted">/ {payment.period}</span>
+                    </td>
+                    <td className="text-right tabular-nums">
+                      {formatMinor(payment.amount.minor, payment.amount.currency)}
+                    </td>
+                    <td>
+                      <StatusBadge status={payment.state} />
+                      {payment.failureReason ? (
+                        <span className="ml-2 text-xs text-muted">{payment.failureReason}</span>
+                      ) : null}
+                    </td>
+                    <td className="text-xs">{payment.credited ? "yes" : "no"}</td>
+                    <td className="app-mono text-xs text-muted">
+                      {payment.providerReference ?? "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Card>
 
@@ -497,44 +505,46 @@ export function Billing() {
             No receipts yet. One is issued when a payment is verified.
           </p>
         ) : (
-          <table className="app-table">
-            <thead>
-              <tr>
-                <th>Number</th>
-                <th>Issued</th>
-                <th>Service period</th>
-                <th className="text-right">Total</th>
-                <th>Status</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {data.invoices.map((invoice) => (
-                <tr key={invoice.id}>
-                  <td className="app-mono text-xs">{invoice.number}</td>
-                  <td className="whitespace-nowrap text-xs">{formatDate(invoice.issuedAt)}</td>
-                  <td className="whitespace-nowrap text-xs">
-                    {formatDay(invoice.periodStart)} → {formatDay(invoice.periodEnd)}
-                  </td>
-                  <td className="text-right tabular-nums">
-                    {formatMinor(invoice.total.minor, invoice.total.currency)}
-                  </td>
-                  <td>
-                    <StatusBadge status={invoice.status} />
-                  </td>
-                  <td className="text-right">
-                    <button
-                      type="button"
-                      className="app-btn"
-                      onClick={() => downloadReceipt(invoice, sub.planName)}
-                    >
-                      <Download size={13} /> Receipt
-                    </button>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="app-table">
+              <thead>
+                <tr>
+                  <th>Number</th>
+                  <th>Issued</th>
+                  <th>Service period</th>
+                  <th className="text-right">Total</th>
+                  <th>Status</th>
+                  <th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {data.invoices.map((invoice) => (
+                  <tr key={invoice.id}>
+                    <td className="app-mono text-xs">{invoice.number}</td>
+                    <td className="whitespace-nowrap text-xs">{formatDate(invoice.issuedAt)}</td>
+                    <td className="whitespace-nowrap text-xs">
+                      {formatDay(invoice.periodStart)} → {formatDay(invoice.periodEnd)}
+                    </td>
+                    <td className="text-right tabular-nums">
+                      {formatMinor(invoice.total.minor, invoice.total.currency)}
+                    </td>
+                    <td>
+                      <StatusBadge status={invoice.status} />
+                    </td>
+                    <td className="text-right">
+                      <button
+                        type="button"
+                        className="app-btn"
+                        onClick={() => downloadReceipt(invoice, sub.planName)}
+                      >
+                        <Download size={13} /> Receipt
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Card>
 

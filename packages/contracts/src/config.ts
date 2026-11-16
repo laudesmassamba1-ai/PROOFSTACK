@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { moduleIdSchema, environmentKindSchema } from "./statuses.js";
+import { environmentKindSchema, moduleIdSchema } from "./statuses.js";
 
 /**
  * One configuration file drives the CLI, the SDK and the cloud-side project
@@ -12,7 +12,10 @@ import { moduleIdSchema, environmentKindSchema } from "./statuses.js";
 
 export const localeProfileSchema = z
   .string()
-  .regex(/^[a-z]{2,3}(?:-[A-Za-z]{4})?-(?:[A-Z]{2}|[0-9]{3})(?:-[A-Za-z0-9]{5,8})?$/, "expected BCP-47 locale like fr-BJ or zh-Hans-CN");
+  .regex(
+    /^[a-z]{2,3}(?:-[A-Za-z]{4})?-(?:[A-Z]{2}|[0-9]{3})(?:-[A-Za-z0-9]{5,8})?$/,
+    "expected BCP-47 locale like fr-BJ or zh-Hans-CN"
+  );
 
 export const worldConfigSchema = z
   .object({
@@ -22,7 +25,18 @@ export const worldConfigSchema = z
     /** Extra/override profile definitions loaded from disk. */
     profileFiles: z.array(z.string()).default([]),
     categories: z
-      .array(z.enum(["identity", "phone", "address", "currency", "datetime", "forms", "sorting", "collation"]))
+      .array(
+        z.enum([
+          "identity",
+          "phone",
+          "address",
+          "currency",
+          "datetime",
+          "forms",
+          "sorting",
+          "collation",
+        ])
+      )
       .default(["identity", "phone", "address", "currency", "datetime"]),
     /** Form descriptors the engine fills in and submits. */
     forms: z
@@ -44,7 +58,18 @@ export const worldConfigSchema = z
                     selector: z.string().optional(),
                     label: z.string().optional(),
                     kind: z
-                      .enum(["text", "email", "tel", "name", "postal", "address", "select", "date", "number", "currency"])
+                      .enum([
+                        "text",
+                        "email",
+                        "tel",
+                        "name",
+                        "postal",
+                        "address",
+                        "select",
+                        "date",
+                        "number",
+                        "currency",
+                      ])
                       .default("text"),
                     required: z.boolean().default(false),
                     maxLength: z.number().int().positive().optional(),
@@ -52,11 +77,13 @@ export const worldConfigSchema = z
                     fixtures: z.array(z.string()).default([]),
                   })
                   .strict()
-                  .refine((f) => Boolean(f.selector || f.label), { message: "field needs selector or label" }),
+                  .refine((f) => Boolean(f.selector || f.label), {
+                    message: "field needs selector or label",
+                  })
               )
               .min(1),
           })
-          .strict(),
+          .strict()
       )
       .default([]),
     /** Reject values the product should accept. Failures here are product bugs. */
@@ -102,21 +129,28 @@ export const flowConfigSchema = z
     enabled: z.boolean().default(true),
     paymentMode: paymentModeSchema.default("simulated"),
     scenarios: z
-      .array(z.enum([
+      .array(
+        z.enum([
+          "checkout_success",
+          "checkout_declined",
+          "checkout_cancelled",
+          "checkout_timeout",
+          "webhook_duplicate",
+          "webhook_delayed",
+          "webhook_out_of_order",
+          "webhook_invalid_signature",
+          "order_missing_confirmation",
+          "order_duplicate",
+          "refund_flow",
+          "inconsistent_state",
+        ])
+      )
+      .default([
         "checkout_success",
         "checkout_declined",
-        "checkout_cancelled",
-        "checkout_timeout",
         "webhook_duplicate",
-        "webhook_delayed",
-        "webhook_out_of_order",
         "webhook_invalid_signature",
-        "order_missing_confirmation",
-        "order_duplicate",
-        "refund_flow",
-        "inconsistent_state",
-      ]))
-      .default(["checkout_success", "checkout_declined", "webhook_duplicate", "webhook_invalid_signature"]),
+      ]),
     journeys: z
       .array(
         z
@@ -146,13 +180,13 @@ export const flowConfigSchema = z
                     timeoutMs: z.number().int().positive().max(120_000).default(15_000),
                     optional: z.boolean().default(false),
                   })
-                  .strict(),
+                  .strict()
               )
               .min(1),
             /** Destructive journeys (real orders) require staging or local. */
             destructive: z.boolean().default(false),
           })
-          .strict(),
+          .strict()
       )
       .default([]),
     /** Webhook endpoint the engine posts forged/duplicated events to. */
@@ -178,7 +212,10 @@ export type FlowConfig = z.infer<typeof flowConfigSchema>;
 export const exitConfigSchema = z
   .object({
     enabled: z.boolean().default(true),
-    formats: z.array(z.enum(["csv", "json", "zip"])).min(1).default(["json", "csv"]),
+    formats: z
+      .array(z.enum(["csv", "json", "zip"]))
+      .min(1)
+      .default(["json", "csv"]),
     /** Where the export is produced from. Production needs an explicit opt-in. */
     target: z.enum(["synthetic", "staging", "production"]).default("synthetic"),
     /** Endpoint or command that produces the export. */
@@ -193,7 +230,22 @@ export const exitConfigSchema = z
       .strict()
       .optional(),
     /** Expected schema the export must satisfy (field name -> type). */
-    schema: z.record(z.string(), z.enum(["string", "number", "integer", "boolean", "date", "datetime", "id", "money", "nullable"])).default({}),
+    schema: z
+      .record(
+        z.string(),
+        z.enum([
+          "string",
+          "number",
+          "integer",
+          "boolean",
+          "date",
+          "datetime",
+          "id",
+          "money",
+          "nullable",
+        ])
+      )
+      .default({}),
     relationships: z
       .array(
         z
@@ -204,10 +256,12 @@ export const exitConfigSchema = z
             parentField: z.string(),
             required: z.boolean().default(true),
           })
-          .strict(),
+          .strict()
       )
       .default([]),
-    unique: z.array(z.object({ table: z.string(), fields: z.array(z.string()).min(1) }).strict()).default([]),
+    unique: z
+      .array(z.object({ table: z.string(), fields: z.array(z.string()).min(1) }).strict())
+      .default([]),
     /** Round-trip: re-import the export and compare. */
     roundTrip: z
       .object({
@@ -301,9 +355,13 @@ export const mcpServerSchema = z
     timeoutMs: z.number().int().positive().max(120_000).default(30_000),
   })
   .strict()
-  .refine((server) => (server.transport === "stdio" ? Boolean(server.command?.length) : Boolean(server.url)), {
-    message: 'stdio servers need a command argv; http servers need a url',
-  });
+  .refine(
+    (server) =>
+      server.transport === "stdio" ? Boolean(server.command?.length) : Boolean(server.url),
+    {
+      message: "stdio servers need a command argv; http servers need a url",
+    }
+  );
 export type McpServerConfig = z.infer<typeof mcpServerSchema>;
 
 export const aiProviderSchema = z
@@ -324,6 +382,11 @@ export const aiProviderSchema = z
     maxTokens: z.number().int().positive().max(200_000).default(4_096),
     temperature: z.number().min(0).max(2).default(0.2),
     timeoutMs: z.number().int().positive().max(600_000).default(120_000),
+    /**
+     * Whether this model can request tool calls. Local models often cannot; a wrong
+     * `true` makes the agent loop send a tools array the server rejects.
+     */
+    supportsTools: z.boolean().default(true),
     /** Marks the provider used when `--provider` is omitted. */
     default: z.boolean().default(false),
   })
@@ -440,11 +503,15 @@ export function validateConfig(config: ProofstackConfig): ConfigValidationIssue[
     });
   }
 
-  if (config.modules.exit.enabled && config.modules.exit.target === "production" && !config.allowDestructiveProduction) {
+  if (
+    config.modules.exit.enabled &&
+    config.modules.exit.target === "production" &&
+    !config.allowDestructiveProduction
+  ) {
     issues.push({
       path: "modules.exit.target",
       message: 'exit.target="production" requires allowDestructiveProduction=true',
-      hint: "prefer target=\"staging\"; exports of production datasets are never uploaded by default",
+      hint: 'prefer target="staging"; exports of production datasets are never uploaded by default',
     });
   }
 
@@ -460,7 +527,11 @@ export function validateConfig(config: ProofstackConfig): ConfigValidationIssue[
     });
   }
 
-  if (config.modules.world.enabled && config.modules.world.target.kind === "http" && !config.modules.world.target.submitUrl) {
+  if (
+    config.modules.world.enabled &&
+    config.modules.world.target.kind === "http" &&
+    !config.modules.world.target.submitUrl
+  ) {
     issues.push({
       path: "modules.world.target.submitUrl",
       message: 'target.kind="http" requires submitUrl',
@@ -469,12 +540,17 @@ export function validateConfig(config: ProofstackConfig): ConfigValidationIssue[
   }
 
   if (config.modules.world.enabled && config.modules.world.profiles.length === 0) {
-    issues.push({ path: "modules.world.profiles", message: "at least one locale profile is required" });
+    issues.push({
+      path: "modules.world.profiles",
+      message: "at least one locale profile is required",
+    });
   }
 
   if (config.environment === "production") {
     const destructive = [
-      ...config.modules.flow.journeys.filter((j) => j.destructive).map((j) => `flow.journeys.${j.id}`),
+      ...config.modules.flow.journeys
+        .filter((j) => j.destructive)
+        .map((j) => `flow.journeys.${j.id}`),
       ...(config.modules.exit.target === "production" ? ["modules.exit.target"] : []),
     ];
     for (const path of destructive) {
@@ -492,7 +568,11 @@ export function validateConfig(config: ProofstackConfig): ConfigValidationIssue[
 
   // ---- AI integration
   if (config.ai.enabled) {
-    if (config.ai.providers.length === 0 && config.ai.mcpServers.length === 0 && config.ai.agents.length === 0) {
+    if (
+      config.ai.providers.length === 0 &&
+      config.ai.mcpServers.length === 0 &&
+      config.ai.agents.length === 0
+    ) {
       issues.push({
         path: "ai.enabled",
         message: "ai is enabled but nothing is configured",
@@ -520,7 +600,9 @@ export function validateConfig(config: ProofstackConfig): ConfigValidationIssue[
     }
 
     const serverNames = config.ai.mcpServers.map((s) => s.name);
-    const duplicateServers = serverNames.filter((name, index) => serverNames.indexOf(name) !== index);
+    const duplicateServers = serverNames.filter(
+      (name, index) => serverNames.indexOf(name) !== index
+    );
     if (duplicateServers.length > 0) {
       issues.push({
         path: "ai.mcpServers",
@@ -542,7 +624,7 @@ export function validateConfig(config: ProofstackConfig): ConfigValidationIssue[
       if (agent.allowFileWrites && config.ai.autonomy === "read") {
         issues.push({
           path: `ai.agents.${agent.name}.allowFileWrites`,
-          message: "agent may write files but ai.autonomy is \"read\"",
+          message: 'agent may write files but ai.autonomy is "read"',
           hint: 'raise ai.autonomy to "propose" or "write", or set allowFileWrites=false',
         });
       }
@@ -565,11 +647,14 @@ export function validateConfig(config: ProofstackConfig): ConfigValidationIssue[
 
 export function assertSafeForAutomatedRun(config: ProofstackConfig): void {
   const issues = validateConfig(config).filter(
-    (i) => i.path.includes("live_charge") || i.message.includes("refused") || i.message.includes("not allowed"),
+    (i) =>
+      i.path.includes("live_charge") ||
+      i.message.includes("refused") ||
+      i.message.includes("not allowed")
   );
   if (issues.length > 0) {
     throw new Error(
-      `Unsafe configuration for an automated run:\n${issues.map((i) => ` - ${i.path}: ${i.message}${i.hint ? ` (${i.hint})` : ""}`).join("\n")}`,
+      `Unsafe configuration for an automated run:\n${issues.map((i) => ` - ${i.path}: ${i.message}${i.hint ? ` (${i.hint})` : ""}`).join("\n")}`
     );
   }
 }

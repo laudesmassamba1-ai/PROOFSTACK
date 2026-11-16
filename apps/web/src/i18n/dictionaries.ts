@@ -66,7 +66,7 @@ export const en = {
   "pricing.perYear": "/ year",
   "pricing.save": "Save {percent}%",
   "pricing.free": "Free",
-  "currency": "Currency",
+  currency: "Currency",
   "pricing.cta": "Choose {plan}",
   "pricing.current": "Current plan",
   "pricing.contact": "Talk to us",
@@ -86,7 +86,8 @@ export const en = {
   "footer.company": "Company",
   "footer.status": "Status",
   "footer.rights": "© {year} PROOFSTACK. Name provisional pending trademark and domain checks.",
-  "footer.notAffiliated": "PROOFSTACK is an independent product and is not affiliated with any brand shown in its visual research.",
+  "footer.notAffiliated":
+    "PROOFSTACK is an independent product and is not affiliated with any brand shown in its visual research.",
   "auth.signin.title": "Sign in to PROOFSTACK",
   "auth.signup.title": "Create your account",
   "auth.email": "Email",
@@ -102,7 +103,8 @@ export const en = {
   "auth.haveAccount": "Already have an account?",
   "auth.noAccount": "No account yet?",
   "docs.title": "Documentation",
-  "docs.lede": "Guides live in the repository under docs/guides. This page lists what is implemented today.",
+  "docs.lede":
+    "Guides live in the repository under docs/guides. This page lists what is implemented today.",
   "docs.available": "Available now",
   "docs.planned": "Documented, not implemented yet",
   "changelog.title": "Changelog",
@@ -143,7 +145,8 @@ export const fr: Messages = {
   "hero.cta.docs": "Lire la documentation",
   "hero.cli": "$ npm i -D @proofstack/cli && npx proofstack init",
   "hero.status": "Moteur v0.1 · s'exécute en local, en CI ou sur une préproduction",
-  "question.world": "Des utilisateurs de pays différents peuvent-ils utiliser le logiciel correctement ?",
+  "question.world":
+    "Des utilisateurs de pays différents peuvent-ils utiliser le logiciel correctement ?",
   "question.flow": "Les utilisateurs peuvent-ils terminer les opérations critiques ?",
   "question.exit": "Les utilisateurs peuvent-ils récupérer leurs informations sans perte ?",
   "modules.eyebrow": "Trois questions, un moteur",
@@ -157,7 +160,7 @@ export const fr: Messages = {
   "modules.flow.name": "FLOW",
   "modules.flow.tag": "Fiabilité des transactions",
   "modules.flow.body":
-    "Parcours panier, paiement et confirmation, plus forged, duplicate, delayed and out-of-order webhooks contre un fournisseur sandbox.",
+    "Parcours panier, paiement et confirmation, plus des webhooks falsifiés, dupliqués, retardés ou désordonnés contre un fournisseur sandbox.",
   "modules.exit.name": "EXIT",
   "modules.exit.tag": "Portabilité des données",
   "modules.exit.body":
@@ -187,7 +190,7 @@ export const fr: Messages = {
   "pricing.perYear": "/ an",
   "pricing.save": "Économisez {percent} %",
   "pricing.free": "Gratuit",
-  "currency": "Devise",
+  currency: "Devise",
   "pricing.cta": "Choisir {plan}",
   "pricing.current": "Plan actuel",
   "pricing.contact": "Nous parler",
@@ -206,8 +209,10 @@ export const fr: Messages = {
   "footer.developers": "Développeurs",
   "footer.company": "Entreprise",
   "footer.status": "Statut",
-  "footer.rights": "© {year} PROOFSTACK. Nom provisoire, en attente des vérifications de marque et de domaine.",
-  "footer.notAffiliated": "PROOFSTACK est un produit indépendant et n'est affilié à aucune marque présente dans sa recherche visuelle.",
+  "footer.rights":
+    "© {year} PROOFSTACK. Nom provisoire, en attente des vérifications de marque et de domaine.",
+  "footer.notAffiliated":
+    "PROOFSTACK est un produit indépendant et n'est affilié à aucune marque présente dans sa recherche visuelle.",
   "auth.signin.title": "Connectez-vous à PROOFSTACK",
   "auth.signup.title": "Créez votre compte",
   "auth.email": "E-mail",
@@ -223,7 +228,8 @@ export const fr: Messages = {
   "auth.haveAccount": "Vous avez déjà un compte ?",
   "auth.noAccount": "Pas encore de compte ?",
   "docs.title": "Documentation",
-  "docs.lede": "Les guides vivent dans le dépôt sous docs/guides. Cette page liste ce qui est réellement implémenté aujourd'hui.",
+  "docs.lede":
+    "Les guides vivent dans le dépôt sous docs/guides. Cette page liste ce qui est réellement implémenté aujourd'hui.",
   "docs.available": "Disponible maintenant",
   "docs.planned": "Documenté, pas encore implémenté",
   "changelog.title": "Nouveautés",

@@ -1,7 +1,7 @@
 import type { LocaleProfileData } from "@proofstack/contracts";
 import {
-  Money,
   currencyMeta,
+  Money,
   numberSeparators,
   parseLocalizedDecimal,
   resolveWallClock,
@@ -10,7 +10,14 @@ import type { CountryCode } from "libphonenumber-js";
 import { parsePhoneNumberFromString } from "libphonenumber-js/max";
 import { parseJapaneseDate, parseWithAnyPattern, toAsciiDigits } from "./dateformat.js";
 
-export const FIXTURE_CATEGORIES = ["identity", "phone", "address", "currency", "datetime", "collation"] as const;
+export const FIXTURE_CATEGORIES = [
+  "identity",
+  "phone",
+  "address",
+  "currency",
+  "datetime",
+  "collation",
+] as const;
 export type FixtureCategory = (typeof FIXTURE_CATEGORIES)[number];
 
 export interface Fixture {
@@ -48,7 +55,11 @@ function fixtureId(profile: string, category: string, hint: string): string {
 }
 
 function slug(value: string): string {
-  return toAsciiDigits(value).replace(/[^A-Za-z0-9]+/g, "").slice(0, 12) || "x";
+  return (
+    toAsciiDigits(value)
+      .replace(/[^A-Za-z0-9]+/g, "")
+      .slice(0, 12) || "x"
+  );
 }
 
 export interface BuildOptions {
@@ -186,7 +197,9 @@ function phoneFixtures(profile: LocaleProfileData, push: Push): void {
       expectation: "reject",
       tolerance: "digits",
       strictness: "hard",
-      note: parsed?.isValid() ? "metadata says valid; profile declares it invalid" : "must not be accepted",
+      note: parsed?.isValid()
+        ? "metadata says valid; profile declares it invalid"
+        : "must not be accepted",
     });
   }
 }
@@ -207,9 +220,9 @@ function addressFixtures(profile: LocaleProfileData, push: Push): void {
   }
   // A 300-character address is legitimate for a farm with a landmark description.
   // Rejection is a warning; silent truncation is a failure.
-  const long = `${profile.fixtures.addresses[0] ?? "1 Main St"}, `.repeat(1).concat(
-    "Apt ".repeat(1) + "x".repeat(280),
-  );
+  const long = `${profile.fixtures.addresses[0] ?? "1 Main St"}, `
+    .repeat(1)
+    .concat("Apt ".repeat(1) + "x".repeat(280));
   push({
     id: fixtureId(profile.id, "address", "long"),
     profile: profile.id,
@@ -224,9 +237,10 @@ function addressFixtures(profile: LocaleProfileData, push: Push): void {
   });
 
   for (const code of profile.fixtures.postalCodes) {
-    const matches = profile.address.postalCode.pattern.length === 0
-      ? true
-      : new RegExp(profile.address.postalCode.pattern).test(code);
+    const matches =
+      profile.address.postalCode.pattern.length === 0
+        ? true
+        : new RegExp(profile.address.postalCode.pattern).test(code);
     push({
       id: fixtureId(profile.id, "address", `postal-${slug(code)}`),
       profile: profile.id,
@@ -262,7 +276,12 @@ function currencyFixtures(profile: LocaleProfileData, push: Push): void {
   const meta = currencyMeta(code);
   const separators = numberSeparators(profile.id);
 
-  const declare = (value: string, expected: string | undefined, note: string, strictness: "hard" | "soft" = "hard"): void => {
+  const declare = (
+    value: string,
+    expected: string | undefined,
+    note: string,
+    strictness: "hard" | "soft" = "hard"
+  ): void => {
     push({
       id: fixtureId(profile.id, "currency", slug(value)),
       profile: profile.id,
@@ -277,7 +296,8 @@ function currencyFixtures(profile: LocaleProfileData, push: Push): void {
     });
   };
 
-  const minor = (major: string): string => Money.fromDecimalString(major, code, { exact: true }).minor.toString();
+  const minor = (major: string): string =>
+    Money.fromDecimalString(major, code, { exact: true }).minor.toString();
 
   /**
    * An amount with the currency's own number of decimals.
@@ -288,7 +308,9 @@ function currencyFixtures(profile: LocaleProfileData, push: Push): void {
    * for every profile instead of only the two-decimal ones.
    */
   const amountWith = (whole: string, fraction: string): string =>
-    meta.exponent === 0 ? whole : `${whole}.${fraction.slice(0, meta.exponent).padEnd(meta.exponent, "0")}`;
+    meta.exponent === 0
+      ? whole
+      : `${whole}.${fraction.slice(0, meta.exponent).padEnd(meta.exponent, "0")}`;
 
   // 1. Exactly what the product's own locale would render.
   const rendered = new Intl.NumberFormat(profile.id, {
@@ -303,7 +325,7 @@ function currencyFixtures(profile: LocaleProfileData, push: Push): void {
   declare(
     rendered,
     renderedExpected.ok ? renderedExpected.money.minor.toString() : minor(amountWith("1234", "50")),
-    `rendered by Intl for ${profile.id}; the product must read back its own output`,
+    `rendered by Intl for ${profile.id}; the product must read back its own output`
   );
 
   // 2. Plain decimal with the locale separators.
@@ -312,7 +334,7 @@ function currencyFixtures(profile: LocaleProfileData, push: Push): void {
     `${"1"}${separators.groupingSeparator || ""}${separators.decimalSeparator === "." ? "" : "234"}${meta.exponent === 0 ? "" : `${separators.decimalSeparator}56`}`,
     minor(amountWith("1234", "56")),
     `locale-separated input (${profile.id})`,
-    "soft",
+    "soft"
   );
 
   // 3. Boundaries that expose float arithmetic.
@@ -321,19 +343,28 @@ function currencyFixtures(profile: LocaleProfileData, push: Push): void {
   declare(
     amountWith("999999999999999999", "99"),
     minor(amountWith("999999999999999999", "99")),
-    "beyond Number.MAX_SAFE_INTEGER: float parsing loses digits",
+    "beyond Number.MAX_SAFE_INTEGER: float parsing loses digits"
   );
   declare("0", minor("0"), "zero is a valid amount");
 
   // 4. Sub-minor precision must be refused, never silently rounded.
   const tooPrecise = meta.exponent === 0 ? "1000.50" : meta.exponent === 2 ? "1.0055" : "1.0005";
-  declare(tooPrecise, undefined, `${code} has ${meta.exponent} decimal digit(s); ${tooPrecise} cannot be represented`);
+  declare(
+    tooPrecise,
+    undefined,
+    `${code} has ${meta.exponent} decimal digit(s); ${tooPrecise} cannot be represented`
+  );
 
   // 5. Garbage must be garbage.
   for (const [value, note] of [
     ["12a", "letters inside an amount"],
     ["--12", "double sign"],
-    ["1,234", separators.groupingSeparator === "," ? "grouping without decimals is valid; kept as accept below" : `grouping separator for ${profile.id} is not ","`],
+    [
+      "1,234",
+      separators.groupingSeparator === ","
+        ? "grouping without decimals is valid; kept as accept below"
+        : `grouping separator for ${profile.id} is not ","`,
+    ],
   ] as Array<[string, string]>) {
     const parseable = parseLocalizedDecimal(value, separators, code);
     declare(value, parseable.ok ? parseable.money.minor.toString() : undefined, note);
@@ -348,7 +379,7 @@ function datetimeFixtures(profile: LocaleProfileData, push: Push): void {
     instant: string | undefined,
     note: string,
     strictness: "hard" | "soft" = "hard",
-    alternatives?: string[],
+    alternatives?: string[]
   ): void => {
     push({
       id: fixtureId(profile.id, "datetime", slug(value)),
@@ -370,7 +401,11 @@ function datetimeFixtures(profile: LocaleProfileData, push: Push): void {
       parseWithAnyPattern(sample, profile.dateFormats.input) ??
       (profile.language === "ja" ? parseJapaneseDate(sample) : undefined);
     if (!parsed) {
-      emit(sample, undefined, `matches none of the declared input formats: ${profile.dateFormats.input.join(", ")}`);
+      emit(
+        sample,
+        undefined,
+        `matches none of the declared input formats: ${profile.dateFormats.input.join(", ")}`
+      );
       continue;
     }
     const resolution = resolveWallClock(zone, parsed.wall);
@@ -379,7 +414,7 @@ function datetimeFixtures(profile: LocaleProfileData, push: Push): void {
         sample,
         new Date(resolution.nearestAfter).toISOString(),
         `wall time ${sample} does not exist in ${zone} (spring-forward gap); the canonical reading is the shifted instant`,
-        "soft",
+        "soft"
       );
       continue;
     }
@@ -389,7 +424,7 @@ function datetimeFixtures(profile: LocaleProfileData, push: Push): void {
         new Date(resolution.instants[0] as number).toISOString(),
         `wall time ${sample} happens twice in ${zone} (fall-back overlap); either reading is defensible, so both are accepted`,
         "soft",
-        resolution.instants.map((ms) => new Date(ms).toISOString()),
+        resolution.instants.map((ms) => new Date(ms).toISOString())
       );
       continue;
     }
@@ -411,7 +446,10 @@ function datetimeFixtures(profile: LocaleProfileData, push: Push): void {
  * Build a wall time that falls in the spring-forward gap of the profile zone, when
  * the zone observes DST at all.
  */
-function dstGapSample(profile: LocaleProfileData, zone: string): { value: string; instant: string; note: string } | undefined {
+function dstGapSample(
+  profile: LocaleProfileData,
+  zone: string
+): { value: string; instant: string; note: string } | undefined {
   const year = 2026;
   for (let month = 1; month <= 12; month++) {
     for (let day = 1; day <= 28; day++) {
@@ -457,7 +495,8 @@ function collationFixtures(profile: LocaleProfileData, push: Push): void {
 export function fixtureSummary(fixtures: readonly Fixture[]): Record<string, number> {
   const out: Record<string, number> = {};
   for (const fixture of fixtures) {
-    out[`${fixture.profile}:${fixture.category}`] = (out[`${fixture.profile}:${fixture.category}`] ?? 0) + 1;
+    out[`${fixture.profile}:${fixture.category}`] =
+      (out[`${fixture.profile}:${fixture.category}`] ?? 0) + 1;
   }
   return out;
 }

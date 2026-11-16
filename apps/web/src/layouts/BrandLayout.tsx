@@ -1,7 +1,7 @@
-import { Outlet, useLocation } from "react-router";
 import { useEffect } from "react";
-import { Nav } from "../components/marketing/Nav.js";
+import { Outlet, useLocation } from "react-router";
 import { Footer } from "../components/marketing/Footer.js";
+import { Nav } from "../components/marketing/Nav.js";
 
 export function BrandLayout() {
   const { pathname } = useLocation();
@@ -55,8 +55,12 @@ export function SectionHeading({
   return (
     <header className="max-w-[62ch]">
       {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
-      <h2 className="mt-3 text-[1.9rem] leading-[1.12] tracking-tight sm:text-[2.4rem]">{title}</h2>
-      {lede ? <p className="mt-4 text-[1rem] leading-relaxed text-white/56">{lede}</p> : null}
+      <h2 className="mt-3 text-balance text-[1.9rem] leading-[1.12] tracking-tight sm:text-[2.4rem]">
+        {title}
+      </h2>
+      {lede ? (
+        <p className="mt-4 max-w-[64ch] text-[1rem] leading-relaxed text-white/56">{lede}</p>
+      ) : null}
     </header>
   );
 }

@@ -1,6 +1,6 @@
 import { Link } from "react-router";
-import { Section } from "../layouts/BrandLayout.js";
 import { useI18n } from "../i18n/index.js";
+import { Section } from "../layouts/BrandLayout.js";
 
 export function NotFound() {
   const { t } = useI18n();

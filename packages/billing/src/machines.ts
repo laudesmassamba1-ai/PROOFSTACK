@@ -1,7 +1,7 @@
 import {
   PAYMENT_STATES,
-  SUBSCRIPTION_STATES,
   type PaymentState,
+  SUBSCRIPTION_STATES,
   type SubscriptionState,
 } from "@proofstack/contracts";
 
@@ -44,10 +44,10 @@ export class IllegalTransitionError extends Error {
     readonly machine: "payment" | "subscription",
     readonly from: string,
     readonly to: string,
-    readonly allowed: readonly string[],
+    readonly allowed: readonly string[]
   ) {
     super(
-      `Illegal ${machine} transition ${from} → ${to}. Allowed from ${from}: ${allowed.join(", ") || "(terminal state)"}`,
+      `Illegal ${machine} transition ${from} → ${to}. Allowed from ${from}: ${allowed.join(", ") || "(terminal state)"}`
     );
     this.name = "IllegalTransitionError";
   }
@@ -99,7 +99,7 @@ export function evaluateAccessWindow(
   state: SubscriptionState,
   now: Date,
   currentPeriodEnd: Date | null,
-  trialEndsAt: Date | null,
+  trialEndsAt: Date | null
 ): AccessWindow {
   const stateAllows = ACCESS_KEEPING_STATES.includes(state);
   const candidate = state === "TRIALING" ? trialEndsAt : currentPeriodEnd;
@@ -115,7 +115,7 @@ export function grantsAccess(
   state: SubscriptionState,
   now: Date,
   currentPeriodEnd: Date | null,
-  trialEndsAt: Date | null,
+  trialEndsAt: Date | null
 ): boolean {
   const window = evaluateAccessWindow(state, now, currentPeriodEnd, trialEndsAt);
   return window.stateAllows && !window.expired;

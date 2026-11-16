@@ -1,5 +1,12 @@
 import type { UsageEventKind } from "@proofstack/contracts";
-import type { Customer, PaymentIntent, StoredInvoice, StoredUsageEvent, StoredWebhookRecord, Subscription } from "./records.js";
+import type {
+  Customer,
+  PaymentIntent,
+  StoredInvoice,
+  StoredUsageEvent,
+  StoredWebhookRecord,
+  Subscription,
+} from "./records.js";
 
 /**
  * Persistence boundary for billing.
@@ -36,7 +43,11 @@ export interface BillingStore {
 
   /** Resolves false when (workspaceId, kind, dedupeKey) already exists. */
   insertUsage(event: StoredUsageEvent): Promise<boolean>;
-  usageByKind(workspaceId: string, periodStart: string, periodEnd: string): Promise<Record<string, number>>;
+  usageByKind(
+    workspaceId: string,
+    periodStart: string,
+    periodEnd: string
+  ): Promise<Record<string, number>>;
 
   saveInvoice(invoice: StoredInvoice): Promise<void>;
   getInvoice(id: string): Promise<StoredInvoice | null>;
@@ -107,7 +118,9 @@ export class MemoryBillingStore implements BillingStore {
   }
 
   async liveSubscription(workspaceId: string): Promise<Subscription | null> {
-    const live = (await this.listSubscriptions(workspaceId)).filter((s) => s.state !== "CANCELLED" && s.state !== "EXPIRED");
+    const live = (await this.listSubscriptions(workspaceId)).filter(
+      (s) => s.state !== "CANCELLED" && s.state !== "EXPIRED"
+    );
     const newest = live.at(-1);
     return newest ? structuredClone(newest) : null;
   }
@@ -154,7 +167,10 @@ export class MemoryBillingStore implements BillingStore {
   }
 
   async listWebhooks(limit: number): Promise<StoredWebhookRecord[]> {
-    return [...this.webhooks.values()].sort((a, b) => b.receivedAt.localeCompare(a.receivedAt)).slice(0, limit).map((w) => structuredClone(w));
+    return [...this.webhooks.values()]
+      .sort((a, b) => b.receivedAt.localeCompare(a.receivedAt))
+      .slice(0, limit)
+      .map((w) => structuredClone(w));
   }
 
   async insertUsage(event: StoredUsageEvent): Promise<boolean> {
@@ -164,7 +180,11 @@ export class MemoryBillingStore implements BillingStore {
     return true;
   }
 
-  async usageByKind(workspaceId: string, periodStart: string, periodEnd: string): Promise<Record<string, number>> {
+  async usageByKind(
+    workspaceId: string,
+    periodStart: string,
+    periodEnd: string
+  ): Promise<Record<string, number>> {
     const totals: Record<string, number> = Object.fromEntries(USAGE_KINDS.map((k) => [k, 0]));
     for (const event of this.usage.values()) {
       if (event.workspaceId !== workspaceId) continue;
@@ -204,6 +224,9 @@ export class MemoryBillingStore implements BillingStore {
   }
 
   async listAudit(workspaceId: string, limit: number): Promise<AuditEntry[]> {
-    return this.audit.filter((a) => a.workspaceId === workspaceId).slice(0, limit).map((a) => structuredClone(a));
+    return this.audit
+      .filter((a) => a.workspaceId === workspaceId)
+      .slice(0, limit)
+      .map((a) => structuredClone(a));
   }
 }

@@ -13,7 +13,8 @@ import { localeProfileSchema } from "./config.js";
 
 export const PROFILE_SET_VERSION = 1;
 
-const FORBIDDEN_FIXTURE_KEYS = /(national_?id|identity_?number|ssn|nin|bvn|cni|cin|passport|drivers?_?license|tax_?id|vat_?number|bank_?account|card_?number|iban)/i;
+const FORBIDDEN_FIXTURE_KEYS =
+  /(national_?id|identity_?number|ssn|nin|bvn|cni|cin|passport|drivers?_?license|tax_?id|vat_?number|bank_?account|card_?number|iban)/i;
 
 export const addressFormatSchema = z
   .object({
@@ -61,7 +62,9 @@ export const localeProfileSchemaData = z
     weekStartsOn: z.number().int().min(0).max(6).default(1),
     /** Collation-sensitive pairs that must sort in the documented order. */
     collationSamples: z
-      .array(z.object({ a: z.string(), b: z.string(), expected: z.enum(["lt", "gt", "eq"]) }).strict())
+      .array(
+        z.object({ a: z.string(), b: z.string(), expected: z.enum(["lt", "gt", "eq"]) }).strict()
+      )
       .default([]),
     fixtures: z
       .object({

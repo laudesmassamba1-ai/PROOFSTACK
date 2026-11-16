@@ -217,7 +217,7 @@ export function Settings() {
               </button>
             ))}
           </div>
-          <Cannot reason="Stored in this browser. The dashboard is translated; run reports keep the language of the project config." />
+          <Cannot reason="Stored in this browser. The marketing shell, home page, pricing and account forms follow this choice. Long-form technical pages and the authenticated dashboard are English-only; run reports keep the language of the project config." />
         </Card>
       </div>
 

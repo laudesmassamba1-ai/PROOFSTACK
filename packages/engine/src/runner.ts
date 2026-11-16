@@ -1,7 +1,6 @@
 import {
   type Assertion,
   aggregateStatus,
-  testRunSchema,
   type Finding,
   type ModuleId,
   type ModuleRun,
@@ -10,18 +9,25 @@ import {
   type TestCaseResult,
   type TestRun,
   type TestStatus,
+  testRunSchema,
 } from "@proofstack/contracts";
 import {
+  type Clock,
+  durationMs,
   FixedClock,
   Logger,
   ProofstackError,
-  durationMs,
   sha256Hex,
   toFailureRecord,
   uuid,
-  type Clock,
 } from "@proofstack/core";
-import { AssertionFailed, CaseContext, NullEvidenceStore, SkipRequested, TimeoutRequested } from "./context.js";
+import {
+  AssertionFailed,
+  CaseContext,
+  NullEvidenceStore,
+  SkipRequested,
+  TimeoutRequested,
+} from "./context.js";
 import { fingerprintFinding } from "./fingerprint.js";
 import { rngFor } from "./rng.js";
 import type {
@@ -71,6 +77,7 @@ export async function runEngine(options: EngineOptions): Promise<EngineRunResult
   const runId = options.runId ?? `run_${uuid()}`;
   const only = new Set<ModuleId>(options.only ?? config.enabledModules);
   const providers = options.providers.filter((p) => only.has(p.id));
+  const onlyCases = (options.onlyCases ?? []).map((pattern) => pattern.trim().toLowerCase()).filter(Boolean);
 
   if (providers.length === 0) {
     throw new ProofstackError({
@@ -85,7 +92,8 @@ export async function runEngine(options: EngineOptions): Promise<EngineRunResult
   const external = options.signal;
   if (external) {
     if (external.aborted) controller.abort(external.reason);
-    else external.addEventListener("abort", () => controller.abort(external.reason), { once: true });
+    else
+      external.addEventListener("abort", () => controller.abort(external.reason), { once: true });
   }
 
   const startedAt = clock.now();
@@ -98,12 +106,37 @@ export async function runEngine(options: EngineOptions): Promise<EngineRunResult
     });
     for (const suite of suites) {
       for (const caseDef of suite.cases) {
+        if (onlyCases.length > 0 && !matchesOnlyCases(caseDef, suite, onlyCases)) continue;
         planned.push({ provider, suite, caseDef, index: planned.length });
       }
     }
   }
 
-  logger.debug("engine scheduled", { runId, cases: planned.length, modules: providers.map((p) => p.id) });
+  // An explicit `--only` that matches nothing is an operator error, not an empty pass.
+  // A provider that legitimately emits no cases is left to the status model, where an
+  // empty module is ERROR rather than a vacuous success.
+  if (planned.length === 0 && onlyCases.length > 0) {
+    throw new ProofstackError({
+      message: `no case matched --only ${onlyCases.join(", ")}`,
+      category: "CONFIGURATION",
+      code: "no_matching_cases",
+      details: { onlyCases, requestedModules: [...only] },
+    });
+  }
+
+  // A module whose cases were all filtered out by `--only` must not appear as an
+  // empty ERROR module: it simply did not participate in this run.
+  const activeIds = new Set(planned.map((item) => item.provider.id));
+  const activeProviders =
+    onlyCases.length > 0
+      ? providers.filter((provider) => activeIds.has(provider.id))
+      : providers;
+
+  logger.debug("engine scheduled", {
+    runId,
+    cases: planned.length,
+    modules: activeProviders.map((p) => p.id),
+  });
 
   const outcomes = new Map<number, CaseOutcome>();
   let cursor = 0;
@@ -167,7 +200,7 @@ export async function runEngine(options: EngineOptions): Promise<EngineRunResult
   const allFindings: Finding[] = [];
   for (const outcome of ordered) allFindings.push(...outcome.findings);
 
-  const moduleRuns: ModuleRun[] = providers.map((provider) => {
+  const moduleRuns: ModuleRun[] = activeProviders.map((provider) => {
     const cases = ordered.filter((o) => o.result.module === provider.id).map((o) => o.result);
     const starts = cases.map((c) => Date.parse(c.startedAt));
     const ends = cases.map((c) => Date.parse(c.endedAt));
@@ -220,7 +253,7 @@ export async function runEngine(options: EngineOptions): Promise<EngineRunResult
     startedAt: new Date(startedAt).toISOString(),
     endedAt: new Date(endedAt).toISOString(),
     durationMs: durationMs(startedAt, endedAt),
-    modules: providers.map((p) => p.id),
+    modules: activeProviders.map((p) => p.id),
     moduleRuns,
     findings: allFindings,
     engineVersion: ENGINE_VERSION,
@@ -230,7 +263,9 @@ export async function runEngine(options: EngineOptions): Promise<EngineRunResult
 
   const parsed = testRunSchema.safeParse(candidate);
   if (!parsed.success) {
-    const issues = parsed.error.issues.map((i) => ` - ${i.path.join(".")}: ${i.message}`).join("\n");
+    const issues = parsed.error.issues
+      .map((i) => ` - ${i.path.join(".")}: ${i.message}`)
+      .join("\n");
     throw new ProofstackError({
       message: `engine produced a run that violates the shared contract:\n${issues}`,
       category: "INTERNAL",
@@ -293,10 +328,20 @@ async function executeCase(item: Planned, deps: ExecuteDeps): Promise<CaseOutcom
         skippedReason = error.reason;
       } else if (error instanceof AssertionFailed) {
         status = "FAILED";
-        failure = { message: error.message, category: error.category, code: error.code, retryable: false };
+        failure = {
+          message: error.message,
+          category: error.category,
+          code: error.code,
+          retryable: false,
+        };
       } else if (error instanceof TimeoutRequested) {
         status = "ERROR";
-        failure = { message: error.message, category: "TIMEOUT", code: error.code, retryable: true };
+        failure = {
+          message: error.message,
+          category: "TIMEOUT",
+          code: error.code,
+          retryable: true,
+        };
       } else {
         const record = toFailureRecord(error);
         status = "ERROR";
@@ -315,7 +360,11 @@ async function executeCase(item: Planned, deps: ExecuteDeps): Promise<CaseOutcom
     const isLastAttempt = attempt >= maxAttempts;
 
     if (!isLastAttempt && failure?.retryable === true && status === "ERROR") {
-      deps.logger.warn("retrying case after harness error", { caseId: caseDef.id, attempt, category: failure.category });
+      deps.logger.warn("retrying case after harness error", {
+        caseId: caseDef.id,
+        attempt,
+        category: failure.category,
+      });
       continue;
     }
 
@@ -326,7 +375,9 @@ async function executeCase(item: Planned, deps: ExecuteDeps): Promise<CaseOutcom
         endedAt: new Date(endedAt).toISOString(),
         durationMs: durationMs(startedAt, endedAt),
         environment: deps.config.environment,
-        ...(deps.config.project.revision === undefined ? {} : { revision: deps.config.project.revision }),
+        ...(deps.config.project.revision === undefined
+          ? {}
+          : { revision: deps.config.project.revision }),
         ...(skippedReason === undefined ? {} : { skippedReason }),
         ...(failure === undefined ? {} : { failure }),
       }),
@@ -336,12 +387,21 @@ async function executeCase(item: Planned, deps: ExecuteDeps): Promise<CaseOutcom
       ...(caseDef.profile === undefined ? {} : { profile: caseDef.profile }),
     };
 
-    const findings = await buildFindings(result, ctx.assertions, ctx.reports, ctx.evidence.map((e) => e.id));
+    const findings = await buildFindings(
+      result,
+      ctx.assertions,
+      ctx.reports,
+      ctx.evidence.map((e) => e.id)
+    );
     result.findingIds = findings.map((f) => f.id);
     return { result, findings };
   }
 
-  throw new ProofstackError({ message: "engine: unreachable retry exit", category: "INTERNAL", code: "unreachable" });
+  throw new ProofstackError({
+    message: "engine: unreachable retry exit",
+    category: "INTERNAL",
+    code: "unreachable",
+  });
 }
 
 function retryableCategory(retryOn: readonly string[], category: string): boolean {
@@ -359,7 +419,7 @@ async function raceWithTimeout(
   work: void | Promise<void>,
   timeoutMs: number,
   local: AbortController,
-  caseId: string,
+  caseId: string
 ): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -368,13 +428,37 @@ async function raceWithTimeout(
       new Promise<never>((_resolve, reject) => {
         timer = setTimeout(() => {
           local.abort("timeout");
-          reject(new TimeoutRequested(`case ${caseId} exceeded ${timeoutMs}ms`, { caseId, timeoutMs }));
+          reject(
+            new TimeoutRequested(`case ${caseId} exceeded ${timeoutMs}ms`, { caseId, timeoutMs })
+          );
         }, timeoutMs);
       }),
     ]);
   } finally {
     if (timer !== undefined) clearTimeout(timer);
   }
+}
+
+/**
+ * `--only` is a substring filter over the fields a human would type or copy from a
+ * report. It is applied by the scheduler rather than by each module so WORLD, FLOW and
+ * EXIT all honour it the same way, including fixture-category patterns like "address"
+ * (WORLD case ids embed the profile and category).
+ */
+function matchesOnlyCases(
+  caseDef: TestCaseDef,
+  suite: TestSuiteDef,
+  patterns: readonly string[]
+): boolean {
+  const haystacks = [
+    caseDef.id,
+    caseDef.name,
+    caseDef.module,
+    caseDef.profile ?? "",
+    suite.id,
+    suite.name,
+  ].map((value) => value.toLowerCase());
+  return patterns.some((pattern) => haystacks.some((value) => value.includes(pattern)));
 }
 
 function baseResult(
@@ -389,7 +473,7 @@ function baseResult(
     revision?: string;
     skippedReason?: string;
     failure?: TestCaseResult["failure"];
-  },
+  }
 ): TestCaseResult {
   return {
     id: caseDef.id,
@@ -423,7 +507,7 @@ async function buildFindings(
   result: TestCaseResult,
   assertions: readonly Assertion[],
   reports: readonly ReportCall[],
-  evidenceIds: readonly string[],
+  evidenceIds: readonly string[]
 ): Promise<Finding[]> {
   const out: Finding[] = [];
   const repro = {
@@ -443,7 +527,7 @@ async function buildFindings(
       field: assertion.target,
     });
     out.push({
-      id: `fnd_${(await shortHash(`${result.id}${assertion.id}`))}`,
+      id: `fnd_${await shortHash(`${result.id}${assertion.id}`)}`,
       testCaseId: result.id,
       module: result.module,
       title: `${result.name}: ${assertion.description}`,
@@ -479,7 +563,7 @@ async function buildFindings(
       field: report.field,
     });
     out.push({
-      id: `fnd_${(await shortHash(`${result.id}${report.title}`))}`,
+      id: `fnd_${await shortHash(`${result.id}${report.title}`)}`,
       testCaseId: result.id,
       module: result.module,
       title: `${result.name}: ${report.title}`,
@@ -507,7 +591,7 @@ async function buildFindings(
       code: result.failure.code,
     });
     out.push({
-      id: `fnd_${(await shortHash(`${result.id}err`))}`,
+      id: `fnd_${await shortHash(`${result.id}err`)}`,
       testCaseId: result.id,
       module: result.module,
       title: `${result.name}: execution error`,

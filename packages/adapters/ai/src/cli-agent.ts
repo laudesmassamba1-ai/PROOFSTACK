@@ -133,7 +133,9 @@ export class CliAgent {
         agent: this.name,
         answer: asText(failed.stdout).trim(),
         exitCode: typeof failed.code === "number" ? failed.code : 1,
-        stderr: asText(failed.stderr ?? (error instanceof Error ? error.message : String(error))).trim(),
+        stderr: asText(
+          failed.stderr ?? (error instanceof Error ? error.message : String(error))
+        ).trim(),
         durationMs: Date.now() - startedAt,
         timedOut,
       };
@@ -152,7 +154,7 @@ export class CliAgent {
     env: Record<string, string>,
     prompt: string,
     startedAt: number,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<CliAgentResult> {
     return new Promise<CliAgentResult>((resolve) => {
       const child = spawn(file, args, {
@@ -249,7 +251,7 @@ function asText(value: string | Buffer | undefined): string {
 export function buildAgentArgv(
   command: readonly string[],
   prompt: string,
-  delivery: "stdin" | "arg",
+  delivery: "stdin" | "arg"
 ): { file: string; args: string[]; stdin?: string } {
   const [file, ...rest] = command;
   if (!file) {
@@ -263,6 +265,8 @@ export function buildAgentArgv(
   const hasPlaceholder = rest.some((arg) => arg.includes("{prompt}"));
   return {
     file,
-    args: hasPlaceholder ? rest.map((arg) => arg.replaceAll("{prompt}", prompt)) : [...rest, prompt],
+    args: hasPlaceholder
+      ? rest.map((arg) => arg.replaceAll("{prompt}", prompt))
+      : [...rest, prompt],
   };
 }

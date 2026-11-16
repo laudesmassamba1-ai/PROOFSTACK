@@ -1,10 +1,9 @@
+import { PLANS, SUPPORTED_CURRENCIES, yearlySavingPercent } from "@proofstack/billing";
+import { type EntitlementKey, planSchema } from "@proofstack/contracts";
+import { Money } from "@proofstack/core";
+import { Check, Minus } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
-import { Check, Minus } from "lucide-react";
-import { Money } from "@proofstack/core";
-import { yearlySavingPercent } from "@proofstack/billing";
-import { planSchema, type EntitlementKey, type Plan } from "@proofstack/contracts";
-import { PLANS, SUPPORTED_CURRENCIES } from "@proofstack/billing";
 import { useI18n } from "../../i18n/index.js";
 
 type Period = "monthly" | "yearly";
@@ -59,7 +58,9 @@ export function PricingTable({ currentPlanKey }: { currentPlanKey?: string }) {
 
       <div className="grid gap-5 lg:grid-cols-4">
         {featured.map((plan) => {
-          const price = plan.prices.find((entry) => entry.period === period && entry.amount.currency === currency);
+          const price = plan.prices.find(
+            (entry) => entry.period === period && entry.amount.currency === currency
+          );
           const saving = period === "yearly" ? yearlySavingPercent(plan, currency) : undefined;
           const isFree = plan.prices.length === 0;
           const isCurrent = plan.key === currentPlanKey;
@@ -72,22 +73,26 @@ export function PricingTable({ currentPlanKey }: { currentPlanKey?: string }) {
             >
               {plan.key === "studio" ? (
                 <span className="absolute -top-3 left-6 rounded-full bg-brand-mint px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-[#05231b]">
-                  Most coverage
+                  {t("mkt.pricing.featured")}
                 </span>
               ) : null}
 
               <h3 className="text-[1.05rem] font-semibold">{plan.name}</h3>
-              <p className="mt-1.5 min-h-[3.2rem] text-[0.84rem] leading-relaxed text-white/52">{plan.description}</p>
+              <p className="mt-1.5 min-h-[3.2rem] text-[0.84rem] leading-relaxed text-white/52">
+                {plan.description}
+              </p>
 
               <div className="mt-4 flex items-baseline gap-2">
                 {isFree ? (
-                  <span className="text-[2.1rem] font-semibold tracking-tight">{t("pricing.free")}</span>
+                  <span className="text-[2.1rem] font-semibold tracking-tight">
+                    {t("pricing.free")}
+                  </span>
                 ) : price ? (
                   <>
                     <span className="text-[2.1rem] font-semibold tracking-tight tabular-nums">
                       {Money.of(price.amount.currency, BigInt(price.amount.minor)).format(
                         locale === "fr" ? "fr-FR" : "en-US",
-                        { maximumFractionDigits: price.amount.currency === "XOF" ? 0 : 2 },
+                        { maximumFractionDigits: price.amount.currency === "XOF" ? 0 : 2 }
                       )}
                     </span>
                     <span className="text-[0.84rem] text-white/46">
@@ -95,7 +100,9 @@ export function PricingTable({ currentPlanKey }: { currentPlanKey?: string }) {
                     </span>
                   </>
                 ) : (
-                  <span className="text-[1.4rem] font-semibold text-white/60">{currency} — not offered</span>
+                  <span className="text-[1.4rem] font-semibold text-white/60">
+                    {t("mkt.pricing.notOffered").replace("{currency}", currency)}
+                  </span>
                 )}
               </div>
 
@@ -106,23 +113,55 @@ export function PricingTable({ currentPlanKey }: { currentPlanKey?: string }) {
               ) : null}
 
               <ul className="mt-5 space-y-2.5 text-[0.85rem]">
-                <LimitLine label="Projects" value={plan.entitlements.project_limit} />
-                <LimitLine label="Test runs / month" value={plan.entitlements.monthly_test_runs} />
-                <LimitLine label="WORLD locale profiles" value={plan.entitlements.world_profiles} />
-                <LimitLine label="FLOW scenarios" value={plan.entitlements.flow_scenarios} />
-                <LimitLine label="EXIT datasets" value={plan.entitlements.exit_datasets} />
-                <LimitLine label="Team members" value={plan.entitlements.team_members} />
-                <LimitLine label="Report retention (days)" value={plan.entitlements.report_retention_days} />
-                <FlagLine label="CLI cloud sync" value={plan.entitlements.cli_access} />
-                <FlagLine label="API access" value={plan.entitlements.api_access} />
-                <FlagLine label="GitHub integration" value={plan.entitlements.github_integration} />
-                <FlagLine label="Advanced reports" value={plan.entitlements.advanced_reports} />
-                <FlagLine label="Client-facing reports" value={plan.entitlements.client_sharing} />
+                <LimitLine
+                  label={t("mkt.pricing.projects")}
+                  value={plan.entitlements.project_limit}
+                />
+                <LimitLine
+                  label={t("mkt.pricing.runs")}
+                  value={plan.entitlements.monthly_test_runs}
+                />
+                <LimitLine
+                  label={t("mkt.pricing.worldProfiles")}
+                  value={plan.entitlements.world_profiles}
+                />
+                <LimitLine
+                  label={t("mkt.pricing.flowScenarios")}
+                  value={plan.entitlements.flow_scenarios}
+                />
+                <LimitLine
+                  label={t("mkt.pricing.exitDatasets")}
+                  value={plan.entitlements.exit_datasets}
+                />
+                <LimitLine
+                  label={t("mkt.pricing.teamMembers")}
+                  value={plan.entitlements.team_members}
+                />
+                <LimitLine
+                  label={t("mkt.pricing.retention")}
+                  value={plan.entitlements.report_retention_days}
+                />
+                <FlagLine label={t("mkt.pricing.cli")} value={plan.entitlements.cli_access} />
+                <FlagLine label={t("mkt.pricing.api")} value={plan.entitlements.api_access} />
+                <FlagLine
+                  label={t("mkt.pricing.github")}
+                  value={plan.entitlements.github_integration}
+                />
+                <FlagLine
+                  label={t("mkt.pricing.advanced")}
+                  value={plan.entitlements.advanced_reports}
+                />
+                <FlagLine
+                  label={t("mkt.pricing.client")}
+                  value={plan.entitlements.client_sharing}
+                />
               </ul>
 
               <div className="mt-6 grow" />
               {isCurrent ? (
-                <span className="btn btn-ghost justify-center opacity-70">{t("pricing.current")}</span>
+                <span className="btn btn-ghost justify-center opacity-70">
+                  {t("pricing.current")}
+                </span>
               ) : (
                 <Link
                   to={`/signup?plan=${plan.key}&period=${period}&currency=${currency}`}
@@ -133,7 +172,7 @@ export function PricingTable({ currentPlanKey }: { currentPlanKey?: string }) {
               )}
               {plan.prepaidOnly ? (
                 <p className="mt-3 text-[0.72rem] leading-relaxed text-white/38">
-                  Prepaid period · manual renewal with a {plan.graceDays}-day grace window.
+                  {t("mkt.pricing.prepaid").replace("{days}", String(plan.graceDays))}
                 </p>
               ) : null}
             </article>
@@ -143,15 +182,30 @@ export function PricingTable({ currentPlanKey }: { currentPlanKey?: string }) {
 
       <div className="brand-panel mt-6 p-6">
         <h4 className="text-[0.95rem] font-semibold">{t("pricing.renewal.title")}</h4>
-        <p className="mt-2 max-w-[92ch] text-[0.86rem] leading-relaxed text-white/56">{t("pricing.renewal.body")}</p>
+        <p className="mt-2 max-w-[92ch] text-[0.86rem] leading-relaxed text-white/56">
+          {t("pricing.renewal.body")}
+        </p>
       </div>
     </div>
   );
 }
 
-function LimitLine({ label, value }: { label: string; value: EntitlementKey | number | boolean | undefined }) {
+function LimitLine({
+  label,
+  value,
+}: {
+  label: string;
+  value: EntitlementKey | number | boolean | undefined;
+}) {
+  const { t } = useI18n();
   const display =
-    value === true ? "yes" : value === false ? "no" : Number(value) === -1 ? "Unlimited" : String(value ?? 0);
+    value === true
+      ? t("mkt.yes")
+      : value === false
+        ? t("mkt.no")
+        : Number(value) === -1
+          ? t("mkt.pricing.unlimited")
+          : String(value ?? 0);
   return (
     <li className="flex items-center justify-between gap-3 border-b border-white/6 pb-2 last:border-0">
       <span className="text-white/56">{label}</span>
@@ -161,13 +215,16 @@ function LimitLine({ label, value }: { label: string; value: EntitlementKey | nu
 }
 
 function FlagLine({ label, value }: { label: string; value: boolean | number | undefined }) {
+  const { t } = useI18n();
   const on = value === true;
   return (
     <li className="flex items-center justify-between gap-3 text-[0.85rem]">
       <span className="text-white/56">{label}</span>
       <span className={on ? "text-brand-mint" : "text-white/26"}>
         {on ? <Check size={15} /> : <Minus size={15} />}
-        <span className="sr-only">{on ? "included" : "not included"}</span>
+        <span className="sr-only">
+          {on ? t("mkt.pricing.included") : t("mkt.pricing.notIncluded")}
+        </span>
       </span>
     </li>
   );

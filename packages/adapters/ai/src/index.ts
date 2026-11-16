@@ -18,8 +18,9 @@
  * Nothing here is required for the product to work, and no key is ever stored: every
  * credential is read from an environment variable at call time.
  */
-export * from "./mcp.js";
-export * from "./provider.js";
+
 export * from "./agent.js";
 export * from "./cli-agent.js";
+export * from "./mcp.js";
+export * from "./provider.js";
 export * from "./runtime.js";

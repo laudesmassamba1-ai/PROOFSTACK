@@ -6,16 +6,23 @@ import { ProofstackError } from "./errors.js";
  * JSON.stringify does not guarantee because key order follows insertion order.
  */
 
-export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
 
 export function stableStringify(value: unknown, indent = 0): string {
   const seen = new WeakSet<object>();
   const walk = (node: unknown, depth: number): string => {
-    if (node === undefined) throw new ProofstackError({
-      message: "stableStringify: undefined is not a JSON value",
-      category: "VALIDATION",
-      code: "undefined_value",
-    });
+    if (node === undefined)
+      throw new ProofstackError({
+        message: "stableStringify: undefined is not a JSON value",
+        category: "VALIDATION",
+        code: "undefined_value",
+      });
     if (typeof node === "bigint") return JSON.stringify(`${node}n`);
     if (node === null || typeof node !== "object") return JSON.stringify(node);
     if (seen.has(node as object)) {
@@ -38,7 +45,9 @@ export function stableStringify(value: unknown, indent = 0): string {
       return `[${nl}${items.join(`,${nl}`)}${nl}${closePad}]`;
     }
     const obj = node as Record<string, unknown>;
-    const keys = Object.keys(obj).filter((k) => obj[k] !== undefined).sort();
+    const keys = Object.keys(obj)
+      .filter((k) => obj[k] !== undefined)
+      .sort();
     if (keys.length === 0) return "{}";
     const sep = pretty ? ": " : ":";
     const entries = keys.map((k) => `${pad}${JSON.stringify(k)}${sep}${walk(obj[k], depth + 1)}`);
@@ -52,7 +61,9 @@ export function canonical(value: unknown): string {
   return stableStringify(value, 0);
 }
 
-export function parseJsonSafe(text: string): { ok: true; value: JsonValue } | { ok: false; error: string } {
+export function parseJsonSafe(
+  text: string
+): { ok: true; value: JsonValue } | { ok: false; error: string } {
   try {
     return { ok: true, value: JSON.parse(text) as JsonValue };
   } catch (error) {

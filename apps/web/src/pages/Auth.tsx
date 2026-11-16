@@ -3,25 +3,9 @@ import { CircleAlert, CircleCheck, LoaderCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { z } from "zod";
-import { Wordmark } from "../components/brand/Logo.js";
 import { useI18n } from "../i18n/index.js";
 import { API_BASE, type Probe, postJson, probeApi } from "../lib/api.js";
 import { useSession } from "../lib/session.js";
-
-const signInSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1, "Required"),
-});
-
-const signUpSchema = signInSchema
-  .extend({
-    name: z.string().min(2, "At least 2 characters"),
-    workspace: z.string().min(2, "At least 2 characters"),
-  })
-  .refine((value) => value.password.length >= 10, {
-    message: "Use at least 10 characters",
-    path: ["password"],
-  });
 
 type Mode = "in" | "up";
 
@@ -46,6 +30,24 @@ export function Auth({ mode }: { mode: Mode }) {
     return key ? findPlan(key) : undefined;
   }, [params]);
 
+  // Validation messages follow the interface language instead of staying English.
+  const schemas = useMemo(() => {
+    const signIn = z.object({
+      email: z.string().email(t("auth.error.email")),
+      password: z.string().min(1, t("auth.error.required")),
+    });
+    const signUp = signIn
+      .extend({
+        name: z.string().min(2, t("auth.error.min2")),
+        workspace: z.string().min(2, t("auth.error.min2")),
+      })
+      .refine((value) => value.password.length >= 10, {
+        message: t("auth.error.password10"),
+        path: ["password"],
+      });
+    return { in: signIn, up: signUp };
+  }, [t]);
+
   useEffect(() => {
     let cancelled = false;
     probeApi().then((result) => {
@@ -59,7 +61,7 @@ export function Auth({ mode }: { mode: Mode }) {
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setErrors({});
-    const schema = mode === "in" ? signInSchema : signUpSchema;
+    const schema = mode === "in" ? schemas.in : schemas.up;
     const parsed = schema.safeParse(values);
     if (!parsed.success) {
       const next: Record<string, string> = {};
@@ -98,20 +100,16 @@ export function Auth({ mode }: { mode: Mode }) {
 
   return (
     <div className="mx-auto flex min-h-[calc(100vh-6rem)] max-w-[520px] flex-col justify-center px-5 py-10">
-      <Link to="/" className="mb-8 self-start">
-        <Wordmark size={14} />
-      </Link>
-
       <h1 className="text-[1.6rem] tracking-tight">
         {mode === "in" ? t("auth.signin.title") : t("auth.signup.title")}
       </h1>
 
       {plan ? (
         <p className="mt-3 rounded-lg border border-brand-mint/30 bg-brand-mint/8 px-3 py-2 text-[0.82rem] text-white/74">
-          Selected plan: <strong>{plan.name}</strong>
-          {params.get("period") ? ` · ${params.get("period")}` : ""}
-          {params.get("currency") ? ` · ${params.get("currency")}` : ""}. The plan is applied after
-          the account exists; the price is re-read from the server at checkout.
+          {t("mkt.auth.selected")
+            .replace("{plan}", plan.name)
+            .replace("{period}", params.get("period") ? ` · ${params.get("period")}` : "")
+            .replace("{currency}", params.get("currency") ? ` · ${params.get("currency")}` : "")}
         </p>
       ) : null}
 

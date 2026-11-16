@@ -1,19 +1,19 @@
-import { describe, expect, it } from "vitest";
-import { FixedClock } from "@proofstack/core";
 import { SandboxProvider } from "@proofstack/adapter-payments";
+import { FixedClock } from "@proofstack/core";
+import { describe, expect, it } from "vitest";
 import {
   CheckoutService,
-  MemoryBillingStore,
-  ReconciliationService,
-  UsageMeter,
-  WebhookProcessor,
   checkEntitlement,
   entitlementsFor,
   findPlan,
+  MemoryBillingStore,
   normalizeEmail,
   planChangeEffect,
+  ReconciliationService,
   resolveEntitlements,
   type Subscription,
+  UsageMeter,
+  WebhookProcessor,
 } from "../src/index.js";
 
 /**
@@ -26,7 +26,9 @@ import {
 
 const WORKSPACE = "ws_test_1";
 
-function harness(options: { outcome?: "success" | "declined" | "pending" | "cancelled" | "expired" } = {}) {
+function harness(
+  options: { outcome?: "success" | "declined" | "pending" | "cancelled" | "expired" } = {}
+) {
   const store = new MemoryBillingStore();
   const provider = new SandboxProvider({ outcome: options.outcome ?? "pending" });
   const clock = new FixedClock("2026-03-01T10:00:00.000Z");
@@ -151,7 +153,11 @@ describe("entitlement engine", () => {
       cancelAtPeriodEnd: false,
       recurringSupported: false,
     };
-    const decision = checkEntitlement({ ...free, modules: [...free.modules] }, { key: "project_limit" }, 1);
+    const decision = checkEntitlement(
+      { ...free, modules: [...free.modules] },
+      { key: "project_limit" },
+      1
+    );
     expect(decision.allowed).toBe(false);
     expect(decision.reason).toBe("quota_project_limit_exhausted");
     expect(decision.requiredPlanKey).toBe("developer");
@@ -174,7 +180,11 @@ describe("entitlement engine", () => {
       cancelAtPeriodEnd: false,
       recurringSupported: false,
     };
-    const decision = checkEntitlement(entitlements, { key: "project_limit", requested: 10_000 }, 999_999);
+    const decision = checkEntitlement(
+      entitlements,
+      { key: "project_limit", requested: 10_000 },
+      999_999
+    );
     expect(decision.allowed).toBe(true);
     expect(decision.remaining).toBe(-1);
   });
@@ -238,7 +248,7 @@ describe("checkout: a redirect never grants a plan", () => {
         currency: "JPY",
         customer,
         provider: "sandbox",
-      }),
+      })
     ).rejects.toThrow(/does not declare support for JPY|no configured price/);
   });
 
@@ -252,7 +262,7 @@ describe("checkout: a redirect never grants a plan", () => {
         currency: "USD",
         customer,
         provider: "sandbox",
-      }),
+      })
     ).rejects.toThrow(/Unknown plan/);
   });
 
@@ -366,7 +376,10 @@ describe("webhooks", () => {
 
   it("rejects a tampered signature", async () => {
     const { webhooks, provider } = harness();
-    const signed = await provider.signWebhook("payment.success", { id: "txn_1", status: "SUCCESS" });
+    const signed = await provider.signWebhook("payment.success", {
+      id: "txn_1",
+      status: "SUCCESS",
+    });
     const outcome = await webhooks.handle({
       body: signed.body,
       headers: { ...signed.headers, "x-webhook-signature": "0".repeat(64) },
@@ -450,8 +463,16 @@ describe("webhooks", () => {
 describe("usage metering", () => {
   it("meters a subject once no matter how many times it is reported", async () => {
     const { meter } = harness();
-    const first = await meter.meter({ workspaceId: WORKSPACE, kind: "test_run", subjectId: "run_1" });
-    const second = await meter.meter({ workspaceId: WORKSPACE, kind: "test_run", subjectId: "run_1" });
+    const first = await meter.meter({
+      workspaceId: WORKSPACE,
+      kind: "test_run",
+      subjectId: "run_1",
+    });
+    const second = await meter.meter({
+      workspaceId: WORKSPACE,
+      kind: "test_run",
+      subjectId: "run_1",
+    });
 
     expect(first.counted).toBe(true);
     expect(first.reason).toBe("recorded");
@@ -477,10 +498,18 @@ describe("usage metering", () => {
     const { meter } = harness();
     const limit = entitlementsFor("free").monthly_test_runs as number;
     for (let i = 0; i < limit; i += 1) {
-      const result = await meter.meter({ workspaceId: WORKSPACE, kind: "test_run", subjectId: `run_${i}` });
+      const result = await meter.meter({
+        workspaceId: WORKSPACE,
+        kind: "test_run",
+        subjectId: `run_${i}`,
+      });
       expect(result.counted).toBe(true);
     }
-    const over = await meter.meter({ workspaceId: WORKSPACE, kind: "test_run", subjectId: "run_over" });
+    const over = await meter.meter({
+      workspaceId: WORKSPACE,
+      kind: "test_run",
+      subjectId: "run_over",
+    });
     expect(over.counted).toBe(false);
     expect(over.reason).toBe("quota_exhausted");
   });

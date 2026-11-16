@@ -1,13 +1,5 @@
 import { z } from "zod";
 import {
-  environmentKindSchema,
-  moduleIdSchema,
-  moduleIdStringSchema,
-  runStatusSchema,
-  testStatusSchema,
-} from "./statuses.js";
-import { isoInstantSchema, moduleTotalsSchema, testRunSchema } from "./engine.js";
-import {
   checkoutIntentSchema,
   entitlementKeySchema,
   entitlementKeyStringSchema,
@@ -16,7 +8,14 @@ import {
   planSchema,
   subscriptionStateSchema,
 } from "./billing.js";
+import { isoInstantSchema, testRunSchema } from "./engine.js";
 import { moneySchema } from "./money.js";
+import {
+  environmentKindSchema,
+  moduleIdSchema,
+  runStatusSchema,
+  testStatusSchema,
+} from "./statuses.js";
 
 /**
  * HTTP contracts for the PROOFSTACK API. The web app and the CLI/SDK both consume
@@ -80,9 +79,7 @@ export const createProjectRequestSchema = z
   })
   .strict();
 
-export const createWorkspaceRequestSchema = z
-  .object({ name: z.string().min(2).max(80) })
-  .strict();
+export const createWorkspaceRequestSchema = z.object({ name: z.string().min(2).max(80) }).strict();
 
 /**
  * Run upload: the CLI sends the run it produced. `idempotencyKey` is mandatory so
@@ -94,14 +91,19 @@ export const runUploadRequestSchema = z
     /** Trimmed summary so list endpoints do not need the full payload. */
     summary: z
       .object({
-        totals: z.record(moduleIdSchema, z.object({
-          total: z.number().int(),
-          passed: z.number().int(),
-          failed: z.number().int(),
-          warnings: z.number().int(),
-          errors: z.number().int(),
-          skipped: z.number().int(),
-        }).strict()),
+        totals: z.record(
+          moduleIdSchema,
+          z
+            .object({
+              total: z.number().int(),
+              passed: z.number().int(),
+              failed: z.number().int(),
+              warnings: z.number().int(),
+              errors: z.number().int(),
+              skipped: z.number().int(),
+            })
+            .strict()
+        ),
       })
       .strict(),
   })
@@ -144,7 +146,12 @@ export const reportListItemSchema = z
   .strict();
 export type ReportListItem = z.infer<typeof reportListItemSchema>;
 
-export const apiKeyScopeSchema = z.enum(["project:read", "runs:write", "reports:read", "usage:read"]);
+export const apiKeyScopeSchema = z.enum([
+  "project:read",
+  "runs:write",
+  "reports:read",
+  "usage:read",
+]);
 export type ApiKeyScope = z.infer<typeof apiKeyScopeSchema>;
 
 export const createApiKeyRequestSchema = z
@@ -225,7 +232,7 @@ export const subscriptionSummarySchema = z
             used: z.number().int().nonnegative(),
             limit: z.union([z.number().int(), z.literal(-1)]),
           })
-          .strict(),
+          .strict()
       )
       .optional(),
   })
@@ -245,7 +252,7 @@ export const usageSummarySchema = z
           /** Billing treatment of the counted events, surfaced so it is not folklore. */
           counted: z.string(),
         })
-        .strict(),
+        .strict()
     ),
   })
   .strict();
@@ -292,7 +299,9 @@ export const paymentStatusResponseSchema = z
     /** Explicitly false until a verified transaction exists. */
     entitled: z.boolean(),
     message: z.string(),
-    nextAction: z.enum(["none", "verify", "retry", "manual_renewal", "contact_support"]).default("none"),
+    nextAction: z
+      .enum(["none", "verify", "retry", "manual_renewal", "contact_support"])
+      .default("none"),
   })
   .strict();
 export type PaymentStatusResponse = z.infer<typeof paymentStatusResponseSchema>;
@@ -340,7 +349,7 @@ export const overviewResponseSchema = z
           detectedAt: isoInstantSchema,
           projectId: z.string(),
         })
-        .strict(),
+        .strict()
     ),
     usage: usageSummarySchema,
     subscription: subscriptionSummarySchema,

@@ -1,6 +1,5 @@
 import type { PaymentState } from "@proofstack/contracts";
-import { Money, ProofstackError, iso } from "@proofstack/core";
-import { verifyHmacWebhook } from "./sandbox.js";
+import { iso, Money, ProofstackError } from "@proofstack/core";
 import type {
   CheckoutInput,
   CheckoutResult,
@@ -10,6 +9,7 @@ import type {
   VerifiedWebhook,
 } from "./provider.js";
 import { PaymentProviderError } from "./provider.js";
+import { verifyHmacWebhook } from "./sandbox.js";
 
 /**
  * SasPay adapter — written against the published OpenAPI 3.1 document stored at
@@ -72,7 +72,10 @@ export class SasPayProvider implements PaymentProvider {
     }
     this.apiKey = config.apiKey;
     this.webhookSecret = config.webhookSecret;
-    this.baseUrl = (config.baseUrl ?? (config.apiKey.startsWith("sk_test_") ? SASPAY_SANDBOX_BASE : SASPAY_LIVE_BASE)).replace(/\/+$/, "");
+    this.baseUrl = (
+      config.baseUrl ??
+      (config.apiKey.startsWith("sk_test_") ? SASPAY_SANDBOX_BASE : SASPAY_LIVE_BASE)
+    ).replace(/\/+$/, "");
     this.fetchImpl = config.fetchImpl ?? fetch;
     this.feeChargeMode = config.feeChargeMode ?? "ADD_ON";
     this.timeoutMs = config.requestTimeoutMs ?? 15_000;
@@ -108,7 +111,9 @@ export class SasPayProvider implements PaymentProvider {
     };
   }
 
-  async createCheckout(input: CheckoutInput & { flow: "hosted" | "push" }): Promise<CheckoutResult> {
+  async createCheckout(
+    input: CheckoutInput & { flow: "hosted" | "push" }
+  ): Promise<CheckoutResult> {
     const amount = input.amount.toProviderDecimal();
     if (input.flow === "push") {
       if (!input.push) {
@@ -134,7 +139,12 @@ export class SasPayProvider implements PaymentProvider {
         },
         metadata: input.metadata,
       };
-      const data = (await this.request("POST", "/payments/softpay/", body, input.idempotencyKey)) as {
+      const data = (await this.request(
+        "POST",
+        "/payments/softpay/",
+        body,
+        input.idempotencyKey
+      )) as {
         id: string;
         status?: string;
         checkout_url?: string | null;
@@ -145,7 +155,10 @@ export class SasPayProvider implements PaymentProvider {
         state: mapPaymentStatus(data.status ?? "PENDING"),
         ...(data.checkout_url ? { checkoutUrl: data.checkout_url } : {}),
         ...(data.checkout_url
-          ? { instructions: "A payment page was returned: the payer must complete it before any charge happens." }
+          ? {
+              instructions:
+                "A payment page was returned: the payer must complete it before any charge happens.",
+            }
           : { instructions: "A push was sent to the payer's phone. Confirm it on the device." }),
         providerStatus: data.status ?? "PENDING",
       };
@@ -190,7 +203,10 @@ export class SasPayProvider implements PaymentProvider {
 
     if (providerReference.startsWith("cs_") || providerReference.length >= 32) {
       try {
-        const session = (await this.request("GET", `/checkout-sessions/${encodeURIComponent(providerReference)}/status/`)) as {
+        const session = (await this.request(
+          "GET",
+          `/checkout-sessions/${encodeURIComponent(providerReference)}/status/`
+        )) as {
           status?: string;
           transaction_id?: string | null;
           transaction_status?: string | null;
@@ -203,11 +219,16 @@ export class SasPayProvider implements PaymentProvider {
       }
     }
 
-    const data = (await this.request("GET", `/payments/${encodeURIComponent(transactionId)}/verify/`)) as SasPayVerifyResponse;
+    const data = (await this.request(
+      "GET",
+      `/payments/${encodeURIComponent(transactionId)}/verify/`
+    )) as SasPayVerifyResponse;
     const state = mapPaymentStatus(data.status);
     const currency = data.currency ?? "XOF";
     const money = (value: string | null | undefined): Money | undefined =>
-      value === undefined || value === null ? undefined : Money.fromDecimalString(String(value), currency);
+      value === undefined || value === null
+        ? undefined
+        : Money.fromDecimalString(String(value), currency);
 
     return {
       providerReference: transactionId,
@@ -223,7 +244,10 @@ export class SasPayProvider implements PaymentProvider {
     };
   }
 
-  async verifyWebhook(input: { body: string; headers: Record<string, string> }): Promise<VerifiedWebhook> {
+  async verifyWebhook(input: {
+    body: string;
+    headers: Record<string, string>;
+  }): Promise<VerifiedWebhook> {
     return verifyHmacWebhook(input, this.webhookSecret, "saspay");
   }
 
@@ -232,7 +256,12 @@ export class SasPayProvider implements PaymentProvider {
    * attempt to call it would be an invented endpoint, which the project rules forbid.
    */
 
-  private async request(method: "GET" | "POST", path: string, body?: unknown, idempotencyKey?: string): Promise<unknown> {
+  private async request(
+    method: "GET" | "POST",
+    path: string,
+    body?: unknown,
+    idempotencyKey?: string
+  ): Promise<unknown> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     const headers: Record<string, string> = {
@@ -257,7 +286,7 @@ export class SasPayProvider implements PaymentProvider {
         `SasPay request failed: ${error instanceof Error ? error.message : String(error)}`,
         0,
         "network_error",
-        true,
+        true
       );
     } finally {
       clearTimeout(timer);
@@ -266,24 +295,27 @@ export class SasPayProvider implements PaymentProvider {
     const text = await response.text();
     if (!response.ok) {
       const parsed = safeParse(text);
-      const code = typeof parsed?.error === "object" && parsed.error && "code" in parsed.error
-        ? String((parsed.error as { code?: string }).code)
-        : `http_${response.status}`;
+      const code =
+        typeof parsed?.error === "object" && parsed.error && "code" in parsed.error
+          ? String((parsed.error as { code?: string }).code)
+          : `http_${response.status}`;
       const message =
         typeof parsed?.error === "string"
           ? parsed.error
-          : (parsed?.error as { message?: string } | undefined)?.message ?? `HTTP ${response.status}`;
+          : ((parsed?.error as { message?: string } | undefined)?.message ??
+            `HTTP ${response.status}`);
       throw new PaymentProviderError(
         message,
         response.status,
         code,
         // 429 must be spaced out, 5xx may recover; the rest are terminal.
         response.status === 429 || response.status >= 500,
-        { path, ...(parsed?.field_errors ? { fieldErrors: parsed.field_errors } : {}) },
+        { path, ...(parsed?.field_errors ? { fieldErrors: parsed.field_errors } : {}) }
       );
     }
     const parsed = safeParse(text);
-    if (!parsed) throw new PaymentProviderError("SasPay returned a non-JSON body", 502, "bad_response", false);
+    if (!parsed)
+      throw new PaymentProviderError("SasPay returned a non-JSON body", 502, "bad_response", false);
     return parsed.data ?? parsed;
   }
 }

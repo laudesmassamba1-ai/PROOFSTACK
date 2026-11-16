@@ -1,10 +1,12 @@
-import { describe, expect, it } from "vitest";
-import { mkdtemp, readFile, writeFile, mkdir } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+import { describe, expect, it } from "vitest";
 
 const exec = promisify(execFile);
 const CLI = fileURLToPath(new URL("../dist/index.js", import.meta.url));
@@ -20,11 +22,17 @@ const CLI = fileURLToPath(new URL("../dist/index.js", import.meta.url));
  * otherwise rather than failing for the wrong reason.
  */
 
-const TEST_TIMEOUT = 60_000;
-
-async function cli(args: string[], cwd: string): Promise<{ code: number; stdout: string; stderr: string }> {
+async function cli(
+  args: string[],
+  cwd: string,
+  env: Record<string, string> = {}
+): Promise<{ code: number; stdout: string; stderr: string }> {
   try {
-    const result = await exec(process.execPath, [CLI, ...args], { cwd, timeout: 60_000 });
+    const result = await exec(process.execPath, [CLI, ...args], {
+      cwd,
+      timeout: 60_000,
+      env: { ...process.env, ...env },
+    });
     return { code: 0, stdout: result.stdout, stderr: result.stderr };
   } catch (error) {
     const failed = error as { code?: number; stdout?: string; stderr?: string };
@@ -48,6 +56,13 @@ describe("CLI", () => {
   it("prints a version", async () => {
     const dir = await project();
     const result = await cli(["--version"], dir);
+    expect(result.code).toBe(0);
+    expect(result.stdout.trim()).toMatch(/^\d+\.\d+\.\d+$/);
+  });
+
+  it("ignores the `--` separator that pnpm and npm forward literally", async () => {
+    const dir = await project();
+    const result = await cli(["--", "--version"], dir);
     expect(result.code).toBe(0);
     expect(result.stdout.trim()).toMatch(/^\d+\.\d+\.\d+$/);
   });
@@ -98,7 +113,7 @@ describe("CLI", () => {
         },
         enabledModules: ["world"],
       }),
-      "utf8",
+      "utf8"
     );
     const result = await cli(["validate"], dir);
     expect(result.code).toBe(1);
@@ -123,10 +138,185 @@ describe("CLI", () => {
     const dir = await project();
     await cli(["init", "--yes", "JSON run"], dir);
     const result = await cli(["test", "--json", "--no-report", "--module", "exit"], dir);
-    const parsed = JSON.parse(result.stdout) as { id: string; status: string; moduleRuns: unknown[] };
+    const parsed = JSON.parse(result.stdout) as {
+      id: string;
+      status: string;
+      moduleRuns: unknown[];
+    };
     expect(parsed.id).toMatch(/^run_/);
     expect(parsed.status).toBe("NOTHING_VERIFIED");
     expect(parsed.moduleRuns).toHaveLength(1);
+  });
+
+  it("test rejects an unknown module instead of silently running everything", async () => {
+    const dir = await project();
+    await cli(["init", "--yes", "Bad module"], dir);
+    const result = await cli(["test", "--module", "wrold"], dir);
+    expect(result.code).toBe(64);
+    expect(result.stderr).toContain('Unknown module "wrold"');
+  });
+
+  it("test rejects an unknown report format", async () => {
+    const dir = await project();
+    await cli(["init", "--yes", "Bad format"], dir);
+    const result = await cli(["test", "--format", "yaml"], dir);
+    expect(result.code).toBe(64);
+    expect(result.stderr).toContain('Unknown report format "yaml"');
+  });
+
+  it("test --only filters cases across modules, not just WORLD", async () => {
+    const dir = await project();
+    await cli(["init", "--yes", "Filtered"], dir);
+    const result = await cli(
+      ["test", "--json", "--no-report", "--module", "exit", "--only", "exit/csv"],
+      dir
+    );
+    const parsed = JSON.parse(result.stdout) as {
+      moduleRuns: { cases: { id: string }[] }[];
+    };
+    const cases = parsed.moduleRuns.flatMap((moduleRun) => moduleRun.cases);
+    expect(cases.length).toBeGreaterThan(0);
+    expect(cases.every((testCase) => testCase.id.includes("exit/csv"))).toBe(true);
+  });
+
+  it("test --only exits 2 when nothing matches, rather than reporting a false pass", async () => {
+    const dir = await project();
+    await cli(["init", "--yes", "No match"], dir);
+    const result = await cli(
+      ["test", "--no-report", "--module", "exit", "--only", "does-not-exist"],
+      dir
+    );
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain("no case matched");
+  });
+
+  it("ai ask sends the question, not the --provider value, and reads a real response", async () => {
+    const received: { messages?: { role: string; content: string }[] }[] = [];
+    const server = createServer((request, response) => {
+      let body = "";
+      request.setEncoding("utf8");
+      request.on("data", (chunk: string) => {
+        body += chunk;
+      });
+      request.on("end", () => {
+        received.push(JSON.parse(body) as { messages?: { role: string; content: string }[] });
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(
+          JSON.stringify({
+            model: "fake-1",
+            choices: [
+              {
+                message: { role: "assistant", content: "Le dernier run est vert." },
+                finish_reason: "stop",
+              },
+            ],
+            usage: { prompt_tokens: 12, completion_tokens: 6, total_tokens: 18 },
+          })
+        );
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = (server.address() as AddressInfo).port;
+
+    try {
+      const dir = await project();
+      await writeFile(
+        join(dir, "proofstack.config.json"),
+        JSON.stringify({
+          schemaVersion: 1,
+          project: { name: "AI test", baseUrl: "http://localhost:3000" },
+          modules: { world: { enabled: false }, flow: { enabled: false }, exit: { enabled: false } },
+          enabledModules: ["world"],
+          ai: {
+            enabled: true,
+            providers: [
+              {
+                name: "local",
+                baseUrl: `http://127.0.0.1:${port}/v1`,
+                model: "fake-1",
+                supportsTools: false,
+              },
+            ],
+          },
+        }),
+        "utf8"
+      );
+
+      const result = await cli(
+        ["ai", "ask", "Résume le dernier run", "--provider", "local", "--json"],
+        dir
+      );
+      expect(result.code).toBe(0);
+      const answer = JSON.parse(result.stdout) as { answer: string; provider: string };
+      expect(answer.provider).toBe("local");
+      expect(answer.answer).toContain("dernier run est vert");
+      expect(received).toHaveLength(1);
+      const userMessage = received[0]!.messages?.find((message) => message.role === "user");
+      expect(userMessage?.content).toContain("Résume le dernier run");
+      expect(userMessage?.content).not.toContain("local");
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  it("sync uploads real totals instead of an empty summary", async () => {
+    const received: { summary?: { total?: number } }[] = [];
+    const server = createServer((request, response) => {
+      let body = "";
+      request.setEncoding("utf8");
+      request.on("data", (chunk: string) => {
+        body += chunk;
+      });
+      request.on("end", () => {
+        received.push(JSON.parse(body) as { summary?: { total?: number } });
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ runId: "run_test", recorded: true }));
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = (server.address() as AddressInfo).port;
+
+    try {
+      const dir = await project();
+      await mkdir(join(dir, ".proofstack", "reports"), { recursive: true });
+      await writeFile(
+        join(dir, ".proofstack", "reports", "run.json"),
+        JSON.stringify({
+          id: "run_test",
+          status: "COMPLETED",
+          moduleRuns: [
+            {
+              module: "world",
+              status: "COMPLETED",
+              totals: { total: 3, passed: 3, failed: 0, warnings: 0, skipped: 0, errors: 0 },
+              cases: [],
+            },
+          ],
+          findings: [],
+        }),
+        "utf8"
+      );
+      await writeFile(
+        join(dir, "proofstack.config.json"),
+        JSON.stringify({
+          schemaVersion: 1,
+          project: { name: "Sync test", baseUrl: "http://localhost:3000" },
+          modules: { world: { enabled: false }, flow: { enabled: false }, exit: { enabled: false } },
+          enabledModules: ["world"],
+          sync: { enabled: true, apiUrl: `http://127.0.0.1:${port}` },
+        }),
+        "utf8"
+      );
+
+      const result = await cli(["sync", "--json"], dir, {
+        PROOFSTACK_PROJECT_TOKEN: "psk_test",
+      });
+      expect(result.code).toBe(0);
+      expect(received).toHaveLength(1);
+      expect(received[0]!.summary?.total).toBe(3);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
 
   it("test writes the report files it says it wrote", async () => {
@@ -144,6 +334,15 @@ describe("CLI", () => {
     const result = await cli(["report", "text"], dir);
     expect(result.code).toBe(0);
     expect(result.stdout).toContain("PROOFSTACK run");
+  });
+
+  it("report rejects an unknown format instead of falling back to text", async () => {
+    const dir = await project();
+    await cli(["init", "--yes", "Bad report"], dir);
+    await cli(["test", "--quiet", "--module", "exit"], dir);
+    const result = await cli(["report", "yaml"], dir);
+    expect(result.code).toBe(64);
+    expect(result.stderr).toContain('Unknown report format "yaml"');
   });
 
   it("report exits 2 when there is no run to render", async () => {
@@ -166,7 +365,7 @@ describe("CLI", () => {
         enabledModules: ["world"],
         sync: { enabled: true, apiUrl: "http://localhost:9999" },
       }),
-      "utf8",
+      "utf8"
     );
     const result = await cli(["sync"], dir);
     expect(result.code).toBe(2);

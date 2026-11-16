@@ -1,14 +1,30 @@
-import { Link } from "react-router";
 import { Boxes, GitBranch, Layers, ShieldCheck } from "lucide-react";
-import { Section, SectionHeading } from "../layouts/BrandLayout.js";
+import { Link } from "react-router";
 import { ModuleShowcase } from "../components/marketing/ModuleShowcase.js";
 import { useI18n } from "../i18n/index.js";
+import { Section, SectionHeading } from "../layouts/BrandLayout.js";
 
 const SHARED = [
-  { icon: Boxes, title: "One project system", body: "A project owns environments, module activation and tokens. Modules never invent their own notion of a project." },
-  { icon: Layers, title: "One execution engine", body: "Scheduling, timeouts, retries, cancellation, evidence and status aggregation are implemented once, in @proofstack/engine, and validated against the shared contract." },
-  { icon: GitBranch, title: "One report architecture", body: "JSON, JUnit XML, HTML and CLI text all render from the same TestRun object, so a CI gate and a dashboard cannot disagree." },
-  { icon: ShieldCheck, title: "One workspace and one bill", body: "Entitlements, usage metering and payment state live server-side. A plan change is enforced, not styled." },
+  {
+    icon: Boxes,
+    title: "One project system",
+    body: "A project owns environments, module activation and tokens. Modules never invent their own notion of a project.",
+  },
+  {
+    icon: Layers,
+    title: "One execution engine",
+    body: "Scheduling, timeouts, retries, cancellation, evidence and status aggregation are implemented once, in @proofstack/engine, and validated against the shared contract.",
+  },
+  {
+    icon: GitBranch,
+    title: "One report architecture",
+    body: "JSON, JUnit XML, HTML and CLI text all render from the same TestRun object, so a CI gate and a dashboard cannot disagree.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "One workspace and one bill",
+    body: "Entitlements, usage metering and payment state live server-side. A plan change is enforced, not styled.",
+  },
 ];
 
 export function Product() {
@@ -38,10 +54,18 @@ export function Product() {
           ))}
         </div>
         <div className="mt-8 flex flex-wrap gap-3">
-          <Link to="/world" className="btn btn-ghost">WORLD</Link>
-          <Link to="/flow" className="btn btn-ghost">FLOW</Link>
-          <Link to="/exit" className="btn btn-ghost">EXIT</Link>
-          <Link to="/platform" className="btn btn-primary">{t("nav.platform")}</Link>
+          <Link to="/world" className="btn btn-ghost">
+            WORLD
+          </Link>
+          <Link to="/flow" className="btn btn-ghost">
+            FLOW
+          </Link>
+          <Link to="/exit" className="btn btn-ghost">
+            EXIT
+          </Link>
+          <Link to="/platform" className="btn btn-primary">
+            {t("nav.platform")}
+          </Link>
         </div>
       </Section>
     </>

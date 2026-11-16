@@ -45,7 +45,7 @@ async function collect() {
       // Apps that are not plain-tsc packages (web) opt out with "buildOrder": false
       if (pkg.buildOrder === false) continue;
       const deps = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }).filter((d) =>
-        d.startsWith("@proofstack/"),
+        d.startsWith("@proofstack/")
       );
       nodes.set(pkg.name, { name: pkg.name, dir, deps });
     }
@@ -61,9 +61,7 @@ function topo(nodes) {
   while (remaining.length) {
     const ready = remaining.filter((n) => n.deps.every((d) => done.has(d) || !nodes.has(d)));
     if (ready.length === 0) {
-      throw new Error(
-        `Dependency cycle among: ${remaining.map((n) => n.name).join(", ")}`,
-      );
+      throw new Error(`Dependency cycle among: ${remaining.map((n) => n.name).join(", ")}`);
     }
     levels.push(ready.map((n) => n.name));
     for (const n of ready) done.add(n.name);
@@ -77,10 +75,10 @@ function run(dir, args) {
     const child = spawn(
       process.execPath,
       [join(root, "node_modules/typescript/bin/tsc"), ...args],
-      { cwd: dir, stdio: "inherit", env: process.env },
+      { cwd: dir, stdio: "inherit", env: process.env }
     );
     child.on("exit", (code) =>
-      code === 0 ? res() : rej(new Error(`tsc failed in ${dir} (exit ${code})`)),
+      code === 0 ? res() : rej(new Error(`tsc failed in ${dir} (exit ${code})`))
     );
   });
 }
@@ -92,7 +90,7 @@ if (nodes.size === 0) {
 }
 const levels = topo(nodes);
 console.log(
-  `proofstack build (${noEmit ? "typecheck" : "emit"}) — ${nodes.size} packages, ${levels.length} levels`,
+  `proofstack build (${noEmit ? "typecheck" : "emit"}) — ${nodes.size} packages, ${levels.length} levels`
 );
 for (const [i, level] of levels.entries()) {
   console.log(`\n── level ${i + 1}: ${level.join(", ")}`);
@@ -105,9 +103,9 @@ for (const [i, level] of levels.entries()) {
         (err) => {
           console.error(`   FAIL ${name}`);
           throw err;
-        },
+        }
       );
-    }),
+    })
   );
 }
 console.log(`\n✔ ${noEmit ? "typecheck" : "build"} complete`);

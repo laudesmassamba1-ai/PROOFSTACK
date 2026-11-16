@@ -33,7 +33,11 @@ export interface RenderOptions {
   verbose?: boolean;
 }
 
-export function renderReport(run: TestRun, format: ReportFormat, options: RenderOptions = {}): string {
+export function renderReport(
+  run: TestRun,
+  format: ReportFormat,
+  options: RenderOptions = {}
+): string {
   switch (format) {
     case "json":
       return renderJson(run);
@@ -70,12 +74,12 @@ export function renderJunit(run: TestRun): string {
 
   lines.push('<?xml version="1.0" encoding="UTF-8"?>');
   lines.push(
-    `<testsuites name="PROOFSTACK" tests="${totals.total}" failures="${totals.failed}" errors="${totals.errors}" skipped="${totals.skipped}" time="${seconds(run.durationMs)}">`,
+    `<testsuites name="PROOFSTACK" tests="${totals.total}" failures="${totals.failed}" errors="${totals.errors}" skipped="${totals.skipped}" time="${seconds(run.durationMs)}">`
   );
 
   for (const moduleRun of run.moduleRuns) {
     lines.push(
-      `  <testsuite name="${escapeXml(moduleRun.module.toUpperCase())}" tests="${moduleRun.totals.total}" failures="${moduleRun.totals.failed}" errors="${moduleRun.totals.errors}" skipped="${moduleRun.totals.skipped}" time="${seconds(moduleRun.durationMs)}" timestamp="${escapeXml(moduleRun.startedAt)}">`,
+      `  <testsuite name="${escapeXml(moduleRun.module.toUpperCase())}" tests="${moduleRun.totals.total}" failures="${moduleRun.totals.failed}" errors="${moduleRun.totals.errors}" skipped="${moduleRun.totals.skipped}" time="${seconds(moduleRun.durationMs)}" timestamp="${escapeXml(moduleRun.startedAt)}">`
     );
 
     for (const testCase of moduleRun.cases) {
@@ -120,7 +124,9 @@ function junitBody(testCase: TestCaseResult, moduleRun: ModuleRun, run: TestRun)
   if (testCase.status === "FAILED" || testCase.status === "WARNING") {
     const findings = run.findings.filter((f) => f.testCaseId === testCase.id);
     const message = findings[0]?.title ?? testCase.failure?.message ?? "assertion failed";
-    const detail = findings.map((f) => `${f.title}\n  ${f.detail}\n  reproduce: ${f.reproduction.command}`).join("\n\n");
+    const detail = findings
+      .map((f) => `${f.title}\n  ${f.detail}\n  reproduce: ${f.reproduction.command}`)
+      .join("\n\n");
     return [
       `      <failure type="${escapeXml(testCase.failure?.code ?? "assertion_failed")}" message="${escapeXml(message)}">`,
       escapeXml(detail || message),
@@ -149,7 +155,7 @@ export function renderText(run: TestRun, options: RenderOptions = {}): string {
 
   for (const moduleRun of run.moduleRuns) {
     lines.push(
-      `${moduleRun.module.toUpperCase().padEnd(6)} ${statusBadge(moduleRun.status)}  ${moduleRun.totals.passed} passed  ${moduleRun.totals.failed} failed  ${moduleRun.totals.warnings} warning  ${moduleRun.totals.errors} error  ${moduleRun.totals.skipped} skipped`,
+      `${moduleRun.module.toUpperCase().padEnd(6)} ${statusBadge(moduleRun.status)}  ${moduleRun.totals.passed} passed  ${moduleRun.totals.failed} failed  ${moduleRun.totals.warnings} warning  ${moduleRun.totals.errors} error  ${moduleRun.totals.skipped} skipped`
     );
 
     const interesting = options.verbose
@@ -173,7 +179,7 @@ export function renderText(run: TestRun, options: RenderOptions = {}): string {
   }
 
   lines.push(
-    `${statusBadge(run.status)} ${totals.total} cases: ${totals.passed} passed, ${totals.failed} failed, ${totals.warnings} warning, ${totals.errors} error, ${totals.skipped} skipped in ${(run.durationMs / 1000).toFixed(2)}s`,
+    `${statusBadge(run.status)} ${totals.total} cases: ${totals.passed} passed, ${totals.failed} failed, ${totals.warnings} warning, ${totals.errors} error, ${totals.skipped} skipped in ${(run.durationMs / 1000).toFixed(2)}s`
   );
 
   if (totals.critical > 0) {
@@ -192,7 +198,9 @@ export function renderText(run: TestRun, options: RenderOptions = {}): string {
  */
 export function renderHtml(run: TestRun, options: RenderOptions = {}): string {
   const totals = runTotals(run);
-  const title = options.projectName ? `${options.projectName} — PROOFSTACK report` : "PROOFSTACK report";
+  const title = options.projectName
+    ? `${options.projectName} — PROOFSTACK report`
+    : "PROOFSTACK report";
 
   const moduleSections = run.moduleRuns
     .map((moduleRun) => {
@@ -203,7 +211,7 @@ export function renderHtml(run: TestRun, options: RenderOptions = {}): string {
             ? `<ul class="findings">${findings
                 .map(
                   (f) =>
-                    `<li><strong>${escapeHtml(f.title)}</strong><br><span class="muted">${escapeHtml(f.detail)}</span><br><code>${escapeHtml(f.reproduction.command)}</code></li>`,
+                    `<li><strong>${escapeHtml(f.title)}</strong><br><span class="muted">${escapeHtml(f.detail)}</span><br><code>${escapeHtml(f.reproduction.command)}</code></li>`
                 )
                 .join("")}</ul>`
             : testCase.skippedReason
@@ -303,7 +311,15 @@ export interface RunTotals {
 }
 
 export function runTotals(run: TestRun): RunTotals {
-  const totals: RunTotals = { total: 0, passed: 0, failed: 0, warnings: 0, errors: 0, skipped: 0, critical: 0 };
+  const totals: RunTotals = {
+    total: 0,
+    passed: 0,
+    failed: 0,
+    warnings: 0,
+    errors: 0,
+    skipped: 0,
+    critical: 0,
+  };
   for (const moduleRun of run.moduleRuns) {
     totals.total += moduleRun.totals.total;
     totals.passed += moduleRun.totals.passed;
@@ -312,7 +328,9 @@ export function runTotals(run: TestRun): RunTotals {
     totals.errors += moduleRun.totals.errors;
     totals.skipped += moduleRun.totals.skipped;
   }
-  totals.critical = run.findings.filter((f) => f.severity === "CRITICAL" && f.status === "FAILED").length;
+  totals.critical = run.findings.filter(
+    (f) => f.severity === "CRITICAL" && f.status === "FAILED"
+  ).length;
   return totals;
 }
 
@@ -366,14 +384,17 @@ function seconds(ms: number): string {
 }
 
 function escapeXml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;")
-    // XML 1.0 forbids most control characters; strip them rather than emit invalid XML.
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "");
+  return (
+    value
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&apos;")
+      // XML 1.0 forbids most control characters; strip them rather than emit invalid XML.
+      // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping forbidden XML characters is the purpose
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "")
+  );
 }
 
 function escapeHtml(value: string): string {

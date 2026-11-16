@@ -1,7 +1,17 @@
-import { describe, expect, it } from "vitest";
-import { proofstackConfigSchema, type ModuleId, type ProofstackConfig } from "@proofstack/contracts";
+import {
+  type ModuleId,
+  type ProofstackConfig,
+  proofstackConfigSchema,
+} from "@proofstack/contracts";
 import { FixedClock, Logger, MemorySink } from "@proofstack/core";
-import { ENGINE_VERSION, MemoryEvidenceStore, runEngine, type ModuleProvider, type TestContext } from "@proofstack/engine";
+import {
+  ENGINE_VERSION,
+  MemoryEvidenceStore,
+  type ModuleProvider,
+  runEngine,
+  type TestContext,
+} from "@proofstack/engine";
+import { describe, expect, it } from "vitest";
 
 function baseConfig(overrides: Record<string, unknown> = {}): ProofstackConfig {
   return proofstackConfigSchema.parse({
@@ -12,7 +22,11 @@ function baseConfig(overrides: Record<string, unknown> = {}): ProofstackConfig {
 
 function provider(
   id: ModuleId,
-  cases: Array<{ id: string; run: (ctx: TestContext) => void | Promise<void>; severity?: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "INFO" }>,
+  cases: Array<{
+    id: string;
+    run: (ctx: TestContext) => void | Promise<void>;
+    severity?: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "INFO";
+  }>
 ): ModuleProvider {
   return {
     id,
@@ -41,12 +55,21 @@ describe("shared execution engine", () => {
   it("passes when every case passes and validates the run against the contract", async () => {
     const { run } = await runEngine({
       config: baseConfig(),
-      providers: [provider("world", [{ id: "w1", run: (ctx) => ctx.check(true, { description: "ok" }) }])],
+      providers: [
+        provider("world", [{ id: "w1", run: (ctx) => ctx.check(true, { description: "ok" }) }]),
+      ],
       clock: new FixedClock("2026-01-15T12:00:00.000Z"),
     });
     expect(run.status).toBe("COMPLETED");
     expect(run.engineVersion).toBe(ENGINE_VERSION);
-    expect(run.moduleRuns[0]!.totals).toEqual({ total: 1, passed: 1, failed: 0, warnings: 0, skipped: 0, errors: 0 });
+    expect(run.moduleRuns[0]!.totals).toEqual({
+      total: 1,
+      passed: 1,
+      failed: 0,
+      warnings: 0,
+      skipped: 0,
+      errors: 0,
+    });
     expect(run.findings).toEqual([]);
   });
 
@@ -55,7 +78,16 @@ describe("shared execution engine", () => {
       config: baseConfig(),
       providers: [
         provider("world", [
-          { id: "w1", run: (ctx) => ctx.check(false, { description: "accepts accented name", expected: "accepted", actual: "rejected", target: "last_name" }) },
+          {
+            id: "w1",
+            run: (ctx) =>
+              ctx.check(false, {
+                description: "accepts accented name",
+                expected: "accepted",
+                actual: "rejected",
+                target: "last_name",
+              }),
+          },
         ]),
       ],
     });
@@ -72,7 +104,16 @@ describe("shared execution engine", () => {
   it("reports an exception as ERROR, never as a product failure", async () => {
     const { run } = await runEngine({
       config: baseConfig(),
-      providers: [provider("flow", [{ id: "f1", run: () => { throw new Error("browser crashed"); } }])],
+      providers: [
+        provider("flow", [
+          {
+            id: "f1",
+            run: () => {
+              throw new Error("browser crashed");
+            },
+          },
+        ]),
+      ],
     });
     expect(run.moduleRuns[0]!.cases[0]!.status).toBe("ERROR");
     expect(run.status).toBe("ERROR");
@@ -170,18 +211,26 @@ describe("shared execution engine", () => {
         Array.from({ length: 24 }, (_unused, i) => ({
           id: `c${String(i).padStart(2, "0")}`,
           run: async (ctx: TestContext) => {
-            await new Promise((r) => setTimeout(r, (i => i % 5)(i)));
+            await new Promise((r) => setTimeout(r, ((i) => i % 5)(i)));
             ctx.check(true, { description: "ok" });
           },
-        })),
+        }))
       );
-    const a = await runEngine({ config: baseConfig({ engine: { ...baseConfig().engine, parallel: 8 } }), providers: [build()], clock: new FixedClock(0) });
-    const b = await runEngine({ config: baseConfig({ engine: { ...baseConfig().engine, parallel: 2 } }), providers: [build()], clock: new FixedClock(0) });
+    const a = await runEngine({
+      config: baseConfig({ engine: { ...baseConfig().engine, parallel: 8 } }),
+      providers: [build()],
+      clock: new FixedClock(0),
+    });
+    const b = await runEngine({
+      config: baseConfig({ engine: { ...baseConfig().engine, parallel: 2 } }),
+      providers: [build()],
+      clock: new FixedClock(0),
+    });
     expect(a.run.moduleRuns[0]!.cases.map((c) => c.id)).toEqual(
-      Array.from({ length: 24 }, (_unused, i) => `c${String(i).padStart(2, "0")}`),
+      Array.from({ length: 24 }, (_unused, i) => `c${String(i).padStart(2, "0")}`)
     );
     expect(JSON.stringify(b.run.moduleRuns[0]!.cases.map((c) => [c.id, c.status]))).toBe(
-      JSON.stringify(a.run.moduleRuns[0]!.cases.map((c) => [c.id, c.status])),
+      JSON.stringify(a.run.moduleRuns[0]!.cases.map((c) => [c.id, c.status]))
     );
   });
 
@@ -192,7 +241,13 @@ describe("shared execution engine", () => {
       signal: controller.signal,
       providers: [
         provider("world", [
-          { id: "a", run: async (ctx) => { controller.abort("user requested"); ctx.check(true, { description: "x" }); } },
+          {
+            id: "a",
+            run: async (ctx) => {
+              controller.abort("user requested");
+              ctx.check(true, { description: "x" });
+            },
+          },
           { id: "b", run: () => undefined },
           { id: "c", run: () => undefined },
         ]),
@@ -211,7 +266,11 @@ describe("shared execution engine", () => {
       config: baseConfig({ engine: { parallel: 1, stopOnCritical: true } }),
       providers: [
         provider("flow", [
-          { id: "critical", severity: "CRITICAL", run: (ctx) => ctx.check(false, { description: "double charge" }) },
+          {
+            id: "critical",
+            severity: "CRITICAL",
+            run: (ctx) => ctx.check(false, { description: "double charge" }),
+          },
           { id: "later", run: () => undefined },
         ]),
       ],
@@ -229,7 +288,12 @@ describe("shared execution engine", () => {
           {
             id: "w1",
             run: (ctx) => {
-              ctx.report({ title: "silent truncation", detail: "name was truncated at 32 chars", severity: "LOW", field: "full_name" });
+              ctx.report({
+                title: "silent truncation",
+                detail: "name was truncated at 32 chars",
+                severity: "LOW",
+                field: "full_name",
+              });
               ctx.check(true, { description: "submitted" });
             },
           },
@@ -282,7 +346,17 @@ describe("shared execution engine", () => {
     const collect = async () => {
       const { run } = await runEngine({
         config: baseConfig({ engine: { seed: 1234 } }),
-        providers: [provider("world", [{ id: "w1", run: (ctx) => { seen.push(ctx.rng.next()); ctx.check(true, { description: "x" }); } }])],
+        providers: [
+          provider("world", [
+            {
+              id: "w1",
+              run: (ctx) => {
+                seen.push(ctx.rng.next());
+                ctx.check(true, { description: "x" });
+              },
+            },
+          ]),
+        ],
       });
       return run;
     };
@@ -302,7 +376,12 @@ describe("shared execution engine", () => {
           {
             id: "w1",
             run: async (ctx) => {
-              await ctx.attachText({ label: "response body", text: '{"name":"Kòfí"}', kind: "payload", mediaType: "application/json" });
+              await ctx.attachText({
+                label: "response body",
+                text: '{"name":"Kòfí"}',
+                kind: "payload",
+                mediaType: "application/json",
+              });
               ctx.check(false, { description: "name preserved" });
             },
           },
@@ -317,7 +396,9 @@ describe("shared execution engine", () => {
   });
 
   it("refuses to run with no provider and never invents an empty pass", async () => {
-    await expect(runEngine({ config: baseConfig(), providers: [] })).rejects.toThrowError(/no module provider/);
+    await expect(runEngine({ config: baseConfig(), providers: [] })).rejects.toThrowError(
+      /no module provider/
+    );
     // A suite that produced no checks is an ERROR, never a vacuous pass.
     const empty = await runEngine({ config: baseConfig(), providers: [provider("world", [])] });
     expect(empty.run.status).toBe("ERROR");
@@ -328,7 +409,10 @@ describe("shared execution engine", () => {
     const { run } = await runEngine({
       config: baseConfig(),
       only: ["exit"],
-      providers: [provider("world", [{ id: "w1", run: () => undefined }]), provider("exit", [{ id: "e1", run: () => undefined }])],
+      providers: [
+        provider("world", [{ id: "w1", run: () => undefined }]),
+        provider("exit", [{ id: "e1", run: () => undefined }]),
+      ],
     });
     expect(run.modules).toEqual(["exit"]);
     expect(run.moduleRuns).toHaveLength(1);
@@ -339,7 +423,16 @@ describe("shared execution engine", () => {
     await runEngine({
       config: baseConfig(),
       logger: new Logger({ level: "debug", sinks: [sink] }),
-      providers: [provider("world", [{ id: "w1", run: (ctx) => { ctx.log.info("ran", { apiKey: "sk_test_abcdefghijklmnop" }); } }])],
+      providers: [
+        provider("world", [
+          {
+            id: "w1",
+            run: (ctx) => {
+              ctx.log.info("ran", { apiKey: "sk_test_abcdefghijklmnop" });
+            },
+          },
+        ]),
+      ],
     });
     expect(JSON.stringify(sink.records)).not.toContain("sk_test_abcdefghijklmnop");
   });

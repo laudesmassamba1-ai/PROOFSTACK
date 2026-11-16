@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import {
   caseFold,
   codePointLength,
@@ -18,6 +17,7 @@ import {
   truncateGraphemes,
   unicodeEquals,
 } from "@proofstack/core";
+import { describe, expect, it } from "vitest";
 
 describe("international text primitives", () => {
   it("counts what a reader sees, not what a UTF-16 buffer holds", () => {
@@ -45,7 +45,7 @@ describe("international text primitives", () => {
   it("truncates on cluster boundaries", () => {
     expect(truncateGraphemes("e\u0301abc", 1)).toBe("e\u0301");
     expect(truncateGraphemes("\u{1F469}\u200D\u{1F469}\u200D\u{1F467}", 1)).toBe(
-      "\u{1F469}\u200D\u{1F469}\u200D\u{1F467}",
+      "\u{1F469}\u200D\u{1F469}\u200D\u{1F467}"
     );
     expect(truncateGraphemes("hello", 0)).toBe("");
   });
@@ -83,7 +83,7 @@ describe("international text primitives", () => {
   });
 
   it("knows which exported cells a spreadsheet would execute", () => {
-    for (const cell of ["=HYPERLINK(\"http://evil\")", "+1", "-1", "@SUM(A1)"]) {
+    for (const cell of ['=HYPERLINK("http://evil")', "+1", "-1", "@SUM(A1)"]) {
       expect(isFormulaLikeCell(cell)).toBe(true);
     }
     expect(isFormulaLikeCell("Awa")).toBe(false);
@@ -98,7 +98,9 @@ describe("international text primitives", () => {
       "Eric",
     ]);
     // Default JS sort puts accented letters after z: the bug collation fixes.
-    expect([...names].sort((a, b) => a.localeCompare(b, "fr", { sensitivity: "base" }))[0]).toBe("Aaron");
+    expect([...names].sort((a, b) => a.localeCompare(b, "fr", { sensitivity: "base" }))[0]).toBe(
+      "Aaron"
+    );
     expect(localeCompare("ä", "a", "de")).toBe(1);
     expect(localeCompare("a", "a", "de")).toBe(0);
   });

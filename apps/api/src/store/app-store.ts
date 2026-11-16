@@ -665,6 +665,20 @@ export class AppStore {
       .bind(workspaceId, limit)
       .all<Row>();
     return rows.map(mapFinding);
+  } /** Findings across every project of a workspace, optionally for one module. */
+  async workspaceFindings(
+    workspaceId: string,
+    module?: ModuleId,
+    limit = 100
+  ): Promise<FindingRecord[]> {
+    const rows = await this.db
+      .prepare(
+        `SELECT * FROM findings WHERE workspace_id = ? AND (? IS NULL OR module = ?)
+         ORDER BY detected_at DESC LIMIT ?`
+      )
+      .bind(workspaceId, module ?? null, module ?? null, limit)
+      .all<Row>();
+    return rows.map(mapFinding);
   }
 
   async listFindings(

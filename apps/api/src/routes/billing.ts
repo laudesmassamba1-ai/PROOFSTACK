@@ -127,7 +127,12 @@ export function billingRoutes(services: Services): Hono<AppEnv> {
           provider: capability.provider,
           automatedRenewal: result.automatedRenewal,
         },
-        ...(result.checkoutUrl ? { redirectUrl: result.checkoutUrl } : {}),
+        // The sandbox provider's synthetic URL has no hosted page. Returning it
+        // would send an integrator to a 404, so the sandbox answers with
+        // instructions and the control surface instead.
+        ...(result.checkoutUrl && capability.provider !== "sandbox"
+          ? { redirectUrl: result.checkoutUrl }
+          : {}),
         ...(result.instructions ? { instructions: result.instructions } : {}),
       },
       201

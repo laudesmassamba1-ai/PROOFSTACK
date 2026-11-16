@@ -202,6 +202,18 @@ pre,
   text-transform: uppercase;
 }
 
+/* The full lockup must fit a 320 px viewport without being clipped. */
+.hero-wordmark {
+  font-size: clamp(1.75rem, 7.4vw, var(--hero-size, 4rem));
+  line-height: 1;
+}
+
+.hero-mark {
+  width: clamp(30px, 7vw, calc(var(--hero-size, 4rem) * 0.9));
+  height: auto;
+  flex-shrink: 0;
+}
+
 /* ---------- reference B: modular floating tiles ---------- */
 
 .spectrum-field {
@@ -240,12 +252,20 @@ pre,
     box-shadow 420ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
-.tile:hover {
-  transform: translateY(-6px) rotateX(4deg);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.95) inset,
-    0 26px 46px -20px rgba(12, 18, 40, 0.6),
-    0 60px 90px -50px rgba(12, 18, 40, 0.5);
+/* Touch devices keep the resting state: a hover that sticks looks like a layout bug. */
+@media (hover: hover) {
+  .tile:hover {
+    transform: translateY(-6px) rotateX(4deg);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.95) inset,
+      0 26px 46px -20px rgba(12, 18, 40, 0.6),
+      0 60px 90px -50px rgba(12, 18, 40, 0.5);
+  }
+}
+
+.tile:focus-within {
+  outline: 2px solid rgba(120, 227, 203, 0.75);
+  outline-offset: 3px;
 }
 
 .tile-chip {
@@ -260,12 +280,25 @@ pre,
   color: #1b2f77;
 }
 
+.tile-body {
+  color: #4a5a72;
+}
+
+.tile-mono {
+  color: #68778a;
+}
+
+.tile-link {
+  color: var(--brand-blue);
+}
+
 /* ---------- buttons ---------- */
 
 .btn {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
+  white-space: nowrap;
   border-radius: 999px;
   padding: 0.7rem 1.15rem;
   font-size: 0.9rem;
@@ -449,7 +482,9 @@ pre,
   padding: 0.5rem 0.85rem;
   font-size: 0.85rem;
   font-weight: 520;
-  transition: background 140ms ease, border-color 140ms ease;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease;
 }
 
 .app-btn:hover {
@@ -500,8 +535,14 @@ pre,
 
 .app-table {
   width: 100%;
+  min-width: 34rem;
   border-collapse: collapse;
   font-size: 0.84rem;
+}
+
+/* A narrow viewport scrolls the table, not the whole page. */
+.overflow-x-auto > .app-table {
+  min-width: 32rem;
 }
 
 .app-table th {

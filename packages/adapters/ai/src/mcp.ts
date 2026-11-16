@@ -1,4 +1,4 @@
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { ProofstackError } from "@proofstack/core";
 
 /**
@@ -101,9 +101,7 @@ export interface McpClient {
  */
 export async function connectMcp(options: McpClientOptions): Promise<McpClient> {
   const client =
-    options.transport === "stdio"
-      ? new StdioMcpClient(options)
-      : new HttpMcpClient(options);
+    options.transport === "stdio" ? new StdioMcpClient(options) : new HttpMcpClient(options);
   await client.initialize();
   return client;
 }
@@ -117,7 +115,14 @@ class StdioMcpClient implements McpClient {
   private child: ChildProcessWithoutNullStreams | null = null;
   private buffer = "";
   private nextId = 1;
-  private readonly pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }>();
+  private readonly pending = new Map<
+    number,
+    {
+      resolve: (v: unknown) => void;
+      reject: (e: Error) => void;
+      timer: ReturnType<typeof setTimeout>;
+    }
+  >();
   private readonly timeoutMs: number;
   private closed = false;
 
@@ -147,7 +152,7 @@ class StdioMcpClient implements McpClient {
 
     // Resolve ${ENV_VAR} references rather than passing literal placeholders, so a
     // config file can name a token without containing one.
-    const env: Record<string, string> = { ...process.env as Record<string, string> };
+    const env: Record<string, string> = { ...(process.env as Record<string, string>) };
     for (const [key, value] of Object.entries(this.options.env ?? {})) {
       env[key] = expandEnv(value);
     }
@@ -174,7 +179,7 @@ class StdioMcpClient implements McpClient {
             category: "PROVIDER",
             code: "mcp_server_exited",
             details: { code, signal },
-          }),
+          })
         );
       }
     });
@@ -304,7 +309,13 @@ class StdioMcpClient implements McpClient {
         resolve();
       }
     });
-    this.failAll(new ProofstackError({ message: `MCP server "${this.name}" closed`, category: "INTERNAL", code: "mcp_closed" }));
+    this.failAll(
+      new ProofstackError({
+        message: `MCP server "${this.name}" closed`,
+        category: "INTERNAL",
+        code: "mcp_closed",
+      })
+    );
   }
 
   // ---- JSON-RPC plumbing
@@ -353,7 +364,7 @@ class StdioMcpClient implements McpClient {
             category: "PROVIDER",
             code: `mcp_error_${error.code ?? "unknown"}`,
             details: { data: error.data },
-          }),
+          })
         );
       } else {
         pending.resolve(record.result);
@@ -384,7 +395,7 @@ class StdioMcpClient implements McpClient {
             code: "mcp_timeout",
             retryable: true,
             details: { method, timeoutMs: this.timeoutMs },
-          }),
+          })
         );
       }, this.timeoutMs);
 
@@ -656,7 +667,11 @@ function flattenContent(content: unknown[]): string {
       parts.push(record.text);
       continue;
     }
-    if (record.type === "resource" && typeof record.resource === "object" && record.resource !== null) {
+    if (
+      record.type === "resource" &&
+      typeof record.resource === "object" &&
+      record.resource !== null
+    ) {
       const resource = record.resource as Record<string, unknown>;
       if (typeof resource.text === "string") parts.push(resource.text);
       else if (typeof resource.uri === "string") parts.push(`[resource ${resource.uri}]`);
@@ -690,7 +705,7 @@ export function namespacedToolName(server: string, tool: string): string {
 export function filterTools(
   tools: readonly McpTool[],
   allow: readonly string[],
-  deny: readonly string[],
+  deny: readonly string[]
 ): McpTool[] {
   return tools.filter((tool) => {
     if (deny.includes(tool.name)) return false;

@@ -1,5 +1,5 @@
-import { iso, uuid } from "@proofstack/core";
 import type { PaymentProvider } from "@proofstack/adapter-payments";
+import { iso, uuid } from "@proofstack/core";
 import type { CheckoutService } from "./checkout.js";
 import type { BillingStore } from "./store.js";
 
@@ -18,7 +18,7 @@ export class ReconciliationService {
   constructor(
     private readonly store: BillingStore,
     private readonly provider: PaymentProvider,
-    private readonly checkout: CheckoutService,
+    private readonly checkout: CheckoutService
   ) {}
 
   async sweep(input: { workspaceIds: string[]; now?: Date }): Promise<ReconciliationReport> {
@@ -73,7 +73,11 @@ export class ReconciliationService {
         // already drops access at this boundary; recording the state makes the *why*
         // visible to the customer instead of looking like a bug.
         const nextState = subscription.cancelAtPeriodEnd ? "EXPIRED" : "PAST_DUE";
-        await this.store.saveSubscription({ ...subscription, state: nextState, updatedAt: iso(now) });
+        await this.store.saveSubscription({
+          ...subscription,
+          state: nextState,
+          updatedAt: iso(now),
+        });
         report.expiredPeriodsClosed += 1;
         report.details.push({ intentId: subscription.id, outcome: `period_closed:${nextState}` });
       }
@@ -118,7 +122,8 @@ export class ReconciliationService {
         } catch {
           providerState = "unavailable";
         }
-        const amountAgrees = providerAmountMinor === null || providerAmountMinor === intent.amountMinor;
+        const amountAgrees =
+          providerAmountMinor === null || providerAmountMinor === intent.amountMinor;
         const stateAgrees =
           providerState === "unavailable" ||
           (providerState === "SUCCEEDED" && intent.credited) ||

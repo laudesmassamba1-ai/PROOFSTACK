@@ -1,7 +1,6 @@
-import { describe, expect, it } from "vitest";
 import {
-  FixedClock,
   dstTransitions,
+  FixedClock,
   isIsoInstant,
   parseIsoStrict,
   resolveWallClock,
@@ -9,6 +8,7 @@ import {
   zoneObservesDst,
   zoneOffsetMs,
 } from "@proofstack/core";
+import { describe, expect, it } from "vitest";
 
 describe("time and time zones", () => {
   it("reads real UTC offsets for a winter and a summer instant", () => {

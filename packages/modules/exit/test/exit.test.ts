@@ -1,21 +1,21 @@
-import { describe, expect, it } from "vitest";
-import { FixedClock, Logger } from "@proofstack/core";
 import { proofstackConfigSchema } from "@proofstack/contracts";
+import { FixedClock, Logger } from "@proofstack/core";
 import { runEngine } from "@proofstack/engine";
+import { describe, expect, it } from "vitest";
 import {
   checkFieldType,
   compareRecords,
   createExitProvider,
+  type ExportArtifact,
+  type ExportFormat,
+  type ExportSource,
   findDuplicates,
   findOrphans,
   parseCsv,
   parseJsonRecords,
+  type RoundTripTarget,
   readZipEntries,
   toArtifact,
-  type ExportArtifact,
-  type ExportFormat,
-  type ExportSource,
-  type RoundTripTarget,
 } from "../src/index.js";
 
 /**
@@ -76,29 +76,41 @@ async function runExit(options: {
 
 function caseFor(run: Awaited<ReturnType<typeof runExit>>, id: string) {
   const found = run.moduleRuns[0]?.cases.find((c) => c.id === id);
-  if (!found) throw new Error(`case ${id} not found; have: ${run.moduleRuns[0]?.cases.map((c) => c.id).join(", ")}`);
+  if (!found)
+    throw new Error(
+      `case ${id} not found; have: ${run.moduleRuns[0]?.cases.map((c) => c.id).join(", ")}`
+    );
   return found;
 }
 
 const GOOD_JSON = JSON.stringify([
   { id: "p1", name: "Root", amount: "0.00", created_at: "2026-01-01T00:00:00.000Z", parent_id: "" },
-  { id: "c1", name: "Ada", amount: "12.50", created_at: "2026-01-01T00:00:00.000Z", parent_id: "p1" },
-  { id: "c2", name: "Grace", amount: "99.00", created_at: "2026-01-02T00:00:00.000Z", parent_id: "p1" },
+  {
+    id: "c1",
+    name: "Ada",
+    amount: "12.50",
+    created_at: "2026-01-01T00:00:00.000Z",
+    parent_id: "p1",
+  },
+  {
+    id: "c2",
+    name: "Grace",
+    amount: "99.00",
+    created_at: "2026-01-02T00:00:00.000Z",
+    parent_id: "p1",
+  },
 ]);
-
-const GOOD_CSV = `id,name,amount,created_at,parent_id
-c1,Ada,12.50,2026-01-01T00:00:00.000Z,p1
-c2,Grace,99.00,2026-01-02T00:00:00.000Z,p1
-`;
 
 describe("EXIT parsing primitives", () => {
   it("parses CSV with quoted commas, embedded newlines and doubled quotes", () => {
-    const parsed = parseCsv(`id,note\n1,"hello, world"\n2,"line one\nline two"\n3,"she said ""hi"""\n`);
+    const parsed = parseCsv(
+      `id,note\n1,"hello, world"\n2,"line one\nline two"\n3,"she said ""hi"""\n`
+    );
     expect(parsed.headers).toEqual(["id", "note"]);
     expect(parsed.records).toHaveLength(3);
-    expect(parsed.records[0]!.note).toBe("hello, world");
-    expect(parsed.records[1]!.note).toBe("line one\nline two");
-    expect(parsed.records[2]!.note).toBe('she said "hi"');
+    expect(parsed.records[0]?.note).toBe("hello, world");
+    expect(parsed.records[1]?.note).toBe("line one\nline two");
+    expect(parsed.records[2]?.note).toBe('she said "hi"');
   });
 
   it("strips a UTF-8 BOM so the first header is not corrupted", () => {
@@ -125,12 +137,14 @@ describe("EXIT parsing primitives", () => {
     const zip = buildStoredZip("hello.txt", "hi");
     const entries = readZipEntries(zip);
     expect(entries).toHaveLength(1);
-    expect(entries[0]!.name).toBe("hello.txt");
-    expect(entries[0]!.bytes).toBe(2);
+    expect(entries[0]?.name).toBe("hello.txt");
+    expect(entries[0]?.bytes).toBe(2);
   });
 
   it("rejects a file that is not a zip", () => {
-    expect(() => readZipEntries(new TextEncoder().encode("not a zip at all"))).toThrow(/end-of-central-directory/);
+    expect(() => readZipEntries(new TextEncoder().encode("not a zip at all"))).toThrow(
+      /end-of-central-directory/
+    );
   });
 });
 
@@ -150,12 +164,12 @@ describe("EXIT comparison primitives", () => {
   it("detects a number that came back as a string", () => {
     const result = compareRecords([{ id: "1", amount: 12.5 }], [{ id: "1", amount: "12.5" }], "id");
     expect(result.differences).toHaveLength(1);
-    expect(result.differences[0]!.kind).toBe("type_changed");
+    expect(result.differences[0]?.kind).toBe("type_changed");
   });
 
   it("detects a changed value", () => {
     const result = compareRecords([{ id: "1", name: "Ada" }], [{ id: "1", name: "Ada " }], "id");
-    expect(result.differences[0]!.kind).toBe("changed");
+    expect(result.differences[0]?.kind).toBe("changed");
   });
 
   it("reports no differences for an identical round trip", () => {
@@ -169,7 +183,12 @@ describe("EXIT comparison primitives", () => {
       { id: "2", parent_id: "missing" },
       { id: "1", parent_id: "p1" },
     ];
-    const orphans = findOrphans({ children: records, childField: "parent_id", parents: records, parentField: "id" });
+    const orphans = findOrphans({
+      children: records,
+      childField: "parent_id",
+      parents: records,
+      parentField: "id",
+    });
     expect(orphans.orphans.map((o) => o.value)).toContain("missing");
     expect(findDuplicates(records, ["id"])).toHaveLength(1);
   });
@@ -198,7 +217,9 @@ describe("EXIT against a healthy export", () => {
           created_at: "datetime",
           parent_id: "nullable",
         },
-        relationships: [{ child: "records", childField: "parent_id", parent: "records", parentField: "id" }],
+        relationships: [
+          { child: "records", childField: "parent_id", parent: "records", parentField: "id" },
+        ],
         unique: [{ table: "records", fields: ["id"] }],
       },
       source: sourceOf({ json: GOOD_JSON }),
@@ -246,7 +267,9 @@ describe("EXIT catches real portability defects", () => {
     const run = await runExit({
       exit: {
         formats: ["json"],
-        relationships: [{ child: "records", childField: "parent_id", parent: "records", parentField: "id" }],
+        relationships: [
+          { child: "records", childField: "parent_id", parent: "records", parentField: "id" },
+        ],
       },
       source: sourceOf({
         json: JSON.stringify([{ id: "c1", parent_id: "does_not_exist" }]),
@@ -287,7 +310,15 @@ describe("EXIT catches real portability defects", () => {
         return { imported: 1, datasetId: "ds_1" };
       },
       async readBack() {
-        return [{ id: "p1", name: "Root", amount: "0.00", created_at: "2026-01-01T00:00:00.000Z", parent_id: "" }];
+        return [
+          {
+            id: "p1",
+            name: "Root",
+            amount: "0.00",
+            created_at: "2026-01-01T00:00:00.000Z",
+            parent_id: "",
+          },
+        ];
       },
     };
     const run = await runExit({
@@ -308,9 +339,27 @@ describe("EXIT catches real portability defects", () => {
       },
       async readBack() {
         return [
-          { id: "p1", name: "Root", amount: "0.00", created_at: "2026-01-01T00:00:00.000Z", parent_id: "" },
-          { id: "c1", name: "Ada", amount: "12.5", created_at: "2026-01-01T00:00:00.000Z", parent_id: "p1" },
-          { id: "c2", name: "Grace", amount: "99.00", created_at: "2026-01-02T00:00:00.000Z", parent_id: "p1" },
+          {
+            id: "p1",
+            name: "Root",
+            amount: "0.00",
+            created_at: "2026-01-01T00:00:00.000Z",
+            parent_id: "",
+          },
+          {
+            id: "c1",
+            name: "Ada",
+            amount: "12.5",
+            created_at: "2026-01-01T00:00:00.000Z",
+            parent_id: "p1",
+          },
+          {
+            id: "c2",
+            name: "Grace",
+            amount: "99.00",
+            created_at: "2026-01-02T00:00:00.000Z",
+            parent_id: "p1",
+          },
         ];
       },
     };

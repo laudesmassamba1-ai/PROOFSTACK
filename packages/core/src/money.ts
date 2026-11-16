@@ -1,4 +1,4 @@
-import { currencyMeta, type CurrencyMeta } from "./currency.js";
+import { type CurrencyMeta, currencyMeta } from "./currency.js";
 import { ProofstackError } from "./errors.js";
 
 /**
@@ -18,7 +18,11 @@ const DECIMAL_RE = /^([+-]?)(\d+)(?:\.(\d+))?$/;
 
 function divRound(a: bigint, b: bigint, mode: RoundingMode): bigint {
   if (b === 0n) {
-    throw new ProofstackError({ message: "divRound: zero denominator", category: "VALIDATION", code: "divide_by_zero" });
+    throw new ProofstackError({
+      message: "divRound: zero denominator",
+      category: "VALIDATION",
+      code: "divide_by_zero",
+    });
   }
   let num = a;
   let den = b;
@@ -88,7 +92,7 @@ export class Money {
   static fromDecimalString(
     input: string,
     code: string,
-    opts: { rounding?: RoundingMode; exact?: boolean } = {},
+    opts: { rounding?: RoundingMode; exact?: boolean } = {}
   ): Money {
     const rounding = opts.rounding ?? "HALF_UP";
     const text = input.trim();
@@ -198,16 +202,24 @@ export class Money {
    */
   allocate(weights: readonly bigint[]): Money[] {
     if (weights.length === 0) {
-      throw new ProofstackError({ message: "allocate: no weights", category: "VALIDATION", code: "empty_weights" });
+      throw new ProofstackError({
+        message: "allocate: no weights",
+        category: "VALIDATION",
+        code: "empty_weights",
+      });
     }
     const total = weights.reduce((acc, w) => acc + w, 0n);
     if (total <= 0n) {
-      throw new ProofstackError({ message: "allocate: weights must sum to a positive number", category: "VALIDATION", code: "bad_weights" });
+      throw new ProofstackError({
+        message: "allocate: weights must sum to a positive number",
+        category: "VALIDATION",
+        code: "bad_weights",
+      });
     }
     const floors = weights.map((w) => (this.minor * w) / total);
     const remainders = weights.map((w, i) => ({
       index: i,
-      frac: ((this.minor * w) % total) * 1000n / total,
+      frac: (((this.minor * w) % total) * 1000n) / total,
       value: floors[i]!,
     }));
     let left = this.minor - floors.reduce((acc, v) => acc + v, 0n);
@@ -227,7 +239,11 @@ export class Money {
   /** Equal split across `parts`, remainder given to the first parts. */
   splitEvenly(parts: number): Money[] {
     if (!Number.isInteger(parts) || parts <= 0) {
-      throw new ProofstackError({ message: `splitEvenly: bad part count ${parts}`, category: "VALIDATION", code: "bad_parts" });
+      throw new ProofstackError({
+        message: `splitEvenly: bad part count ${parts}`,
+        category: "VALIDATION",
+        code: "bad_parts",
+      });
     }
     return this.allocate(Array.from({ length: parts }, () => 1n));
   }
@@ -335,14 +351,15 @@ export function parseLocalizedDecimal(
   raw: string,
   spec: LocalizedDecimalSpec,
   code: string,
-  opts: { exact?: boolean } = {},
+  opts: { exact?: boolean } = {}
 ): { ok: true; money: Money } | { ok: false; reason: string } {
   let text = raw.trim();
   if (text.length === 0) return { ok: false, reason: "empty" };
   if (spec.decimalSeparator.length !== 1 || SPACE_LIKE.test(spec.decimalSeparator)) {
     return { ok: false, reason: "bad_spec" };
   }
-  const spaceLikeGrouping = spec.groupingSeparator === "" || SPACE_LIKE.test(spec.groupingSeparator);
+  const spaceLikeGrouping =
+    spec.groupingSeparator === "" || SPACE_LIKE.test(spec.groupingSeparator);
   // Normalise every space variant to a plain space so grouping can be stripped.
   text = text.replace(new RegExp(SPACE_LIKE.source, "g"), " ");
 
@@ -368,7 +385,8 @@ export function parseLocalizedDecimal(
     const grp = spec.groupingSeparator;
     const groups = digits.split(grp);
     if (groups.length > 1) {
-      if (groups[0] === undefined || !/^\d{1,3}$/.test(groups[0])) return { ok: false, reason: "bad_first_group" };
+      if (groups[0] === undefined || !/^\d{1,3}$/.test(groups[0]))
+        return { ok: false, reason: "bad_first_group" };
       for (let i = 1; i < groups.length; i++) {
         if (!/^\d{3}$/.test(groups[i] ?? "")) return { ok: false, reason: "bad_group_length" };
       }

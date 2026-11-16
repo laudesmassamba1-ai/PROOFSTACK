@@ -51,8 +51,13 @@
         "useExhaustiveDependencies": "warn"
       },
       "security": {
-        "noEval": "error"
+        "noGlobalEval": "error"
       }
+    }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
     }
   },
   "javascript": {

@@ -45,9 +45,7 @@ export interface ProductUnderTest {
   sorted?(input: { profile: string; field: string; values: string[] }): Promise<string[]>;
 }
 
-export interface FetchLike {
-  (input: string, init?: RequestInit): Promise<Response>;
-}
+export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 /**
  * HTTP target. Works in Node 22 and in CI with plain `fetch`; authentication comes
@@ -153,11 +151,12 @@ export class HttpProductUnderTest implements ProductUnderTest {
 
   async sorted(input: { profile: string; field: string; values: string[] }): Promise<string[]> {
     const url = this.cfg.sortUrl;
-    if (!url) throw new ProofstackError({
-      message: "WORLD collation checks need modules.world.target.sortUrl",
-      category: "CONFIGURATION",
-      code: "world_sort_url_missing",
-    });
+    if (!url)
+      throw new ProofstackError({
+        message: "WORLD collation checks need modules.world.target.sortUrl",
+        category: "CONFIGURATION",
+        code: "world_sort_url_missing",
+      });
     const response = await this.fetchImpl(url, {
       method: "POST",
       headers: this.headers(),
@@ -194,7 +193,8 @@ function recordIdOf(parsed: unknown): string | undefined {
   const data = obj.data;
   if (data && typeof data === "object") {
     const nested = data as Record<string, unknown>;
-    for (const key of ["recordId", "id"]) if (typeof nested[key] === "string") return nested[key] as string;
+    for (const key of ["recordId", "id"])
+      if (typeof nested[key] === "string") return nested[key] as string;
   }
   return undefined;
 }
@@ -264,7 +264,7 @@ export class SyntheticProductUnderTest implements ProductUnderTest {
       transform?: (field: string, value: string, profile: string) => string;
       sort?: (values: string[], profile: string, field: string) => string[];
     },
-    name = "synthetic",
+    name = "synthetic"
   ) {
     this.name = name;
   }
@@ -278,7 +278,9 @@ export class SyntheticProductUnderTest implements ProductUnderTest {
         errors[field] = rejection;
         continue;
       }
-      stored[field] = this.behaviour.transform ? this.behaviour.transform(field, value, input.profile) : value;
+      stored[field] = this.behaviour.transform
+        ? this.behaviour.transform(field, value, input.profile)
+        : value;
     }
     const failed = Object.keys(errors).length > 0;
     if (failed) return { accepted: false, errors, stored: undefined };
@@ -292,7 +294,10 @@ export class SyntheticProductUnderTest implements ProductUnderTest {
   }
 
   async sorted(input: { profile: string; field: string; values: string[] }): Promise<string[]> {
-    if (this.behaviour.sort) return this.behaviour.sort([...input.values], input.profile, input.field);
-    return [...input.values].sort((a, b) => a.localeCompare(b, input.profile, { sensitivity: "variant" }));
+    if (this.behaviour.sort)
+      return this.behaviour.sort([...input.values], input.profile, input.field);
+    return [...input.values].sort((a, b) =>
+      a.localeCompare(b, input.profile, { sensitivity: "variant" })
+    );
   }
 }

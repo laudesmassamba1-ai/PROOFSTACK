@@ -1,5 +1,11 @@
-import { Money, ProofstackError, hmacSha256Hex, sha256Hex, timingSafeEqualHex } from "@proofstack/core";
 import type { PaymentState } from "@proofstack/contracts";
+import {
+  hmacSha256Hex,
+  Money,
+  ProofstackError,
+  sha256Hex,
+  timingSafeEqualHex,
+} from "@proofstack/core";
 
 /**
  * The FLOW payment surface.
@@ -70,9 +76,15 @@ export interface PaymentUnderTest {
   /** Read the order back, including how many orders exist for the reference. */
   readOrder?(orderReference: string): Promise<OrderState | undefined>;
   /** POST a (possibly forged or duplicated) webhook body to the product's receiver. */
-  deliverWebhook?(input: { body: string; headers: Record<string, string> }): Promise<WebhookDelivery>;
+  deliverWebhook?(input: {
+    body: string;
+    headers: Record<string, string>;
+  }): Promise<WebhookDelivery>;
   /** Trigger the product's refund path. */
-  refund?(input: { paymentId: string; amount?: string }): Promise<{ accepted: boolean; state?: string }>;
+  refund?(input: {
+    paymentId: string;
+    amount?: string;
+  }): Promise<{ accepted: boolean; state?: string }>;
 }
 
 export type FlowScenario =
@@ -166,7 +178,8 @@ export async function verifySignedWebhook(input: {
 
   const tolerance = input.toleranceSeconds ?? 300;
   const now = input.nowSeconds ?? Math.floor(Date.now() / 1000);
-  if (Math.abs(now - seconds) > tolerance) return { valid: false, reason: "timestamp outside tolerance" };
+  if (Math.abs(now - seconds) > tolerance)
+    return { valid: false, reason: "timestamp outside tolerance" };
 
   const expected = await hmacSha256Hex(input.secret, `${timestamp}.${input.body}`);
   if (!timingSafeEqualHex(expected.toLowerCase(), signature.toLowerCase())) {
@@ -211,14 +224,30 @@ export const SCENARIO_EXPECTATIONS: Record<FlowScenario, ScenarioExpectation> = 
   checkout_declined: {
     scenario: "checkout_declined",
     description: "A declined payment must not create a paid order.",
-    acceptableOrderStatuses: ["failed", "FAILED", "declined", "DECLINED", "pending", "PENDING", "cancelled", "CANCELLED"],
+    acceptableOrderStatuses: [
+      "failed",
+      "FAILED",
+      "declined",
+      "DECLINED",
+      "pending",
+      "PENDING",
+      "cancelled",
+      "CANCELLED",
+    ],
     exactlyOneOrder: true,
     expectsPaid: false,
   },
   checkout_cancelled: {
     scenario: "checkout_cancelled",
     description: "A cancelled payment must not create a paid order.",
-    acceptableOrderStatuses: ["cancelled", "CANCELLED", "abandoned", "ABANDONED", "pending", "PENDING"],
+    acceptableOrderStatuses: [
+      "cancelled",
+      "CANCELLED",
+      "abandoned",
+      "ABANDONED",
+      "pending",
+      "PENDING",
+    ],
     exactlyOneOrder: true,
     expectsPaid: false,
   },
@@ -231,7 +260,8 @@ export const SCENARIO_EXPECTATIONS: Record<FlowScenario, ScenarioExpectation> = 
   },
   webhook_duplicate: {
     scenario: "webhook_duplicate",
-    description: "The same webhook delivered twice must not create a second order or a second credit.",
+    description:
+      "The same webhook delivered twice must not create a second order or a second credit.",
     acceptableOrderStatuses: ["paid", "PAID", "completed", "COMPLETED", "confirmed", "CONFIRMED"],
     exactlyOneOrder: true,
     expectsPaid: true,
@@ -253,7 +283,14 @@ export const SCENARIO_EXPECTATIONS: Record<FlowScenario, ScenarioExpectation> = 
   webhook_invalid_signature: {
     scenario: "webhook_invalid_signature",
     description: "A forged webhook must be rejected and must change nothing.",
-    acceptableOrderStatuses: ["pending", "PENDING", "created", "CREATED", "awaiting_payment", "AWAITING_PAYMENT"],
+    acceptableOrderStatuses: [
+      "pending",
+      "PENDING",
+      "created",
+      "CREATED",
+      "awaiting_payment",
+      "AWAITING_PAYMENT",
+    ],
     exactlyOneOrder: true,
     expectsPaid: false,
   },
@@ -301,7 +338,9 @@ export const SCENARIO_EXPECTATIONS: Record<FlowScenario, ScenarioExpectation> = 
 /** Map a product's status string to whether it means "money collected". */
 export function looksPaid(status: string): boolean {
   const normalised = status.trim().toLowerCase();
-  return ["paid", "completed", "confirmed", "succeeded", "success", "captured", "settled"].includes(normalised);
+  return ["paid", "completed", "confirmed", "succeeded", "success", "captured", "settled"].includes(
+    normalised
+  );
 }
 
 /** Map a product's status to whether it is terminal. */
@@ -330,7 +369,10 @@ export function looksTerminal(status: string): boolean {
  * that catches the classic integration bug: the webhook says PAID, the order says
  * pending, and the customer has been charged for nothing.
  */
-export function statusesAgree(orderStatus: string, paymentStatus: string): { agree: boolean; reason?: string } {
+export function statusesAgree(
+  orderStatus: string,
+  paymentStatus: string
+): { agree: boolean; reason?: string } {
   const orderPaid = looksPaid(orderStatus);
   const paymentPaid = looksPaid(paymentStatus);
   if (orderPaid === paymentPaid) return { agree: true };
@@ -345,10 +387,15 @@ export function syntheticOrderReference(runId: string, scenario: FlowScenario): 
   return `PS-${runId.slice(-8).toUpperCase()}-${scenario.toUpperCase().replaceAll("_", "-")}`;
 }
 
-/** Money for a scenario, as the decimal string a product API expects. */
-export function scenarioAmount(scenario: FlowScenario, currency = "XOF"): string {
-  const amount = Money.of(currency, currency === "XOF" ? 2500n : 2500n);
-  return amount.toProviderDecimal();
+/**
+ * The synthetic amount a journey uses, as the decimal string a product API expects.
+ *
+ * It is deliberately the same for every scenario: FLOW verifies state transitions,
+ * not pricing, and a random amount would make failures harder to reproduce. Currency
+ * precision still comes from the Money type, so XOF stays exponent-0.
+ */
+export function scenarioAmount(currency = "XOF"): string {
+  return Money.of(currency, 2500n).toProviderDecimal();
 }
 
 export class FlowHarnessError extends ProofstackError {

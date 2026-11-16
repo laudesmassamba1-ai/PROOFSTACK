@@ -20,7 +20,7 @@ export class AssertionFailed extends ProofstackError {
      * "assertion_failed" cannot be triaged, and the fingerprint that groups the same
      * defect across runs depends on this being specific.
      */
-    code = "assertion_failed",
+    code = "assertion_failed"
   ) {
     super({ message, category: "ASSERTION", code, details: details_ });
     this.name = "AssertionFailed";
@@ -107,7 +107,7 @@ export class CaseContext implements TestContext {
       severity?: TestCaseResult["severity"];
       code?: string;
       detail?: string;
-    },
+    }
   ): void {
     const assertion: Assertion = {
       id: `${this.caseId}#a${this.assertionList.length + 1}`,
@@ -134,7 +134,7 @@ export class CaseContext implements TestContext {
         expected: safe(input.expected),
         actual: safe(input.actual),
       },
-      input.code ?? "assertion_failed",
+      input.code ?? "assertion_failed"
     );
   }
 
@@ -148,7 +148,10 @@ export class CaseContext implements TestContext {
   }
 
   warn(input: ReportCall): void {
-    this.reportList.push({ ...input, severity: input.severity === "CRITICAL" ? "HIGH" : input.severity });
+    this.reportList.push({
+      ...input,
+      severity: input.severity === "CRITICAL" ? "HIGH" : input.severity,
+    });
   }
 
   report(input: ReportCall): void {
@@ -208,7 +211,14 @@ export class CaseContext implements TestContext {
       const timer = setTimeout(resolve, ms);
       const onAbort = () => {
         clearTimeout(timer);
-        reject(new ProofstackError({ message: "cancelled", category: "TIMEOUT", code: "cancelled", retryable: false }));
+        reject(
+          new ProofstackError({
+            message: "cancelled",
+            category: "TIMEOUT",
+            code: "cancelled",
+            retryable: false,
+          })
+        );
       };
       if (this.signal.aborted) {
         clearTimeout(timer);
@@ -284,7 +294,8 @@ export class MemoryEvidenceStore implements EvidenceStore {
 }
 
 function render(value: unknown): string {
-  if (typeof value === "string") return JSON.stringify(value.length > 80 ? `${value.slice(0, 80)}…` : value);
+  if (typeof value === "string")
+    return JSON.stringify(value.length > 80 ? `${value.slice(0, 80)}…` : value);
   return JSON.stringify(safe(value)) ?? String(value);
 }
 
@@ -308,8 +319,8 @@ function deepEqual(a: unknown, b: unknown): boolean {
   const bk = Object.keys(b as object);
   if (ak.length !== bk.length) return false;
   for (const key of ak) {
-    if (!deepEqual((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key])) return false;
+    if (!deepEqual((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]))
+      return false;
   }
   return true;
 }
-

@@ -15,7 +15,10 @@ import {
 
 export const isoInstantSchema = z
   .string()
-  .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?(Z|[+-]\d{2}:\d{2})$/, "must be an ISO-8601 instant");
+  .regex(
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?(Z|[+-]\d{2}:\d{2})$/,
+    "must be an ISO-8601 instant"
+  );
 
 export const assertionSchema = z
   .object({
@@ -140,7 +143,7 @@ export const testCaseResultSchema = z
             message: z.string(),
             time: isoInstantSchema,
           })
-          .strict(),
+          .strict()
       )
       .default([]),
     attempts: z.number().int().positive().default(1),

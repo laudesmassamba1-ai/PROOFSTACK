@@ -24,11 +24,12 @@ export class FixedClock implements Clock {
   private ms: number;
   constructor(start: number | string = Date.UTC(2026, 0, 1)) {
     this.ms = typeof start === "string" ? Date.parse(start) : start;
-    if (!Number.isFinite(this.ms)) throw new ProofstackError({
-      message: `FixedClock: unparseable start ${start}`,
-      category: "VALIDATION",
-      code: "bad_instant",
-    });
+    if (!Number.isFinite(this.ms))
+      throw new ProofstackError({
+        message: `FixedClock: unparseable start ${start}`,
+        category: "VALIDATION",
+        code: "bad_instant",
+      });
   }
   now(): number {
     return this.ms;
@@ -54,9 +55,8 @@ export function durationMs(start: number, end: number): number {
 }
 
 export function isIsoInstant(value: string): boolean {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(\.\d{1,3})?(Z|[+-]\d{2}:\d{2})$/.exec(
-    value,
-  );
+  const match =
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(\.\d{1,3})?(Z|[+-]\d{2}:\d{2})$/.exec(value);
   if (!match) return false;
   const instant = Date.parse(value);
   if (!Number.isFinite(instant)) return false;
@@ -70,14 +70,17 @@ export function isIsoInstant(value: string): boolean {
   let day = d.getUTCDate();
   if (offset !== "Z") {
     const sign = offset.startsWith("-") ? -1 : 1;
-    const shift = sign * (Number(offset.slice(1, 3)) * HOURS_UTC + Number(offset.slice(4, 6)) * 60_000);
+    const shift =
+      sign * (Number(offset.slice(1, 3)) * HOURS_UTC + Number(offset.slice(4, 6)) * 60_000);
     const local = new Date(instant + shift);
     y = local.getUTCFullYear();
     mo = local.getUTCMonth() + 1;
     day = local.getUTCDate();
   }
   return (
-    y === Number(match[1]) && mo === Number(match[2]) && day === Number(match[3]) &&
+    y === Number(match[1]) &&
+    mo === Number(match[2]) &&
+    day === Number(match[3]) &&
     d.getUTCHours() < 25
   );
 }
@@ -143,7 +146,14 @@ export function zoneOffsetMs(zone: string, instant: number): number {
     }
     return Number(found.value);
   };
-  const asUtc = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
+  const asUtc = Date.UTC(
+    get("year"),
+    get("month") - 1,
+    get("day"),
+    get("hour"),
+    get("minute"),
+    get("second")
+  );
   return asUtc - Math.floor(instant / 1000) * 1000;
 }
 
@@ -255,6 +265,10 @@ export function dstTransitions(zone: string, fromYear: number, toYear: number): 
   return out;
 }
 
-export function formatInZone(zone: string, instant: number, dateStyle: Intl.DateTimeFormatOptions["dateStyle"] = "short"): string {
+export function formatInZone(
+  zone: string,
+  instant: number,
+  dateStyle: Intl.DateTimeFormatOptions["dateStyle"] = "short"
+): string {
   return new Intl.DateTimeFormat("en-US", { timeZone: zone, dateStyle }).format(new Date(instant));
 }

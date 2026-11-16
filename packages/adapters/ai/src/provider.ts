@@ -102,7 +102,9 @@ export class OpenAiCompatibleProvider implements AiProvider {
     this.fetchImpl = options.fetchImpl ?? fetch;
 
     const base = options.baseUrl.replace(/\/+$/, "");
-    this.endpoint = /\/v\d+$/.test(base) ? `${base}/chat/completions` : `${base}/v1/chat/completions`;
+    this.endpoint = /\/v\d+$/.test(base)
+      ? `${base}/chat/completions`
+      : `${base}/v1/chat/completions`;
   }
 
   async chat(request: ChatRequest): Promise<ChatResponse> {
@@ -133,8 +135,10 @@ export class OpenAiCompatibleProvider implements AiProvider {
 
     const headers: Record<string, string> = {
       "content-type": "application/json",
-      ...(this.options.headers ?? {}),
     };
+    for (const [key, value] of Object.entries(this.options.headers ?? {})) {
+      headers[key] = expandEnvValue(value);
+    }
     if (this.options.apiKey) headers.authorization = `Bearer ${this.options.apiKey}`;
 
     let response: Response;
@@ -290,6 +294,7 @@ export function providerFromConfig(config: {
   headers?: Record<string, string>;
   maxTokens?: number;
   temperature?: number;
+  supportsTools?: boolean;
   timeoutMs?: number;
 }): AiProvider {
   let apiKey: string | undefined;
@@ -313,6 +318,18 @@ export function providerFromConfig(config: {
     ...(config.headers === undefined ? {} : { headers: config.headers }),
     ...(config.maxTokens === undefined ? {} : { maxTokens: config.maxTokens }),
     ...(config.temperature === undefined ? {} : { temperature: config.temperature }),
+    ...(config.supportsTools === undefined ? {} : { supportsTools: config.supportsTools }),
     ...(config.timeoutMs === undefined ? {} : { timeoutMs: config.timeoutMs }),
   });
+}
+
+/**
+ * Resolve `${ENV_VAR}` references in a header value.
+ *
+ * A config file may name a credential without containing one; the value is read at
+ * request time, so rotating a key does not require a config change and a committed
+ * file never holds the secret.
+ */
+function expandEnvValue(value: string): string {
+  return value.replace(/\$\{([A-Z0-9_]+)\}/gi, (match, name: string) => process.env[name] ?? match);
 }

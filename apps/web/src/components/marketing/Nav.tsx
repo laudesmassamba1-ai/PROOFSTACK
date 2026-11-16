@@ -1,9 +1,9 @@
+import { Languages, Menu, Moon, Sun, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router";
-import { Languages, Menu, Moon, Sun, X } from "lucide-react";
-import { Wordmark } from "../brand/Logo.js";
 import { useI18n } from "../../i18n/index.js";
 import { useTheme } from "../../lib/theme.js";
+import { Wordmark } from "../brand/Logo.js";
 
 const LINKS = [
   { to: "/product", key: "nav.product" as const },
@@ -34,15 +34,17 @@ export function Nav() {
   return (
     <header
       className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
-        scrolled ? "border-b border-white/10 bg-[#050708]/80 backdrop-blur-xl" : "border-b border-transparent"
+        scrolled
+          ? "border-b border-white/10 bg-[#050708]/80 backdrop-blur-xl"
+          : "border-b border-transparent"
       }`}
     >
       <nav className="mx-auto flex max-w-[1240px] items-center gap-6 px-5 py-4 lg:px-8">
-        <Link to="/" aria-label="PROOFSTACK home">
+        <Link to="/" aria-label={t("mkt.homeLabel")}>
           <Wordmark size={15} />
         </Link>
 
-        <ul className="ml-4 hidden flex-1 items-center gap-1 lg:flex">
+        <ul className="ml-4 hidden flex-1 items-center gap-1 xl:flex">
           {LINKS.map((link) => (
             <li key={link.to}>
               <NavLink
@@ -53,7 +55,9 @@ export function Nav() {
                   }`
                 }
               >
-                {link.key === "modules.world.name" || link.key === "modules.flow.name" || link.key === "modules.exit.name"
+                {link.key === "modules.world.name" ||
+                link.key === "modules.flow.name" ||
+                link.key === "modules.exit.name"
                   ? link.key.split(".")[1]?.toUpperCase()
                   : t(link.key)}
               </NavLink>
@@ -61,7 +65,7 @@ export function Nav() {
           ))}
         </ul>
 
-        <div className="ml-auto hidden items-center gap-2 lg:flex">
+        <div className="ml-auto hidden items-center gap-2 xl:flex">
           <button
             type="button"
             onClick={() => setLocale(locale === "en" ? "fr" : "en")}
@@ -89,22 +93,28 @@ export function Nav() {
 
         <button
           type="button"
-          className="ml-auto rounded-lg border border-white/15 p-2 text-white lg:hidden"
+          className="ml-auto rounded-lg border border-white/15 p-2 text-white xl:hidden"
           onClick={() => setOpen((value) => !value)}
           aria-expanded={open}
           aria-controls="mobile-nav"
-          aria-label={open ? "Close menu" : "Open menu"}
+          aria-label={open ? t("mkt.menu.close") : t("mkt.menu.open")}
         >
           {open ? <X size={18} /> : <Menu size={18} />}
         </button>
       </nav>
 
       {open ? (
-        <div id="mobile-nav" className="border-t border-white/10 bg-[#050708]/95 px-5 py-4 backdrop-blur-xl lg:hidden">
+        <div
+          id="mobile-nav"
+          className="max-h-[calc(100dvh-4.5rem)] overflow-y-auto border-y border-white/10 bg-[#050708] px-5 py-4 shadow-2xl xl:hidden"
+        >
           <ul className="flex flex-col gap-1">
             {LINKS.map((link) => (
               <li key={link.to}>
-                <Link to={link.to} className="block rounded-lg px-3 py-2.5 text-[0.95rem] text-white/80 hover:bg-white/8">
+                <Link
+                  to={link.to}
+                  className="block rounded-lg px-3 py-2.5 text-[0.95rem] text-white/80 hover:bg-white/8"
+                >
                   {t(link.key)}
                 </Link>
               </li>
@@ -118,7 +128,12 @@ export function Nav() {
             >
               <Languages size={15} /> {locale === "en" ? "Français" : "English"}
             </button>
-            <button type="button" onClick={toggle} className="btn btn-ghost" aria-label={t("nav.theme")}>
+            <button
+              type="button"
+              onClick={toggle}
+              className="btn btn-ghost"
+              aria-label={t("nav.theme")}
+            >
               {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
             </button>
           </div>

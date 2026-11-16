@@ -186,6 +186,25 @@ export function workspaceRoutes(services: Services): Hono<AppEnv> {
     return c.json({ ok: true });
   });
 
+  /** Recent runs across every project, for the module views. */
+  app.get("/runs", async (c) => {
+    const { workspace } = await requireWorkspace(c, services, c.req.query("workspaceId"));
+    const limit = Math.min(100, Math.max(1, Number(c.req.query("limit") ?? 25) || 25));
+    const runs = await services.store.recentRuns(workspace.id, limit);
+    return c.json({
+      items: runs.map((run) => ({ ...runSummaryDto(run), projectName: run.projectName })),
+    });
+  });
+
+  /** Findings across the workspace, filtered by module when asked. */
+  app.get("/findings", async (c) => {
+    const { workspace } = await requireWorkspace(c, services, c.req.query("workspaceId"));
+    const raw = c.req.query("module");
+    const module = raw === "world" || raw === "flow" || raw === "exit" ? raw : undefined;
+    const findings = await services.store.workspaceFindings(workspace.id, module, 100);
+    return c.json({ items: findings });
+  });
+
   app.get("/projects/:projectId/runs", async (c) => {
     const { workspace } = await requireWorkspace(c, services, c.req.query("workspaceId"));
     const project = await services.store.getProject(workspace.id, c.req.param("projectId"));

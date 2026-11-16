@@ -6,7 +6,7 @@ import type {
   SubscriptionState,
 } from "@proofstack/contracts";
 import { grantsAccess } from "./machines.js";
-import { PLANS, entitlementsFor, findPlan, planRank } from "./plans.js";
+import { entitlementsFor, findPlan, PLANS, planRank } from "./plans.js";
 import type { Subscription } from "./records.js";
 import type { BillingStore } from "./store.js";
 
@@ -61,7 +61,7 @@ export interface EffectiveEntitlements {
 export async function resolveEntitlements(
   store: BillingStore,
   workspaceId: string,
-  now: Date = new Date(),
+  now: Date = new Date()
 ): Promise<EffectiveEntitlements> {
   const subscription = await store.liveSubscription(workspaceId);
   if (!subscription) {
@@ -73,7 +73,7 @@ export async function resolveEntitlements(
     subscription.state,
     now,
     subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd) : null,
-    subscription.trialEndsAt ? new Date(subscription.trialEndsAt) : null,
+    subscription.trialEndsAt ? new Date(subscription.trialEndsAt) : null
   );
 
   if (!entitled) {
@@ -154,7 +154,8 @@ export function calendarMonth(now: Date): { start: string; end: string } {
  * subscription row.
  */
 function accessBoundary(subscription: Subscription): string | null {
-  if (subscription.state === "TRIALING") return subscription.trialEndsAt ?? subscription.currentPeriodEnd;
+  if (subscription.state === "TRIALING")
+    return subscription.trialEndsAt ?? subscription.currentPeriodEnd;
   return subscription.currentPeriodEnd;
 }
 
@@ -192,7 +193,7 @@ export interface EntitlementDecision {
 export function checkEntitlement(
   entitlements: EffectiveEntitlements,
   check: EntitlementCheck,
-  used = 0,
+  used = 0
 ): EntitlementDecision {
   const requested = check.requested ?? 1;
   const limit = entitlements.entitlements[check.key];
@@ -261,8 +262,13 @@ function findPlanUpgrade(key: EntitlementKey, currentRank: number): string | und
 export function planChangeEffect(
   subscription: Subscription,
   targetPlanKey: string,
-  period: BillingPeriod,
-): { mode: "immediate" | "at_period_end"; effectiveAt: string; pendingPlanKey: string | null; reason: string } {
+  period: BillingPeriod
+): {
+  mode: "immediate" | "at_period_end";
+  effectiveAt: string;
+  pendingPlanKey: string | null;
+  reason: string;
+} {
   void period;
   if (subscription.planKey === targetPlanKey) {
     return {

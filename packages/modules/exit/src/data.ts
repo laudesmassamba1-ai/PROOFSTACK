@@ -223,8 +223,14 @@ export function readZipEntries(bytes: Uint8Array): ZipEntry[] {
  * this is the file's own digest; for a deflated entry it is a stable fingerprint of
  * the compressed stream, which is still enough to prove presence and change.
  */
-function digestOfLocalEntry(bytes: Uint8Array, view: DataView, localOffset: number, compressedSize: number): string {
-  if (localOffset + 30 > bytes.length || view.getUint32(localOffset, true) !== 0x04034b50) return "";
+function digestOfLocalEntry(
+  bytes: Uint8Array,
+  view: DataView,
+  localOffset: number,
+  compressedSize: number
+): string {
+  if (localOffset + 30 > bytes.length || view.getUint32(localOffset, true) !== 0x04034b50)
+    return "";
   const nameLength = view.getUint16(localOffset + 26, true);
   const extraLength = view.getUint16(localOffset + 28, true);
   const start = localOffset + 30 + nameLength + extraLength;
@@ -274,7 +280,7 @@ export interface FieldDifference {
 export function compareRecords(
   original: readonly Record<string, unknown>[],
   roundTripped: readonly Record<string, unknown>[],
-  keyField: string,
+  keyField: string
 ): { differences: FieldDifference[]; missing: string[]; extra: string[] } {
   const differences: FieldDifference[] = [];
   const originalByKey = new Map<string, Record<string, unknown>>();
@@ -304,11 +310,23 @@ export function compareRecords(
       const before = record[field];
       const after = other[field];
       if (before === undefined && after !== undefined) {
-        differences.push({ recordKey: key, field, original: before, roundTripped: after, kind: "extra" });
+        differences.push({
+          recordKey: key,
+          field,
+          original: before,
+          roundTripped: after,
+          kind: "extra",
+        });
         continue;
       }
       if (before !== undefined && after === undefined) {
-        differences.push({ recordKey: key, field, original: before, roundTripped: after, kind: "missing" });
+        differences.push({
+          recordKey: key,
+          field,
+          original: before,
+          roundTripped: after,
+          kind: "missing",
+        });
         continue;
       }
       if (before === after) continue;
@@ -337,14 +355,25 @@ export function compareRecords(
  */
 export function checkFieldType(
   value: unknown,
-  type: "string" | "number" | "integer" | "boolean" | "date" | "datetime" | "id" | "money" | "nullable",
+  type:
+    | "string"
+    | "number"
+    | "integer"
+    | "boolean"
+    | "date"
+    | "datetime"
+    | "id"
+    | "money"
+    | "nullable"
 ): { ok: boolean; reason?: string } {
   if (type === "nullable") return { ok: true };
   if (value === null || value === undefined) return { ok: false, reason: "value is null" };
 
   switch (type) {
     case "string":
-      return typeof value === "string" ? { ok: true } : { ok: false, reason: `expected string, got ${typeof value}` };
+      return typeof value === "string"
+        ? { ok: true }
+        : { ok: false, reason: `expected string, got ${typeof value}` };
     case "number":
       return typeof value === "number" && Number.isFinite(value)
         ? { ok: true }
@@ -354,7 +383,9 @@ export function checkFieldType(
         ? { ok: true }
         : { ok: false, reason: `expected integer, got ${String(value)}` };
     case "boolean":
-      return typeof value === "boolean" ? { ok: true } : { ok: false, reason: `expected boolean, got ${typeof value}` };
+      return typeof value === "boolean"
+        ? { ok: true }
+        : { ok: false, reason: `expected boolean, got ${typeof value}` };
     case "id":
       return typeof value === "string" && value.length > 0
         ? { ok: true }
@@ -368,9 +399,12 @@ export function checkFieldType(
         ? { ok: true }
         : { ok: false, reason: `expected YYYY-MM-DD, got ${JSON.stringify(value)}` };
     case "datetime": {
-      if (typeof value !== "string") return { ok: false, reason: `expected ISO datetime, got ${typeof value}` };
+      if (typeof value !== "string")
+        return { ok: false, reason: `expected ISO datetime, got ${typeof value}` };
       const parsed = Date.parse(value);
-      return Number.isFinite(parsed) ? { ok: true } : { ok: false, reason: `unparseable datetime ${value}` };
+      return Number.isFinite(parsed)
+        ? { ok: true }
+        : { ok: false, reason: `unparseable datetime ${value}` };
     }
     default:
       return { ok: true };
@@ -405,7 +439,7 @@ export function findOrphans(input: {
 /** Duplicate detection on a declared unique key. */
 export function findDuplicates(
   records: readonly Record<string, unknown>[],
-  fields: readonly string[],
+  fields: readonly string[]
 ): { key: string; count: number }[] {
   const counts = new Map<string, number>();
   for (const record of records) {

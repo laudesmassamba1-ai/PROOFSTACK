@@ -44,7 +44,7 @@ export function createExitProvider(options: ExitProviderOptions = {}): ModulePro
  */
 export function defaultExportSource(
   config: ProofstackConfig,
-  tokenProvider?: () => string | undefined,
+  tokenProvider?: () => string | undefined
 ): ExportSource | undefined {
   const source = config.modules.exit.exportSource;
   if (!source) return undefined;

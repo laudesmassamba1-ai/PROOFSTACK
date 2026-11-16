@@ -134,7 +134,11 @@ export class HttpPaymentTarget implements PaymentUnderTest {
     // The product must report how many orders exist for the reference; without it we
     // cannot detect duplicates, so we say so rather than assuming one.
     const orderCount =
-      typeof body.order_count === "number" ? body.order_count : Array.isArray(body.orders) ? body.orders.length : 1;
+      typeof body.order_count === "number"
+        ? body.order_count
+        : Array.isArray(body.orders)
+          ? body.orders.length
+          : 1;
 
     return {
       orderId,
@@ -147,7 +151,10 @@ export class HttpPaymentTarget implements PaymentUnderTest {
     };
   }
 
-  async deliverWebhook(input: { body: string; headers: Record<string, string> }): Promise<WebhookDelivery> {
+  async deliverWebhook(input: {
+    body: string;
+    headers: Record<string, string>;
+  }): Promise<WebhookDelivery> {
     if (!this.target.webhookUrl) {
       throw new ProofstackError({
         message: "FLOW target has no webhookUrl",
@@ -157,15 +164,24 @@ export class HttpPaymentTarget implements PaymentUnderTest {
     }
     // The body is sent byte-for-byte: re-serialising it would invalidate the signature
     // and make a correct receiver look broken.
-    const response = await this.request("POST", this.target.webhookUrl, input.body, {
-      ...input.headers,
-      "content-type": "application/json",
-    }, true);
+    const response = await this.request(
+      "POST",
+      this.target.webhookUrl,
+      input.body,
+      {
+        ...input.headers,
+        "content-type": "application/json",
+      },
+      true
+    );
     const text = await response.text().catch(() => "");
     return { status: response.status, body: text.slice(0, 2_000) };
   }
 
-  async refund(input: { paymentId: string; amount?: string }): Promise<{ accepted: boolean; state?: string }> {
+  async refund(input: {
+    paymentId: string;
+    amount?: string;
+  }): Promise<{ accepted: boolean; state?: string }> {
     if (!this.target.refundUrl) {
       throw new ProofstackError({
         message: "FLOW target has no refundUrl",
@@ -189,7 +205,7 @@ export class HttpPaymentTarget implements PaymentUnderTest {
     url: string,
     body?: unknown,
     extraHeaders: Record<string, string> = {},
-    raw = false,
+    raw = false
   ): Promise<Response> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.target.timeoutMs ?? 15_000);

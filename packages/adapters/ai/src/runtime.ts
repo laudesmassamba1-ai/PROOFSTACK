@@ -1,8 +1,14 @@
 import type { AiConfig, McpServerConfig } from "@proofstack/contracts";
 import { ProofstackError } from "@proofstack/core";
-import { connectMcp, filterTools, namespacedToolName, type McpClient, type McpTool } from "./mcp.js";
 import type { AgentTool } from "./agent.js";
-import { providerFromConfig, type AiProvider } from "./provider.js";
+import {
+  connectMcp,
+  filterTools,
+  type McpClient,
+  type McpTool,
+  namespacedToolName,
+} from "./mcp.js";
+import { type AiProvider, providerFromConfig } from "./provider.js";
 
 /**
  * Wiring: turn the `ai` block of the project config into live objects.
@@ -61,13 +67,14 @@ export async function buildAiRuntime(options: BuildAiRuntimeOptions): Promise<Ai
     }
   }
 
-  const explicitDefault = providers.find((provider) =>
-    config.providers.find((entry) => entry.name === provider.name)?.default,
+  const explicitDefault = providers.find(
+    (provider) => config.providers.find((entry) => entry.name === provider.name)?.default
   );
   const defaultProvider = explicitDefault ?? providers[0] ?? null;
 
   // ---- MCP servers
-  const wanted = options.connectServers ?? config.mcpServers.filter((s) => s.autoConnect).map((s) => s.name);
+  const wanted =
+    options.connectServers ?? config.mcpServers.filter((s) => s.autoConnect).map((s) => s.name);
   const mcpClients: McpClient[] = [];
   const mcpTools: AgentTool[] = [];
 
@@ -88,10 +95,10 @@ export async function buildAiRuntime(options: BuildAiRuntimeOptions): Promise<Ai
           : {}),
       });
       mcpClients.push(client);
-      mcpTools.push(...await toolsFromServer(client, server));
+      mcpTools.push(...(await toolsFromServer(client, server)));
     } catch (error) {
       warnings.push(
-        `MCP server "${server.name}" could not connect: ${error instanceof Error ? error.message : String(error)}`,
+        `MCP server "${server.name}" could not connect: ${error instanceof Error ? error.message : String(error)}`
       );
     }
   }
@@ -120,8 +127,7 @@ async function toolsFromServer(client: McpClient, server: McpServerConfig): Prom
   const permitted = filterTools(available, server.allowTools, server.denyTools);
 
   return permitted.map((tool) => {
-    const effect: "read" | "write" =
-      tool.annotations?.readOnlyHint === true ? "read" : "write";
+    const effect: "read" | "write" = tool.annotations?.readOnlyHint === true ? "read" : "write";
 
     return {
       effect,
@@ -162,7 +168,7 @@ export function describeRuntime(runtime: AiRuntime): string[] {
     for (const provider of runtime.providers) {
       const isDefault = runtime.defaultProvider?.name === provider.name;
       lines.push(
-        `  ${provider.name}${isDefault ? " (default)" : ""} — model ${provider.model}, tools ${provider.supportsTools ? "yes" : "no"}`,
+        `  ${provider.name}${isDefault ? " (default)" : ""} — model ${provider.model}, tools ${provider.supportsTools ? "yes" : "no"}`
       );
     }
   }
@@ -174,7 +180,7 @@ export function describeRuntime(runtime: AiRuntime): string[] {
     for (const client of runtime.mcpClients) {
       const info = client.serverInfo;
       lines.push(
-        `  ${client.name} — ${info?.name ?? "unknown"} ${info?.version ?? ""} (protocol ${info?.protocolVersion ?? "?"})`,
+        `  ${client.name} — ${info?.name ?? "unknown"} ${info?.version ?? ""} (protocol ${info?.protocolVersion ?? "?"})`
       );
     }
     lines.push(`mcp tools: ${runtime.mcpTools.length}`);

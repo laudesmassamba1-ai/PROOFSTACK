@@ -1,15 +1,15 @@
 import type { ProofstackConfig } from "@proofstack/contracts";
 import type { TestCaseDef, TestSuiteDef } from "@proofstack/engine";
 import {
-  SCENARIO_EXPECTATIONS,
   buildForgedWebhook,
   buildSignedWebhook,
+  type FlowScenario,
   looksPaid,
+  type PaymentUnderTest,
+  SCENARIO_EXPECTATIONS,
   scenarioAmount,
   statusesAgree,
   syntheticOrderReference,
-  type FlowScenario,
-  type PaymentUnderTest,
 } from "./harness.js";
 
 /**
@@ -73,7 +73,7 @@ function flowCase(scenario: FlowScenario, options: FlowCheckOptions): TestCaseDe
 
       const orderReference = syntheticOrderReference(options.runId, scenario);
       const currency = "XOF";
-      const amount = scenarioAmount(scenario, currency);
+      const amount = scenarioAmount(currency);
 
       switch (scenario) {
         case "checkout_success":
@@ -149,11 +149,15 @@ function flowCase(scenario: FlowScenario, options: FlowCheckOptions): TestCaseDe
           const paymentId = checkout.paymentId ?? checkout.orderId;
           const secret = options.webhookSecret;
           if (!paymentId) {
-            ctx.skip("the product did not return a payment id, so a webhook cannot be addressed to it");
+            ctx.skip(
+              "the product did not return a payment id, so a webhook cannot be addressed to it"
+            );
             return;
           }
           if (!secret) {
-            ctx.skip("no webhook secret configured (modules.flow.webhookSecretEnvVar is unset or empty)");
+            ctx.skip(
+              "no webhook secret configured (modules.flow.webhookSecretEnvVar is unset or empty)"
+            );
             return;
           }
 
@@ -200,7 +204,13 @@ function flowCase(scenario: FlowScenario, options: FlowCheckOptions): TestCaseDe
             const stale = await buildSignedWebhook({
               secret,
               event: "payment.pending",
-              data: { id: paymentId, status: "PENDING", amount, currency, reference: orderReference },
+              data: {
+                id: paymentId,
+                status: "PENDING",
+                amount,
+                currency,
+                reference: orderReference,
+              },
             });
             const staleResult = await target.deliverWebhook!(stale);
             ctx.check(staleResult.status < 500, {
@@ -253,7 +263,7 @@ function flowCase(scenario: FlowScenario, options: FlowCheckOptions): TestCaseDe
           if (!orderBefore) return;
           if (looksPaid(orderBefore.status)) {
             ctx.skip(
-              `the product settled the order as "${orderBefore.status}" before any webhook, so a forged webhook cannot be shown to change anything`,
+              `the product settled the order as "${orderBefore.status}" before any webhook, so a forged webhook cannot be shown to change anything`
             );
             return;
           }
@@ -414,14 +424,16 @@ function flowCase(scenario: FlowScenario, options: FlowCheckOptions): TestCaseDe
             severity: "HIGH",
           });
           ctx.check(
-            expectation.acceptableOrderStatuses.some((s) => s.toLowerCase() === order.status.toLowerCase()),
+            expectation.acceptableOrderStatuses.some(
+              (s) => s.toLowerCase() === order.status.toLowerCase()
+            ),
             {
               description: "the order moved to a refunded state",
               expected: expectation.acceptableOrderStatuses.join(" | "),
               actual: order.status,
               code: "refund_state_wrong",
               severity: "HIGH",
-            },
+            }
           );
           return;
         }
@@ -470,26 +482,34 @@ function flowCase(scenario: FlowScenario, options: FlowCheckOptions): TestCaseDe
 async function readOrderOrSkip(
   ctx: { skip(reason: string): never },
   target: PaymentUnderTest,
-  orderReference: string,
+  orderReference: string
 ) {
   if (!target.capabilities.orderReadback || !target.readOrder) {
-    ctx.skip("the product does not expose an order readback endpoint, so the outcome cannot be verified");
+    ctx.skip(
+      "the product does not expose an order readback endpoint, so the outcome cannot be verified"
+    );
   }
   const order = await target.readOrder(orderReference);
   if (!order) {
-    ctx.skip(`no order found for reference ${orderReference}; the product may not persist sandbox orders`);
+    ctx.skip(
+      `no order found for reference ${orderReference}; the product may not persist sandbox orders`
+    );
   }
   return order;
 }
 
 function skipFor(scenario: FlowScenario, target: PaymentUnderTest | undefined): string | undefined {
   if (!target) return 'no payment target configured (modules.flow.target.kind is "none")';
-  if (!target.capabilities.checkout || !target.checkout) return "the product does not expose a checkout endpoint";
+  if (!target.capabilities.checkout || !target.checkout)
+    return "the product does not expose a checkout endpoint";
   const needsReadback = scenario !== "checkout_success" && scenario !== "checkout_declined";
   if (needsReadback && (!target.capabilities.orderReadback || !target.readOrder)) {
     return "the product does not expose an order readback endpoint";
   }
-  if (scenario.startsWith("webhook_") && (!target.capabilities.webhookReceiver || !target.deliverWebhook)) {
+  if (
+    scenario.startsWith("webhook_") &&
+    (!target.capabilities.webhookReceiver || !target.deliverWebhook)
+  ) {
     return "the product does not expose a webhook receiver";
   }
   if (scenario === "refund_flow" && (!target.capabilities.refund || !target.refund)) {

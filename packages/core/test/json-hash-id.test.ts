@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import {
   canonical,
   deterministicId,
@@ -12,6 +11,7 @@ import {
   timingSafeEqualHex,
   toHex,
 } from "@proofstack/core";
+import { describe, expect, it } from "vitest";
 
 describe("canonical JSON", () => {
   it("is independent of key insertion order", () => {
@@ -37,9 +37,12 @@ describe("canonical JSON", () => {
 
 describe("hashing", () => {
   it("matches published SHA-256 vectors", async () => {
-    expect(await sha256Hex("abc")).toBe("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
-    expect(await sha256Hex(""))
-      .toBe("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+    expect(await sha256Hex("abc")).toBe(
+      "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    );
+    expect(await sha256Hex("")).toBe(
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    );
   });
 
   it("round-trips hex and compares digests in constant time", () => {

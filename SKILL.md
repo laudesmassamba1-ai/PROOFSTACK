@@ -1,4 +1,5 @@
 ---
+
 name: saspay-integration
 description: Intégrer SasPay (encaissement mobile money et carte, retraits vers bénéficiaires mobile money, wallet, webhooks) dans une application, un site ou un SaaS, quelle que soit la stack. Utiliser dès qu'on demande d'ajouter SasPay, d'encaisser en mobile money, de payer un bénéficiaire, de vérifier un paiement SasPay, ou de traiter un webhook SasPay (« sk_test », « sk_live », « checkout_url », « X-Webhook-Signature »).
 ---
@@ -29,6 +30,7 @@ Documentation : `/llms.txt` à la racine du site de documentation.
 ## 2. Ce que fait l'humain, ce que fait l'agent
 
 **L'humain (tableau de bord `app.saspay.me`, section Développeur) :**
+
 1. Créer le compte, vérifier l'email, compléter le KYC, créer le marchand.
 2. Générer une clé `sk_test_...` pour développer, puis `sk_live_...` pour la production.
 3. Whitelister l'IP du serveur si des retraits sont prévus.
@@ -53,10 +55,10 @@ APP_URL=
 
 ## 3. Choisir le bon flux d'encaissement
 
-| Besoin | Route | Réponse à traiter |
-|---|---|---|
-| Pousser une demande sur le téléphone du client (MTN Bénin, etc.) | `POST /payments/softpay/` | `id`, `status: PENDING`, `checkout_url` |
-| Rediriger le client vers une page de paiement hébergée | `POST /checkout-sessions/` | `id`, `slug`, `checkout_url` à ouvrir |
+| Besoin                                                           | Route                      | Réponse à traiter                       |
+| ---------------------------------------------------------------- | -------------------------- | --------------------------------------- |
+| Pousser une demande sur le téléphone du client (MTN Bénin, etc.) | `POST /payments/softpay/`  | `id`, `status: PENDING`, `checkout_url` |
+| Rediriger le client vers une page de paiement hébergée           | `POST /checkout-sessions/` | `id`, `slug`, `checkout_url` à ouvrir   |
 
 **Attention :** `checkout_url` peut être vide en softpay (push direct) et **non vide** sur Wave, Orange Money, Djamo ou carte. Si elle est non vide, il faut rediriger le client vers cette URL, sinon aucun paiement n'a lieu.
 
@@ -139,6 +141,7 @@ Un retry réseau sans `Idempotency-Key` envoie un second paiement au bénéficia
 Chaque requête contient : `X-Webhook-Signature` (HMAC SHA-256 hexadécimal, minuscules), `X-Webhook-Timestamp` (secondes Unix), `X-Webhook-Event` (ex. `transaction.success`), et le corps JSON `{"event": "...", "data": {...}}`.
 
 Vérification, dans cet ordre :
+
 1. Rejeter si `X-Webhook-Timestamp` s'écarte de plus de 300 secondes de l'horloge du serveur.
 2. Recalculer la signature sur le **corps brut reçu**, avec `f"{timestamp}.{body}"` comme message et `signing_secret` comme clé, puis comparer en temps constant.
 
@@ -162,22 +165,23 @@ Répondre rapidement (2xx) puis traiter en tâche de fond ; rendre le traitement
 ## 7. Erreurs
 
 Enveloppe de réponse :
+
 - Succès : `{"success": true, "data": {...}, "code": 200}`
 - Erreur métier : `{"success": false, "error": {"message": "...", "code": "insufficient_balance"}, "code": 422}`
 - Erreur de validation : `{"champ": ["message"]}`, une entrée par champ.
 
 Classer d'abord par code HTTP :
 
-| Code | Traitement |
-|---|---|
-| `400` | Corriger la requête (champ manquant ou mal formé) |
-| `401` | Clé absente, invalide ou expirée : ne pas réessayer |
-| `403` | Compte suspendu, ressource non rattachée au compte, ou IP non whitelistée (`ip_not_whitelisted`) |
-| `404` | Ressource introuvable |
-| `409` | Conflit d'idempotence ou état : ne pas réexécuter sans vérifier |
-| `410` | Lien ou session expiré |
+| Code  | Traitement                                                                                               |
+| ----- | -------------------------------------------------------------------------------------------------------- |
+| `400` | Corriger la requête (champ manquant ou mal formé)                                                        |
+| `401` | Clé absente, invalide ou expirée : ne pas réessayer                                                      |
+| `403` | Compte suspendu, ressource non rattachée au compte, ou IP non whitelistée (`ip_not_whitelisted`)         |
+| `404` | Ressource introuvable                                                                                    |
+| `409` | Conflit d'idempotence ou état : ne pas réexécuter sans vérifier                                          |
+| `410` | Lien ou session expiré                                                                                   |
 | `422` | Impossible en l'état (ex. `insufficient_balance`, `currency_country_mismatch`, `prepayment_otp_missing`) |
-| `429` | Attendre avant de réessayer, espacer les appels |
+| `429` | Attendre avant de réessayer, espacer les appels                                                          |
 
 ---
 

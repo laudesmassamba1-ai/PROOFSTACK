@@ -76,7 +76,15 @@ export function parseWithPattern(value: string, pattern: string): ParsedDate | u
       const useTwo = /^\d{2}$/.test(two) && (!greedy || !/^\d{3,}/.test(digits.slice(cursor)));
       const chunk = useTwo ? two : one;
       if (!/^\d{1,2}$/.test(chunk)) return undefined;
-      const key = token.startsWith("M") ? "month" : token.startsWith("D") ? "day" : token.startsWith("H") ? "hour" : token.startsWith("m") ? "minute" : "second";
+      const key = token.startsWith("M")
+        ? "month"
+        : token.startsWith("D")
+          ? "day"
+          : token.startsWith("H")
+            ? "hour"
+            : token.startsWith("m")
+              ? "minute"
+              : "second";
       numbers[key] = Number(chunk);
       cursor += chunk.length;
     }
@@ -120,7 +128,10 @@ export function isLeapYear(year: number): boolean {
 }
 
 /** Parse against every pattern the profile declares, best match wins. */
-export function parseWithAnyPattern(value: string, patterns: readonly string[]): ParsedDate | undefined {
+export function parseWithAnyPattern(
+  value: string,
+  patterns: readonly string[]
+): ParsedDate | undefined {
   for (const pattern of patterns) {
     const parsed = parseWithPattern(value, pattern);
     if (parsed) return parsed;

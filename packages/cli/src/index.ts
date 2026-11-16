@@ -1,38 +1,32 @@
 #!/usr/bin/env node
-import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
-
+import { createInterface } from "node:readline/promises";
 import {
-  ProofstackError,
-  Logger,
-  iso,
-  stableStringify,
-} from "@proofstack/core";
-import type { ModuleId, ReportFormat, TestRun } from "@proofstack/contracts";
-import { runEngine, ENGINE_VERSION } from "@proofstack/engine";
-import { createWorldProvider, HttpProductUnderTest } from "@proofstack/module-world";
-import * as worldProfiles from "@proofstack/module-world";
-import { createFlowProvider, defaultFlowTarget } from "@proofstack/module-flow";
-import { createExitProvider, defaultExportSource } from "@proofstack/module-exit";
-import {
-  CONFIG_FILE_NAMES,
-  loadConfig,
-  renderConfigFile,
-  starterConfig,
-  type LoadedConfig,
-} from "@proofstack/config";
-import { exitCodeFor, renderReport, runTotals } from "@proofstack/adapter-reporting";
-import {
-  CliAgent,
   agentSystemPrompt,
   buildAiRuntime,
+  CliAgent,
   describeRuntime,
   runAgent,
   summarizeRunForAgent,
 } from "@proofstack/adapter-ai";
+import { exitCodeFor, renderReport, runTotals } from "@proofstack/adapter-reporting";
+import {
+  CONFIG_FILE_NAMES,
+  type LoadedConfig,
+  loadConfig,
+  renderConfigFile,
+  starterConfig,
+} from "@proofstack/config";
+import type { ModuleId, ReportFormat, TestRun } from "@proofstack/contracts";
+import { iso, Logger, ProofstackError, stableStringify } from "@proofstack/core";
+import { ENGINE_VERSION, runEngine } from "@proofstack/engine";
+import { createExitProvider, defaultExportSource } from "@proofstack/module-exit";
+import { createFlowProvider, defaultFlowTarget } from "@proofstack/module-flow";
+import * as worldProfiles from "@proofstack/module-world";
+import { createWorldProvider, HttpProductUnderTest } from "@proofstack/module-world";
 
 /**
  * The PROOFSTACK CLI.
@@ -117,7 +111,8 @@ function err(flags: GlobalFlags, text: string): void {
 
 async function main(argv: string[]): Promise<number> {
   const { flags, rest } = parseGlobalFlags(argv);
-  const [command, ...args] = rest;
+  // `pnpm cli -- test` and `npm exec -- proofstack` forward the separator literally.
+  const [command, ...args] = rest[0] === "--" ? rest.slice(1) : rest;
 
   switch (command) {
     case undefined:
@@ -159,7 +154,9 @@ async function main(argv: string[]): Promise<number> {
 
 async function commandInit(flags: GlobalFlags, args: string[]): Promise<number> {
   const root = flags.cwd;
-  const existing = CONFIG_FILE_NAMES.map((name: string) => join(root, name)).find((path: string) => existsSync(path));
+  const existing = CONFIG_FILE_NAMES.map((name: string) => join(root, name)).find((path: string) =>
+    existsSync(path)
+  );
   if (existing) {
     err(flags, red(flags, `A configuration already exists: ${existing}`));
     err(flags, "Refusing to overwrite it. Delete it first if you want a fresh start.");
@@ -174,7 +171,9 @@ async function commandInit(flags: GlobalFlags, args: string[]): Promise<number> 
     const rl = createInterface({ input: stdin, output: stdout });
     try {
       projectName =
-        (await rl.question(`Project name${projectName ? ` (${projectName})` : ""}: `)).trim() || projectName || "My project";
+        (await rl.question(`Project name${projectName ? ` (${projectName})` : ""}: `)).trim() ||
+        projectName ||
+        "My project";
       baseUrl = (await rl.question(`Base URL under test (${baseUrl}): `)).trim() || baseUrl;
     } finally {
       rl.close();
@@ -211,7 +210,10 @@ async function commandDoctor(flags: GlobalFlags): Promise<number> {
   // Runtime
   const nodeMajor = Number(process.versions.node.split(".")[0]);
   const nodeOk = nodeMajor >= 22;
-  out(flags, `${nodeOk ? green(flags, "ok  ") : red(flags, "FAIL")} node ${process.versions.node}${nodeOk ? "" : " (>= 22 required)"}`);
+  out(
+    flags,
+    `${nodeOk ? green(flags, "ok  ") : red(flags, "FAIL")} node ${process.versions.node}${nodeOk ? "" : " (>= 22 required)"}`
+  );
   if (!nodeOk) problems.push("Node 22 or newer is required");
 
   // Config
@@ -220,13 +222,19 @@ async function commandDoctor(flags: GlobalFlags): Promise<number> {
     loaded = await loadConfig({ cwd: flags.cwd, skipValidation: true });
     out(flags, `${green(flags, "ok  ")} config ${loaded.path}`);
   } catch (error) {
-    out(flags, `${red(flags, "FAIL")} config — ${error instanceof Error ? error.message : String(error)}`);
+    out(
+      flags,
+      `${red(flags, "FAIL")} config — ${error instanceof Error ? error.message : String(error)}`
+    );
     problems.push("no usable configuration");
   }
 
   if (loaded) {
     const { config } = loaded;
-    out(flags, `${green(flags, "ok  ")} project "${config.project.name}" → ${config.project.baseUrl}`);
+    out(
+      flags,
+      `${green(flags, "ok  ")} project "${config.project.name}" → ${config.project.baseUrl}`
+    );
 
     // Module wiring
     for (const moduleId of config.enabledModules) {
@@ -239,6 +247,28 @@ async function commandDoctor(flags: GlobalFlags): Promise<number> {
       }
     }
 
+    // AI integration: what is configured, and whether its credential is present.
+    if (config.ai.enabled) {
+      out(
+        flags,
+        `${green(flags, "ok  ")} AI   autonomy=${config.ai.autonomy} · ${config.ai.providers.length} provider(s), ${config.ai.mcpServers.length} MCP server(s), ${config.ai.agents.length} CLI agent(s)`
+      );
+      for (const provider of config.ai.providers) {
+        if (!provider.apiKeyEnvVar) {
+          out(flags, dim(flags, `     ${provider.name}: no key required (${provider.baseUrl})`));
+          continue;
+        }
+        const present = Boolean(process.env[provider.apiKeyEnvVar]);
+        out(
+          flags,
+          `${present ? green(flags, "ok  ") : yellow(flags, "warn")} ${provider.name}: ${provider.apiKeyEnvVar} ${present ? "set" : "not set"}`
+        );
+        if (!present) notes.push(`AI provider ${provider.name} needs ${provider.apiKeyEnvVar}`);
+      }
+    } else {
+      out(flags, dim(flags, "—    AI   disabled (ai.enabled = false)"));
+    }
+
     // Secrets: presence only, never the value.
     for (const [label, envVar] of [
       ["WORLD token", config.modules.world.target.tokenEnvVar],
@@ -248,7 +278,10 @@ async function commandDoctor(flags: GlobalFlags): Promise<number> {
     ] as const) {
       if (!envVar) continue;
       const present = Boolean(process.env[envVar]);
-      out(flags, `${present ? green(flags, "ok  ") : dim(flags, "—   ")} ${label}: ${envVar} ${present ? "set" : "not set"}`);
+      out(
+        flags,
+        `${present ? green(flags, "ok  ") : dim(flags, "—   ")} ${label}: ${envVar} ${present ? "set" : "not set"}`
+      );
     }
 
     // Cross-field validation
@@ -267,7 +300,13 @@ async function commandDoctor(flags: GlobalFlags): Promise<number> {
   if (problems.length === 0) {
     out(flags, green(flags, "No blocking problems."));
     if (notes.length > 0) {
-      out(flags, yellow(flags, `${notes.length} module(s) are not wired to a target; their cases will be SKIPPED.`));
+      out(
+        flags,
+        yellow(
+          flags,
+          `${notes.length} module(s) are not wired to a target; their cases will be SKIPPED.`
+        )
+      );
     }
     return 0;
   }
@@ -276,12 +315,18 @@ async function commandDoctor(flags: GlobalFlags): Promise<number> {
   return 2;
 }
 
-function moduleStatus(moduleId: ModuleId, config: LoadedConfig["config"]): { ok: boolean; detail: string } {
+function moduleStatus(
+  moduleId: ModuleId,
+  config: LoadedConfig["config"]
+): { ok: boolean; detail: string } {
   switch (moduleId) {
     case "world": {
       const target = config.modules.world.target;
       if (target.kind === "none") {
-        return { ok: false, detail: "no target configured (target.kind = none) — cases will be SKIPPED" };
+        return {
+          ok: false,
+          detail: "no target configured (target.kind = none) — cases will be SKIPPED",
+        };
       }
       if (target.kind === "http" && !target.submitUrl) {
         return { ok: false, detail: "target.kind = http but submitUrl is missing" };
@@ -299,11 +344,15 @@ function moduleStatus(moduleId: ModuleId, config: LoadedConfig["config"]): { ok:
       ].filter(Boolean);
       return missing.length === 0
         ? { ok: true, detail: `checkout ${target.checkoutUrl}` }
-        : { ok: false, detail: `checkout set; missing ${missing.join(", ")} — some cases will be SKIPPED` };
+        : {
+            ok: false,
+            detail: `checkout set; missing ${missing.join(", ")} — some cases will be SKIPPED`,
+          };
     }
     case "exit": {
       const source = config.modules.exit.exportSource;
-      if (!source) return { ok: false, detail: "no exportSource configured — cases will be SKIPPED" };
+      if (!source)
+        return { ok: false, detail: "no exportSource configured — cases will be SKIPPED" };
       return { ok: true, detail: `${source.kind} export ${source.value}` };
     }
     default:
@@ -355,7 +404,9 @@ async function commandValidate(flags: GlobalFlags): Promise<number> {
   try {
     const loaded = await loadConfig({ cwd: flags.cwd });
     if (flags.json) {
-      stdout.write(`${stableStringify({ ok: loaded.warnings.length === 0, path: loaded.path, warnings: loaded.warnings }, 2)}\n`);
+      stdout.write(
+        `${stableStringify({ ok: loaded.warnings.length === 0, path: loaded.path, warnings: loaded.warnings }, 2)}\n`
+      );
     } else {
       out(flags, green(flags, `Configuration is valid: ${loaded.path}`));
       for (const warning of loaded.warnings) {
@@ -384,31 +435,75 @@ interface TestArgs {
   seed?: number;
 }
 
+const TEST_MODULES = ["world", "flow", "exit"] as const;
+const REPORT_FORMATS = ["json", "junit", "html", "text"] as const;
+
+function flagError(message: string): ProofstackError {
+  return new ProofstackError({ message, category: "CONFIGURATION", code: "bad_flag" });
+}
+
 function parseTestArgs(args: string[]): TestArgs {
-  const parsed: TestArgs = { modules: [], only: [], profiles: [], formats: [], noReport: false, failOnWarning: false };
+  const parsed: TestArgs = {
+    modules: [],
+    only: [],
+    profiles: [],
+    formats: [],
+    noReport: false,
+    failOnWarning: false,
+  };
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i]!;
-    const next = () => args[++i] ?? "";
+    const next = () => {
+      const value = args[++i];
+      if (value === undefined || value.startsWith("--")) {
+        throw flagError(`${arg} needs a value.`);
+      }
+      return value;
+    };
     switch (arg) {
       case "--module":
       case "-m": {
         const value = next();
         for (const part of value.split(",")) {
           const trimmed = part.trim();
-          if (trimmed === "world" || trimmed === "flow" || trimmed === "exit") parsed.modules.push(trimmed);
+          if (!trimmed) continue;
+          if (!(TEST_MODULES as readonly string[]).includes(trimmed)) {
+            throw flagError(
+              `Unknown module "${trimmed}". Available: ${TEST_MODULES.join(", ")}.`
+            );
+          }
+          parsed.modules.push(trimmed as ModuleId);
         }
         break;
       }
-      case "--only":
-        parsed.only.push(next());
+      case "--only": {
+        const value = next().trim();
+        if (!value) throw flagError("--only needs a case id, category or name fragment.");
+        parsed.only.push(value);
         break;
+      }
       case "--profile":
       case "--profiles":
-        parsed.profiles.push(...next().split(",").map((p) => p.trim()).filter(Boolean));
+        parsed.profiles.push(
+          ...next()
+            .split(",")
+            .map((p) => p.trim())
+            .filter(Boolean)
+        );
         break;
-      case "--format":
-        parsed.formats.push(...(next().split(",") as ReportFormat[]));
+      case "--format": {
+        for (const part of next().split(",")) {
+          const trimmed = part.trim();
+          if (!trimmed) continue;
+          if (!(REPORT_FORMATS as readonly string[]).includes(trimmed)) {
+            throw flagError(
+              `Unknown report format "${trimmed}". Available: ${REPORT_FORMATS.join(", ")}.`
+            );
+          }
+          parsed.formats.push(trimmed as ReportFormat);
+        }
         break;
+      }
       case "--out":
         parsed.outputDir = next();
         break;
@@ -418,9 +513,15 @@ function parseTestArgs(args: string[]): TestArgs {
       case "--fail-on-warning":
         parsed.failOnWarning = true;
         break;
-      case "--seed":
-        parsed.seed = Number(next());
+      case "--seed": {
+        const raw = next();
+        const value = Number(raw);
+        if (!Number.isInteger(value)) {
+          throw flagError(`--seed needs an integer, got "${raw}".`);
+        }
+        parsed.seed = value;
         break;
+      }
       default:
         break;
     }
@@ -429,7 +530,13 @@ function parseTestArgs(args: string[]): TestArgs {
 }
 
 async function commandTest(flags: GlobalFlags, args: string[]): Promise<number> {
-  const testArgs = parseTestArgs(args);
+  let testArgs: TestArgs;
+  try {
+    testArgs = parseTestArgs(args);
+  } catch (error) {
+    err(flags, red(flags, describeError(error).message));
+    return 64;
+  }
   let loaded: LoadedConfig;
   try {
     loaded = await loadConfig({ cwd: flags.cwd });
@@ -438,7 +545,12 @@ async function commandTest(flags: GlobalFlags, args: string[]): Promise<number> 
     return 2;
   }
 
-  const { config } = loaded;
+  // `--seed` must change the run, not be silently dropped. Everything below (providers
+  // included) sees the overridden engine config.
+  const config =
+    testArgs.seed === undefined
+      ? loaded.config
+      : { ...loaded.config, engine: { ...loaded.config.engine, seed: testArgs.seed } };
   const modules = testArgs.modules.length > 0 ? testArgs.modules : config.enabledModules;
 
   // Refuse an unsafe configuration before running anything.
@@ -446,7 +558,7 @@ async function commandTest(flags: GlobalFlags, args: string[]): Promise<number> 
     (warning: { message: string }) =>
       warning.message.includes("refused") ||
       warning.message.includes("not allowed") ||
-      warning.message.includes("requires"),
+      warning.message.includes("requires")
   );
   if (blocking.length > 0) {
     err(flags, red(flags, "Refusing to run: the configuration is unsafe."));
@@ -471,9 +583,10 @@ async function commandTest(flags: GlobalFlags, args: string[]): Promise<number> 
     providers.push(
       createWorldProvider({
         ...(worldTarget === undefined ? {} : { target: worldTarget }),
-        ...(testArgs.only.length === 0 ? {} : { only: testArgs.only }),
-        ...(testArgs.profiles.length === 0 ? {} : { profiles: resolveProfileIds(testArgs.profiles) }),
-      }),
+        ...(testArgs.profiles.length === 0
+          ? {}
+          : { profiles: resolveProfileIds(testArgs.profiles) }),
+      })
     );
   }
   if (modules.includes("flow")) {
@@ -485,7 +598,7 @@ async function commandTest(flags: GlobalFlags, args: string[]): Promise<number> 
         ...(webhookSecretVar && process.env[webhookSecretVar]
           ? { webhookSecret: process.env[webhookSecretVar] }
           : {}),
-      }),
+      })
     );
   }
   if (modules.includes("exit")) {
@@ -505,9 +618,9 @@ async function commandTest(flags: GlobalFlags, args: string[]): Promise<number> 
       config,
       providers,
       only: modules,
+      ...(testArgs.only.length === 0 ? {} : { onlyCases: testArgs.only }),
       ...(testArgs.profiles.length === 0 ? {} : { profiles: testArgs.profiles }),
       logger,
-      ...(testArgs.seed === undefined ? {} : { clock: undefined }),
       projectId: `local:${config.project.name}`,
       workspaceId: "local",
       cliVersion: CLI_VERSION,
@@ -540,7 +653,11 @@ async function commandTest(flags: GlobalFlags, args: string[]): Promise<number> 
               ? config.output.htmlFile
               : `run-${run.id}.txt`;
       const path = join(outputDir, fileName);
-      await writeFile(path, renderReport(run, format, { projectName: config.project.name }), "utf8");
+      await writeFile(
+        path,
+        renderReport(run, format, { projectName: config.project.name }),
+        "utf8"
+      );
       written.push(path);
     }
     if (!flags.json && !flags.quiet) {
@@ -555,12 +672,24 @@ async function commandTest(flags: GlobalFlags, args: string[]): Promise<number> 
   } else {
     const totals = runTotals(run);
     out(flags, "");
-    out(flags, renderReport(run, "text", { projectName: config.project.name, verbose: flags.verbose }).trimEnd());
+    out(
+      flags,
+      renderReport(run, "text", {
+        projectName: config.project.name,
+        verbose: flags.verbose,
+      }).trimEnd()
+    );
     void totals;
   }
 
   if (process.env.CI && !flags.quiet && !flags.json) {
-    out(flags, dim(flags, `elapsed ${((Date.now() - startedAt) / 1000).toFixed(1)}s · engine ${ENGINE_VERSION}`));
+    out(
+      flags,
+      dim(
+        flags,
+        `elapsed ${((Date.now() - startedAt) / 1000).toFixed(1)}s · engine ${ENGINE_VERSION}`
+      )
+    );
   }
 
   const code = exitCodeFor(run);
@@ -571,7 +700,7 @@ async function commandTest(flags: GlobalFlags, args: string[]): Promise<number> 
     out(flags, "");
     out(flags, yellow(flags, "Nothing was verified: every case was skipped."));
     out(flags, "Wire at least one module to a target, then run again:");
-    out(flags, dim(flags, "  modules.world.target.kind = \"http\"  (with submitUrl)"));
+    out(flags, dim(flags, '  modules.world.target.kind = "http"  (with submitUrl)'));
     out(flags, dim(flags, "  modules.flow.target.checkoutUrl"));
     out(flags, dim(flags, "  modules.exit.exportSource"));
     out(flags, dim(flags, "`proofstack doctor` lists exactly what is missing."));
@@ -582,7 +711,15 @@ async function commandTest(flags: GlobalFlags, args: string[]): Promise<number> 
 }
 
 async function commandReport(flags: GlobalFlags, args: string[]): Promise<number> {
-  const format = (args.find((a) => ["json", "junit", "html", "text"].includes(a)) ?? "text") as ReportFormat;
+  const requested = args.find((arg) => !arg.startsWith("--") && !arg.endsWith(".json"));
+  if (requested !== undefined && !(REPORT_FORMATS as readonly string[]).includes(requested)) {
+    err(
+      flags,
+      red(flags, `Unknown report format "${requested}". Available: ${REPORT_FORMATS.join(", ")}.`)
+    );
+    return 64;
+  }
+  const format = (requested ?? "text") as ReportFormat;
   const runPath = args.find((a) => a.endsWith(".json"));
 
   let loaded: LoadedConfig | null = null;
@@ -599,7 +736,10 @@ async function commandReport(flags: GlobalFlags, args: string[]): Promise<number
       : null;
 
   if (!path || !existsSync(path)) {
-    err(flags, red(flags, `No run report found${path ? ` at ${path}` : ""}. Run \`proofstack test\` first.`));
+    err(
+      flags,
+      red(flags, `No run report found${path ? ` at ${path}` : ""}. Run \`proofstack test\` first.`)
+    );
     return 2;
   }
 
@@ -642,7 +782,9 @@ async function commandProjects(flags: GlobalFlags): Promise<number> {
   ];
 
   if (flags.json) {
-    stdout.write(`${stableStringify({ projects: rows, cloud: { available: false, reason: "no project token configured" } }, 2)}\n`);
+    stdout.write(
+      `${stableStringify({ projects: rows, cloud: { available: false, reason: "no project token configured" } }, 2)}\n`
+    );
     return 0;
   }
 
@@ -651,14 +793,23 @@ async function commandProjects(flags: GlobalFlags): Promise<number> {
     out(flags, `  ${row.name}  ${dim(flags, row.baseUrl)}  [${row.modules}]`);
   }
   out(flags, "");
-  out(flags, dim(flags, "Cloud projects require a project token (PROOFSTACK_PROJECT_TOKEN) and a running API."));
+  out(
+    flags,
+    dim(
+      flags,
+      "Cloud projects require a project token (PROOFSTACK_PROJECT_TOKEN) and a running API."
+    )
+  );
   return 0;
 }
 
 async function commandAuth(flags: GlobalFlags, command: "login" | "logout"): Promise<number> {
   if (command === "logout") {
     out(flags, "No credentials are stored by this CLI build.");
-    out(flags, dim(flags, "Tokens are read from environment variables, so there is nothing to remove."));
+    out(
+      flags,
+      dim(flags, "Tokens are read from environment variables, so there is nothing to remove.")
+    );
     return 0;
   }
 
@@ -687,17 +838,27 @@ async function commandSync(flags: GlobalFlags, args: string[]): Promise<number> 
 
   const { config } = loaded;
   if (!config.sync.enabled || !config.sync.apiUrl) {
-    err(flags, red(flags, "Sync is not configured. Set sync.enabled = true and sync.apiUrl in your config."));
+    err(
+      flags,
+      red(flags, "Sync is not configured. Set sync.enabled = true and sync.apiUrl in your config.")
+    );
     return 2;
   }
 
   const token = process.env[config.sync.tokenEnvVar];
   if (!token) {
-    err(flags, red(flags, `${config.sync.tokenEnvVar} is not set. Run \`proofstack login\` for instructions.`));
+    err(
+      flags,
+      red(
+        flags,
+        `${config.sync.tokenEnvVar} is not set. Run \`proofstack login\` for instructions.`
+      )
+    );
     return 2;
   }
 
-  const runPath = args.find((a) => a.endsWith(".json")) ?? join(config.output.dir, config.output.jsonFile);
+  const runPath =
+    args.find((a) => a.endsWith(".json")) ?? join(config.output.dir, config.output.jsonFile);
   const path = resolve(loaded.root, runPath);
   if (!existsSync(path)) {
     err(flags, red(flags, `No run report at ${path}. Run \`proofstack test\` first.`));
@@ -712,15 +873,17 @@ async function commandSync(flags: GlobalFlags, args: string[]): Promise<number> 
     return 2;
   }
 
-  const payload = stableStringify({ run, summary: { totals: {} } });
+  // Send real totals: the API recomputes them from moduleRuns, but a payload that
+  // claims zero cases for a 400-case run is wrong on its face for any other consumer.
+  const payload = stableStringify({ run, summary: runTotals(run) });
   if (Buffer.byteLength(payload) > config.sync.maxPayloadBytes) {
     err(
       flags,
       red(
         flags,
         `Payload is ${Buffer.byteLength(payload)} bytes, over the ${config.sync.maxPayloadBytes} byte limit. ` +
-          "Run with fewer cases or raise sync.maxPayloadBytes.",
-      ),
+          "Run with fewer cases or raise sync.maxPayloadBytes."
+      )
     );
     return 2;
   }
@@ -736,11 +899,17 @@ async function commandSync(flags: GlobalFlags, args: string[]): Promise<number> 
       err(flags, red(flags, `Sync failed: HTTP ${response.status} ${text.slice(0, 400)}`));
       return 2;
     }
-    const body = (await response.json().catch(() => ({}))) as { runId?: string; recorded?: boolean };
+    const body = (await response.json().catch(() => ({}))) as {
+      runId?: string;
+      recorded?: boolean;
+    };
     if (flags.json) {
       stdout.write(`${stableStringify({ ok: true, ...body }, 2)}\n`);
     } else {
-      out(flags, green(flags, `Synced run ${run.id}${body.recorded === false ? " (already recorded)" : ""}`));
+      out(
+        flags,
+        green(flags, `Synced run ${run.id}${body.recorded === false ? " (already recorded)" : ""}`)
+      );
     }
     return 0;
   } catch (error) {
@@ -784,7 +953,7 @@ async function commandAi(flags: GlobalFlags, args: string[]): Promise<number> {
       out(flags, dim(flags, "ai.enabled is false."));
       out(flags, "");
       out(flags, "To turn it on, add an ai block to your config:");
-      out(flags, dim(flags, '  ai: { enabled: true, providers: [...], mcpServers: [...] }'));
+      out(flags, dim(flags, "  ai: { enabled: true, providers: [...], mcpServers: [...] }"));
       out(flags, dim(flags, "See docs/guides/AI_INTEGRATION.md."));
       return 0;
     }
@@ -795,8 +964,14 @@ async function commandAi(flags: GlobalFlags, args: string[]): Promise<number> {
   switch (sub) {
     case undefined:
     case "status": {
+      const connect = connectServers(rest);
       const runtime = await buildAiRuntime({
         config: ai,
+        ...(connect === undefined
+          ? {}
+          : {
+              connectServers: connect.length > 0 ? connect : ai.mcpServers.map((s) => s.name),
+            }),
         onStderr: (server, chunk) => {
           if (flags.verbose) err(flags, dim(flags, `[${server}] ${chunk.trimEnd()}`));
         },
@@ -822,17 +997,26 @@ async function commandAi(flags: GlobalFlags, args: string[]): Promise<number> {
                   name: t.definition.name,
                   effect: t.effect ?? "write",
                 })),
-                agents: ai.agents.map((a) => ({ name: a.name, allowFileWrites: a.allowFileWrites })),
+                agents: ai.agents.map((a) => ({
+                  name: a.name,
+                  allowFileWrites: a.allowFileWrites,
+                })),
                 warnings: runtime.warnings,
               },
-              2,
-            )}\n`,
+              2
+            )}\n`
           );
           return 0;
         }
 
         out(flags, bold(flags, "AI integration"));
-        out(flags, dim(flags, `autonomy: ${ai.autonomy} · max turns: ${ai.maxTurns} · token budget: ${ai.maxTokensPerSession}`));
+        out(
+          flags,
+          dim(
+            flags,
+            `autonomy: ${ai.autonomy} · max turns: ${ai.maxTurns} · token budget: ${ai.maxTokensPerSession}`
+          )
+        );
         out(flags, "");
         for (const line of describeRuntime(runtime)) out(flags, line);
 
@@ -840,7 +1024,10 @@ async function commandAi(flags: GlobalFlags, args: string[]): Promise<number> {
           out(flags, "");
           out(flags, `external agents: ${ai.agents.length}`);
           for (const agent of ai.agents) {
-            out(flags, `  ${agent.name} — ${agent.command.join(" ")}${agent.allowFileWrites ? " (may write files)" : ""}`);
+            out(
+              flags,
+              `  ${agent.name} — ${agent.command.join(" ")}${agent.allowFileWrites ? " (may write files)" : ""}`
+            );
           }
         }
 
@@ -848,7 +1035,13 @@ async function commandAi(flags: GlobalFlags, args: string[]): Promise<number> {
         const configured = ai.mcpServers.length;
         if (configured > connected) {
           out(flags, "");
-          out(flags, dim(flags, `${configured - connected} server(s) not connected (autoConnect is false; use --connect).`));
+          out(
+            flags,
+            dim(
+              flags,
+              `${configured - connected} server(s) not connected (autoConnect is false; use --connect).`
+            )
+          );
         }
         return 0;
       } finally {
@@ -874,8 +1067,8 @@ async function commandAi(flags: GlobalFlags, args: string[]): Promise<number> {
                 description: t.definition.description,
                 parameters: t.definition.parameters,
               })),
-              2,
-            )}\n`,
+              2
+            )}\n`
           );
           return 0;
         }
@@ -889,7 +1082,8 @@ async function commandAi(flags: GlobalFlags, args: string[]): Promise<number> {
           const effect = tool.effect ?? "write";
           const tag = effect === "read" ? green(flags, "read ") : yellow(flags, "write");
           out(flags, `  ${tag} ${tool.definition.name}`);
-          if (tool.definition.description) out(flags, dim(flags, `        ${tool.definition.description}`));
+          if (tool.definition.description)
+            out(flags, dim(flags, `        ${tool.definition.description}`));
         }
         return 0;
       } finally {
@@ -898,9 +1092,9 @@ async function commandAi(flags: GlobalFlags, args: string[]): Promise<number> {
     }
 
     case "ask": {
-      const question = rest.filter((a) => !a.startsWith("--")).join(" ").trim();
+      const question = aiPositionals(rest).join(" ").trim();
       if (!question) {
-        err(flags, red(flags, "Usage: proofstack ai ask \"your question\""));
+        err(flags, red(flags, 'Usage: proofstack ai ask "your question"'));
         return 64;
       }
       const providerName = flagValue(rest, "--provider");
@@ -910,7 +1104,13 @@ async function commandAi(flags: GlobalFlags, args: string[]): Promise<number> {
           ? runtime.providers.find((p) => p.name === providerName)
           : runtime.defaultProvider;
         if (!provider) {
-          err(flags, red(flags, providerName ? `No provider named "${providerName}".` : "No AI provider configured."));
+          err(
+            flags,
+            red(
+              flags,
+              providerName ? `No provider named "${providerName}".` : "No AI provider configured."
+            )
+          );
           for (const warning of runtime.warnings) err(flags, dim(flags, `  ${warning}`));
           return 2;
         }
@@ -927,10 +1127,19 @@ async function commandAi(flags: GlobalFlags, args: string[]): Promise<number> {
         });
 
         if (flags.json) {
-          stdout.write(`${stableStringify({ provider: provider.name, model: response.model, answer: response.message.content, usage: response.usage }, 2)}\n`);
+          stdout.write(
+            `${stableStringify({ provider: provider.name, model: response.model, answer: response.message.content, usage: response.usage }, 2)}\n`
+          );
         } else {
           out(flags, response.message.content.trim());
-          if (response.usage) out(flags, dim(flags, `\n${response.usage.totalTokens} tokens · ${provider.name}/${response.model}`));
+          if (response.usage)
+            out(
+              flags,
+              dim(
+                flags,
+                `\n${response.usage.totalTokens} tokens · ${provider.name}/${response.model}`
+              )
+            );
         }
         return 0;
       } finally {
@@ -939,9 +1148,9 @@ async function commandAi(flags: GlobalFlags, args: string[]): Promise<number> {
     }
 
     case "agent": {
-      const task = rest.filter((a) => !a.startsWith("--")).join(" ").trim();
+      const task = aiPositionals(rest).join(" ").trim();
       if (!task) {
-        err(flags, red(flags, "Usage: proofstack ai agent \"what to investigate\""));
+        err(flags, red(flags, 'Usage: proofstack ai agent "what to investigate"'));
         return 64;
       }
       const providerName = flagValue(rest, "--provider");
@@ -951,11 +1160,25 @@ async function commandAi(flags: GlobalFlags, args: string[]): Promise<number> {
       if (agentName) {
         const config = ai.agents.find((a) => a.name === agentName);
         if (!config) {
-          err(flags, red(flags, `No CLI agent named "${agentName}". Configured: ${ai.agents.map((a) => a.name).join(", ") || "none"}`));
+          err(
+            flags,
+            red(
+              flags,
+              `No CLI agent named "${agentName}". Configured: ${ai.agents.map((a) => a.name).join(", ") || "none"}`
+            )
+          );
           return 2;
         }
         const context = await lastRunSummary(loaded);
-        const prompt = [agentSystemPrompt(loaded.config.project.name), "", context ?? "(no run report found)", "", "---", "", task].join("\n");
+        const prompt = [
+          agentSystemPrompt(loaded.config.project.name),
+          "",
+          context ?? "(no run report found)",
+          "",
+          "---",
+          "",
+          task,
+        ].join("\n");
         const agent = new CliAgent(config);
         const result = await agent.run(prompt);
         if (flags.json) {
@@ -963,7 +1186,13 @@ async function commandAi(flags: GlobalFlags, args: string[]): Promise<number> {
         } else {
           if (result.answer) out(flags, result.answer);
           if (result.stderr) err(flags, dim(flags, result.stderr));
-          out(flags, dim(flags, `\n${result.agent} exited ${result.exitCode} in ${(result.durationMs / 1000).toFixed(1)}s${result.timedOut ? " (timed out)" : ""}`));
+          out(
+            flags,
+            dim(
+              flags,
+              `\n${result.agent} exited ${result.exitCode} in ${(result.durationMs / 1000).toFixed(1)}s${result.timedOut ? " (timed out)" : ""}`
+            )
+          );
         }
         return result.exitCode === 0 ? 0 : 1;
       }
@@ -1001,13 +1230,19 @@ async function commandAi(flags: GlobalFlags, args: string[]): Promise<number> {
             : {
                 approve: async (request: { tool: string; args: Record<string, unknown> }) => {
                   if (!stdin.isTTY) {
-                    err(flags, yellow(flags, `refused ${request.tool}: no interactive terminal to approve it`));
+                    err(
+                      flags,
+                      yellow(
+                        flags,
+                        `refused ${request.tool}: no interactive terminal to approve it`
+                      )
+                    );
                     return false;
                   }
                   const rl = createInterface({ input: stdin, output: stdout });
                   try {
                     const answer = await rl.question(
-                      `Allow ${request.tool}(${JSON.stringify(request.args).slice(0, 120)})? [y/N] `,
+                      `Allow ${request.tool}(${JSON.stringify(request.args).slice(0, 120)})? [y/N] `
                     );
                     return answer.trim().toLowerCase().startsWith("y");
                   } finally {
@@ -1018,7 +1253,8 @@ async function commandAi(flags: GlobalFlags, args: string[]): Promise<number> {
           onEvent: flags.verbose
             ? (event) => {
                 if (event.type === "tool_call") err(flags, dim(flags, `→ ${event.tool}`));
-                if (event.type === "tool_refused") err(flags, yellow(flags, `refused ${event.tool}: ${event.reason}`));
+                if (event.type === "tool_refused")
+                  err(flags, yellow(flags, `refused ${event.tool}: ${event.reason}`));
               }
             : undefined,
         });
@@ -1033,8 +1269,8 @@ async function commandAi(flags: GlobalFlags, args: string[]): Promise<number> {
             flags,
             dim(
               flags,
-              `${result.turns} turn(s), ${result.steps.length} tool call(s), ${result.tokensUsed} tokens · stopped: ${result.stopReason}`,
-            ),
+              `${result.turns} turn(s), ${result.steps.length} tool call(s), ${result.tokensUsed} tokens · stopped: ${result.stopReason}`
+            )
           );
           for (const step of result.steps.filter((s) => s.refused)) {
             out(flags, yellow(flags, `  refused ${step.tool}: ${step.refused}`));
@@ -1048,7 +1284,7 @@ async function commandAi(flags: GlobalFlags, args: string[]): Promise<number> {
 
     default:
       err(flags, red(flags, `Unknown ai subcommand: ${sub}`));
-      out(flags, "  proofstack ai status | tools | ask \"...\" | agent \"...\"");
+      out(flags, '  proofstack ai status | tools | ask "..." | agent "..."');
       return 64;
   }
 }
@@ -1058,6 +1294,48 @@ function flagValue(args: string[], flag: string): string | undefined {
   const index = args.indexOf(flag);
   if (index < 0) return undefined;
   return args[index + 1];
+}
+
+/**
+ * Parse `--connect [a,b]` for the AI commands.
+ *
+ *   omitted          → only autoConnect servers
+ *   `--connect`      → every configured server
+ *   `--connect a,b`  → exactly those servers
+ */
+function connectServers(args: string[]): string[] | undefined {
+  const index = args.indexOf("--connect");
+  if (index < 0) return undefined;
+  const next = args[index + 1];
+  if (next === undefined || next.startsWith("--")) return [];
+  return next
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Positional words of an `ai ask` / `ai agent` command.
+ *
+ * Flags and their values must never leak into the prompt: `ai ask "why?" --provider
+ * local` used to send "why? local" to the model.
+ */
+function aiPositionals(args: string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i]!;
+    if (arg === "--provider" || arg === "--cli-agent") {
+      i += 1;
+      continue;
+    }
+    if (arg === "--connect") {
+      if (args[i + 1] !== undefined && !args[i + 1]!.startsWith("--")) i += 1;
+      continue;
+    }
+    if (arg.startsWith("--")) continue;
+    out.push(arg);
+  }
+  return out;
 }
 
 /** Load the last run and render it as compact context, or null when there is none. */
@@ -1132,6 +1410,8 @@ main(process.argv.slice(2))
     process.exitCode = code;
   })
   .catch((error: unknown) => {
-    process.stderr.write(`proofstack: ${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);
+    process.stderr.write(
+      `proofstack: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`
+    );
     process.exitCode = 2;
   });

@@ -1,8 +1,23 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { normalizeUiLocale, type UiLocale } from "@proofstack/contracts";
-import { en, fr, type MessageKey, type Messages } from "./dictionaries.js";
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { type MessageKey as BaseKey, en, fr } from "./dictionaries.js";
+import { type MarketingKey, marketingEn, marketingFr } from "./marketing.js";
 
-const DICTIONARIES: Record<UiLocale, Messages> = { en, fr };
+export type MessageKey = BaseKey | MarketingKey;
+type Messages = Record<MessageKey, string>;
+
+const DICTIONARIES: Record<UiLocale, Messages> = {
+  en: { ...en, ...marketingEn },
+  fr: { ...fr, ...marketingFr },
+};
 
 const STORAGE_KEY = "proofstack.locale";
 
@@ -49,9 +64,11 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       setLocale,
       messages,
       t: (key, vars) => {
-        const template = messages[key] ?? en[key] ?? key;
+        const template = messages[key] ?? DICTIONARIES.en[key] ?? key;
         if (!vars) return template;
-        return template.replace(/\{(\w+)\}/g, (_match, name: string) => String(vars[name] ?? `{${name}}`));
+        return template.replace(/\{(\w+)\}/g, (_match, name: string) =>
+          String(vars[name] ?? `{${name}}`)
+        );
       },
     };
   }, [locale, setLocale]);
@@ -64,5 +81,3 @@ export function useI18n(): I18nValue {
   if (!value) throw new Error("useI18n must be used inside I18nProvider");
   return value;
 }
-
-export type { MessageKey };

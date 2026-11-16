@@ -55,7 +55,11 @@ export interface ApprovalRequest {
 
 export interface AgentOptions {
   /** Injected so tests do not need a network. */
-  chat: (request: { messages: ChatMessage[]; tools: ToolDefinition[]; signal: AbortSignal }) => Promise<{
+  chat: (request: {
+    messages: ChatMessage[];
+    tools: ToolDefinition[];
+    signal: AbortSignal;
+  }) => Promise<{
     message: ChatMessage;
     usage?: { totalTokens: number };
   }>;
@@ -118,7 +122,8 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
   const external = options.signal;
   if (external) {
     if (external.aborted) controller.abort(external.reason);
-    else external.addEventListener("abort", () => controller.abort(external.reason), { once: true });
+    else
+      external.addEventListener("abort", () => controller.abort(external.reason), { once: true });
   }
 
   const toolsByName = new Map(options.tools.map((tool) => [tool.definition.name, tool]));
@@ -240,7 +245,7 @@ async function executeCall(
     approve?: (request: ApprovalRequest) => Promise<boolean>;
     signal: AbortSignal;
     onEvent?: (event: AgentEvent) => void;
-  },
+  }
 ): Promise<AgentStep> {
   const tool = context.toolsByName.get(call.name);
   if (!tool) {
@@ -295,7 +300,13 @@ async function executeCall(
   } catch (runError) {
     const message = runError instanceof Error ? runError.message : String(runError);
     context.onEvent?.({ type: "tool_result", tool: call.name, output: message, isError: true });
-    return { turn: context.turn, tool: call.name, args: call.arguments, output: message, isError: true };
+    return {
+      turn: context.turn,
+      tool: call.name,
+      args: call.arguments,
+      output: message,
+      isError: true,
+    };
   }
 }
 
@@ -331,13 +342,19 @@ export function summarizeRunForAgent(run: {
   id: string;
   status: string;
   moduleRuns: { module: string; status: string; totals: Record<string, number> }[];
-  findings: { testCaseId: string; title: string; severity: string; detail: string; reproduction: { command: string } }[];
+  findings: {
+    testCaseId: string;
+    title: string;
+    severity: string;
+    detail: string;
+    reproduction: { command: string };
+  }[];
 }): string {
   const lines: string[] = [`Run ${run.id} — status ${run.status}`];
   for (const moduleRun of run.moduleRuns) {
     const totals = moduleRun.totals;
     lines.push(
-      `  ${moduleRun.module}: ${moduleRun.status} — ${totals.passed ?? 0} passed, ${totals.failed ?? 0} failed, ${totals.warnings ?? 0} warning, ${totals.errors ?? 0} error, ${totals.skipped ?? 0} skipped`,
+      `  ${moduleRun.module}: ${moduleRun.status} — ${totals.passed ?? 0} passed, ${totals.failed ?? 0} failed, ${totals.warnings ?? 0} warning, ${totals.errors ?? 0} error, ${totals.skipped ?? 0} skipped`
     );
   }
   if (run.findings.length === 0) {

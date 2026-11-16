@@ -1,5 +1,11 @@
+import {
+  currencyMeta,
+  knownCurrencies,
+  Money,
+  numberSeparators,
+  parseLocalizedDecimal,
+} from "@proofstack/core";
 import { describe, expect, it } from "vitest";
-import { Money, currencyMeta, knownCurrencies, numberSeparators, parseLocalizedDecimal } from "@proofstack/core";
 
 describe("Money — exact minor-unit arithmetic", () => {
   it("never uses floating point for the classic 0.1 + 0.2 case", () => {
@@ -40,7 +46,7 @@ describe("Money — exact minor-unit arithmetic", () => {
 
   it("refuses to silently drop precision when asked to be exact", () => {
     expect(() => Money.fromDecimalString("1000.50", "XOF", { exact: true })).toThrowError(
-      /more precision than XOF/,
+      /more precision than XOF/
     );
     expect(() => Money.fromDecimalString("1,000.50", "USD")).toThrowError(/plain decimal/);
     expect(() => Money.fromDecimalString("1e3", "USD")).toThrowError(/plain decimal/);
@@ -110,8 +116,14 @@ describe("Money — exact minor-unit arithmetic", () => {
 
   it("rejects malformed localized numbers with a reason", () => {
     const en = numberSeparators("en-US");
-    expect(parseLocalizedDecimal("1,23,4.56", en, "USD")).toEqual({ ok: false, reason: "bad_group_length" });
-    expect(parseLocalizedDecimal("1.2.3", en, "USD")).toEqual({ ok: false, reason: "multiple_decimal_separators" });
+    expect(parseLocalizedDecimal("1,23,4.56", en, "USD")).toEqual({
+      ok: false,
+      reason: "bad_group_length",
+    });
+    expect(parseLocalizedDecimal("1.2.3", en, "USD")).toEqual({
+      ok: false,
+      reason: "multiple_decimal_separators",
+    });
     expect(parseLocalizedDecimal("", en, "USD")).toEqual({ ok: false, reason: "empty" });
     expect(parseLocalizedDecimal("abc", en, "USD").ok).toBe(false);
   });
