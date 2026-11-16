@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
+import { apiPost, validateProjectDraft } from "../dist/ui.js";
 
 const exec = promisify(execFile);
 const CLI = fileURLToPath(new URL("../dist/index.js", import.meta.url));
@@ -183,6 +184,80 @@ describe("terminal console", () => {
     expect(result.code).toBe(0);
     expect(result.stdout).toContain("terminal console");
     expect(result.stdout).toContain("1 Overview");
+  });
+
+  it("validates project drafts before calling the API", () => {
+    expect(
+      validateProjectDraft({ name: " ", baseUrl: "http://localhost:3000", stack: "" })
+    ).toContain("name");
+    expect(validateProjectDraft({ name: "Shop", baseUrl: "not-a-url", stack: "" })).toContain(
+      "http"
+    );
+    expect(
+      validateProjectDraft({ name: "Shop", baseUrl: "ftp://example.com", stack: "" })
+    ).toContain("http");
+    expect(
+      validateProjectDraft({
+        name: "Shop",
+        baseUrl: "http://localhost:3000",
+        stack: "x".repeat(61),
+      })
+    ).toContain("Stack");
+    expect(
+      validateProjectDraft({ name: "Shop", baseUrl: "http://localhost:3000", stack: "nextjs" })
+    ).toBeNull();
+  });
+
+  it("posts the exact project contract with the session cookie", async () => {
+    let received: { cookie?: string; body?: unknown } = {};
+    const server = createServer((request, response) => {
+      if (request.method !== "POST" || request.url !== "/api/v1/projects") {
+        response.writeHead(404, { "content-type": "application/json" });
+        response.end(JSON.stringify({ error: { code: "not_found", message: "no route" } }));
+        return;
+      }
+      let raw = "";
+      request.setEncoding("utf8");
+      request.on("data", (chunk: string) => {
+        raw += chunk;
+      });
+      request.on("end", () => {
+        received = { cookie: request.headers.cookie, body: JSON.parse(raw) as unknown };
+        response.writeHead(201, { "content-type": "application/json" });
+        response.end(JSON.stringify({ project: { id: "prj_2", name: "Shop 2" } }));
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = (server.address() as AddressInfo).port;
+    try {
+      const created = await apiPost<{ project: { id: string } }>(
+        {
+          apiUrl: `http://127.0.0.1:${port}`,
+          cookie: "ps_session=test",
+          email: "ada@example.com",
+          savedAt: "2026-11-16T20:00:00.000Z",
+        },
+        "/api/v1/projects",
+        {
+          workspaceId: "ws_1",
+          name: "Shop 2",
+          baseUrl: "http://localhost:3000",
+          environment: "local",
+          enabledModules: ["world", "flow", "exit"],
+        }
+      );
+      expect(created.project.id).toBe("prj_2");
+      expect(received.cookie).toBe("ps_session=test");
+      expect(received.body).toEqual({
+        workspaceId: "ws_1",
+        name: "Shop 2",
+        baseUrl: "http://localhost:3000",
+        environment: "local",
+        enabledModules: ["world", "flow", "exit"],
+      });
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
 
   it("logout removes the stored session file", async () => {

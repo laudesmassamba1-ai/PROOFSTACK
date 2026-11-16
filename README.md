@@ -22,7 +22,7 @@ not implemented yet — see the status file.
 Implemented and tested: the shared engine and all three modules, the CLI with JSON/
 JUnit/HTML reports, the SaaS API (auth, workspaces, projects, run ingestion, API keys,
 billing, webhooks), the authenticated dashboard and the terminal console. `pnpm test`
-runs 217 tests;
+runs 219 tests;
 `pnpm typecheck`, `pnpm lint` (warnings only) and `pnpm build` pass.
 
 The creator's read-only operations console lives at `/app/admin`: users, workspaces,
@@ -71,9 +71,10 @@ built binary. When it is published, the same commands are `proofstack <command>`
 
 ## Terminal console
 
-`pnpm proofstack` opens a full-screen, read-only console in a real terminal: Overview,
-Projects, Runs, Billing, Admin (when the account is allowlisted) and Help. Use arrow
-keys, Enter to open a project, `w` to switch workspace, `r` to refresh and `q` to quit.
+`pnpm proofstack` opens a full-screen console in a real terminal: Overview, Projects,
+Runs, Billing, Admin (when the account is allowlisted) and Help. On Projects, press `n`
+to create a project (name, base URL, optional stack, environment). Use arrow keys, Enter
+to open a project, `w` to switch workspace, `r` to refresh and `q` to quit.
 
 ```bash
 pnpm proofstack                              # open the console
@@ -87,8 +88,9 @@ pnpm proofstack -- logout                    # remove the stored session
 mode `0600`; it never stores the password. Use
 `PROOFSTACK_API_URL=http://127.0.0.1:8787` for the local API, or pass `--api` to `login`,
 `ui` or `status`. For CI, `PROOFSTACK_SESSION_COOKIE` supplies the cookie without a file.
-The default API is the live Vercel deployment. The console is read-only; mutating
-actions stay in the web dashboard.
+The default API is the live Vercel deployment. Creating a project is the only mutating
+action in the console; test execution and uploads still run locally with
+`proofstack test` and `proofstack sync`, and billing/admin stay read-only.
 
 Without `SASPAY_API_KEY` and `SASPAY_WEBHOOK_SECRET`, checkout uses the deterministic
 sandbox provider: no money moves, and paid access is still granted only after the

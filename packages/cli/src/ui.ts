@@ -13,9 +13,10 @@ import { createInterface } from "node:readline/promises";
  * locally with mode 0600 so a terminal session can survive a restart. Passwords are
  * never stored; `proofstack logout` removes the cookie file.
  *
- * The TUI is read-only for now. "Pilot the app" means seeing the workspace, projects,
- * runs, plan and payments without opening a browser; actions that change production
- * data stay in the dashboard until they can be confirmed explicitly.
+ * The TUI is read-only except for explicit project creation. "Pilot the app" means
+ * seeing the workspace, projects, runs, plan and payments without opening a browser;
+ * creating a project is confirmed through a form, while test execution and uploads
+ * still happen locally through `proofstack test` / `proofstack sync`.
  */
 
 export const DEFAULT_API_URL = "https://proofstack-iota.vercel.app";
@@ -94,6 +95,21 @@ export interface Project {
   enabledModules: string[];
   lastRunAt?: string;
   lastRunStatus?: string;
+}
+
+export const PROJECT_ENVIRONMENTS = ["local", "staging", "production", "ci"] as const;
+export type ProjectEnvironment = (typeof PROJECT_ENVIRONMENTS)[number];
+export const PROJECT_MODULES = ["world", "flow", "exit"] as const;
+export type ProjectFormField = "name" | "baseUrl" | "stack" | "environment";
+
+export interface ProjectFormState {
+  name: string;
+  baseUrl: string;
+  stack: string;
+  environment: ProjectEnvironment;
+  field: ProjectFormField;
+  error: string | null;
+  busy: boolean;
 }
 
 export interface Run {
@@ -184,6 +200,7 @@ export interface UiState {
   billing: BillingData | null;
   admin: AdminOverview | null;
   adminError: string | null;
+  projectForm: ProjectFormState | null;
   selectedProject: number;
   selectedRun: number;
   projectFilter: string | null;
@@ -328,6 +345,22 @@ export async function apiGet<T>(session: StoredSession, path: string): Promise<T
   return (text.length === 0 ? ({} as T) : JSON.parse(text)) as T;
 }
 
+export async function apiPost<T>(session: StoredSession, path: string, body: unknown): Promise<T> {
+  const response = await fetch(`${session.apiUrl}${path}`, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json",
+      cookie: session.cookie,
+      "cache-control": "no-store",
+    },
+    body: JSON.stringify(body),
+  });
+  const text = await response.text();
+  if (!response.ok) throw apiError(response.status, text);
+  return (text.length === 0 ? ({} as T) : JSON.parse(text)) as T;
+}
+
 function apiError(status: number, text: string): UiApiError {
   let code = `http_${status}`;
   let message = `HTTP ${status}`;
@@ -462,6 +495,7 @@ export async function runUi(options: UiOptions): Promise<number> {
     billing: null,
     admin: null,
     adminError: null,
+    projectForm: null,
     selectedProject: 0,
     selectedRun: 0,
     projectFilter: null,
@@ -542,8 +576,21 @@ function interactiveLoop(state: UiState, rerender: () => void): Promise<number> 
       void loadCurrent(state, rerender).then(rerender);
     };
     const onData = (chunk: string): void => {
-      if (chunk === "\u0003" || chunk === "q") {
+      if (chunk === "\u0003") {
         quit();
+        return;
+      }
+      if (state.projectForm) {
+        handleProjectFormKey(state, chunk, rerender);
+        return;
+      }
+      if (chunk === "q") {
+        quit();
+        return;
+      }
+      if (chunk === "n" && state.screen === "projects") {
+        openProjectForm(state);
+        rerender();
         return;
       }
       if (chunk === "\t" || chunk === "\u001B[C") {
@@ -637,6 +684,221 @@ function interactiveLoop(state: UiState, rerender: () => void): Promise<number> 
   });
 }
 
+const PROJECT_FORM_FIELDS: readonly ProjectFormField[] = [
+  "name",
+  "baseUrl",
+  "stack",
+  "environment",
+];
+
+function openProjectForm(state: UiState): void {
+  state.projectForm = {
+    name: "",
+    baseUrl: "http://localhost:3000",
+    stack: "",
+    environment: "local",
+    field: "name",
+    error: null,
+    busy: false,
+  };
+  state.error = null;
+  state.notice = null;
+}
+
+function moveProjectField(form: ProjectFormState, delta: number): void {
+  const index = PROJECT_FORM_FIELDS.indexOf(form.field);
+  const next =
+    PROJECT_FORM_FIELDS[(index + delta + PROJECT_FORM_FIELDS.length) % PROJECT_FORM_FIELDS.length];
+  if (next) form.field = next;
+  form.error = null;
+}
+
+function cycleEnvironment(form: ProjectFormState, delta: number): void {
+  const index = PROJECT_ENVIRONMENTS.indexOf(form.environment);
+  const next =
+    PROJECT_ENVIRONMENTS[
+      (index + delta + PROJECT_ENVIRONMENTS.length) % PROJECT_ENVIRONMENTS.length
+    ];
+  if (next) form.environment = next;
+  form.error = null;
+}
+
+function appendProjectFormText(form: ProjectFormState, character: string): void {
+  switch (form.field) {
+    case "name":
+      if (form.name.length < 120) form.name += character;
+      break;
+    case "baseUrl":
+      if (form.baseUrl.length < 2048) form.baseUrl += character;
+      break;
+    case "stack":
+      if (form.stack.length < 60) form.stack += character;
+      break;
+    case "environment":
+      if (character === " ") cycleEnvironment(form, 1);
+      break;
+  }
+  form.error = null;
+}
+
+function deleteProjectFormText(form: ProjectFormState): void {
+  switch (form.field) {
+    case "name":
+      form.name = form.name.slice(0, -1);
+      break;
+    case "baseUrl":
+      form.baseUrl = form.baseUrl.slice(0, -1);
+      break;
+    case "stack":
+      form.stack = form.stack.slice(0, -1);
+      break;
+    case "environment":
+      break;
+  }
+  form.error = null;
+}
+
+function clearProjectFormText(form: ProjectFormState): void {
+  switch (form.field) {
+    case "name":
+      form.name = "";
+      break;
+    case "baseUrl":
+      form.baseUrl = "";
+      break;
+    case "stack":
+      form.stack = "";
+      break;
+    case "environment":
+      break;
+  }
+  form.error = null;
+}
+
+function handleProjectFormKey(state: UiState, chunk: string, rerender: () => void): void {
+  const form = state.projectForm;
+  if (!form || form.busy) return;
+
+  if (chunk === "\u001B") {
+    state.projectForm = null;
+    state.notice = "Project creation cancelled.";
+    rerender();
+    return;
+  }
+  if (chunk === "\t" || chunk === "\u001B[B") {
+    moveProjectField(form, 1);
+    rerender();
+    return;
+  }
+  if (chunk === "\u001B[Z" || chunk === "\u001B[A") {
+    moveProjectField(form, -1);
+    rerender();
+    return;
+  }
+  if (chunk === "\u001B[C" || chunk === "\u001B[D") {
+    if (form.field === "environment") cycleEnvironment(form, chunk === "\u001B[C" ? 1 : -1);
+    rerender();
+    return;
+  }
+  if (chunk === "\r" || chunk === "\n") {
+    if (form.field === "environment") void submitProject(state, rerender);
+    else moveProjectField(form, 1);
+    rerender();
+    return;
+  }
+  if (chunk === "\u0013") {
+    void submitProject(state, rerender);
+    return;
+  }
+  if (chunk === "\u007F" || chunk === "\b") {
+    deleteProjectFormText(form);
+    rerender();
+    return;
+  }
+  if (chunk === "\u0015") {
+    clearProjectFormText(form);
+    rerender();
+    return;
+  }
+  if (chunk.startsWith("\u001B")) return;
+  for (const character of chunk) {
+    if (character < " " || character === "\u007F") continue;
+    appendProjectFormText(form, character);
+  }
+  rerender();
+}
+
+export function validateProjectDraft(
+  draft: Pick<ProjectFormState, "name" | "baseUrl" | "stack">
+): string | null {
+  const name = draft.name.trim();
+  const baseUrl = draft.baseUrl.trim();
+  if (name.length === 0) return "Project name is required.";
+  if (name.length > 120) return "Project name must be 120 characters or fewer.";
+  if (baseUrl.length === 0) return "Base URL is required.";
+  if (baseUrl.length > 2048) return "Base URL must be 2048 characters or fewer.";
+  try {
+    const url = new URL(baseUrl);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return "Base URL must start with http:// or https://.";
+    }
+  } catch {
+    return "Base URL must be a valid http(s) URL.";
+  }
+  if (draft.stack.length > 60) return "Stack must be 60 characters or fewer.";
+  return null;
+}
+
+async function submitProject(state: UiState, rerender: () => void): Promise<void> {
+  const form = state.projectForm;
+  if (!form || form.busy) return;
+
+  const validation = validateProjectDraft(form);
+  if (validation) {
+    form.error = validation;
+    rerender();
+    return;
+  }
+
+  form.busy = true;
+  form.error = null;
+  state.error = null;
+  rerender();
+
+  try {
+    const response = await apiPost<{ project: Project }>(state.session, "/api/v1/projects", {
+      workspaceId: state.workspaceId,
+      name: form.name.trim(),
+      baseUrl: form.baseUrl.trim(),
+      ...(form.stack.trim() ? { stack: form.stack.trim() } : {}),
+      environment: form.environment,
+      enabledModules: [...PROJECT_MODULES],
+    });
+    const created = response.project;
+    if (!created || typeof created.id !== "string") {
+      throw new UiApiError(
+        "The API accepted the request but did not return the created project.",
+        502,
+        "invalid_response"
+      );
+    }
+
+    state.projectForm = null;
+    state.selectedProject = 0;
+    await loadCurrent(state, rerender);
+    const index = state.projects?.findIndex((project) => project.id === created.id) ?? -1;
+    if (index >= 0) state.selectedProject = index;
+    state.notice = `Project "${created.name}" created.`;
+    rerender();
+  } catch (error) {
+    if (state.projectForm) {
+      state.projectForm.busy = false;
+      state.projectForm.error = describeError(error);
+      rerender();
+    }
+  }
+}
+
 async function loadCurrent(state: UiState, rerender: () => void): Promise<void> {
   const sequence = ++state.loadSeq;
   state.loading = true;
@@ -711,7 +973,9 @@ export function renderScreen(state: UiState, width = 100, height = 40, color = t
   );
   add(paint("2", "─".repeat(Math.max(1, Math.min(width, 100)))));
 
-  if (state.loading) {
+  if (state.projectForm) {
+    for (const line of renderProjectForm(state, paint, width)) add(line);
+  } else if (state.loading) {
     add(paint("2", "Loading…"));
   } else {
     const body = renderBody(state, paint, width);
@@ -723,7 +987,14 @@ export function renderScreen(state: UiState, width = 100, height = 40, color = t
   if (notice) add(paint(state.error ? "31" : "33", truncate(notice, width)));
   else add(paint("2", `workspace: ${workspace?.name ?? state.workspaceId}`));
   add(
-    paint("2", "1-6 screens · ↑/↓ select · Enter open · w workspace · r refresh · ? help · q quit")
+    paint(
+      "2",
+      state.projectForm
+        ? "Tab/↑↓ field · ←/→ environment · Enter next/create · Ctrl-S create · Esc cancel"
+        : state.screen === "projects"
+          ? "1-6 screens · n new project · ↑/↓ select · Enter open · w workspace · r refresh · ? help · q quit"
+          : "1-6 screens · ↑/↓ select · Enter open · w workspace · r refresh · ? help · q quit"
+    )
   );
   return lines.slice(0, height).join("\n");
 }
@@ -796,6 +1067,39 @@ function renderOverview(
   return lines;
 }
 
+function renderProjectForm(
+  state: UiState,
+  paint: (code: string, text: string) => string,
+  width: number
+): string[] {
+  const form = state.projectForm;
+  if (!form) return [];
+  const marker = (field: ProjectFormField): string =>
+    form.field === field ? paint("36", "›") : " ";
+  const cursor = (field: ProjectFormField): string =>
+    form.field === field ? paint("36", "▌") : "";
+  const line = (field: ProjectFormField, label: string, value: string): string =>
+    `${marker(field)} ${pad(label, 12)} ${value}${cursor(field)}`;
+  return [
+    "",
+    paint("1", "New project"),
+    paint("2", "Create a project in this workspace. Runs can then be uploaded to it."),
+    "",
+    line("name", "Name", form.name || paint("2", "(required)")),
+    line("baseUrl", "Base URL", form.baseUrl),
+    line("stack", "Stack", form.stack || paint("2", "(optional)")),
+    line("environment", "Environment", `‹ ${form.environment} ›`),
+    "",
+    paint("2", "modules      world, flow, exit (editable later in the dashboard)"),
+    "",
+    form.busy
+      ? paint("33", "Creating…")
+      : form.error
+        ? paint("31", truncate(form.error, width))
+        : paint("2", "Enter moves to the next field; on Environment it creates the project."),
+  ];
+}
+
 function renderProjects(
   state: UiState,
   paint: (code: string, text: string) => string,
@@ -803,7 +1107,7 @@ function renderProjects(
 ): string[] {
   if (!state.projects) return ["", paint("2", "No projects loaded. Press r to retry.")];
   if (state.projects.length === 0) {
-    return ["", paint("2", "No project in this workspace yet. Create one in the web dashboard.")];
+    return ["", paint("2", "No project in this workspace yet. Press n to create one.")];
   }
   const lines = ["", paint("1", "Projects"), ""];
   state.projects.forEach((project, index) => {
@@ -815,7 +1119,7 @@ function renderProjects(
       `  ${paint("2", `last run: ${project.lastRunStatus ?? "never"}`)} ${project.lastRunAt ? paint("2", when(project.lastRunAt)) : ""}`
     );
   });
-  lines.push("", paint("2", "Enter: open this project's runs · ↑/↓ select"));
+  lines.push("", paint("2", "Enter: open this project's runs · ↑/↓ select · n: create a project"));
   return lines;
 }
 
@@ -984,12 +1288,14 @@ export function renderHelp(width: number, _color = false): string {
     "  Tab / Shift-Tab / ← →   next or previous screen",
     "  ↑ / ↓ (or k / j)        move the selection",
     "  Enter                   open the selected project",
+    "  n                       create a project (Projects screen)",
     "  Esc                     clear the project filter / back to Overview",
     "  w                       switch workspace",
     "  r                       refresh the current screen",
     "  ?                       help    q / Ctrl-C   quit",
     "",
-    "The console is read-only. Mutating actions stay in the web dashboard.",
+    "Projects can be created from the console. Test execution and uploads still run",
+    "locally with `proofstack test` and `proofstack sync`; billing/admin stay read-only.",
     "",
     `API default: ${DEFAULT_API_URL}`,
     `Session file: ${sessionFilePath()}`,

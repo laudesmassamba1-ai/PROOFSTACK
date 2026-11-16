@@ -9,11 +9,11 @@ verified by running the commands below. It replaces the earlier Phase 0 planner 
 pnpm install
 pnpm lint        # Biome: passes, warnings only
 pnpm typecheck   # tsc across 5 build levels: passes
-pnpm test        # 15 files, 217 tests: passes
+pnpm test        # 15 files, 219 tests: passes
 pnpm build       # packages + web bundle: passes (chunk-size warning)
 ```
 
-Last run: 217/217 tests in ~20 s; web bundle built with a >500 kB chunk warning
+Last run: 219/219 tests in ~20 s; web bundle built with a >500 kB chunk warning
 (marketing bundle, not a defect).
 
 ## Deployed
@@ -59,9 +59,10 @@ Verified on 2026-11-16 against the live hosts:
   3 cancelled) and are covered by CLI tests.
 - `packages/cli` terminal console (`proofstack` / `ui`): full-screen Overview, Projects,
   Runs, Billing, Admin and Help; keyboard navigation, workspace switching, refresh and
-  a one-shot `--once` mode for CI. It uses the same API and session cookie as the web
-  app, stores the cookie at `~/.config/proofstack/session.json` with mode `0600`, never
-  stores the password, and is read-only.
+  a one-shot `--once` mode for CI. The Projects screen can create a project through the
+  real `POST /api/v1/projects` endpoint; test execution and uploads still run locally.
+  It uses the same API and session cookie as the web app, stores the cookie at
+  `~/.config/proofstack/session.json` with mode `0600`, and never stores the password.
 
 ### SaaS API (`apps/api`)
 
