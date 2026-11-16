@@ -554,6 +554,19 @@ async function commandTest(flags: GlobalFlags, args: string[]): Promise<number> 
   }
 
   const code = exitCodeFor(run);
+
+  // A run where nothing was verified is not a crash and not a pass. Say so plainly,
+  // because "exit 2" with no explanation reads like the tool broke.
+  if (run.status === "NOTHING_VERIFIED" && !flags.json) {
+    out(flags, "");
+    out(flags, yellow(flags, "Nothing was verified: every case was skipped."));
+    out(flags, "Wire at least one module to a target, then run again:");
+    out(flags, dim(flags, "  modules.world.target.kind = \"http\"  (with submitUrl)"));
+    out(flags, dim(flags, "  modules.flow.target.checkoutUrl"));
+    out(flags, dim(flags, "  modules.exit.exportSource"));
+    out(flags, dim(flags, "`proofstack doctor` lists exactly what is missing."));
+  }
+
   if (testArgs.failOnWarning && code === 0 && runTotals(run).warnings > 0) return 1;
   return code;
 }

@@ -206,7 +206,9 @@ export async function runEngine(options: EngineOptions): Promise<EngineRunResult
             ? "FAILED"
             : moduleRuns.some((m) => m.status === "CANCELLED")
               ? "CANCELLED"
-              : "PARTIAL";
+              : moduleRuns.every((m) => m.status === "NOTHING_VERIFIED")
+                ? "NOTHING_VERIFIED"
+                : "PARTIAL";
 
   const candidate: TestRun = {
     id: runId,

@@ -32,6 +32,14 @@ export const RUN_STATUSES = [
   "FAILED",
   "ERROR",
   "CANCELLED",
+  /**
+   * Nothing was verified: every case was skipped because a module had no target.
+   *
+   * This is deliberately not ERROR (the harness worked fine) and deliberately not
+   * COMPLETED (nothing was proven). A fresh project lands here on its first run, and
+   * the CLI exits non-zero so CI cannot mistake "not wired up" for "passing".
+   */
+  "NOTHING_VERIFIED",
 ] as const;
 export const runStatusSchema = z.enum(RUN_STATUSES);
 export type RunStatus = z.infer<typeof runStatusSchema>;
@@ -90,7 +98,9 @@ export function aggregateStatus(statuses: readonly TestStatus[]): RunStatus {
   if (active.some((s) => s === "RUNNING")) return "RUNNING";
   if (statuses.includes("ERROR")) return "ERROR";
   if (statuses.includes("FAILED")) return "FAILED";
-  if (statuses.every((s) => s === "SKIPPED")) return "ERROR";
+  // Every case skipped means nothing was actually verified. That is its own outcome:
+  // calling it ERROR blames the harness, calling it COMPLETED claims a pass nobody ran.
+  if (statuses.every((s) => s === "SKIPPED")) return "NOTHING_VERIFIED";
   if (statuses.includes("WARNING")) return "PARTIAL";
   return "COMPLETED";
 }

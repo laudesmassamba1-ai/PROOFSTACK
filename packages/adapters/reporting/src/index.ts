@@ -263,6 +263,7 @@ export function renderHtml(run: TestRun, options: RenderOptions = {}): string {
   .badge-warning, .badge-partial { background:color-mix(in srgb, var(--warn) 18%, transparent); color:var(--warn); }
   .badge-error { background:color-mix(in srgb, var(--err) 18%, transparent); color:var(--err); }
   .badge-skipped, .badge-pending, .badge-running, .badge-cancelled { background:color-mix(in srgb, var(--skip) 16%, transparent); color:var(--skip); }
+  .badge-nothing_verified { background:color-mix(in srgb, var(--warn) 18%, transparent); color:var(--warn); }
   .findings { margin:.45rem 0 0; padding-left:1.1rem; }
   .findings li { margin-bottom:.35rem; }
   footer { margin-top:3rem; color:var(--muted); font-size:.8rem; }
@@ -318,15 +319,20 @@ export function runTotals(run: TestRun): RunTotals {
 /**
  * Exit code policy, in one place so the CLI and CI agree.
  *
- *   0  every case passed (skips are allowed: an unconfigured module is not a failure)
+ *   0  cases ran and none failed (some modules may legitimately be skipped)
  *   1  at least one product defect
- *   2  at least one harness error (the run itself could not be trusted)
+ *   2  at least one harness error, or nothing was verified at all
  *   3  the run was cancelled before it finished
+ *
+ * "Nothing verified" is 2, not 0: a project whose modules are not wired up must not
+ * pass a CI gate. It is reported as its own status so the message can say *why*,
+ * rather than looking like a crash.
  */
 export function exitCodeFor(run: TestRun): 0 | 1 | 2 | 3 {
   if (run.status === "CANCELLED") return 3;
   if (run.moduleRuns.some((m) => m.totals.errors > 0) || run.status === "ERROR") return 2;
   if (run.moduleRuns.some((m) => m.totals.failed > 0) || run.status === "FAILED") return 1;
+  if (run.status === "NOTHING_VERIFIED") return 2;
   return 0;
 }
 
@@ -346,6 +352,8 @@ function statusBadge(status: RunStatus | TestCaseResult["status"]): string {
       return "SKIP";
     case "CANCELLED":
       return "CANC";
+    case "NOTHING_VERIFIED":
+      return "NONE";
     case "RUNNING":
       return "RUN ";
     default:
