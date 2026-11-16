@@ -25,10 +25,10 @@ export function Home() {
           <div className="max-w-[760px]">
             <HeroLockup size={54} />
             <p className="eyebrow mt-10">{t("hero.eyebrow")}</p>
-            <h1 className="rise rise-2 mt-4 max-w-[18ch] text-balance text-[2.2rem] leading-[1.06] tracking-tight sm:text-[3.4rem] lg:text-[4rem]">
+            <h1 className="rise rise-2 mt-4 max-w-[18ch] text-balance text-white text-[2.2rem] leading-[1.06] tracking-tight sm:text-[3.4rem] lg:text-[4rem]">
               {t("hero.title")}
             </h1>
-            <p className="rise rise-3 mt-6 max-w-[58ch] text-[1.05rem] leading-relaxed text-white/62">
+            <p className="rise rise-3 mt-6 max-w-[58ch] text-[1.05rem] leading-relaxed text-white/80">
               {t("hero.lede")}
             </p>
             <div className="rise rise-4 mt-9 flex flex-wrap items-center gap-3">

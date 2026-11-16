@@ -264,15 +264,39 @@ describe("CLI", () => {
   });
 
   it("sync uploads real totals instead of an empty summary", async () => {
-    const received: { summary?: { total?: number } }[] = [];
+    const received: {
+      summary?: { totals?: Record<string, { total: number }> };
+      run?: { workspaceId?: string; projectId?: string };
+    }[] = [];
+    const headersSeen: Record<string, string | undefined>[] = [];
     const server = createServer((request, response) => {
+      // `GET /v1/project` is how the CLI learns which workspace its key speaks for.
+      // Without it the CLI refuses to upload rather than guessing a tenant.
+      if (request.method === "GET" && request.url?.startsWith("/v1/project")) {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(
+          JSON.stringify({
+            workspace: { id: "ws_from_key", name: "Sync test" },
+            project: { id: "prj_from_key", name: "Sync test" },
+          })
+        );
+        return;
+      }
       let body = "";
       request.setEncoding("utf8");
       request.on("data", (chunk: string) => {
         body += chunk;
       });
       request.on("end", () => {
-        received.push(JSON.parse(body) as { summary?: { total?: number } });
+        headersSeen.push({
+          idempotencyKey: request.headers["idempotency-key"] as string | undefined,
+        });
+        received.push(
+          JSON.parse(body) as {
+            summary?: { totals?: Record<string, { total: number }> };
+            run?: { workspaceId?: string; projectId?: string };
+          }
+        );
         response.writeHead(200, { "content-type": "application/json" });
         response.end(JSON.stringify({ runId: "run_test", recorded: true }));
       });
@@ -321,7 +345,14 @@ describe("CLI", () => {
       });
       expect(result.code).toBe(0);
       expect(received).toHaveLength(1);
-      expect(received[0]!.summary?.total).toBe(3);
+      // Totals are keyed by module, not flat: a summary that cannot say which module
+      // failed is not a summary.
+      expect(received[0]!.summary?.totals?.world?.total).toBe(3);
+      // The tenant is taken from the key, never from the local run payload.
+      expect(received[0]!.run?.workspaceId).toBe("ws_from_key");
+      expect(received[0]!.run?.projectId).toBe("prj_from_key");
+      // A retried upload must present the same key or the run is counted twice.
+      expect(headersSeen[0]!.idempotencyKey).toBe("sync:run_test");
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }

@@ -27,6 +27,19 @@ import { createExitProvider, defaultExportSource } from "@proofstack/module-exit
 import { createFlowProvider, defaultFlowTarget } from "@proofstack/module-flow";
 import * as worldProfiles from "@proofstack/module-world";
 import { createWorldProvider, HttpProductUnderTest } from "@proofstack/module-world";
+import {
+  apiGet,
+  clearStoredSession,
+  DEFAULT_API_URL,
+  loadStoredSession,
+  loginInteractive,
+  type Overview,
+  resolveApiUrl,
+  runUi,
+  SCREENS,
+  type Screen,
+  type SessionPayload,
+} from "./ui.js";
 
 /**
  * The PROOFSTACK CLI.
@@ -116,6 +129,11 @@ async function main(argv: string[]): Promise<number> {
 
   switch (command) {
     case undefined:
+      // A bare invocation in a terminal opens the console; piped/CI invocations keep
+      // the deterministic help output they already had.
+      if (stdin.isTTY && !flags.json) return commandUi(flags, []);
+      printHelp(flags);
+      return 0;
     case "--help":
     case "-h":
     case "help":
@@ -138,9 +156,15 @@ async function main(argv: string[]): Promise<number> {
       return commandReport(flags, args);
     case "projects":
       return commandProjects(flags);
+    case "ui":
+    case "dashboard":
+    case "console":
+      return commandUi(flags, args);
+    case "status":
+      return commandStatus(flags, args);
     case "login":
     case "logout":
-      return commandAuth(flags, command);
+      return commandAuth(flags, command, args);
     case "sync":
       return commandSync(flags, args);
     case "ai":
@@ -801,14 +825,32 @@ async function commandProjects(flags: GlobalFlags): Promise<number> {
   return 0;
 }
 
-async function commandAuth(flags: GlobalFlags, command: "login" | "logout"): Promise<number> {
+async function commandAuth(
+  flags: GlobalFlags,
+  command: "login" | "logout",
+  args: string[]
+): Promise<number> {
   if (command === "logout") {
-    out(flags, "No credentials are stored by this CLI build.");
+    const removed = await clearStoredSession();
     out(
       flags,
-      dim(flags, "Tokens are read from environment variables, so there is nothing to remove.")
+      removed
+        ? green(flags, "Stored session removed.")
+        : "No stored session was found. Project tokens still come from the environment."
     );
     return 0;
+  }
+
+  const apiUrl = resolveApiUrl(flagValue(args, "--api"));
+  if (stdin.isTTY && !flags.json) {
+    try {
+      await loginInteractive({ apiUrl });
+      out(flags, dim(flags, "Next: run `proofstack` to open the terminal console."));
+      return 0;
+    } catch (error) {
+      err(flags, red(flags, describeError(error).message));
+      return 2;
+    }
   }
 
   out(flags, bold(flags, "proofstack login"));
@@ -822,7 +864,121 @@ async function commandAuth(flags: GlobalFlags, command: "login" | "logout"): Pro
   out(flags, dim(flags, '       sync: { enabled: true, apiUrl: "https://your-api.example" }'));
   out(flags, "");
   out(flags, yellow(flags, "No token is written to disk by this command, by design."));
+  out(flags, "");
+  out(
+    flags,
+    dim(
+      flags,
+      `For the interactive console, run \`proofstack\` (or \`proofstack ui\`) in a terminal. API default: ${DEFAULT_API_URL}`
+    )
+  );
   return 0;
+}
+
+interface UiArgs {
+  once: boolean;
+  screen: Screen;
+  apiUrl?: string;
+}
+
+function parseUiArgs(args: string[]): UiArgs {
+  const parsed: UiArgs = { once: false, screen: "overview" };
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i]!;
+    if (arg === "--once") {
+      parsed.once = true;
+      continue;
+    }
+    if (arg === "--screen") {
+      const value = args[++i];
+      if (!value || !(SCREENS as readonly string[]).includes(value)) {
+        throw flagError(`--screen needs one of: ${SCREENS.join(", ")}.`);
+      }
+      parsed.screen = value as Screen;
+      continue;
+    }
+    if (arg === "--api") {
+      const value = args[++i];
+      if (!value) throw flagError("--api needs a URL.");
+      parsed.apiUrl = value;
+      continue;
+    }
+    throw flagError(`Unknown ui option: ${arg}`);
+  }
+  return parsed;
+}
+
+async function commandUi(flags: GlobalFlags, args: string[]): Promise<number> {
+  let parsed: UiArgs;
+  try {
+    parsed = parseUiArgs(args);
+  } catch (error) {
+    err(flags, red(flags, describeError(error).message));
+    return 64;
+  }
+  try {
+    return await runUi({ ...parsed, color: flags.color });
+  } catch (error) {
+    err(flags, red(flags, describeError(error).message));
+    return 2;
+  }
+}
+
+/** A scriptable one-shot view of the same data the console shows first. */
+async function commandStatus(flags: GlobalFlags, args: string[]): Promise<number> {
+  const apiUrl = resolveApiUrl(flagValue(args, "--api"));
+  const session = await loadStoredSession(apiUrl);
+  if (!session) {
+    err(flags, red(flags, "Not signed in. Run `proofstack login` in a terminal first."));
+    return 2;
+  }
+  try {
+    const auth = await apiGet<SessionPayload>(session, "/api/auth/session");
+    if (!auth.user) {
+      err(flags, red(flags, "The stored session is no longer valid. Run `proofstack login`."));
+      return 2;
+    }
+    const requested = flagValue(args, "--workspace");
+    const workspaceId = requested ?? auth.workspaces?.[0]?.id;
+    if (!workspaceId) {
+      err(flags, red(flags, "This account has no workspace yet."));
+      return 2;
+    }
+    const overview = await apiGet<Overview>(
+      session,
+      `/api/v1/overview?workspaceId=${encodeURIComponent(workspaceId)}`
+    );
+    if (flags.json) {
+      stdout.write(
+        `${stableStringify(
+          { apiUrl, user: auth.user, workspace: overview.workspace, overview },
+          2
+        )}\n`
+      );
+      return 0;
+    }
+    out(flags, bold(flags, "PROOFSTACK status"));
+    out(flags, `account    ${auth.user.email}`);
+    out(flags, `api        ${apiUrl}`);
+    out(
+      flags,
+      `workspace  ${overview.workspace.name} (${overview.workspace.myRole}) · ${overview.subscription.planName}${overview.subscription.entitled ? "" : " (free)"}`
+    );
+    out(flags, `projects   ${overview.projects.length}`);
+    out(flags, `runs       ${overview.recentRuns.length} recent`);
+    for (const run of overview.recentRuns.slice(0, 5)) {
+      out(
+        flags,
+        `  ${run.status.padEnd(16)} ${(run.projectName ?? "—").padEnd(20)} ${run.startedAt.slice(0, 16)}`
+      );
+    }
+    out(flags, "");
+    out(flags, dim(flags, "Interactive console: `proofstack ui` · machine-readable: `--json`"));
+    return 0;
+  } catch (error) {
+    err(flags, red(flags, describeError(error).message));
+    return 2;
+  }
 }
 
 async function commandSync(flags: GlobalFlags, args: string[]): Promise<number> {
@@ -873,7 +1029,50 @@ async function commandSync(flags: GlobalFlags, args: string[]): Promise<number> 
 
   // Send real totals: the API recomputes them from moduleRuns, but a payload that
   // claims zero cases for a 400-case run is wrong on its face for any other consumer.
-  const payload = stableStringify({ run, summary: runTotals(run) });
+  //
+  // The shape is `summary.totals` keyed by module — not the flat run-wide totals. The
+  // flat object was rejected by the API with `summary.totals: expected record`, which
+  // is the contract doing its job: a summary that cannot say which module failed is
+  // not a summary.
+  const summary = {
+    totals: Object.fromEntries(
+      run.moduleRuns.map((moduleRun) => [
+        moduleRun.module,
+        {
+          total: moduleRun.totals.total,
+          passed: moduleRun.totals.passed,
+          failed: moduleRun.totals.failed,
+          warnings: moduleRun.totals.warnings,
+          errors: moduleRun.totals.errors,
+          skipped: moduleRun.totals.skipped,
+        },
+      ])
+    ),
+  };
+
+  // A run produced locally carries `local:<project name>` as its workspace, because the
+  // CLI has no idea which cloud workspace it belongs to until it asks. The API is right
+  // to refuse a run that claims another tenant, so the fix is to learn the identity
+  // from the key rather than to relax the check: `GET /v1/project` is authenticated by
+  // the same key and returns the workspace it speaks for.
+  const identity = await resolveSyncIdentity(config.sync.apiUrl, token);
+  if (!identity) {
+    err(
+      flags,
+      red(
+        flags,
+        "The API did not confirm which workspace this key belongs to. Nothing was uploaded."
+      )
+    );
+    return 2;
+  }
+  const scopedRun: TestRun = {
+    ...run,
+    workspaceId: identity.workspaceId,
+    ...(identity.projectId ? { projectId: identity.projectId } : {}),
+  };
+
+  const payload = stableStringify({ run: scopedRun, summary });
   if (Buffer.byteLength(payload) > config.sync.maxPayloadBytes) {
     err(
       flags,
@@ -887,9 +1086,18 @@ async function commandSync(flags: GlobalFlags, args: string[]): Promise<number> 
   }
 
   try {
+    // The API requires an Idempotency-Key so a retried upload is recorded once. It must
+    // derive from the run identity, not from a fresh uuid: a second attempt after a
+    // network blip has to present the *same* key or the run is counted twice and the
+    // customer is billed twice for one test run.
+    const idempotencyKey = run.idempotencyKey ?? `sync:${run.id}`;
     const response = await fetch(`${config.sync.apiUrl.replace(/\/+$/, "")}/v1/runs`, {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${token}`,
+        "idempotency-key": idempotencyKey,
+      },
       body: payload,
     });
     if (!response.ok) {
@@ -1287,6 +1495,38 @@ async function commandAi(flags: GlobalFlags, args: string[]): Promise<number> {
   }
 }
 
+/**
+ * Ask the API which workspace (and project) a key speaks for.
+ *
+ * Returns null when the API does not answer or does not confirm an identity. Uploading
+ * with a guessed workspace would be worse than not uploading: the API would either
+ * reject it (best case) or, if the check ever loosened, file a customer's results under
+ * someone else's tenant.
+ */
+async function resolveSyncIdentity(
+  apiUrl: string,
+  token: string
+): Promise<{ workspaceId: string; projectId?: string } | null> {
+  try {
+    const response = await fetch(`${apiUrl.replace(/\/+$/, "")}/v1/project`, {
+      headers: { accept: "application/json", authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) return null;
+    const body = (await response.json()) as {
+      workspace?: { id?: string };
+      project?: { id?: string } | null;
+    };
+    const workspaceId = body.workspace?.id;
+    if (!workspaceId) return null;
+    return {
+      workspaceId,
+      ...(body.project?.id ? { projectId: body.project.id } : {}),
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** Read `--flag value` from an argv slice. */
 function flagValue(args: string[], flag: string): string | undefined {
   const index = args.indexOf(flag);
@@ -1372,7 +1612,11 @@ function printHelp(flags: GlobalFlags): void {
   w("  test                     Run the enabled modules");
   w("  report [json|junit|html|text]   Render the last run");
   w("  projects                 List projects");
-  w("  login | logout           How to authenticate (token-based)");
+  w(
+    "  ui, dashboard            Full-screen terminal console (login, projects, runs, billing, admin)"
+  );
+  w("  status                   One-shot cloud status for the signed-in account");
+  w("  login | logout           Sign in interactively / remove the stored session");
   w("  sync                     Upload the last run to the API");
   w("  ai <status|ask|agent>    MCP servers, AI providers and external agents");
   w("");

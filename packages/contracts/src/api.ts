@@ -13,6 +13,7 @@ import { moneySchema } from "./money.js";
 import {
   environmentKindSchema,
   moduleIdSchema,
+  moduleIdStringSchema,
   runStatusSchema,
   testStatusSchema,
 } from "./statuses.js";
@@ -91,8 +92,18 @@ export const runUploadRequestSchema = z
     /** Trimmed summary so list endpoints do not need the full payload. */
     summary: z
       .object({
+        /**
+         * Keyed by module, and **sparse on purpose**.
+         *
+         * An enum-keyed `z.record` is a *total* map: it demands every module key, so a
+         * run that only executed `--module world` was rejected for not reporting FLOW
+         * and EXIT totals. Filling those with zeros would be worse than the rejection:
+         * it would claim a module was verified and found clean when it never ran. The
+         * string-keyed variant validates the key at runtime and lets a run report only
+         * what it actually did.
+         */
         totals: z.record(
-          moduleIdSchema,
+          moduleIdStringSchema,
           z
             .object({
               total: z.number().int(),
