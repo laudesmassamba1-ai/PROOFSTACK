@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="512" height="512" role="img" aria-label="PROOFSTACK">
+  <title>PROOFSTACK — compact icon</title>
+  <path d="M20 4.5 34.2 12.4 20 20.3 5.8 12.4Z" fill="#78E3CB"/>
+  <path d="M5.8 12.4 20 20.3v15.2L5.8 27.6Z" fill="#315FC8"/>
+  <path d="M34.2 12.4 20 20.3v15.2l14.2-7.9Z" fill="#73D68B" opacity=".92"/>
+  <path d="M12.6 12.9 17.4 16.2 27.1 10.4" stroke="#050708" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

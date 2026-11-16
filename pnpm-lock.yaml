@@ -249,11 +249,56 @@ importers:
         specifier: workspace:*
         version: link:../../core
 
+  packages/adapters/reporting:
+    dependencies:
+      '@proofstack/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      '@proofstack/core':
+        specifier: workspace:*
+        version: link:../../core
+
   packages/billing:
     dependencies:
       '@proofstack/adapter-payments':
         specifier: workspace:*
         version: link:../adapters/payments
+      '@proofstack/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@proofstack/core':
+        specifier: workspace:*
+        version: link:../core
+
+  packages/cli:
+    dependencies:
+      '@proofstack/adapter-reporting':
+        specifier: workspace:*
+        version: link:../adapters/reporting
+      '@proofstack/config':
+        specifier: workspace:*
+        version: link:../config
+      '@proofstack/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@proofstack/core':
+        specifier: workspace:*
+        version: link:../core
+      '@proofstack/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@proofstack/module-exit':
+        specifier: workspace:*
+        version: link:../modules/exit
+      '@proofstack/module-flow':
+        specifier: workspace:*
+        version: link:../modules/flow
+      '@proofstack/module-world':
+        specifier: workspace:*
+        version: link:../modules/world
+
+  packages/config:
+    dependencies:
       '@proofstack/contracts':
         specifier: workspace:*
         version: link:../contracts

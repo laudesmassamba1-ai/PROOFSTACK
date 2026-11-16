@@ -453,7 +453,9 @@ async function buildFindings(
       failure: {
         message: `assertion ${assertion.id} failed`,
         category: "ASSERTION",
-        code: "assertion_failed",
+        // The specific code the module raised, so a finding is triageable and the
+        // fingerprint groups the same defect across runs.
+        code: result.failure?.code ?? "assertion_failed",
         expected: render(assertion.expected),
         actual: render(assertion.actual),
       },

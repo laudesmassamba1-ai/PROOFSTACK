@@ -279,6 +279,17 @@ function currencyFixtures(profile: LocaleProfileData, push: Push): void {
 
   const minor = (major: string): string => Money.fromDecimalString(major, code, { exact: true }).minor.toString();
 
+  /**
+   * An amount with the currency's own number of decimals.
+   *
+   * XOF/XAF have exponent 0, so "1234.50" is not a representable amount for them —
+   * asking `minor()` for it throws, and building the fixture set must not throw. This
+   * helper picks a value the currency can actually hold, so the fixture set is valid
+   * for every profile instead of only the two-decimal ones.
+   */
+  const amountWith = (whole: string, fraction: string): string =>
+    meta.exponent === 0 ? whole : `${whole}.${fraction.slice(0, meta.exponent).padEnd(meta.exponent, "0")}`;
+
   // 1. Exactly what the product's own locale would render.
   const rendered = new Intl.NumberFormat(profile.id, {
     style: "currency",
@@ -286,21 +297,32 @@ function currencyFixtures(profile: LocaleProfileData, push: Push): void {
     minimumFractionDigits: meta.exponent,
     maximumFractionDigits: meta.exponent,
   }).format(1234.5);
-  declare(rendered, minor("1234.50"), `rendered by Intl for ${profile.id}; the product must read back its own output`);
+  // The expected value is the *rendered* string parsed back, so it is always
+  // representable in this currency by construction.
+  const renderedExpected = parseLocalizedDecimal(rendered, separators, code);
+  declare(
+    rendered,
+    renderedExpected.ok ? renderedExpected.money.minor.toString() : minor(amountWith("1234", "50")),
+    `rendered by Intl for ${profile.id}; the product must read back its own output`,
+  );
 
   // 2. Plain decimal with the locale separators.
-  declare("1234.56", minor("1234.56"), "machine decimal form");
+  declare(amountWith("1234", "56"), minor(amountWith("1234", "56")), "machine decimal form");
   declare(
-    `${"1"}${separators.groupingSeparator || ""}${separators.decimalSeparator === "." ? "" : "234"}${separators.decimalSeparator}56`,
-    minor("1234.56"),
+    `${"1"}${separators.groupingSeparator || ""}${separators.decimalSeparator === "." ? "" : "234"}${meta.exponent === 0 ? "" : `${separators.decimalSeparator}56`}`,
+    minor(amountWith("1234", "56")),
     `locale-separated input (${profile.id})`,
     "soft",
   );
 
   // 3. Boundaries that expose float arithmetic.
-  declare("0.10", minor("0.10"), "the 0.1 + 0.2 class of bug");
-  declare("-45.00", minor("-45.00"), "negative amount");
-  declare("999999999999999999.99", minor("999999999999999999.99"), "beyond Number.MAX_SAFE_INTEGER: float parsing loses digits");
+  declare(amountWith("0", "10"), minor(amountWith("0", "10")), "the 0.1 + 0.2 class of bug");
+  declare(amountWith("-45", "00"), minor(amountWith("-45", "00")), "negative amount");
+  declare(
+    amountWith("999999999999999999", "99"),
+    minor(amountWith("999999999999999999", "99")),
+    "beyond Number.MAX_SAFE_INTEGER: float parsing loses digits",
+  );
   declare("0", minor("0"), "zero is a valid amount");
 
   // 4. Sub-minor precision must be refused, never silently rounded.

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 96" width="560" height="96" role="img" aria-label="PROOFSTACK">
+  <title>PROOFSTACK — main logo, dark background</title>
+  <g transform="translate(8 16) scale(1.6)">
+    <path d="M20 4.5 34.2 12.4 20 20.3 5.8 12.4Z" fill="#78E3CB"/>
+    <path d="M5.8 12.4 20 20.3v15.2L5.8 27.6Z" fill="#315FC8"/>
+    <path d="M34.2 12.4 20 20.3v15.2l14.2-7.9Z" fill="#73D68B" opacity=".92"/>
+    <path d="M12.6 12.9 17.4 16.2 27.1 10.4" stroke="#050708" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </g>
+  <text x="140" y="60" fill="#F2F6FA" font-family="Geist, Inter, system-ui, sans-serif" font-size="34" font-weight="500" letter-spacing="11.5">PROOFSTACK</text>
+</svg>
