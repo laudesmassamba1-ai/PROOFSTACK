@@ -43,19 +43,19 @@ async function signUp(page: Page, email: string): Promise<void> {
   // The sign-up form asks for a name and a workspace name as well as credentials:
   // the API creates the workspace in the same transaction as the account, so a
   // customer never lands in a dashboard with nothing to select.
-  await page.getByLabel(/your name|votre nom/i).fill("Ada Lovelace");
-  await page.getByLabel(/workspace name|nom de l'espace/i).fill("Ada workspace");
-  await page.getByLabel(/e-?mail/i).fill(email);
-  await page.getByLabel(/mot de passe|password/i).fill(PASSWORD);
-  await page.getByRole("button", { name: /create account|créer le compte/i }).click();
+  await page.locator("#auth-name").fill("Ada Lovelace");
+  await page.locator("#auth-workspace").fill("Ada workspace");
+  await page.locator("#auth-email").fill(email);
+  await page.locator("#auth-password").fill(PASSWORD);
+  await page.locator('form button[type="submit"]').click();
   await page.waitForURL(/\/app(\/|$)/, { timeout: 20_000 });
 }
 
 async function signIn(page: Page, email: string): Promise<void> {
   await page.goto("/signin");
-  await page.getByLabel(/e-?mail/i).fill(email);
-  await page.getByLabel(/mot de passe|password/i).fill(PASSWORD);
-  await page.getByRole("button", { name: /^se connecter$|^sign in$/i }).click();
+  await page.locator("#auth-email").fill(email);
+  await page.locator("#auth-password").fill(PASSWORD);
+  await page.locator('form button[type="submit"]').click();
   await page.waitForURL(/\/app(\/|$)/, { timeout: 20_000 });
 }
 
@@ -144,7 +144,7 @@ test.describe("authentication", () => {
   test("the dashboard is unreachable without a session", async ({ page }) => {
     await page.goto("/app");
     await page.waitForURL(/signin/, { timeout: 15_000 });
-    await expect(page.getByLabel(/e-?mail/i)).toBeVisible();
+    await expect(page.locator("#auth-email")).toBeVisible();
   });
 });
 
