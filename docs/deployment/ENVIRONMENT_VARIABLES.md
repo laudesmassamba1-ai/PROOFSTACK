@@ -61,12 +61,19 @@ Set secrets with `wrangler secret put SASPAY_API_KEY` and
 
 ## CLI and CI
 
-| Variable                    | Purpose                                                                                       |
-| --------------------------- | --------------------------------------------------------------------------------------------- |
-| `PROOFSTACK_PROJECT_TOKEN`  | `psk_…` project token created in the dashboard. Read at call time; never written to a report. |
-| `PROOFSTACK_WORLD_TOKEN`    | Bearer token for the application under test (WORLD/EXIT targets).                             |
-| `PROOFSTACK_FLOW_TOKEN`     | Bearer token for the FLOW target.                                                             |
-| `PROOFSTACK_WEBHOOK_SECRET` | Secret used to sign webhooks the FLOW harness sends to the app under test.                    |
+| Variable                    | Purpose                                                                                        |
+| --------------------------- | ---------------------------------------------------------------------------------------------- |
+| `PROOFSTACK_PROJECT_TOKEN`  | `psk_…` project token created in the dashboard. Read at call time; never written to a report.  |
+| `PROOFSTACK_WORLD_TOKEN`    | Bearer token for the application under test (WORLD/EXIT targets).                              |
+| `PROOFSTACK_FLOW_TOKEN`     | Bearer token for the FLOW target.                                                              |
+| `PROOFSTACK_WEBHOOK_SECRET` | Secret used to sign webhooks the FLOW harness sends to the app under test.                     |
+| `PROOFSTACK_API_URL`        | API origin for `login`, `ui` and `status`. Defaults to the live Vercel deployment.             |
+| `PROOFSTACK_SESSION_COOKIE` | Full `ps_session=…` cookie for headless/CI use. Treat it as a secret; never commit it.         |
+| `PROOFSTACK_SESSION_FILE`   | Override the session file path. Defaults to `~/.config/proofstack/session.json` (mode `0600`). |
+| `PROOFSTACK_CONFIG_HOME`    | Override the config directory used when `XDG_CONFIG_HOME` is not set.                          |
+
+`proofstack login` is interactive and stores only the HttpOnly session cookie, with
+mode `0600`; the password is never persisted. `proofstack logout` removes it.
 
 ## Email delivery (not configured)
 

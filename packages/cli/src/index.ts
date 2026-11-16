@@ -116,7 +116,7 @@ function out(flags: GlobalFlags, text: string): void {
   if (!flags.quiet) stdout.write(`${text}\n`);
 }
 
-function err(flags: GlobalFlags, text: string): void {
+function err(_flags: GlobalFlags, text: string): void {
   process.stderr.write(`${text}\n`);
 }
 
@@ -950,10 +950,7 @@ async function commandStatus(flags: GlobalFlags, args: string[]): Promise<number
     );
     if (flags.json) {
       stdout.write(
-        `${stableStringify(
-          { apiUrl, user: auth.user, workspace: overview.workspace, overview },
-          2
-        )}\n`
+        `${JSON.stringify({ apiUrl, user: auth.user, workspace: overview.workspace, overview }, null, 2)}\n`
       );
       return 0;
     }
@@ -1646,6 +1643,14 @@ function printHelp(flags: GlobalFlags): void {
 }
 
 // --------------------------------------------------------------------------- entry
+
+// `proofstack --help | head` closes stdout early; that is normal shell behaviour, not
+// a crash. Without this handler Node throws an unhandled EPIPE and exits non-zero.
+for (const stream of [process.stdout, process.stderr]) {
+  stream.on("error", (error: NodeJS.ErrnoException) => {
+    if (error.code === "EPIPE") process.exit(0);
+  });
+}
 
 main(process.argv.slice(2))
   .then((code) => {

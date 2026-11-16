@@ -21,7 +21,8 @@ not implemented yet — see the status file.
 
 Implemented and tested: the shared engine and all three modules, the CLI with JSON/
 JUnit/HTML reports, the SaaS API (auth, workspaces, projects, run ingestion, API keys,
-billing, webhooks) and the authenticated dashboard. `pnpm test` runs 208 tests;
+billing, webhooks), the authenticated dashboard and the terminal console. `pnpm test`
+runs 217 tests;
 `pnpm typecheck`, `pnpm lint` (warnings only) and `pnpm build` pass.
 
 The creator's read-only operations console lives at `/app/admin`: users, workspaces,
@@ -68,6 +69,27 @@ pnpm cli -- sync
 `@proofstack/cli` is private to this workspace for now; `pnpm cli -- <command>` runs the
 built binary. When it is published, the same commands are `proofstack <command>`.
 
+## Terminal console
+
+`pnpm proofstack` opens a full-screen, read-only console in a real terminal: Overview,
+Projects, Runs, Billing, Admin (when the account is allowlisted) and Help. Use arrow
+keys, Enter to open a project, `w` to switch workspace, `r` to refresh and `q` to quit.
+
+```bash
+pnpm proofstack                              # open the console
+pnpm proofstack -- status --json             # scriptable account/workspace summary
+pnpm proofstack -- ui --once --screen overview
+pnpm proofstack -- login                     # interactive sign-in
+pnpm proofstack -- logout                    # remove the stored session
+```
+
+`login` stores the HttpOnly session cookie in `~/.config/proofstack/session.json` with
+mode `0600`; it never stores the password. Use
+`PROOFSTACK_API_URL=http://127.0.0.1:8787` for the local API, or pass `--api` to `login`,
+`ui` or `status`. For CI, `PROOFSTACK_SESSION_COOKIE` supplies the cookie without a file.
+The default API is the live Vercel deployment. The console is read-only; mutating
+actions stay in the web dashboard.
+
 Without `SASPAY_API_KEY` and `SASPAY_WEBHOOK_SECRET`, checkout uses the deterministic
 sandbox provider: no money moves, and paid access is still granted only after the
 server verifies a `SUCCEEDED` transaction. The dashboard exposes the sandbox outcome
@@ -84,6 +106,7 @@ control, labelled as such.
 | `pnpm api:dev`      | API + SQLite on `:8787`           |
 | `pnpm web:dev`      | Vite dev server on `:5173`        |
 | `pnpm cli -- <cmd>` | run the built CLI                 |
+| `pnpm proofstack`   | full-screen terminal console      |
 
 API environment variables are documented in
 [`docs/deployment/ENVIRONMENT_VARIABLES.md`](docs/deployment/ENVIRONMENT_VARIABLES.md).

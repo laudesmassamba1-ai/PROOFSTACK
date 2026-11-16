@@ -2,7 +2,7 @@
   "name": "proofstack",
   "version": "0.1.0",
   "private": true,
-  "description": "PROOFSTACK — integrated software quality and reliability suite: WORLD (global compatibility), FLOW (transaction reliability), EXIT (data portability).",
+  "description": "PROOFSTACK \u2014 integrated software quality and reliability suite: WORLD (global compatibility), FLOW (transaction reliability), EXIT (data portability).",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "engines": {
@@ -19,12 +19,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --config tests/playwright.config.ts",
     "db:generate": "pnpm --filter @proofstack/db generate",
     "db:migrate:local": "pnpm --filter @proofstack/db migrate:local",
     "web:dev": "pnpm --filter @proofstack/web dev",
     "api:dev": "pnpm --filter @proofstack/api dev",
     "cli": "node packages/cli/dist/index.js",
+    "proofstack": "node packages/cli/dist/index.js",
     "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
   },
   "devDependencies": {

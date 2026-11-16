@@ -1008,16 +1008,27 @@ function terminalHeight(): number {
   return Math.max(20, stdout.rows ?? 36);
 }
 
-const ANSI = /\u001B\[[0-9;]*m/g;
+function stripAnsi(text: string): string {
+  let result = "";
+  for (let index = 0; index < text.length; index += 1) {
+    if (text.charCodeAt(index) === 27 && text[index + 1] === "[") {
+      index += 2;
+      while (index < text.length && text[index] !== "m") index += 1;
+      continue;
+    }
+    result += text[index];
+  }
+  return result;
+}
 
 function fit(text: string, width: number): string {
-  const visible = text.replace(ANSI, "");
+  const visible = stripAnsi(text);
   if (visible.length > width) return visible.slice(0, width);
   return text + " ".repeat(width - visible.length);
 }
 
 function truncate(text: string, width: number): string {
-  return text.length > width ? text.slice(0, Math.max(0, width - 1)) + "…" : text;
+  return text.length > width ? `${text.slice(0, Math.max(0, width - 1))}…` : text;
 }
 
 function pad(text: string, width: number): string {
