@@ -25,6 +25,14 @@ import {
   type LoadedConfig,
 } from "@proofstack/config";
 import { exitCodeFor, renderReport, runTotals } from "@proofstack/adapter-reporting";
+import {
+  CliAgent,
+  agentSystemPrompt,
+  buildAiRuntime,
+  describeRuntime,
+  runAgent,
+  summarizeRunForAgent,
+} from "@proofstack/adapter-ai";
 
 /**
  * The PROOFSTACK CLI.
@@ -140,6 +148,8 @@ async function main(argv: string[]): Promise<number> {
       return commandAuth(flags, command);
     case "sync":
       return commandSync(flags, args);
+    case "ai":
+      return commandAi(flags, args);
     default:
       err(flags, `Unknown command: ${command}`);
       printHelp(flags);
@@ -739,6 +749,329 @@ async function commandSync(flags: GlobalFlags, args: string[]): Promise<number> 
   }
 }
 
+// ------------------------------------------------------------------------ ai commands
+
+/**
+ * `proofstack ai …`
+ *
+ * Four subcommands, each of which does exactly one thing and says when it cannot:
+ *
+ *   status  — what is configured and what actually connected
+ *   tools   — every MCP tool the agent would be allowed to call
+ *   ask     — one question to a provider, with the last run as context
+ *   agent   — the bounded loop: provider + MCP tools + a real task
+ *
+ * Every command refuses politely when `ai.enabled` is false. None of them invent a
+ * provider, and none of them store a key.
+ */
+async function commandAi(flags: GlobalFlags, args: string[]): Promise<number> {
+  const [sub, ...rest] = args;
+
+  let loaded: LoadedConfig;
+  try {
+    loaded = await loadConfig({ cwd: flags.cwd, skipValidation: true });
+  } catch (error) {
+    err(flags, red(flags, describeError(error).message));
+    return 2;
+  }
+
+  const { ai } = loaded.config;
+
+  if (!ai.enabled) {
+    if (sub === "status" || sub === undefined) {
+      out(flags, bold(flags, "AI integration"));
+      out(flags, "");
+      out(flags, dim(flags, "ai.enabled is false."));
+      out(flags, "");
+      out(flags, "To turn it on, add an ai block to your config:");
+      out(flags, dim(flags, '  ai: { enabled: true, providers: [...], mcpServers: [...] }'));
+      out(flags, dim(flags, "See docs/guides/AI_INTEGRATION.md."));
+      return 0;
+    }
+    err(flags, red(flags, "AI integration is disabled. Set ai.enabled = true in your config."));
+    return 2;
+  }
+
+  switch (sub) {
+    case undefined:
+    case "status": {
+      const runtime = await buildAiRuntime({
+        config: ai,
+        onStderr: (server, chunk) => {
+          if (flags.verbose) err(flags, dim(flags, `[${server}] ${chunk.trimEnd()}`));
+        },
+      });
+      try {
+        if (flags.json) {
+          stdout.write(
+            `${stableStringify(
+              {
+                enabled: ai.enabled,
+                autonomy: ai.autonomy,
+                providers: runtime.providers.map((p) => ({
+                  name: p.name,
+                  model: p.model,
+                  supportsTools: p.supportsTools,
+                  default: runtime.defaultProvider?.name === p.name,
+                })),
+                mcpServers: runtime.mcpClients.map((c) => ({
+                  name: c.name,
+                  server: c.serverInfo,
+                })),
+                mcpTools: runtime.mcpTools.map((t) => ({
+                  name: t.definition.name,
+                  effect: t.effect ?? "write",
+                })),
+                agents: ai.agents.map((a) => ({ name: a.name, allowFileWrites: a.allowFileWrites })),
+                warnings: runtime.warnings,
+              },
+              2,
+            )}\n`,
+          );
+          return 0;
+        }
+
+        out(flags, bold(flags, "AI integration"));
+        out(flags, dim(flags, `autonomy: ${ai.autonomy} · max turns: ${ai.maxTurns} · token budget: ${ai.maxTokensPerSession}`));
+        out(flags, "");
+        for (const line of describeRuntime(runtime)) out(flags, line);
+
+        if (ai.agents.length > 0) {
+          out(flags, "");
+          out(flags, `external agents: ${ai.agents.length}`);
+          for (const agent of ai.agents) {
+            out(flags, `  ${agent.name} — ${agent.command.join(" ")}${agent.allowFileWrites ? " (may write files)" : ""}`);
+          }
+        }
+
+        const connected = runtime.mcpClients.length;
+        const configured = ai.mcpServers.length;
+        if (configured > connected) {
+          out(flags, "");
+          out(flags, dim(flags, `${configured - connected} server(s) not connected (autoConnect is false; use --connect).`));
+        }
+        return 0;
+      } finally {
+        await runtime.close();
+      }
+    }
+
+    case "tools": {
+      const runtime = await buildAiRuntime({
+        config: ai,
+        connectServers: ai.mcpServers.map((s) => s.name),
+        onStderr: (server, chunk) => {
+          if (flags.verbose) err(flags, dim(flags, `[${server}] ${chunk.trimEnd()}`));
+        },
+      });
+      try {
+        if (flags.json) {
+          stdout.write(
+            `${stableStringify(
+              runtime.mcpTools.map((t) => ({
+                name: t.definition.name,
+                effect: t.effect ?? "write",
+                description: t.definition.description,
+                parameters: t.definition.parameters,
+              })),
+              2,
+            )}\n`,
+          );
+          return 0;
+        }
+        if (runtime.mcpTools.length === 0) {
+          out(flags, yellow(flags, "No MCP tools available."));
+          for (const warning of runtime.warnings) out(flags, dim(flags, `  ${warning}`));
+          return 0;
+        }
+        out(flags, bold(flags, `${runtime.mcpTools.length} MCP tool(s)`));
+        for (const tool of runtime.mcpTools) {
+          const effect = tool.effect ?? "write";
+          const tag = effect === "read" ? green(flags, "read ") : yellow(flags, "write");
+          out(flags, `  ${tag} ${tool.definition.name}`);
+          if (tool.definition.description) out(flags, dim(flags, `        ${tool.definition.description}`));
+        }
+        return 0;
+      } finally {
+        await runtime.close();
+      }
+    }
+
+    case "ask": {
+      const question = rest.filter((a) => !a.startsWith("--")).join(" ").trim();
+      if (!question) {
+        err(flags, red(flags, "Usage: proofstack ai ask \"your question\""));
+        return 64;
+      }
+      const providerName = flagValue(rest, "--provider");
+      const runtime = await buildAiRuntime({ config: ai });
+      try {
+        const provider = providerName
+          ? runtime.providers.find((p) => p.name === providerName)
+          : runtime.defaultProvider;
+        if (!provider) {
+          err(flags, red(flags, providerName ? `No provider named "${providerName}".` : "No AI provider configured."));
+          for (const warning of runtime.warnings) err(flags, dim(flags, `  ${warning}`));
+          return 2;
+        }
+
+        const context = await lastRunSummary(loaded);
+        const response = await provider.chat({
+          messages: [
+            { role: "system", content: agentSystemPrompt(loaded.config.project.name) },
+            {
+              role: "user",
+              content: context ? `${context}\n\n---\n\n${question}` : question,
+            },
+          ],
+        });
+
+        if (flags.json) {
+          stdout.write(`${stableStringify({ provider: provider.name, model: response.model, answer: response.message.content, usage: response.usage }, 2)}\n`);
+        } else {
+          out(flags, response.message.content.trim());
+          if (response.usage) out(flags, dim(flags, `\n${response.usage.totalTokens} tokens · ${provider.name}/${response.model}`));
+        }
+        return 0;
+      } finally {
+        await runtime.close();
+      }
+    }
+
+    case "agent": {
+      const task = rest.filter((a) => !a.startsWith("--")).join(" ").trim();
+      if (!task) {
+        err(flags, red(flags, "Usage: proofstack ai agent \"what to investigate\""));
+        return 64;
+      }
+      const providerName = flagValue(rest, "--provider");
+      const agentName = flagValue(rest, "--cli-agent");
+
+      // An external agent takes precedence: if the operator named one, they want it.
+      if (agentName) {
+        const config = ai.agents.find((a) => a.name === agentName);
+        if (!config) {
+          err(flags, red(flags, `No CLI agent named "${agentName}". Configured: ${ai.agents.map((a) => a.name).join(", ") || "none"}`));
+          return 2;
+        }
+        const context = await lastRunSummary(loaded);
+        const prompt = [agentSystemPrompt(loaded.config.project.name), "", context ?? "(no run report found)", "", "---", "", task].join("\n");
+        const agent = new CliAgent(config);
+        const result = await agent.run(prompt);
+        if (flags.json) {
+          stdout.write(`${stableStringify(result, 2)}\n`);
+        } else {
+          if (result.answer) out(flags, result.answer);
+          if (result.stderr) err(flags, dim(flags, result.stderr));
+          out(flags, dim(flags, `\n${result.agent} exited ${result.exitCode} in ${(result.durationMs / 1000).toFixed(1)}s${result.timedOut ? " (timed out)" : ""}`));
+        }
+        return result.exitCode === 0 ? 0 : 1;
+      }
+
+      const runtime = await buildAiRuntime({
+        config: ai,
+        connectServers: ai.mcpServers.map((s) => s.name),
+        onStderr: (server, chunk) => {
+          if (flags.verbose) err(flags, dim(flags, `[${server}] ${chunk.trimEnd()}`));
+        },
+      });
+      try {
+        const provider = providerName
+          ? runtime.providers.find((p) => p.name === providerName)
+          : runtime.defaultProvider;
+        if (!provider) {
+          err(flags, red(flags, "No AI provider configured, so the agent loop cannot run."));
+          for (const warning of runtime.warnings) err(flags, dim(flags, `  ${warning}`));
+          return 2;
+        }
+
+        const context = await lastRunSummary(loaded);
+        const result = await runAgent({
+          chat: async (request) => provider.chat(request),
+          tools: runtime.mcpTools,
+          systemPrompt: agentSystemPrompt(loaded.config.project.name),
+          userPrompt: [context ?? "(no run report found)", "", "---", "", task].join("\n"),
+          autonomy: ai.autonomy,
+          maxTurns: ai.maxTurns,
+          maxTokensPerSession: ai.maxTokensPerSession,
+          // Anything above `read` needs a human. In a non-interactive run there is no
+          // human, so the answer is no — the agent reports it instead of acting.
+          ...(ai.autonomy === "read"
+            ? {}
+            : {
+                approve: async (request: { tool: string; args: Record<string, unknown> }) => {
+                  if (!stdin.isTTY) {
+                    err(flags, yellow(flags, `refused ${request.tool}: no interactive terminal to approve it`));
+                    return false;
+                  }
+                  const rl = createInterface({ input: stdin, output: stdout });
+                  try {
+                    const answer = await rl.question(
+                      `Allow ${request.tool}(${JSON.stringify(request.args).slice(0, 120)})? [y/N] `,
+                    );
+                    return answer.trim().toLowerCase().startsWith("y");
+                  } finally {
+                    rl.close();
+                  }
+                },
+              }),
+          onEvent: flags.verbose
+            ? (event) => {
+                if (event.type === "tool_call") err(flags, dim(flags, `→ ${event.tool}`));
+                if (event.type === "tool_refused") err(flags, yellow(flags, `refused ${event.tool}: ${event.reason}`));
+              }
+            : undefined,
+        });
+
+        if (flags.json) {
+          stdout.write(`${stableStringify(result, 2)}\n`);
+        } else {
+          if (result.answer) out(flags, result.answer);
+          if (result.error) err(flags, red(flags, result.error));
+          out(flags, "");
+          out(
+            flags,
+            dim(
+              flags,
+              `${result.turns} turn(s), ${result.steps.length} tool call(s), ${result.tokensUsed} tokens · stopped: ${result.stopReason}`,
+            ),
+          );
+          for (const step of result.steps.filter((s) => s.refused)) {
+            out(flags, yellow(flags, `  refused ${step.tool}: ${step.refused}`));
+          }
+        }
+        return result.stopReason === "provider_error" ? 2 : 0;
+      } finally {
+        await runtime.close();
+      }
+    }
+
+    default:
+      err(flags, red(flags, `Unknown ai subcommand: ${sub}`));
+      out(flags, "  proofstack ai status | tools | ask \"...\" | agent \"...\"");
+      return 64;
+  }
+}
+
+/** Read `--flag value` from an argv slice. */
+function flagValue(args: string[], flag: string): string | undefined {
+  const index = args.indexOf(flag);
+  if (index < 0) return undefined;
+  return args[index + 1];
+}
+
+/** Load the last run and render it as compact context, or null when there is none. */
+async function lastRunSummary(loaded: LoadedConfig): Promise<string | null> {
+  const path = resolve(loaded.root, loaded.config.output.dir, loaded.config.output.jsonFile);
+  if (!existsSync(path)) return null;
+  try {
+    const run = JSON.parse(await readFile(path, "utf8")) as TestRun;
+    return summarizeRunForAgent(run);
+  } catch {
+    return null;
+  }
+}
+
 // ------------------------------------------------------------------------ helpers
 
 function describeError(error: unknown): { message: string; code?: string; category?: string } {
@@ -765,6 +1098,7 @@ function printHelp(flags: GlobalFlags): void {
   w("  projects                 List projects");
   w("  login | logout           How to authenticate (token-based)");
   w("  sync                     Upload the last run to the API");
+  w("  ai <status|ask|agent>    MCP servers, AI providers and external agents");
   w("");
   w(bold(flags, "test options"));
   w("  --module, -m <ids>       world,flow,exit (repeatable or comma-separated)");

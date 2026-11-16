@@ -286,6 +286,15 @@ importers:
         specifier: 8.3.8
         version: 8.3.8(@types/node@22.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.21.0)
 
+  packages/adapters/ai:
+    dependencies:
+      '@proofstack/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      '@proofstack/core':
+        specifier: workspace:*
+        version: link:../../core
+
   packages/adapters/payments:
     dependencies:
       '@proofstack/contracts':
@@ -318,6 +327,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@proofstack/adapter-ai':
+        specifier: workspace:*
+        version: link:../adapters/ai
       '@proofstack/adapter-reporting':
         specifier: workspace:*
         version: link:../adapters/reporting

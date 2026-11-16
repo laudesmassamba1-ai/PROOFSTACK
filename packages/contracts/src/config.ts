@@ -248,6 +248,122 @@ export const syncConfigSchema = z
   .strict();
 export type SyncConfig = z.infer<typeof syncConfigSchema>;
 
+/**
+ * AI integration.
+ *
+ * PROOFSTACK is not an AI product, but a quality platform is far more useful when an
+ * agent can drive it: read a failing run, propose a fix, or run the suite from a chat
+ * client. This block configures *how* AI can reach the product, never *which* model
+ * must be used, and never stores a key.
+ *
+ * Three integration shapes, because they solve different problems:
+ *
+ *   - **MCP servers** — PROOFSTACK acts as an MCP *client*. It connects to servers the
+ *     user configures (filesystem, GitHub, a database) and their tools become
+ *     available to PROOFSTACK's own agent. Transport is stdio or HTTP.
+ *   - **AI providers** — an OpenAI-compatible chat-completions endpoint. Perch, OpenAI,
+ *     a local Ollama, vLLM, LM Studio: all speak the same shape, so one adapter covers
+ *     them and the base URL is the only thing that changes.
+ *   - **CLI agents** — an external coding agent invoked as an argv array (never a shell
+ *     string), given a prompt on stdin, expected to answer on stdout. This is how you
+ *     hand a failing run to whatever agent the team already uses.
+ *
+ * Every key is read from an environment variable at call time. Nothing here can hold a
+ * secret, and nothing here is required for the product to work.
+ */
+export const mcpTransportSchema = z.enum(["stdio", "http"]);
+export type McpTransport = z.infer<typeof mcpTransportSchema>;
+
+export const mcpServerSchema = z
+  .object({
+    /** Stable name; tools appear as `mcp__<name>__<tool>`. */
+    name: z
+      .string()
+      .min(1)
+      .max(40)
+      .regex(/^[a-z0-9][a-z0-9_-]*$/i, "use letters, digits, dash or underscore"),
+    transport: mcpTransportSchema.default("stdio"),
+    /** stdio: argv array. The first element is the executable. Never a shell string. */
+    command: z.array(z.string().min(1)).optional(),
+    /** http: the server's MCP endpoint. */
+    url: z.string().url().optional(),
+    /** Environment variables passed to the child process (names only, resolved at spawn). */
+    env: z.record(z.string(), z.string()).default({}),
+    /** Extra HTTP headers for the http transport; values may reference ${ENV_VAR}. */
+    headers: z.record(z.string(), z.string()).default({}),
+    cwd: z.string().optional(),
+    /** Tools the agent may call. Empty means every tool the server exposes. */
+    allowTools: z.array(z.string()).default([]),
+    /** Tools that are always refused, even if allowTools is empty. */
+    denyTools: z.array(z.string()).default([]),
+    /** Start this server when an agent session begins. */
+    autoConnect: z.boolean().default(false),
+    timeoutMs: z.number().int().positive().max(120_000).default(30_000),
+  })
+  .strict()
+  .refine((server) => (server.transport === "stdio" ? Boolean(server.command?.length) : Boolean(server.url)), {
+    message: 'stdio servers need a command argv; http servers need a url',
+  });
+export type McpServerConfig = z.infer<typeof mcpServerSchema>;
+
+export const aiProviderSchema = z
+  .object({
+    /** Stable name used by `--provider`. */
+    name: z.string().min(1).max(40),
+    /**
+     * OpenAI-compatible chat completions. One shape covers Perch, OpenAI, Ollama,
+     * vLLM and LM Studio; only the base URL and the model name change.
+     */
+    kind: z.enum(["openai-compatible"]).default("openai-compatible"),
+    baseUrl: z.string().url(),
+    model: z.string().min(1),
+    /** Name of the env var holding the API key. A local endpoint may need none. */
+    apiKeyEnvVar: z.string().optional(),
+    /** Extra headers, values may reference ${ENV_VAR}. */
+    headers: z.record(z.string(), z.string()).default({}),
+    maxTokens: z.number().int().positive().max(200_000).default(4_096),
+    temperature: z.number().min(0).max(2).default(0.2),
+    timeoutMs: z.number().int().positive().max(600_000).default(120_000),
+    /** Marks the provider used when `--provider` is omitted. */
+    default: z.boolean().default(false),
+  })
+  .strict();
+export type AiProviderConfig = z.infer<typeof aiProviderSchema>;
+
+export const cliAgentSchema = z
+  .object({
+    name: z.string().min(1).max(40),
+    /** argv array; `{prompt}` is replaced by the prompt, or the prompt goes to stdin. */
+    command: z.array(z.string().min(1)).min(1),
+    /** How the prompt reaches the agent. */
+    promptDelivery: z.enum(["stdin", "arg"]).default("stdin"),
+    /** Extra env for the child, resolved at spawn. */
+    env: z.record(z.string(), z.string()).default({}),
+    cwd: z.string().optional(),
+    timeoutMs: z.number().int().positive().max(1_800_000).default(300_000),
+    /** Read-only agents are the default: an agent that can write needs an explicit opt-in. */
+    allowFileWrites: z.boolean().default(false),
+  })
+  .strict();
+export type CliAgentConfig = z.infer<typeof cliAgentSchema>;
+
+export const aiConfigSchema = z
+  .object({
+    /** Off by default. An AI integration is a choice, never a surprise. */
+    enabled: z.boolean().default(false),
+    providers: z.array(aiProviderSchema).default([]),
+    mcpServers: z.array(mcpServerSchema).default([]),
+    agents: z.array(cliAgentSchema).default([]),
+    /** Hard ceiling on agent turns, so a loop cannot run away with a bill. */
+    maxTurns: z.number().int().min(1).max(50).default(8),
+    /** Per-session token budget across all model calls. */
+    maxTokensPerSession: z.number().int().positive().default(200_000),
+    /** What the agent may do without asking. `read` is the safe default. */
+    autonomy: z.enum(["read", "propose", "write"]).default("read"),
+  })
+  .strict();
+export type AiConfig = z.infer<typeof aiConfigSchema>;
+
 export const proofstackConfigSchema = z
   .object({
     /** Config format version, so old files keep working when the shape changes. */
@@ -285,6 +401,7 @@ export const proofstackConfigSchema = z
       .strict()
       .prefault({ dir: ".proofstack/reports" }),
     sync: syncConfigSchema.prefault({ enabled: false }),
+    ai: aiConfigSchema.prefault({ enabled: false }),
     enabledModules: z.array(moduleIdSchema).min(1).default(["world", "flow", "exit"]),
   })
   .strict();
@@ -371,6 +488,76 @@ export function validateConfig(config: ProofstackConfig): ConfigValidationIssue[
 
   if (config.sync.enabled && !config.sync.apiUrl) {
     issues.push({ path: "sync.apiUrl", message: "sync is enabled but no apiUrl is configured" });
+  }
+
+  // ---- AI integration
+  if (config.ai.enabled) {
+    if (config.ai.providers.length === 0 && config.ai.mcpServers.length === 0 && config.ai.agents.length === 0) {
+      issues.push({
+        path: "ai.enabled",
+        message: "ai is enabled but nothing is configured",
+        hint: "add an entry to ai.providers, ai.mcpServers or ai.agents",
+      });
+    }
+
+    const providerNames = config.ai.providers.map((p) => p.name);
+    const duplicates = providerNames.filter((name, index) => providerNames.indexOf(name) !== index);
+    if (duplicates.length > 0) {
+      issues.push({
+        path: "ai.providers",
+        message: `duplicate provider name(s): ${[...new Set(duplicates)].join(", ")}`,
+        hint: "each provider needs a unique name so --provider is unambiguous",
+      });
+    }
+
+    const defaults = config.ai.providers.filter((p) => p.default);
+    if (defaults.length > 1) {
+      issues.push({
+        path: "ai.providers",
+        message: `${defaults.length} providers are marked default; exactly one may be`,
+        hint: `marked: ${defaults.map((p) => p.name).join(", ")}`,
+      });
+    }
+
+    const serverNames = config.ai.mcpServers.map((s) => s.name);
+    const duplicateServers = serverNames.filter((name, index) => serverNames.indexOf(name) !== index);
+    if (duplicateServers.length > 0) {
+      issues.push({
+        path: "ai.mcpServers",
+        message: `duplicate MCP server name(s): ${[...new Set(duplicateServers)].join(", ")}`,
+        hint: "tool names are namespaced by server, so names must be unique",
+      });
+    }
+
+    // A write-capable agent in an automated run is the same hazard as a live charge.
+    if (config.ai.autonomy === "write" && config.environment === "production") {
+      issues.push({
+        path: "ai.autonomy",
+        message: 'autonomy="write" is refused while environment="production"',
+        hint: 'use "read" or "propose", or run the agent against staging',
+      });
+    }
+
+    for (const agent of config.ai.agents) {
+      if (agent.allowFileWrites && config.ai.autonomy === "read") {
+        issues.push({
+          path: `ai.agents.${agent.name}.allowFileWrites`,
+          message: "agent may write files but ai.autonomy is \"read\"",
+          hint: 'raise ai.autonomy to "propose" or "write", or set allowFileWrites=false',
+        });
+      }
+    }
+
+    // A key must never be inline. This catches the mistake that leaks a secret.
+    for (const provider of config.ai.providers) {
+      if (provider.apiKeyEnvVar && /^(sk-|sk_|Bearer )/.test(provider.apiKeyEnvVar)) {
+        issues.push({
+          path: `ai.providers.${provider.name}.apiKeyEnvVar`,
+          message: "apiKeyEnvVar looks like a key value, not a variable name",
+          hint: "put the name of the env var here (e.g. OPENAI_API_KEY), never the key itself",
+        });
+      }
+    }
   }
 
   return issues;

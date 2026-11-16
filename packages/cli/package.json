@@ -5,12 +5,21 @@
   "type": "module",
   "license": "MPL-2.0",
   "description": "The PROOFSTACK command line: init, doctor, validate, test, report, sync. Exit codes are a contract: 0 pass, 1 defect, 2 harness error, 3 cancelled.",
-  "bin": { "proofstack": "./dist/index.js" },
+  "bin": {
+    "proofstack": "./dist/index.js"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist", "README.md"],
-  "scripts": { "build": "tsc -p tsconfig.json", "typecheck": "tsc -p tsconfig.json --noEmit" },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
   "dependencies": {
+    "@proofstack/adapter-ai": "workspace:*",
     "@proofstack/adapter-reporting": "workspace:*",
     "@proofstack/config": "workspace:*",
     "@proofstack/contracts": "workspace:*",

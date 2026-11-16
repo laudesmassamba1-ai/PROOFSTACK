@@ -1,0 +1,17 @@
+{
+  "name": "@proofstack/adapter-ai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MPL-2.0",
+  "description": "AI integration: a real MCP client (stdio + HTTP), OpenAI-compatible provider adapters, external CLI agents, and a bounded agent loop with an autonomy gate. No key is ever stored; no AI is required.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "files": ["dist", "README.md"],
+  "scripts": { "build": "tsc -p tsconfig.json", "typecheck": "tsc -p tsconfig.json --noEmit" },
+  "dependencies": {
+    "@proofstack/contracts": "workspace:*",
+    "@proofstack/core": "workspace:*"
+  }
+}
