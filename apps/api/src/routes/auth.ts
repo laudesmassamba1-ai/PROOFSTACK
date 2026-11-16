@@ -13,6 +13,7 @@ import {
   sessionExpiry,
   verifyPassword,
 } from "../auth.js";
+import { isAdminEmail } from "../env.js";
 import { clientAddress, HttpError, RateLimiter } from "../http/errors.js";
 import { readBody } from "../http/guards.js";
 import type { AppEnv, Services } from "../http/services.js";
@@ -167,6 +168,10 @@ export function authRoutes(services: Services): Hono<AppEnv> {
         workspaces,
         session: { expiresAt: found.session.expiresAt },
         emailVerification: "not_configured" as const,
+        // The browser uses this to decide whether to show the operations console.
+        // It is not an authorization decision: /api/v1/admin/* re-checks the
+        // session against the allowlist on every request.
+        isAdmin: isAdminEmail(services.config, found.user.email),
       });
     } catch (error) {
       if (error instanceof ProofstackError) throw error;

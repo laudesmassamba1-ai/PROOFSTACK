@@ -8,6 +8,7 @@ import {
   PackageOpen,
   Route as RouteIcon,
   Settings,
+  ShieldCheck,
 } from "lucide-react";
 import { Navigate, NavLink, Outlet, useLocation } from "react-router";
 import { Wordmark } from "../components/brand/Logo.js";
@@ -117,6 +118,11 @@ export function AppLayout() {
             <NavLink to="/app/settings" className="app-nav-link whitespace-nowrap">
               <Settings size={16} /> Settings
             </NavLink>
+            {session.isAdmin ? (
+              <NavLink to="/app/admin" className="app-nav-link whitespace-nowrap">
+                <ShieldCheck size={16} /> Operations
+              </NavLink>
+            ) : null}
           </nav>
 
           {/* Mobile has no persistent footer: keep the account reachable instead of hiding it. */}

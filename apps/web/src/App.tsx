@@ -3,6 +3,7 @@ import { useI18n } from "./i18n/index.js";
 import { AppLayout } from "./layouts/AppLayout.js";
 import { BrandLayout } from "./layouts/BrandLayout.js";
 import { Auth } from "./pages/Auth.js";
+import { Admin } from "./pages/app/Admin.js";
 import { Billing } from "./pages/app/Billing.js";
 import { ModulePage } from "./pages/app/ModulePage.js";
 import { Overview } from "./pages/app/Overview.js";
@@ -54,6 +55,7 @@ export function App() {
           <Route path="modules/:module" element={<ModulePage />} />
           <Route path="billing" element={<Billing />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="admin" element={<Admin />} />
         </Route>
       </Routes>
     </>

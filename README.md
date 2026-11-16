@@ -24,6 +24,10 @@ JUnit/HTML reports, the SaaS API (auth, workspaces, projects, run ingestion, API
 billing, webhooks) and the authenticated dashboard. `pnpm test` runs 208 tests;
 `pnpm typecheck`, `pnpm lint` (warnings only) and `pnpm build` pass.
 
+The creator's read-only operations console lives at `/app/admin`: users, workspaces,
+subscriptions, payments, runs and webhook delivery. It is gated by the API's
+`ADMIN_EMAILS` allowlist, which is empty by default and disables the page.
+
 Live: [proofstack-iota.vercel.app](https://proofstack-iota.vercel.app) for the web app,
 with `/api/*`, `/v1/*` and `/health` proxied to the
 [Cloudflare Worker](https://proofstack-api.laudesmassamba1.workers.dev) so session

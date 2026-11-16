@@ -7,6 +7,7 @@ import { type Env, readConfig } from "./env.js";
 import { HttpError, toErrorResponse } from "./http/errors.js";
 import { type AppEnv, createServices, type Services } from "./http/services.js";
 import { createPaymentProvider } from "./providers.js";
+import { adminRoutes } from "./routes/admin.js";
 import { authRoutes } from "./routes/auth.js";
 import { billingRoutes, planRoutes } from "./routes/billing.js";
 import { machineRoutes } from "./routes/machine.js";
@@ -119,6 +120,7 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
   app.route("/api/v1", planRoutes(services));
   app.route("/api/v1", workspaceRoutes(services));
   app.route("/api/v1", billingRoutes(services));
+  app.route("/api/v1/admin", adminRoutes(services));
   app.route("/v1", machineRoutes(services));
   app.route("/api/webhooks", webhookRoutes(services));
 

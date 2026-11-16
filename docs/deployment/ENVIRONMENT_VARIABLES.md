@@ -1,5 +1,20 @@
 # Environment variables
 
+## Operations console
+
+`ADMIN_EMAILS` is a comma-separated allowlist of account emails allowed to read
+`/api/v1/admin/overview` and the `/app/admin` page. It is an authorization list, not a
+secret. An empty value disables the console (503 `admin_not_configured`); there is no
+"first user becomes admin" fallback. Set it in `apps/api/wrangler.toml` under `[vars]`
+for the Worker, or in the local environment for `pnpm api:dev`:
+
+```bash
+ADMIN_EMAILS="you@example.com" pnpm api:dev
+```
+
+The console is read-only: users, workspaces, subscriptions, payments, runs and webhook
+delivery. It never selects password hashes or session tokens.
+
 ## Current deployment
 
 - Web: `https://proofstack-iota.vercel.app`; `vercel.json` proxies `/api/*`, `/v1/*`

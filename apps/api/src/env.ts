@@ -1,4 +1,5 @@
 import type { PaymentProvider } from "@proofstack/adapter-payments";
+import { normalizeEmail } from "@proofstack/billing";
 import { createPaymentProvider, hasSasPayCredentials } from "./providers.js";
 
 /**
@@ -13,6 +14,13 @@ export interface AppConfig {
   apiOrigin: string;
   secureCookies: boolean;
   paymentProvider: "saspay" | "sandbox";
+  /**
+   * Accounts allowed to read the internal operations console. This is an
+   * authorization list, not a secret: it contains no credential, and the session
+   * cookie is still required. An empty list disables the console instead of
+   * falling back to "first user" or "any authenticated user".
+   */
+  adminEmails: string[];
 }
 
 export type Env = Record<string, string | undefined>;
@@ -32,7 +40,21 @@ export function readConfig(env: Env): AppConfig {
     // http://localhost would make local sign-in impossible.
     secureCookies: environment === "production" || webOrigin.startsWith("https://"),
     paymentProvider: hasSasPayCredentials(env) ? "saspay" : "sandbox",
+    adminEmails: parseAdminEmails(env.ADMIN_EMAILS),
   };
+}
+
+function parseAdminEmails(raw: string | undefined): string[] {
+  const values = (raw ?? "")
+    .split(",")
+    .map((value) => normalizeEmail(value))
+    .filter((value) => value.length > 0);
+  return [...new Set(values)];
+}
+
+/** Case-insensitive membership test against the configured allowlist. */
+export function isAdminEmail(config: AppConfig, email: string): boolean {
+  return config.adminEmails.includes(normalizeEmail(email));
 }
 
 export function paymentProviderFor(env: Env): PaymentProvider {

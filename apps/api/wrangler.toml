@@ -25,3 +25,9 @@ enabled = true
 NODE_ENV = "production"
 WEB_ORIGIN = "https://proofstack-iota.vercel.app"
 API_ORIGIN = "https://proofstack-api.laudesmassamba1.workers.dev"
+
+# Comma-separated allowlist for the read-only /app/admin operations console.
+# This is an authorization list, not a secret. Empty disables the console; there is
+# no "first user is admin" fallback. Set it to the creator's own account email:
+#   ADMIN_EMAILS = "you@example.com"
+# ADMIN_EMAILS = ""

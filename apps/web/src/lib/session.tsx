@@ -30,6 +30,7 @@ interface SessionPayload {
   user: SessionUser | null;
   workspaces?: SessionWorkspace[];
   emailVerification?: "not_configured";
+  isAdmin?: boolean;
 }
 
 interface SessionState {
@@ -41,6 +42,8 @@ interface SessionState {
   refresh: () => Promise<void>;
   signOut: () => Promise<void>;
   emailVerification: "not_configured" | null;
+  /** Navigation hint only: the admin API re-checks the allowlist server-side. */
+  isAdmin: boolean;
 }
 
 const SessionContext = createContext<SessionState | null>(null);
@@ -52,12 +55,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [workspaces, setWorkspaces] = useState<SessionWorkspace[]>([]);
   const [workspaceId, setWorkspaceIdState] = useState<string | null>(null);
   const [emailVerification, setEmailVerification] = useState<"not_configured" | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const apply = useCallback((payload: SessionPayload) => {
     setUser(payload.user);
     const list = payload.workspaces ?? [];
     setWorkspaces(list);
     setEmailVerification(payload.emailVerification ?? null);
+    setIsAdmin(payload.user ? payload.isAdmin === true : false);
     if (!payload.user) {
       setStatus("signed_out");
       setWorkspaceIdState(null);
@@ -95,6 +100,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       setWorkspaces([]);
       setWorkspaceIdState(null);
+      setIsAdmin(false);
       setStatus("signed_out");
     }
   }, []);
@@ -109,8 +115,19 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       refresh,
       signOut,
       emailVerification,
+      isAdmin,
     }),
-    [status, user, workspaces, workspaceId, setWorkspaceId, refresh, signOut, emailVerification]
+    [
+      status,
+      user,
+      workspaces,
+      workspaceId,
+      setWorkspaceId,
+      refresh,
+      signOut,
+      emailVerification,
+      isAdmin,
+    ]
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

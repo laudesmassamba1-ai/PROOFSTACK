@@ -9,11 +9,11 @@ verified by running the commands below. It replaces the earlier Phase 0 planner 
 pnpm install
 pnpm lint        # Biome: passes, warnings only
 pnpm typecheck   # tsc across 5 build levels: passes
-pnpm test        # 13 files, 208 tests: passes
+pnpm test        # 14 files, 212 tests: passes
 pnpm build       # packages + web bundle: passes (chunk-size warning)
 ```
 
-Last run: 208/208 tests in ~18 s; web bundle built with a >500 kB chunk warning
+Last run: 212/212 tests in ~18 s; web bundle built with a >500 kB chunk warning
 (marketing bundle, not a defect).
 
 ## Deployed
@@ -96,6 +96,10 @@ Verified on 2026-11-16 against the live hosts:
   including validation messages and the selected-plan notice. Long-form technical
   pages and the authenticated dashboard remain English-only by policy, stated in
   Settings rather than silently mixed.
+- Creator operations console at `/app/admin`: read-only users, workspaces,
+  subscriptions, payments, runs and webhook delivery. Access is re-checked server-side
+  against `ADMIN_EMAILS`; an empty list disables the console instead of granting it to
+  the first account. No password hash, session token or API key is selected.
 
 ## Implemented but not fully verified
 
