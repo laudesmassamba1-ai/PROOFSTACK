@@ -1,0 +1,22 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm build",
+  "outputDirectory": "apps/web/dist",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://proofstack-api.laudesmassamba1.workers.dev/api/:path*"
+    },
+    {
+      "source": "/v1/:path*",
+      "destination": "https://proofstack-api.laudesmassamba1.workers.dev/v1/:path*"
+    },
+    {
+      "source": "/health",
+      "destination": "https://proofstack-api.laudesmassamba1.workers.dev/health"
+    },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

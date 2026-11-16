@@ -47,7 +47,8 @@ built in ~1.4 s with a >500 kB chunk warning (marketing bundle, not a defect).
 - Hono application running both as a Cloudflare Worker (`D1`) and on Node 22
   (`node:sqlite`); one SQL surface (`prepare().bind().all()/first()/run()`), versioned
   migrations in `apps/api/migrations/`.
-- Auth: email + password, PBKDF2-SHA256 (210k iterations), server-side hashed sessions,
+- Auth: email + password, PBKDF2-SHA256 (100k iterations, the Workers WebCrypto
+  ceiling), server-side hashed sessions,
   `ps_session` HttpOnly/SameSite=Lax/Secure cookie, origin checking, in-memory
   per-instance rate limits, `Authorization: Bearer psk_...` project tokens.
 - Tenancy: workspaces and members, projects, environments, module activation; every

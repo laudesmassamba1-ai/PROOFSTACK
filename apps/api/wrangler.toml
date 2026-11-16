@@ -11,7 +11,7 @@ compatibility_date = "2026-11-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "proofstack"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "4dd9116b-df79-47f4-99ef-eb19aa019405"
 migrations_dir = "migrations"
 
 [observability]
@@ -20,3 +20,8 @@ enabled = true
 # Secrets are never placed in this file. Set them with:
 #   wrangler secret put SASPAY_API_KEY
 #   wrangler secret put SASPAY_WEBHOOK_SECRET
+
+[vars]
+NODE_ENV = "production"
+WEB_ORIGIN = "https://proofstack-iota.vercel.app"
+API_ORIGIN = "https://proofstack-api.laudesmassamba1.workers.dev"

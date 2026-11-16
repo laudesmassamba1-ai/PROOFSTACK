@@ -63,7 +63,8 @@ client value.
 The auth surface is intentionally small: email/password, one HttpOnly session
 cookie, no social login yet.
 
-- Passwords: PBKDF2-HMAC-SHA256, 210 000 iterations, 16-byte random salt, stored as
+- Passwords: PBKDF2-HMAC-SHA256, 100 000 iterations (the Workers WebCrypto
+  ceiling), 16-byte random salt, stored as
   `pbkdf2-sha256$<iterations>$<salt>$<hash>`. Iteration count is read from the stored
   record, so it can be raised without invalidating existing hashes.
 - Sessions: 32 random bytes, sent as `ps_session`, `HttpOnly`, `SameSite=Lax`,

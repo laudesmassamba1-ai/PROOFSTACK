@@ -10,13 +10,19 @@ import { hmacSha256Hex, sha256Hex, timingSafeEqualHex } from "@proofstack/core";
  * Node. The decision and its trade-offs are recorded in docs/ARCHITECTURE.md.
  *
  * Guarantees:
- *   - passwords are PBKDF2-HMAC-SHA256, 210 000 iterations, 16-byte random salt
+ *   - passwords are PBKDF2-HMAC-SHA256, 100 000 iterations, 16-byte random salt.
+ *     That is not an arbitrary choice: Cloudflare's Workers WebCrypto rejects any
+ *     iteration count above 100 000, so a higher value is a 500 in production even
+ *     though it passes on Node. Raising it requires a KDF that does not go through
+ *     crypto.subtle.
  *   - session tokens are 32 random bytes, sent HttpOnly, and stored only as SHA-256
  *   - comparisons are constant-time
  *   - a session is looked up by hash, so a database leak does not yield live cookies
  */
 
-const PBKDF2_ITERATIONS = 210_000;
+// Hard ceiling enforced by the Workers runtime: >100 000 throws
+// "Pbkdf2 failed: iteration counts above 100000 are not supported".
+const PBKDF2_ITERATIONS = 100_000;
 const SALT_BYTES = 16;
 const KEY_BITS = 256;
 export const SESSION_COOKIE = "ps_session";

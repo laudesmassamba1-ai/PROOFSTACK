@@ -32,3 +32,5 @@ npm-debug.log*
 # Proofstack local run output
 .proofstack/
 reports/
+.vercel
+.env*
