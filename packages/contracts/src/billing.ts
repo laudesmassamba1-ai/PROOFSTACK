@@ -126,7 +126,10 @@ export const planSchema = z
     modules: z.array(moduleIdSchema).default([]),
   })
   .strict();
-export type Plan = z.infer<typeof planSchema>;
+export type Plan = z.output<typeof planSchema>;
+
+/** Seed shape: defaults are applied by the schema, so seeds stay readable. */
+export type PlanSeed = z.input<typeof planSchema>;
 
 export const checkoutIntentSchema = z
   .object({

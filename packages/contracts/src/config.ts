@@ -61,6 +61,28 @@ export const worldConfigSchema = z
       .default([]),
     /** Reject values the product should accept. Failures here are product bugs. */
     strictRejectionDetection: z.boolean().default(true),
+    /**
+     * How WORLD reaches the product. `none` is the safe default and produces
+     * SKIPPED cases with a reason: an unconfigured target must never look like a
+     * passing compatibility test.
+     */
+    target: z
+      .object({
+        kind: z.enum(["http", "driver", "none"]).default("none"),
+        submitUrl: z.string().url().optional(),
+        /** Template containing {recordId}; used to detect storage corruption. */
+        readbackUrl: z.string().optional(),
+        sortUrl: z.string().url().optional(),
+        method: z.enum(["POST", "PUT"]).default("POST"),
+        headers: z.record(z.string(), z.string()).default({}),
+        /** Name of the env var holding a bearer token. Never the token itself. */
+        tokenEnvVar: z.string().optional(),
+        timeoutMs: z.number().int().positive().max(60_000).default(10_000),
+        /** Field name the product uses to report per-field validation errors. */
+        errorField: z.string().default("errors"),
+      })
+      .strict()
+      .prefault({ kind: "none" }),
   })
   .strict();
 export type WorldConfig = z.infer<typeof worldConfigSchema>;
@@ -306,6 +328,26 @@ export function validateConfig(config: ProofstackConfig): ConfigValidationIssue[
       path: "modules.exit.target",
       message: 'exit.target="production" requires allowDestructiveProduction=true',
       hint: "prefer target=\"staging\"; exports of production datasets are never uploaded by default",
+    });
+  }
+
+  if (
+    config.modules.world.enabled &&
+    config.modules.world.target.kind === "none" &&
+    config.modules.world.forms.length === 0
+  ) {
+    issues.push({
+      path: "modules.world.target.kind",
+      message: "WORLD is enabled but has no product target and no forms to drive",
+      hint: 'set modules.world.target.kind="http" with a submitUrl, or configure forms for the browser driver',
+    });
+  }
+
+  if (config.modules.world.enabled && config.modules.world.target.kind === "http" && !config.modules.world.target.submitUrl) {
+    issues.push({
+      path: "modules.world.target.submitUrl",
+      message: 'target.kind="http" requires submitUrl',
+      hint: "point submitUrl at an endpoint that accepts the record payload",
     });
   }
 
