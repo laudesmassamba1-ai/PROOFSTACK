@@ -77,7 +77,9 @@ export async function runEngine(options: EngineOptions): Promise<EngineRunResult
   const runId = options.runId ?? `run_${uuid()}`;
   const only = new Set<ModuleId>(options.only ?? config.enabledModules);
   const providers = options.providers.filter((p) => only.has(p.id));
-  const onlyCases = (options.onlyCases ?? []).map((pattern) => pattern.trim().toLowerCase()).filter(Boolean);
+  const onlyCases = (options.onlyCases ?? [])
+    .map((pattern) => pattern.trim().toLowerCase())
+    .filter(Boolean);
 
   if (providers.length === 0) {
     throw new ProofstackError({
@@ -128,9 +130,7 @@ export async function runEngine(options: EngineOptions): Promise<EngineRunResult
   // empty ERROR module: it simply did not participate in this run.
   const activeIds = new Set(planned.map((item) => item.provider.id));
   const activeProviders =
-    onlyCases.length > 0
-      ? providers.filter((provider) => activeIds.has(provider.id))
-      : providers;
+    onlyCases.length > 0 ? providers.filter((provider) => activeIds.has(provider.id)) : providers;
 
   logger.debug("engine scheduled", {
     runId,

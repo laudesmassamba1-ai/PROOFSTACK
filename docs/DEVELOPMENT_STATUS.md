@@ -9,12 +9,28 @@ verified by running the commands below. It replaces the earlier Phase 0 planner 
 pnpm install
 pnpm lint        # Biome: passes, warnings only
 pnpm typecheck   # tsc across 5 build levels: passes
-pnpm test        # 12 files, 200 tests: passes
+pnpm test        # 13 files, 208 tests: passes
 pnpm build       # packages + web bundle: passes (chunk-size warning)
 ```
 
-Last run: lint 0 errors / 133 warnings / 2 infos; 200/200 tests in ~20 s; web bundle
-built in ~1.4 s with a >500 kB chunk warning (marketing bundle, not a defect).
+Last run: 208/208 tests in ~18 s; web bundle built with a >500 kB chunk warning
+(marketing bundle, not a defect).
+
+## Deployed
+
+Verified on 2026-11-16 against the live hosts:
+
+- Web: https://proofstack-iota.vercel.app (Vercel). `/api/*`, `/v1/*` and `/health`
+  are proxied to the Worker, so the session cookie is same-origin in the browser.
+- API: https://proofstack-api.laudesmassamba1.workers.dev (Cloudflare Worker + D1
+  database `proofstack`; migrations `0001_init.sql` and `0002_report_per_run.sql`
+  applied).
+- `GET /health` returns 200 with `database: ok` on both origins; the JS and CSS assets
+  are served with their real content types, and the SPA routes return the app shell.
+- A real sign-up → session → overview round trip succeeds through the Vercel origin
+  (201 / 200 / 200), so D1 writes, cookie attributes and the proxy all work.
+- Payments stay on the deterministic sandbox provider: no SasPay credentials are
+  configured, so no live charge or payout is claimed.
 
 ## Implemented and tested
 
@@ -86,9 +102,10 @@ built in ~1.4 s with a >500 kB chunk warning (marketing bundle, not a defect).
 - **SasPay live path.** The adapter follows the documented endpoints and is unit
   tested, but no live credential exists in this environment, so signing, payout and
   production webhook behaviour have not been exercised against SasPay.
-- **Cloudflare deployment.** `apps/api/wrangler.toml` exists and the code branches for
-  D1, but nothing has been deployed and no real D1 database has run the migrations.
-  Every test and the dev server use Node's SQLite.
+- **Cloudflare operations.** The Worker, D1 database and migrations are live and a
+  smoke path passes, but the free plan has not been exercised under sustained load,
+  and Workers WebCrypto caps PBKDF2 at 100 000 iterations (the API now uses that
+  ceiling). R2, queues and observability retention have not been evaluated.
 - **Module execution targets.** WORLD and FLOW run over HTTP (form `submitUrl`,
   checkout/order/webhook URLs) and EXIT over export files, all covered by fixture-based
   tests. They have not been run end-to-end against a third-party staging application.

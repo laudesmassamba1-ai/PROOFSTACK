@@ -468,9 +468,7 @@ function parseTestArgs(args: string[]): TestArgs {
           const trimmed = part.trim();
           if (!trimmed) continue;
           if (!(TEST_MODULES as readonly string[]).includes(trimmed)) {
-            throw flagError(
-              `Unknown module "${trimmed}". Available: ${TEST_MODULES.join(", ")}.`
-            );
+            throw flagError(`Unknown module "${trimmed}". Available: ${TEST_MODULES.join(", ")}.`);
           }
           parsed.modules.push(trimmed as ModuleId);
         }

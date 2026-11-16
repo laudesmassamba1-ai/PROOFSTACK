@@ -16,7 +16,7 @@ const RELEASES = [
       "Brand identity, design tokens, dotted-wave hero, modular product visuals, English and French interfaces",
     ],
     known: [
-      "No deployment has been performed: the API is verified on Node 22 SQLite, not on a provisioned D1 database",
+      "Web and API are live on Vercel and Cloudflare Workers with a provisioned D1 database; a production sign-up → session → overview path is verified",
       "WORLD and FLOW drive HTTP targets; Playwright browser journeys are not implemented yet",
       "SasPay live payments are untested without credentials; the sandbox provider exercises the lifecycle",
       "The authenticated dashboard is English-only; no email provider is configured, so verification and invitations are absent",

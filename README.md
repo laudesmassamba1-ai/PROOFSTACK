@@ -21,16 +21,21 @@ not implemented yet — see the status file.
 
 Implemented and tested: the shared engine and all three modules, the CLI with JSON/
 JUnit/HTML reports, the SaaS API (auth, workspaces, projects, run ingestion, API keys,
-billing, webhooks) and the authenticated dashboard. `pnpm test` runs 200 tests;
+billing, webhooks) and the authenticated dashboard. `pnpm test` runs 208 tests;
 `pnpm typecheck`, `pnpm lint` (warnings only) and `pnpm build` pass.
+
+Live: [proofstack-iota.vercel.app](https://proofstack-iota.vercel.app) for the web app,
+with `/api/*`, `/v1/*` and `/health` proxied to the
+[Cloudflare Worker](https://proofstack-api.laudesmassamba1.workers.dev) so session
+cookies stay same-origin. The Worker uses D1 (`proofstack`), migrations applied.
 
 The marketing shell, home page, pricing and account forms are bilingual. Long-form
 technical pages and the authenticated dashboard are English-only; the Settings page
 says so instead of implying a translation that does not exist.
 
-Not yet true: no deployment has been performed, no email provider is configured
-(verification, reset and invitations are therefore absent), SasPay's live path is
-untested without credentials, and prices still require a deploy to change. See
+Not yet true: no email provider is configured (verification, reset and invitations are
+therefore absent), SasPay's live path is untested without credentials, and prices
+still require a deploy to change. See
 [`docs/DEVELOPMENT_STATUS.md`](docs/DEVELOPMENT_STATUS.md) for the full, unvarnished
 list.
 

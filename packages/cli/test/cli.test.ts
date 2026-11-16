@@ -225,7 +225,11 @@ describe("CLI", () => {
         JSON.stringify({
           schemaVersion: 1,
           project: { name: "AI test", baseUrl: "http://localhost:3000" },
-          modules: { world: { enabled: false }, flow: { enabled: false }, exit: { enabled: false } },
+          modules: {
+            world: { enabled: false },
+            flow: { enabled: false },
+            exit: { enabled: false },
+          },
           enabledModules: ["world"],
           ai: {
             enabled: true,
@@ -301,7 +305,11 @@ describe("CLI", () => {
         JSON.stringify({
           schemaVersion: 1,
           project: { name: "Sync test", baseUrl: "http://localhost:3000" },
-          modules: { world: { enabled: false }, flow: { enabled: false }, exit: { enabled: false } },
+          modules: {
+            world: { enabled: false },
+            flow: { enabled: false },
+            exit: { enabled: false },
+          },
           enabledModules: ["world"],
           sync: { enabled: true, apiUrl: `http://127.0.0.1:${port}` },
         }),

@@ -1,5 +1,14 @@
 # Environment variables
 
+## Current deployment
+
+- Web: `https://proofstack-iota.vercel.app`; `vercel.json` proxies `/api/*`, `/v1/*`
+  and `/health` to the API, so `VITE_API_URL` is built as `/` (empty base URL) and the
+  session cookie remains same-origin.
+- API: `https://proofstack-api.laudesmassamba1.workers.dev`; `WEB_ORIGIN` and
+  `API_ORIGIN` are set in `apps/api/wrangler.toml` for that pair of hosts.
+- D1: database `proofstack`; `wrangler d1 migrations apply proofstack --remote`.
+
 No secret is ever committed. `.dev.vars.example` files list names with empty values;
 real values live in the host's secret store (Worker secrets) or a local, ignored file.
 

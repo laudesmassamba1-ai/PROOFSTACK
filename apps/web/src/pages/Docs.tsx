@@ -42,7 +42,7 @@ const PENDING = [
   },
   {
     title: "Cloudflare deployment",
-    body: "wrangler.toml and the D1 code path exist, but no D1 database has been provisioned and no deployment has been performed.",
+    body: "Live on Vercel and Cloudflare: the web app proxies /api, /v1 and /health to a Worker backed by D1, with migrations applied. A production sign-up → session → overview path is verified; SasPay still runs in sandbox because no live credentials are configured.",
   },
   {
     title: "Email delivery",
