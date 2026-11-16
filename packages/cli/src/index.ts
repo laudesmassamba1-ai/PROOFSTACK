@@ -22,7 +22,7 @@ import {
 } from "@proofstack/config";
 import type { ModuleId, ReportFormat, TestRun } from "@proofstack/contracts";
 import { iso, Logger, ProofstackError, stableStringify } from "@proofstack/core";
-import { ENGINE_VERSION, runEngine } from "@proofstack/engine";
+import { ENGINE_VERSION, type EngineEvent, runEngine } from "@proofstack/engine";
 import { createExitProvider, defaultExportSource } from "@proofstack/module-exit";
 import { createFlowProvider, defaultFlowTarget } from "@proofstack/module-flow";
 import * as worldProfiles from "@proofstack/module-world";
@@ -39,6 +39,7 @@ import {
   SCREENS,
   type Screen,
   type SessionPayload,
+  sessionFilePath,
 } from "./ui.js";
 
 /**
@@ -109,6 +110,7 @@ function paint(flags: GlobalFlags, code: string, text: string): string {
 const green = (f: GlobalFlags, t: string) => paint(f, "32", t);
 const red = (f: GlobalFlags, t: string) => paint(f, "31", t);
 const yellow = (f: GlobalFlags, t: string) => paint(f, "33", t);
+const cyan = (f: GlobalFlags, t: string) => paint(f, "36", t);
 const dim = (f: GlobalFlags, t: string) => paint(f, "2", t);
 const bold = (f: GlobalFlags, t: string) => paint(f, "1", t);
 
@@ -633,6 +635,37 @@ async function commandTest(flags: GlobalFlags, args: string[]): Promise<number> 
     return 64;
   }
 
+  const showProgress = !flags.json && !flags.quiet && stdout.isTTY;
+  let progressTotal = 0;
+  let progressDone = 0;
+  let progressPassed = 0;
+  let progressFailed = 0;
+  let progressWarnings = 0;
+  let progressStarted = false;
+  const drawProgress = (event: EngineEvent): void => {
+    if (!showProgress) return;
+    const total = progressTotal > 0 ? ` / ${progressTotal}` : "";
+    const active = event.name ? ` · ${event.name.slice(0, 56)}` : "";
+    stdout.write(
+      `\r\u001B[K${dim(flags, "running")} ${cyan(flags, (event.module ?? "engine").toUpperCase())}${active} ${dim(flags, `${progressDone}${total} · ${progressPassed} passed · ${progressFailed} failed${progressWarnings > 0 ? ` · ${progressWarnings} warning(s)` : ""}`)}`
+    );
+  };
+  const onEvent = (event: EngineEvent): void => {
+    if (!showProgress) return;
+    if (event.type === "scheduled") progressTotal = event.total ?? 0;
+    if (event.type === "case-start") {
+      progressStarted = true;
+      drawProgress(event);
+    }
+    if (event.type === "case-end") {
+      progressDone += 1;
+      if (event.status === "PASSED") progressPassed += 1;
+      else if (event.status === "FAILED" || event.status === "ERROR") progressFailed += 1;
+      else if (event.status === "WARNING") progressWarnings += 1;
+      drawProgress(event);
+    }
+  };
+
   const startedAt = Date.now();
   let result: Awaited<ReturnType<typeof runEngine>>;
   try {
@@ -643,6 +676,7 @@ async function commandTest(flags: GlobalFlags, args: string[]): Promise<number> 
       ...(testArgs.only.length === 0 ? {} : { onlyCases: testArgs.only }),
       ...(testArgs.profiles.length === 0 ? {} : { profiles: testArgs.profiles }),
       logger,
+      onEvent,
       projectId: `local:${config.project.name}`,
       workspaceId: "local",
       cliVersion: CLI_VERSION,
@@ -656,6 +690,8 @@ async function commandTest(flags: GlobalFlags, args: string[]): Promise<number> 
     err(flags, red(flags, `Run failed to start: ${describeError(error).message}`));
     return 2;
   }
+
+  if (showProgress && progressStarted) stdout.write("\r\u001B[K");
 
   const run = result.run;
 
@@ -726,6 +762,12 @@ async function commandTest(flags: GlobalFlags, args: string[]): Promise<number> 
     out(flags, dim(flags, "  modules.flow.target.checkoutUrl"));
     out(flags, dim(flags, "  modules.exit.exportSource"));
     out(flags, dim(flags, "`proofstack doctor` lists exactly what is missing."));
+  }
+
+  if (!flags.json && !flags.quiet) {
+    out(flags, "");
+    out(flags, bold(flags, "Next action"));
+    out(flags, "  proofstack report");
   }
 
   if (testArgs.failOnWarning && code === 0 && runTotals(run).warnings > 0) return 1;
@@ -1594,12 +1636,25 @@ function describeError(error: unknown): { message: string; code?: string; catego
   return { message: error instanceof Error ? error.message : String(error) };
 }
 
+function printBanner(flags: GlobalFlags): void {
+  const signedIn =
+    Boolean(process.env.PROOFSTACK_SESSION_COOKIE?.trim()) || existsSync(sessionFilePath());
+  const mark = ["  ██████╗ ", "  ██╔══██╗", "  ██████╔╝", "  ██╔═══╝ ", "  ██║     ", "  ╚═╝     "];
+  stdout.write(`${mark.map((line) => cyan(flags, line)).join("\n")}\n`);
+  stdout.write(
+    `${bold(flags, "PROOFSTACK")} ${dim(flags, `v${CLI_VERSION}`)}  ${dim(flags, "software quality & reliability")}\n`
+  );
+  stdout.write(`${dim(flags, "Make software work everywhere.")}\n`);
+  stdout.write(
+    `${dim(flags, `session: ${signedIn ? "signed in locally" : "not signed in · proofstack login"}`)}\n\n`
+  );
+}
+
 function printHelp(flags: GlobalFlags): void {
   const w = (text: string): void => {
     stdout.write(`${text}\n`);
   };
-  w(bold(flags, "PROOFSTACK — make software work everywhere"));
-  w("");
+  printBanner(flags);
   w("Usage: proofstack <command> [options]");
   w("");
   w(bold(flags, "Commands"));

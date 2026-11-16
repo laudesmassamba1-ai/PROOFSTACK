@@ -5,6 +5,7 @@ import { BrandLayout } from "./layouts/BrandLayout.js";
 import { Auth } from "./pages/Auth.js";
 import { Admin } from "./pages/app/Admin.js";
 import { Billing } from "./pages/app/Billing.js";
+import { Cli } from "./pages/app/Cli.js";
 import { ModulePage } from "./pages/app/ModulePage.js";
 import { Overview } from "./pages/app/Overview.js";
 import { ProjectDetail } from "./pages/app/ProjectDetail.js";
@@ -53,6 +54,7 @@ export function App() {
           <Route path="projects" element={<Projects />} />
           <Route path="projects/:projectId" element={<ProjectDetail />} />
           <Route path="modules/:module" element={<ModulePage />} />
+          <Route path="cli" element={<Cli />} />
           <Route path="billing" element={<Billing />} />
           <Route path="settings" element={<Settings />} />
           <Route path="admin" element={<Admin />} />

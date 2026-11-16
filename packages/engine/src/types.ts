@@ -7,6 +7,7 @@ import type {
   ProofstackConfig,
   Severity,
   TestCaseResult,
+  TestStatus,
 } from "@proofstack/contracts";
 import type { Clock, Logger } from "@proofstack/core";
 import type { Rng } from "./rng.js";
@@ -141,6 +142,15 @@ export interface ModuleProvider {
   suites(input: SuiteInput): Promise<TestSuiteDef[]> | TestSuiteDef[];
 }
 
+export interface EngineEvent {
+  type: "scheduled" | "case-start" | "case-end";
+  total?: number;
+  module?: ModuleId;
+  name?: string;
+  status?: TestStatus;
+  durationMs?: number;
+}
+
 export interface EngineOptions {
   config: ProofstackConfig;
   providers: ModuleProvider[];
@@ -151,6 +161,8 @@ export interface EngineOptions {
   profiles?: string[];
   clock?: Clock;
   logger?: Logger;
+  /** Observability hook for the CLI; never used to make a verification decision. */
+  onEvent?: (event: EngineEvent) => void;
   evidenceStore?: EvidenceStore;
   signal?: AbortSignal;
   runId?: string;

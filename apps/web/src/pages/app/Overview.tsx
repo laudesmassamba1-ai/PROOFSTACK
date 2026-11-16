@@ -1,6 +1,7 @@
 import { ArrowRight, Terminal } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
+import { RunsChart } from "../../components/app/RunsChart.js";
 import { Card, Empty, ErrorState, Loading, Metric, StatusBadge } from "../../components/app/ui.js";
 import { PageHeader } from "../../layouts/AppLayout.js";
 import { type ApiError, apiFetch } from "../../lib/api.js";
@@ -98,6 +99,9 @@ export function Overview() {
         description="What PROOFSTACK has verified in this workspace, and what it could not verify. Nothing here is simulated: an empty module means no run has covered it yet."
         actions={
           <>
+            <Link to="/app/cli" className="app-btn">
+              <Terminal size={14} /> Connect CLI
+            </Link>
             <Link to="/app/projects" className="app-btn">
               Projects
             </Link>
@@ -143,7 +147,10 @@ export function Overview() {
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
         {data.modules.map((module) => (
-          <div key={module.module} className="app-card p-5">
+          <div
+            key={module.module}
+            className={`app-card app-module-card module-${module.module} p-5`}
+          >
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold uppercase tracking-wide">{module.module}</h2>
               <StatusBadge status={module.status} />
@@ -169,6 +176,15 @@ export function Overview() {
             </p>
           </div>
         ))}
+      </div>
+
+      <div className="mt-6">
+        <Card
+          title="Execution history"
+          description="Actual uploaded runs, newest on the right. No trend is inferred from missing history."
+        >
+          <RunsChart runs={data.recentRuns} />
+        </Card>
       </div>
 
       <div className="mt-6 grid gap-4 xl:grid-cols-[1.4fr_1fr]">

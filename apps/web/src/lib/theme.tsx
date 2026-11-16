@@ -25,7 +25,9 @@ function initial(): Theme {
   } catch {
     /* ignore */
   }
-  return window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  // The product shell is light by default, matching the reference composition.
+  // A dark theme remains available and persisted; the marketing site stays dark.
+  return "light";
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {

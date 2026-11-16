@@ -1,10 +1,18 @@
+import {
+  LOGO_LAYERS,
+  LOGO_LIGHT_LAYERS,
+  LOGO_MONO_LAYERS,
+  LOGO_PATH,
+  LOGO_VIEWBOX,
+} from "./logoGeometry.js";
+
 /**
  * PROOFSTACK identity.
  *
- * Concept: three structural components converge into one verified structure. The
- * mark is an isometric solid built from exactly three faces — WORLD, FLOW, EXIT —
- * with a verification notch cut across the top. It is one object, not three icons
- * standing next to each other, because the product's claim is unity of engine.
+ * One geometric P, three offset plates. The three layers are the three modules
+ * converging into one proof: WORLD at the back, FLOW in the middle, EXIT in front.
+ * The mark is deliberately a single object, not three icons side by side, so it
+ * stays recognizable at favicon size.
  */
 
 export type LogoVariant = "default" | "mono" | "onLight";
@@ -16,42 +24,42 @@ interface MarkProps {
   title?: string;
 }
 
-const PALETTE: Record<LogoVariant, { top: string; left: string; right: string; notch: string }> = {
-  default: { top: "#78E3CB", left: "#315FC8", right: "#73D68B", notch: "#050708" },
-  mono: { top: "#F2F6FA", left: "#9AA9B8", right: "#D7E2EC", notch: "#050708" },
-  onLight: { top: "#2FA98C", left: "#315FC8", right: "#1B2F77", notch: "#FFFFFF" },
-};
+function layersFor(variant: LogoVariant) {
+  if (variant === "mono") return LOGO_MONO_LAYERS;
+  if (variant === "onLight") return LOGO_LIGHT_LAYERS;
+  return LOGO_LAYERS;
+}
+
+function gapFor(variant: LogoVariant): string {
+  return variant === "onLight" ? "#FFFFFF" : "#050708";
+}
 
 export function Mark({ size = 34, variant = "default", className, title }: MarkProps) {
-  const colors = PALETTE[variant];
+  const layers = layersFor(variant);
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 40 40"
+      viewBox={`0 0 ${LOGO_VIEWBOX} ${LOGO_VIEWBOX}`}
       fill="none"
       role="img"
       aria-label={title ?? "PROOFSTACK"}
       className={className}
     >
       {title ? <title>{title}</title> : null}
-      {/* three faces, one solid */}
-      <path d="M20 4.5 34.2 12.4 20 20.3 5.8 12.4Z" fill={colors.top} />
-      <path d="M5.8 12.4 20 20.3v15.2L5.8 27.6Z" fill={colors.left} />
-      <path
-        d="M34.2 12.4 20 20.3v15.2l14.2-7.9Z"
-        fill={colors.right}
-        opacity={variant === "mono" ? 0.75 : 0.92}
-      />
-      {/* verification notch across the top face */}
-      <path
-        d="M12.6 12.9 17.4 16.2 27.1 10.4"
-        stroke={colors.notch}
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-      />
+      {layers.map((layer) => (
+        <path
+          key={layer.offset}
+          d={LOGO_PATH}
+          fill={layer.color}
+          fillRule="evenodd"
+          opacity={layer.opacity}
+          stroke={gapFor(variant)}
+          strokeWidth="2.4"
+          strokeLinejoin="round"
+          transform={`translate(${layer.offset} ${layer.offset})`}
+        />
+      ))}
     </svg>
   );
 }
@@ -71,7 +79,7 @@ export function Wordmark({
 }: WordmarkProps) {
   return (
     <span className={`inline-flex items-center gap-3 ${className ?? ""}`}>
-      {showMark ? <Mark size={Math.round(size * 1.55)} variant={variant} /> : null}
+      {showMark ? <Mark size={Math.round(size * 1.7)} variant={variant} /> : null}
       <span
         className="wordmark select-none"
         style={{
@@ -86,25 +94,34 @@ export function Wordmark({
   );
 }
 
+/** Stable keys for repeated letters in the animated wordmark. */
+const WORDMARK_LETTERS = (() => {
+  const seen = new Map<string, number>();
+  return "PROOFSTACK".split("").map((char) => {
+    const occurrence = (seen.get(char) ?? 0) + 1;
+    seen.set(char, occurrence);
+    return { char, key: `${char}-${occurrence}` };
+  });
+})();
+
 /** Hero lockup: the wordmark draws in, letter by letter, on load. */
 export function HeroLockup({ size = 64 }: { size?: number }) {
-  const letters = "PROOFSTACK".split("");
   return (
     <span className="inline-flex max-w-full items-end gap-3 sm:gap-4">
-      <Mark size={Math.round(size * 0.9)} className="rise hero-mark" />
+      <Mark size={Math.round(size * 0.92)} className="rise hero-mark" />
       <span
         aria-hidden="true"
         style={{ "--hero-size": `${size}px` } as React.CSSProperties}
         className="wordmark hero-wordmark inline-flex"
       >
-        {letters.map((letter, index) => (
+        {WORDMARK_LETTERS.map((letter, index) => (
           <span
-            key={`${letter}-${index}`}
+            key={letter.key}
             className="rise inline-block"
             style={{ animationDelay: `${120 + index * 55}ms` }}
             aria-hidden="true"
           >
-            {letter}
+            {letter.char}
           </span>
         ))}
       </span>

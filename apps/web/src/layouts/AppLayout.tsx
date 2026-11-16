@@ -9,6 +9,7 @@ import {
   Route as RouteIcon,
   Settings,
   ShieldCheck,
+  Terminal,
 } from "lucide-react";
 import { Navigate, NavLink, Outlet, useLocation } from "react-router";
 import { Wordmark } from "../components/brand/Logo.js";
@@ -67,21 +68,23 @@ export function AppLayout() {
   return (
     <div className="app-shell">
       <div className="mx-auto flex max-w-[1440px] flex-col lg:flex-row">
-        <aside className="border-b border-line bg-surface lg:min-h-screen lg:w-[264px] lg:shrink-0 lg:border-b-0 lg:border-r">
+        <aside className="app-sidebar border-b border-white/8 lg:min-h-screen lg:w-[264px] lg:shrink-0 lg:border-b-0 lg:border-r">
           <div className="flex items-center justify-between px-4 py-4 lg:px-5">
             <NavLink to="/" aria-label="PROOFSTACK home">
-              <Wordmark size={12} variant="onLight" />
+              <Wordmark size={12} />
             </NavLink>
-            <span className="app-badge app-badge-accent">beta</span>
+            <span className="rounded-full border border-brand-mint/20 bg-brand-mint/10 px-2 py-0.5 font-mono text-[0.6rem] uppercase tracking-[0.12em] text-brand-mint">
+              beta
+            </span>
           </div>
 
           <div className="px-4 pb-4 lg:px-5">
-            <label className="app-label" htmlFor="workspace-switcher">
+            <label className="app-label text-white/40" htmlFor="workspace-switcher">
               Workspace
             </label>
             <select
               id="workspace-switcher"
-              className="app-select"
+              className="app-sidebar-select"
               value={session.workspaceId ?? ""}
               onChange={(event) => session.setWorkspaceId(event.target.value)}
             >
@@ -97,58 +100,61 @@ export function AppLayout() {
             className="flex flex-wrap gap-1 px-3 pb-3 lg:flex-col lg:flex-nowrap lg:px-3 lg:pb-4"
             aria-label="Dashboard"
           >
-            <NavLink to="/app" end className="app-nav-link whitespace-nowrap">
+            <NavLink to="/app" end className="app-sidebar-link whitespace-nowrap">
               <BarChart3 size={16} /> Overview
             </NavLink>
-            <NavLink to="/app/projects" className="app-nav-link whitespace-nowrap">
+            <NavLink to="/app/projects" className="app-sidebar-link whitespace-nowrap">
               <FolderKanban size={16} /> Projects
             </NavLink>
-            <NavLink to="/app/modules/world" className="app-nav-link whitespace-nowrap">
+            <NavLink to="/app/modules/world" className="app-sidebar-link whitespace-nowrap">
               <Globe2 size={16} /> WORLD
             </NavLink>
-            <NavLink to="/app/modules/flow" className="app-nav-link whitespace-nowrap">
+            <NavLink to="/app/modules/flow" className="app-sidebar-link whitespace-nowrap">
               <RouteIcon size={16} /> FLOW
             </NavLink>
-            <NavLink to="/app/modules/exit" className="app-nav-link whitespace-nowrap">
+            <NavLink to="/app/modules/exit" className="app-sidebar-link whitespace-nowrap">
               <PackageOpen size={16} /> EXIT
             </NavLink>
-            <NavLink to="/app/billing" className="app-nav-link whitespace-nowrap">
+            <NavLink to="/app/cli" className="app-sidebar-link whitespace-nowrap">
+              <Terminal size={16} /> CLI setup
+            </NavLink>
+            <NavLink to="/app/billing" className="app-sidebar-link whitespace-nowrap">
               <CreditCard size={16} /> Billing
             </NavLink>
-            <NavLink to="/app/settings" className="app-nav-link whitespace-nowrap">
+            <NavLink to="/app/settings" className="app-sidebar-link whitespace-nowrap">
               <Settings size={16} /> Settings
             </NavLink>
             {session.isAdmin ? (
-              <NavLink to="/app/admin" className="app-nav-link whitespace-nowrap">
+              <NavLink to="/app/admin" className="app-sidebar-link whitespace-nowrap">
                 <ShieldCheck size={16} /> Operations
               </NavLink>
             ) : null}
           </nav>
 
           {/* Mobile has no persistent footer: keep the account reachable instead of hiding it. */}
-          <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-3 lg:hidden">
+          <div className="flex items-center justify-between gap-3 border-t border-white/8 px-4 py-3 lg:hidden">
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium">{session.user?.name}</p>
-              <p className="truncate text-xs text-muted">{session.user?.email}</p>
+              <p className="truncate text-sm font-medium text-white/85">{session.user?.name}</p>
+              <p className="truncate text-xs text-white/40">{session.user?.email}</p>
             </div>
             <button
               type="button"
-              className="app-btn shrink-0"
+              className="rounded-lg border border-white/15 px-3 py-2 text-xs text-white/75"
               onClick={() => void session.signOut()}
             >
               <LogOut size={14} /> Sign out
             </button>
           </div>
 
-          <div className="mt-auto hidden px-5 py-5 lg:block">
-            <p className="truncate text-sm font-medium">{session.user?.name}</p>
-            <p className="truncate text-xs text-muted">{session.user?.email}</p>
-            <p className="mt-1 text-xs text-muted">
+          <div className="app-sidebar-user mt-auto hidden px-5 py-5 lg:block">
+            <p className="truncate text-sm font-medium text-white/85">{session.user?.name}</p>
+            <p className="truncate text-xs text-white/40">{session.user?.email}</p>
+            <p className="mt-1 text-xs text-white/30">
               {workspace ? `${workspace.name} · ${workspace.role}` : "No workspace"}
             </p>
             <button
               type="button"
-              className="app-btn mt-3 w-full"
+              className="mt-3 w-full rounded-lg border border-white/12 px-3 py-2 text-xs text-white/65 transition-colors hover:border-white/25 hover:text-white"
               onClick={() => void session.signOut()}
             >
               <LogOut size={14} /> Sign out
@@ -156,7 +162,7 @@ export function AppLayout() {
           </div>
         </aside>
 
-        <main className="min-w-0 flex-1 px-3 py-5 sm:px-6 sm:py-6 lg:px-10 lg:py-8">
+        <main className="min-w-0 flex-1 bg-background px-3 py-5 sm:px-6 sm:py-6 lg:px-10 lg:py-8">
           <Outlet />
         </main>
       </div>

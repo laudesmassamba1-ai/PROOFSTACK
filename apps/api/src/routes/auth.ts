@@ -43,12 +43,26 @@ const signInSchema = z
  */
 export function authRoutes(services: Services): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
+
+  // Sign-up throttling.
+  //
+  // The limit is per source address, and an address is shared far more often than it
+  // looks: an office, a university, a mobile carrier's NAT, and every CI runner behind
+  // one egress IP. Five per hour locked out a whole team during the first end-to-end
+  // run. The limit still raises the cost of mass account creation, but it is now
+  // configurable and it is off under test, where a suite legitimately creates dozens of
+  // accounts from one address.
+  const signUpLimit = Number(process.env.SIGNUP_RATE_LIMIT ?? 20);
+  const signUpWindowMs = Number(process.env.SIGNUP_RATE_WINDOW_MS ?? 60 * 60_000);
   const signInLimiter = new RateLimiter(10, 5 * 60_000);
-  const signUpLimiter = new RateLimiter(5, 60 * 60_000);
+  const signUpLimiter =
+    services.config.environment === "test" || signUpLimit <= 0
+      ? null
+      : new RateLimiter(signUpLimit, signUpWindowMs);
 
   app.post("/sign-up/email", async (c) => {
     const address = clientAddress({ get: (name) => c.req.header(name) });
-    const limited = signUpLimiter.check(address);
+    const limited = signUpLimiter?.check(address) ?? { allowed: true, retryAfterSeconds: 0 };
     if (!limited.allowed) {
       c.header("Retry-After", String(limited.retryAfterSeconds));
       throw new HttpError(

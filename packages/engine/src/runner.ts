@@ -32,6 +32,7 @@ import { fingerprintFinding } from "./fingerprint.js";
 import { rngFor } from "./rng.js";
 import type {
   CaseOutcome,
+  EngineEvent,
   EngineOptions,
   EvidenceStore,
   ModuleProvider,
@@ -138,6 +139,19 @@ export async function runEngine(options: EngineOptions): Promise<EngineRunResult
     modules: activeProviders.map((p) => p.id),
   });
 
+  const emit = (event: EngineEvent): void => {
+    try {
+      options.onEvent?.(event);
+    } catch (error) {
+      // A presentation callback must never change whether a run succeeds.
+      logger.warn("engine event handler failed", {
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  emit({ type: "scheduled", total: planned.length });
+
   const outcomes = new Map<number, CaseOutcome>();
   let cursor = 0;
   let stopRequested = false;
@@ -148,6 +162,7 @@ export async function runEngine(options: EngineOptions): Promise<EngineRunResult
       const index = cursor++;
       if (index >= planned.length) return;
       const item = planned[index]!;
+      emit({ type: "case-start", module: item.provider.id, name: item.caseDef.name });
       const outcome = await executeCase(item, {
         runId,
         config,
@@ -157,6 +172,13 @@ export async function runEngine(options: EngineOptions): Promise<EngineRunResult
         signal: controller.signal,
       });
       outcomes.set(index, outcome);
+      emit({
+        type: "case-end",
+        module: item.provider.id,
+        name: item.caseDef.name,
+        status: outcome.result.status,
+        durationMs: outcome.result.durationMs,
+      });
       if (config.engine.stopOnCritical && outcome.findings.some((f) => f.severity === "CRITICAL")) {
         logger.warn("stopOnCritical: halting scheduling", { runId, caseId: outcome.result.id });
         stopRequested = true;

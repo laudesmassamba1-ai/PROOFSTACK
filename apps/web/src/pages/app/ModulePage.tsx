@@ -130,6 +130,17 @@ export function ModulePage() {
 
   return (
     <>
+      <div className={`app-module-strip module-${module} mb-5`}>
+        <span className="app-module-strip-icon">
+          <Icon size={16} />
+        </span>
+        <div className="min-w-0">
+          <p className="font-mono text-[0.68rem] uppercase tracking-[0.16em] text-muted">
+            {meta.name} · module view
+          </p>
+          <p className="mt-0.5 text-sm font-medium">{meta.summary}</p>
+        </div>
+      </div>
       <PageHeader
         title={meta.name}
         description={meta.summary}
