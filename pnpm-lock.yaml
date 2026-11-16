@@ -281,6 +281,30 @@ importers:
         specifier: workspace:*
         version: link:../core
 
+  packages/modules/exit:
+    dependencies:
+      '@proofstack/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      '@proofstack/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@proofstack/engine':
+        specifier: workspace:*
+        version: link:../../engine
+
+  packages/modules/flow:
+    dependencies:
+      '@proofstack/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      '@proofstack/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@proofstack/engine':
+        specifier: workspace:*
+        version: link:../../engine
+
   packages/modules/world:
     dependencies:
       '@proofstack/contracts':

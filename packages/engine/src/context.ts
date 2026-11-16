@@ -14,8 +14,15 @@ export class AssertionFailed extends ProofstackError {
   constructor(
     message: string,
     readonly details_: Record<string, unknown>,
+    /**
+     * The caller's specific failure code (e.g. `duplicate_order_created`). The engine
+     * must not overwrite it with a generic one: a report whose every failure says
+     * "assertion_failed" cannot be triaged, and the fingerprint that groups the same
+     * defect across runs depends on this being specific.
+     */
+    code = "assertion_failed",
   ) {
-    super({ message, category: "ASSERTION", code: "assertion_failed", details: details_ });
+    super({ message, category: "ASSERTION", code, details: details_ });
     this.name = "AssertionFailed";
   }
 }
@@ -116,15 +123,19 @@ export class CaseContext implements TestContext {
       input.target ? ` [${input.target}]` : ""
     } — expected ${render(input.expected)}, got ${render(input.actual)}`;
     this.log.warn("assertion failed", { caseId: this.caseId, target: input.target });
-    throw new AssertionFailed(input.detail ? `${summary} — ${input.detail}` : summary, {
-      caseId: this.caseId,
-      assertionId: assertion.id,
-      severity: input.severity ?? "MEDIUM",
-      ...(input.code === undefined ? {} : { code: input.code }),
-      ...(input.target === undefined ? {} : { target: input.target }),
-      expected: safe(input.expected),
-      actual: safe(input.actual),
-    });
+    throw new AssertionFailed(
+      input.detail ? `${summary} — ${input.detail}` : summary,
+      {
+        caseId: this.caseId,
+        assertionId: assertion.id,
+        severity: input.severity ?? "MEDIUM",
+        ...(input.code === undefined ? {} : { code: input.code }),
+        ...(input.target === undefined ? {} : { target: input.target }),
+        expected: safe(input.expected),
+        actual: safe(input.actual),
+      },
+      input.code ?? "assertion_failed",
+    );
   }
 
   equal(actual: unknown, expected: unknown, description: string, target?: string): void {
