@@ -1,0 +1,37 @@
+{
+  "name": "proofstack",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PROOFSTACK — integrated software quality and reliability suite: WORLD (global compatibility), FLOW (transaction reliability), EXIT (data portability).",
+  "license": "SEE LICENSE IN LICENSE",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@12.15.0",
+  "scripts": {
+    "build": "node tooling/scripts/build.mjs && pnpm -r --filter ./apps/web build",
+    "build:packages": "node tooling/scripts/build.mjs",
+    "typecheck": "node tooling/scripts/build.mjs",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "db:generate": "pnpm --filter @proofstack/db generate",
+    "db:migrate:local": "pnpm --filter @proofstack/db migrate:local",
+    "web:dev": "pnpm --filter @proofstack/web dev",
+    "api:dev": "pnpm --filter @proofstack/api dev",
+    "cli": "node packages/cli/dist/index.js",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.8",
+    "@playwright/test": "1.65.1",
+    "@types/node": "22.19.2",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4"
+  }
+}
