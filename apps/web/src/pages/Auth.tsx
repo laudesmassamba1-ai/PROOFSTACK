@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router";
-import { CircleAlert, CircleCheck, LoaderCircle } from "lucide-react";
-import { z } from "zod";
 import { findPlan } from "@proofstack/billing";
-import { useI18n } from "../i18n/index.js";
-import { API_BASE, postJson, probeApi, type Probe } from "../lib/api.js";
+import { CircleAlert, CircleCheck, LoaderCircle } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router";
+import { z } from "zod";
 import { Wordmark } from "../components/brand/Logo.js";
+import { useI18n } from "../i18n/index.js";
+import { API_BASE, type Probe, postJson, probeApi } from "../lib/api.js";
+import { useSession } from "../lib/session.js";
 
 const signInSchema = z.object({
   email: z.string().email(),
@@ -31,6 +32,8 @@ type Mode = "in" | "up";
  */
 export function Auth({ mode }: { mode: Mode }) {
   const { t } = useI18n();
+  const session = useSession();
+  const navigate = useNavigate();
   const [params] = useSearchParams();
   const [probe, setProbe] = useState<Probe>({ status: "checking" });
   const [values, setValues] = useState({ email: "", password: "", name: "", workspace: "" });
@@ -75,10 +78,18 @@ export function Auth({ mode }: { mode: Mode }) {
         mode === "in" ? "/api/auth/sign-in/email" : "/api/auth/sign-up/email",
         mode === "in"
           ? { email: values.email, password: values.password }
-          : { email: values.email, password: values.password, name: values.name },
+          : {
+              email: values.email,
+              password: values.password,
+              name: values.name,
+              ...(values.workspace.trim() ? { workspace: values.workspace.trim() } : {}),
+            }
       );
       setState("sent");
-      setMessage(mode === "in" ? "Signed in — redirecting to your workspace." : "Account created. Confirm your email.");
+      // The session cookie is HttpOnly; re-read who the API says we are before routing.
+      await session.refresh();
+      const next = params.get("next");
+      navigate(next?.startsWith("/app") ? next : "/app", { replace: true });
     } catch (error) {
       setState("failed");
       setMessage(error instanceof Error ? error.message : String(error));
@@ -99,16 +110,17 @@ export function Auth({ mode }: { mode: Mode }) {
         <p className="mt-3 rounded-lg border border-brand-mint/30 bg-brand-mint/8 px-3 py-2 text-[0.82rem] text-white/74">
           Selected plan: <strong>{plan.name}</strong>
           {params.get("period") ? ` · ${params.get("period")}` : ""}
-          {params.get("currency") ? ` · ${params.get("currency")}` : ""}
-          . The plan is applied after the account exists; the price is re-read from the server at checkout.
+          {params.get("currency") ? ` · ${params.get("currency")}` : ""}. The plan is applied after
+          the account exists; the price is re-read from the server at checkout.
         </p>
       ) : null}
 
       <form onSubmit={submit} className="brand-panel mt-6 space-y-4 p-6" noValidate>
         {mode === "up" ? (
           <>
-            <Field label={t("auth.name")} error={errors.name}>
+            <Field label={t("auth.name")} htmlFor="auth-name" error={errors.name}>
               <input
+                id="auth-name"
                 className="field"
                 name="name"
                 autoComplete="name"
@@ -116,8 +128,9 @@ export function Auth({ mode }: { mode: Mode }) {
                 onChange={(event) => setValues({ ...values, name: event.target.value })}
               />
             </Field>
-            <Field label={t("auth.company")} error={errors.workspace}>
+            <Field label={t("auth.company")} htmlFor="auth-workspace" error={errors.workspace}>
               <input
+                id="auth-workspace"
                 className="field"
                 name="workspace"
                 autoComplete="organization"
@@ -128,8 +141,9 @@ export function Auth({ mode }: { mode: Mode }) {
           </>
         ) : null}
 
-        <Field label={t("auth.email")} error={errors.email}>
+        <Field label={t("auth.email")} htmlFor="auth-email" error={errors.email}>
           <input
+            id="auth-email"
             className="field"
             type="email"
             name="email"
@@ -140,8 +154,9 @@ export function Auth({ mode }: { mode: Mode }) {
           />
         </Field>
 
-        <Field label={t("auth.password")} error={errors.password}>
+        <Field label={t("auth.password")} htmlFor="auth-password" error={errors.password}>
           <input
+            id="auth-password"
             className="field"
             type="password"
             name="password"
@@ -152,14 +167,21 @@ export function Auth({ mode }: { mode: Mode }) {
           />
         </Field>
 
-        <button type="submit" className="btn btn-primary w-full justify-center" disabled={state === "sending"}>
+        <button
+          type="submit"
+          className="btn btn-primary w-full justify-center"
+          disabled={state === "sending"}
+        >
           {state === "sending" ? <LoaderCircle size={16} className="animate-spin" /> : null}
           {mode === "in" ? t("auth.submit.in") : t("auth.submit.up")}
         </button>
 
         <p className="text-[0.8rem] text-white/46">
           {mode === "in" ? t("auth.noAccount") : t("auth.haveAccount")}{" "}
-          <Link className="text-brand-mint underline-offset-2 hover:underline" to={mode === "in" ? "/signup" : "/signin"}>
+          <Link
+            className="text-brand-mint underline-offset-2 hover:underline"
+            to={mode === "in" ? "/signup" : "/signin"}
+          >
             {mode === "in" ? t("nav.signup") : t("nav.signin")}
           </Link>
         </p>
@@ -171,15 +193,29 @@ export function Auth({ mode }: { mode: Mode }) {
         aria-live="polite"
         style={{
           borderColor:
-            probe.status === "reachable" ? "rgba(115,214,139,0.35)" : probe.status === "checking" ? "rgba(255,255,255,0.12)" : "rgba(233,180,90,0.35)",
+            probe.status === "reachable"
+              ? "rgba(115,214,139,0.35)"
+              : probe.status === "checking"
+                ? "rgba(255,255,255,0.12)"
+                : "rgba(233,180,90,0.35)",
           background:
-            probe.status === "reachable" ? "rgba(115,214,139,0.07)" : probe.status === "checking" ? "rgba(255,255,255,0.03)" : "rgba(233,180,90,0.07)",
+            probe.status === "reachable"
+              ? "rgba(115,214,139,0.07)"
+              : probe.status === "checking"
+                ? "rgba(255,255,255,0.03)"
+                : "rgba(233,180,90,0.07)",
           color: probe.status === "reachable" ? "#bfeed4" : "rgba(242,246,250,0.7)",
         }}
       >
-        {probe.status === "checking" ? <LoaderCircle size={15} className="mt-0.5 shrink-0 animate-spin" /> : null}
-        {probe.status === "reachable" ? <CircleCheck size={15} className="mt-0.5 shrink-0" /> : null}
-        {probe.status === "unreachable" ? <CircleAlert size={15} className="mt-0.5 shrink-0 text-[#e9b45a]" /> : null}
+        {probe.status === "checking" ? (
+          <LoaderCircle size={15} className="mt-0.5 shrink-0 animate-spin" />
+        ) : null}
+        {probe.status === "reachable" ? (
+          <CircleCheck size={15} className="mt-0.5 shrink-0" />
+        ) : null}
+        {probe.status === "unreachable" ? (
+          <CircleAlert size={15} className="mt-0.5 shrink-0 text-[#e9b45a]" />
+        ) : null}
         <span>
           {probe.status === "checking"
             ? t("auth.checking")
@@ -193,12 +229,25 @@ export function Auth({ mode }: { mode: Mode }) {
   );
 }
 
-function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+function Field({
+  label,
+  htmlFor,
+  error,
+  children,
+}: {
+  label: string;
+  /** Id of the control passed as children; an explicit association beats a wrapper. */
+  htmlFor: string;
+  error?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <label className="block">
-      <span className="label">{label}</span>
+    <div>
+      <label className="label" htmlFor={htmlFor}>
+        {label}
+      </label>
       {children}
       {error ? <span className="mt-1.5 block text-[0.76rem] text-[#f07884]">{error}</span> : null}
-    </label>
+    </div>
   );
 }

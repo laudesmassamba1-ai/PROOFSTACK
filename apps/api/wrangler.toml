@@ -1,0 +1,22 @@
+name = "proofstack-api"
+main = "src/worker.ts"
+compatibility_date = "2026-11-01"
+# D1 is the production database. Local development uses the same SQL through
+# node:sqlite (see src/node.ts), so a migration that works locally works on D1.
+#
+# Create the database once with:
+#   wrangler d1 create proofstack
+# then paste the returned database_id below.
+
+[[d1_databases]]
+binding = "DB"
+database_name = "proofstack"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+[observability]
+enabled = true
+
+# Secrets are never placed in this file. Set them with:
+#   wrangler secret put SASPAY_API_KEY
+#   wrangler secret put SASPAY_WEBHOOK_SECRET

@@ -111,6 +111,13 @@ export const en = {
   "notfound.title": "Page not found",
   "notfound.body": "That route does not exist in this build.",
   "notfound.cta": "Back to the homepage",
+  "app.settings.title": "Settings",
+  "app.nav.overview": "Overview",
+  "app.nav.projects": "Projects",
+  "app.nav.billing": "Billing",
+  "app.nav.settings": "Settings",
+  "app.signout": "Sign out",
+  "app.workspace": "Workspace",
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -225,4 +232,11 @@ export const fr: Messages = {
   "notfound.title": "Page introuvable",
   "notfound.body": "Cette route n'existe pas dans cette version.",
   "notfound.cta": "Retour à l'accueil",
+  "app.settings.title": "Paramètres",
+  "app.nav.overview": "Vue d'ensemble",
+  "app.nav.projects": "Projets",
+  "app.nav.billing": "Facturation",
+  "app.nav.settings": "Paramètres",
+  "app.signout": "Se déconnecter",
+  "app.workspace": "Espace de travail",
 };

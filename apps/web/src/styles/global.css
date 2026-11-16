@@ -385,3 +385,194 @@ pre,
     animation: none;
   }
 }
+
+/* ============================================================
+   Dashboard — restrained, light, productivity first.
+   These consume the same tokens as the brand site; no component
+   below introduces a colour of its own.
+   ============================================================ */
+
+.app-shell {
+  min-height: 100vh;
+  background: var(--background);
+  color: var(--text-primary);
+}
+
+.app-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 1px 2px rgba(20, 32, 51, 0.04);
+}
+
+.app-input,
+.app-select,
+.app-textarea {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: var(--radius);
+  padding: 0.55rem 0.7rem;
+  font-size: 0.875rem;
+}
+
+.app-input:focus,
+.app-select:focus,
+.app-textarea:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+  border-color: var(--primary);
+}
+
+.app-input::placeholder {
+  color: var(--text-secondary);
+}
+
+.app-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 520;
+  color: var(--text-secondary);
+  margin-bottom: 0.35rem;
+}
+
+.app-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-primary);
+  padding: 0.5rem 0.85rem;
+  font-size: 0.85rem;
+  font-weight: 520;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.app-btn:hover {
+  background: var(--surface-alt);
+}
+
+.app-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.app-btn-primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #ffffff;
+}
+
+.app-btn-primary:hover {
+  background: var(--primary);
+  filter: brightness(1.06);
+}
+
+.app-btn-danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.app-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.app-nav-link:hover {
+  background: var(--surface-alt);
+  color: var(--text-primary);
+}
+
+.app-nav-link[aria-current="page"] {
+  background: var(--surface-alt);
+  color: var(--text-primary);
+  font-weight: 540;
+}
+
+.app-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+
+.app-table th {
+  text-align: left;
+  font-weight: 520;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.app-table td {
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.app-table tr:last-child td {
+  border-bottom: none;
+}
+
+.app-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 999px;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 560;
+  letter-spacing: 0.02em;
+  background: var(--surface-alt);
+  color: var(--text-secondary);
+}
+
+.app-badge-success {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+}
+
+.app-badge-danger {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+.app-badge-warning {
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
+}
+
+.app-badge-accent {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.app-mono {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+
+.app-meter {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  overflow: hidden;
+}
+
+.app-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+}

@@ -1,6 +1,12 @@
 import { Route, Routes } from "react-router";
+import { AppLayout } from "./layouts/AppLayout.js";
 import { BrandLayout } from "./layouts/BrandLayout.js";
 import { Auth } from "./pages/Auth.js";
+import { Billing } from "./pages/app/Billing.js";
+import { Overview } from "./pages/app/Overview.js";
+import { ProjectDetail } from "./pages/app/ProjectDetail.js";
+import { Projects } from "./pages/app/Projects.js";
+import { Settings } from "./pages/app/Settings.js";
 import { Changelog } from "./pages/Changelog.js";
 import { Docs } from "./pages/Docs.js";
 import { Home } from "./pages/Home.js";
@@ -35,6 +41,15 @@ export function App() {
           <Route path="signin" element={<Auth mode="in" />} />
           <Route path="signup" element={<Auth mode="up" />} />
           <Route path="*" element={<NotFound />} />
+        </Route>
+
+        {/* Authenticated application. AppLayout redirects when there is no session. */}
+        <Route path="/app" element={<AppLayout />}>
+          <Route index element={<Overview />} />
+          <Route path="projects" element={<Projects />} />
+          <Route path="projects/:projectId" element={<ProjectDetail />} />
+          <Route path="billing" element={<Billing />} />
+          <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>
     </>
