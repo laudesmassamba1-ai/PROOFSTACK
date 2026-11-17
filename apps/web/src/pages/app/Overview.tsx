@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { ModuleObject } from "../../components/app/ModuleObjects.js";
 import { Empty, ErrorState, Loading, StatusBadge } from "../../components/app/ui.js";
+import { EnhancedCard } from "../../components/common/EnhancedCard.js";
 import { useI18n } from "../../i18n/index.js";
 import { type ApiError, apiFetch } from "../../lib/api.js";
 import { duration, formatDate, relativeTime } from "../../lib/format.js";
@@ -148,41 +149,42 @@ export function Overview() {
     <div className="app-page app-overview">
       <EnhancedCard className="app-situation" enable3d={undefined}>
         <section className="app-situation">
-        <div className="app-situation-copy">
-          <p className="app-eyebrow">
-            {t("ws.overview.eyebrow")} / {data.workspace.name}
-          </p>
-          <h1 className="app-display app-situation-headline">{headline}</h1>
-          <p className="app-support">{support}</p>
-        </div>
-        <aside
-          className="app-situation-stamp"
-          aria-label={fr ? "Faits réels du workspace" : "Real workspace facts"}
-        >
-          <p className="app-eyebrow">01 / {t("ws.overview.latest")}</p>
-          <div className="app-stamp-facts">
-            <div>
-              <span className="app-stamp-value">{data.projects.length}</span>
-              <span>{t("ws.overview.projects")}</span>
-            </div>
-            <div>
-              <span className="app-stamp-value">{data.recentRuns.length}</span>
-              <span>{t("ws.overview.runs.count")}</span>
-            </div>
-            <div>
-              <span className={`app-stamp-value ${failures > 0 ? "is-danger" : ""}`}>
-                {failures}
-              </span>
-              <span>{t("ws.overview.failures.count")}</span>
-            </div>
+          <div className="app-situation-copy">
+            <p className="app-eyebrow">
+              {t("ws.overview.eyebrow")} / {data.workspace.name}
+            </p>
+            <h1 className="app-display app-situation-headline">{headline}</h1>
+            <p className="app-support">{support}</p>
           </div>
-          <p className="app-stamp-note">
-            {latest
-              ? `${latest.projectName} · ${relativeTime(latest.startedAt)}`
-              : t("ws.overview.never")}
-          </p>
-        </aside>
-      </section>
+          <aside
+            className="app-situation-stamp"
+            aria-label={fr ? "Faits réels du workspace" : "Real workspace facts"}
+          >
+            <p className="app-eyebrow">01 / {t("ws.overview.latest")}</p>
+            <div className="app-stamp-facts">
+              <div>
+                <span className="app-stamp-value">{data.projects.length}</span>
+                <span>{t("ws.overview.projects")}</span>
+              </div>
+              <div>
+                <span className="app-stamp-value">{data.recentRuns.length}</span>
+                <span>{t("ws.overview.runs.count")}</span>
+              </div>
+              <div>
+                <span className={`app-stamp-value ${failures > 0 ? "is-danger" : ""}`}>
+                  {failures}
+                </span>
+                <span>{t("ws.overview.failures.count")}</span>
+              </div>
+            </div>
+            <p className="app-stamp-note">
+              {latest
+                ? `${latest.projectName} · ${relativeTime(latest.startedAt)}`
+                : t("ws.overview.never")}
+            </p>
+          </aside>
+        </section>
+      </EnhancedCard>
 
       <section className="app-section" aria-labelledby="module-objects-title">
         <div className="app-section-head">
