@@ -25,16 +25,21 @@ npm install -g ./artifacts/proofstack-cli-0.1.0.tgz
 
 ## Quick start in an application
 
+Open a terminal in your application directory, then run:
+
 ```bash
-proofstack --cwd /path/to/app init
-proofstack --cwd /path/to/app doctor
-proofstack --cwd /path/to/app test --module world,flow,exit
-proofstack --cwd /path/to/app report text
-proofstack --cwd /path/to/app sync
+cd /path/to/your/app   # replace with a real, existing directory
+proofstack init
+proofstack doctor
+proofstack test --module world,flow,exit
+proofstack report text
+proofstack sync
 ```
 
-From the repository root, the equivalent in-repo command is
-`pnpm proofstack -- --cwd /path/to/app <command>`.
+`init` writes `proofstack.config.ts` in the current directory and never creates the
+directory. `--cwd /path/to/your/app` also works, but that directory must already exist;
+the CLI exits with code 2 and an actionable message otherwise. From the repository root,
+the equivalent in-repo command is `pnpm proofstack -- --cwd /path/to/app <command>`.
 
 The local `proofstack.config.ts` currently declares no WORLD HTTP target, no FLOW
 checkout URL and no EXIT export source, so `test` reports every case as `SKIPPED` and

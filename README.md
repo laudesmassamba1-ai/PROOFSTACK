@@ -22,7 +22,7 @@ not implemented yet — see the status file.
 Implemented and tested: the shared engine and all three modules, the CLI with JSON/
 JUnit/HTML reports, the SaaS API (auth, workspaces, projects, run ingestion, API keys,
 billing, webhooks), the authenticated workspace and the terminal console. `pnpm test`
-runs 221 tests; `pnpm typecheck` and `pnpm build` pass. Biome still reports pre-existing
+runs 223 tests; `pnpm typecheck` and `pnpm build` pass. Biome still reports pre-existing
 diagnostics, so `pnpm lint` is not claimed as clean.
 
 The creator's read-only operations console lives at `/app/admin`: users, workspaces,
@@ -90,13 +90,17 @@ Or build, install and check the global binary in one command:
 pnpm cli:install
 ```
 
-Then run it against any application directory:
+Then open a terminal in the application you want to test and run it there:
 
 ```bash
-proofstack --cwd /path/to/your/app init
-proofstack --cwd /path/to/your/app doctor
-proofstack --cwd /path/to/your/app test --module world,flow,exit
+cd /path/to/your/app   # replace with a real, existing directory
+proofstack init
+proofstack doctor
+proofstack test --module world,flow,exit
 ```
+
+`init` writes the config in the current directory; it does not create the directory.
+`--cwd /path/to/your/app` is also supported, but the path must already exist.
 
 The package is not yet on the npm registry. Once npm authentication and ownership of
 the `@proofstack` scope are configured, the generated release is publishable:

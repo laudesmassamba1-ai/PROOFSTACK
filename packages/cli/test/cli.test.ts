@@ -98,6 +98,25 @@ describe("CLI", () => {
     expect(result.stdout).toContain("FAIL");
   });
 
+  it("rejects a missing --cwd without an ENOENT stack", async () => {
+    const dir = await project();
+    const missing = join(dir, "missing-app");
+    const result = await cli(["--cwd", missing, "init", "--yes", "Test"], dir);
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain("directory does not exist");
+    expect(result.stderr).toContain("Replace /path/to/your/app");
+    expect(result.stderr).not.toContain("ENOENT");
+  });
+
+  it("rejects a --cwd that points to a file", async () => {
+    const dir = await project();
+    const file = join(dir, "not-a-directory");
+    await writeFile(file, "x", "utf8");
+    const result = await cli(["--cwd", file, "doctor"], dir);
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain("not a directory");
+  });
+
   it("validate exits 1 when the config has cross-field warnings", async () => {
     const dir = await project();
     // WORLD enabled with no target and no forms: a real warning, not an error.

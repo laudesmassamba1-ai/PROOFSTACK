@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { stdin, stdout } from "node:process";
@@ -61,6 +61,7 @@ const CLI_VERSION = "0.1.0";
 
 interface GlobalFlags {
   cwd: string;
+  cwdExplicit: boolean;
   json: boolean;
   quiet: boolean;
   verbose: boolean;
@@ -70,6 +71,7 @@ interface GlobalFlags {
 function parseGlobalFlags(argv: string[]): { flags: GlobalFlags; rest: string[] } {
   const flags: GlobalFlags = {
     cwd: process.cwd(),
+    cwdExplicit: false,
     json: false,
     quiet: false,
     verbose: false,
@@ -95,6 +97,7 @@ function parseGlobalFlags(argv: string[]): { flags: GlobalFlags; rest: string[] 
         break;
       case "--cwd":
         flags.cwd = resolve(argv[++i] ?? ".");
+        flags.cwdExplicit = true;
         break;
       default:
         rest.push(arg);
@@ -114,6 +117,14 @@ const cyan = (f: GlobalFlags, t: string) => paint(f, "36", t);
 const dim = (f: GlobalFlags, t: string) => paint(f, "2", t);
 const bold = (f: GlobalFlags, t: string) => paint(f, "1", t);
 
+function isDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
 function out(flags: GlobalFlags, text: string): void {
   if (!flags.quiet) stdout.write(`${text}\n`);
 }
@@ -128,6 +139,34 @@ async function main(argv: string[]): Promise<number> {
   const { flags, rest } = parseGlobalFlags(argv);
   // `pnpm cli -- test` and `npm exec -- proofstack` forward the separator literally.
   const [command, ...args] = rest[0] === "--" ? rest.slice(1) : rest;
+
+  const cwdCommands = new Set([
+    "init",
+    "doctor",
+    "validate",
+    "test",
+    "report",
+    "projects",
+    "ui",
+    "dashboard",
+    "console",
+    "sync",
+    "ai",
+  ]);
+  if (command && cwdCommands.has(command) && flags.cwdExplicit && !isDirectory(flags.cwd)) {
+    err(
+      flags,
+      red(
+        flags,
+        `Cannot use --cwd ${flags.cwd}: ${existsSync(flags.cwd) ? "not a directory" : "directory does not exist"}.`
+      )
+    );
+    err(
+      flags,
+      "Replace /path/to/your/app with your real application path, or run from that directory without --cwd."
+    );
+    return 2;
+  }
 
   switch (command) {
     case undefined:
@@ -210,7 +249,19 @@ async function commandInit(flags: GlobalFlags, args: string[]): Promise<number> 
 
   const config = starterConfig(projectName, baseUrl);
   const path = join(root, "proofstack.config.ts");
-  await writeFile(path, renderConfigFile(config), "utf8");
+  try {
+    await writeFile(path, renderConfigFile(config), "utf8");
+  } catch (error) {
+    err(
+      flags,
+      red(
+        flags,
+        `Could not write ${path}: ${error instanceof Error ? error.message : String(error)}`
+      )
+    );
+    err(flags, "Check that the directory exists and is writable.");
+    return 2;
+  }
 
   out(flags, green(flags, `Created ${path}`));
   out(flags, "");

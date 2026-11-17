@@ -180,11 +180,11 @@ export const workspaceEn = {
   "ws.cli.prove": "Prove",
   "ws.cli.checking": "Checking the workspace connection…",
   "ws.cli.step.install.body":
-    "The npm registry package is not published yet. Clone this repository and run `pnpm cli:install` to build and install the dependency-free `proofstack` binary globally.",
+    "Run this from a parent directory, not inside an existing checkout. The npm registry package is not published yet; the last command builds and installs the dependency-free `proofstack` binary globally.",
   "ws.cli.step.configure.body":
-    "Point the modules at localhost or staging, then validate the targets before the first run.",
+    "Open a terminal in your application directory, then run these commands. `init` writes `proofstack.config.ts`; it never creates the directory for you. Then point the modules at localhost or staging and validate the targets.",
   "ws.cli.step.prove.body":
-    "Run the checks, read the finding, reproduce it. Uploading the result is a separate, explicit step.",
+    "From the same application directory, run the checks, read the finding, reproduce it. Uploading the result is a separate, explicit step.",
   "ws.cli.lastUpload.body":
     "{time} · the status is the uploaded run status, not a local test result.",
   "ws.cli.noRun.body":
@@ -198,7 +198,7 @@ export const workspaceEn = {
   "ws.cli.trouble.title": "Installation troubleshooting",
   "ws.cli.trouble.command.title": "Command not found?",
   "ws.cli.trouble.command.body":
-    "Run `pnpm cli:install` from the checkout, then ensure npm's global bin directory is on PATH.",
+    'Run `pnpm cli:install` from the checkout, then add npm\'s global bin directory to PATH: `export PATH="$(npm config get prefix)/bin:$PATH"`.',
   "ws.cli.trouble.sync.title": "401 on sync?",
   "ws.cli.trouble.sync.body": "The token is scoped to one project and must be supplied as",
   "ws.cli.trouble.api.title": "API unreachable?",
@@ -395,11 +395,11 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
   "ws.cli.prove": "Prouver",
   "ws.cli.checking": "Vérification de la connexion à l'espace…",
   "ws.cli.step.install.body":
-    "Le paquet npm n'est pas encore publié. Clonez ce dépôt et lancez `pnpm cli:install` pour construire et installer globalement le binaire autonome `proofstack`.",
+    "Lancez ceci depuis un dossier parent, pas à l'intérieur d'un checkout existant. Le paquet npm n'est pas encore publié ; la dernière commande construit et installe globalement le binaire autonome `proofstack`.",
   "ws.cli.step.configure.body":
-    "Pointez les modules vers localhost ou la préproduction, puis validez les cibles avant la première exécution.",
+    "Ouvrez un terminal dans le dossier de votre application, puis lancez ces commandes. `init` écrit `proofstack.config.ts` ; il ne crée jamais le dossier à votre place. Pointez ensuite les modules vers localhost ou la préproduction et validez les cibles.",
   "ws.cli.step.prove.body":
-    "Lancez les contrôles, lisez le constat, reproduisez-le. Le téléversement du résultat est une étape explicite et séparée.",
+    "Depuis le même dossier d'application, lancez les contrôles, lisez le constat, reproduisez-le. Le téléversement du résultat est une étape explicite et séparée.",
   "ws.cli.lastUpload.body":
     "{time} · le statut est celui du run téléversé, pas un résultat de test local.",
   "ws.cli.noRun.body":
@@ -414,7 +414,7 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
   "ws.cli.trouble.title": "Dépannage de l'installation",
   "ws.cli.trouble.command.title": "Commande introuvable ?",
   "ws.cli.trouble.command.body":
-    "Lancez `pnpm cli:install` depuis le checkout, puis vérifiez que le dossier bin global de npm est dans le PATH.",
+    'Lancez `pnpm cli:install` depuis le checkout, puis ajoutez le dossier bin global de npm au PATH : `export PATH="$(npm config get prefix)/bin:$PATH"`.',
   "ws.cli.trouble.sync.title": "401 à la synchronisation ?",
   "ws.cli.trouble.sync.body": "Le token est limité à un projet et doit être fourni via",
   "ws.cli.trouble.api.title": "API injoignable ?",
