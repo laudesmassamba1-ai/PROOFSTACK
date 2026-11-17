@@ -23,6 +23,7 @@
     "db:generate": "pnpm --filter @proofcore/db generate",
     "db:migrate:local": "pnpm --filter @proofcore/db migrate:local",
     "web:dev": "pnpm --filter @proofcore/web dev",
+    "dev:stack": "node tooling/scripts/dev-stack.mjs",
     "api:dev": "pnpm --filter @proofcore/api dev",
     "cli": "node packages/cli/dist/index.js",
     "proofcore": "node packages/cli/dist/index.js",

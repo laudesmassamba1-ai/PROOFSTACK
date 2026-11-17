@@ -34,12 +34,26 @@ const hiddenOutput = new Writable({
 const rl = createInterface({ input: process.stdin, output: hiddenOutput, terminal: true });
 rl.on("SIGINT", () => process.exit(130));
 
-echoMuted = true;
-const token = await new Promise((res) => rl.question("npm token (npm_…, input hidden): ", res));
-echoMuted = false;
-process.stdout.write("\n");
+// Token sources, in priority order:
+//   1. NPM_TOKEN environment variable — session-only, never in shell history;
+//      recommended for scripts and CI.
+//   2. The hidden prompt (recommended interactively).
+// A bare positional argument is deliberately NOT accepted: it would land in
+// shell history and in process listings visible to other users.
+let token = process.env.NPM_TOKEN ?? "";
+if (token) {
+  console.log("npm token: (from NPM_TOKEN environment variable, not echoed)");
+} else {
+  echoMuted = true;
+  token = (await new Promise((res) => rl.question("npm token (npm_…, input hidden): ", res))) ?? "";
+  echoMuted = false;
+  process.stdout.write("\n");
+}
 if (!/^npm_[A-Za-z0-9_]{20,}$/.test((token ?? "").trim())) {
-  console.error("The value does not look like an npm token (expected npm_…). Aborting — nothing was written.");
+  console.error("No usable npm token (expected npm_…). Nothing was written.");
+  console.error("Set NPM_TOKEN or type the token at the hidden prompt:");
+  console.error("  NPM_TOKEN=npm_… pnpm cli:publish");
+  console.error("  pnpm cli:publish          # then paste at the prompt");
   rl.close();
   process.exit(2);
 }
