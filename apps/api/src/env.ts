@@ -23,6 +23,9 @@ export interface AppConfig {
    * falling back to "first user" or "any authenticated user".
    */
   adminEmails: string[];
+  /** Optional n8n webhook for verified payment events; never payment authority. */
+  n8nWebhookUrl: string | undefined;
+  n8nWebhookSecret: string | undefined;
 }
 
 export type Env = Record<string, string | undefined>;
@@ -46,6 +49,8 @@ export function readConfig(env: Env): AppConfig {
       environment === "production" || webOrigins.some((origin) => origin.startsWith("https://")),
     paymentProvider: hasSasPayCredentials(env) ? "saspay" : "sandbox",
     adminEmails: parseAdminEmails(env.ADMIN_EMAILS),
+    n8nWebhookUrl: env.N8N_WEBHOOK_URL,
+    n8nWebhookSecret: env.N8N_WEBHOOK_SECRET,
   };
 }
 

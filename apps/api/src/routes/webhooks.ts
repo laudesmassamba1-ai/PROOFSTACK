@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { notifyPaymentEvent } from "../automation.js";
 import { HttpError } from "../http/errors.js";
 import type { AppEnv, Services } from "../http/services.js";
 
@@ -41,6 +42,22 @@ export function webhookRoutes(services: Services): Hono<AppEnv> {
 
     try {
       const outcome = await services.webhooks.handle({ body, headers });
+      if (outcome.body.ok && !outcome.body.duplicate) {
+        const task = notifyPaymentEvent(services.config, {
+          event: "payment.webhook.processed",
+          provider,
+          ...(outcome.body.eventId ? { providerEventId: outcome.body.eventId } : {}),
+          ...(outcome.body.intentId ? { intentId: outcome.body.intentId } : {}),
+          ...(outcome.body.result ? { result: outcome.body.result } : {}),
+          occurredAt: new Date(services.clock()).toISOString(),
+        });
+        try {
+          c.executionCtx.waitUntil(task);
+        } catch {
+          // Hono's Node adapter has no executionCtx; local dev may await it.
+          void task;
+        }
+      }
       return c.json(outcome.body, outcome.status as 200);
     } catch (error) {
       // Retryable processing failure: keep the event row (state FAILED_RETRYABLE) and

@@ -17,6 +17,8 @@ import { SqlBillingStore } from "../store/billing-store.js";
  * so an integration test exercises the exact wiring production uses.
  */
 export interface Services {
+  n8n?: { trigger: (event: string, payload: any) => Promise<void> };
+
   db: Database;
   config: AppConfig;
   store: AppStore;

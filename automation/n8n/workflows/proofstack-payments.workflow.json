@@ -1,0 +1,52 @@
+{
+  "id": "proofstack-payments",
+  "name": "PROOFSTACK — verified payment events",
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "proofstack-payments",
+        "responseMode": "responseNode",
+        "options": { "rawBody": true }
+      },
+      "id": "proofstack-webhook",
+      "name": "Payment webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "proofstack-payments"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst item = items[0].json;\nconst raw = typeof item.body === 'string' ? item.body : JSON.stringify(item.body);\nconst timestamp = item.headers['x-proofstack-timestamp'];\nconst age = Math.abs(Date.now() / 1000 - Number(timestamp));\nif (!Number.isFinite(age) || age > 300) throw new Error('stale webhook timestamp');\nconst secret = process.env.PROOFSTACK_WEBHOOK_SECRET || '';\nconst expected = `sha256=${crypto.createHmac('sha256', secret).update(`${timestamp}.${raw}`).digest('hex')}`;\nconst supplied = item.headers['x-proofstack-signature'] || '';\nif (expected.length !== supplied.length || !crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(supplied))) throw new Error('invalid webhook signature');\nconst event = JSON.parse(raw);\nif (event.event !== 'payment.webhook.processed') throw new Error('unsupported event');\nreturn [{ json: { verified: true, receivedAt: new Date().toISOString(), event } }];"
+      },
+      "id": "verify-signature",
+      "name": "Verify signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [480, 0]
+    }
+  ],
+  "connections": {
+    "Payment webhook": {
+      "main": [[{ "node": "Verify signature", "type": "main", "index": 0 }]]
+    },
+    "Verify signature": {
+      "main": [[{ "node": "Respond", "type": "main", "index": 0 }]]
+    }
+  }
+}
