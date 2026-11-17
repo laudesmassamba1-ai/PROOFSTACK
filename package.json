@@ -28,6 +28,7 @@
     "proofcore": "node packages/cli/dist/index.js",
     "cli:package": "node tooling/scripts/package-cli.mjs",
     "cli:install": "pnpm cli:package && node tooling/scripts/install-cli.mjs",
+    "cli:publish": "pnpm cli:package && node tooling/scripts/publish-cli.mjs",
     "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
   },
   "devDependencies": {

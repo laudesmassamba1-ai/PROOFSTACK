@@ -100,7 +100,9 @@ await writeFile(
   join(releaseDir, "package.json"),
   `${JSON.stringify(
     {
-      name: "@proofcore/cli",
+      // Unscoped name: `npm i -g proofcore` with no npm org prerequisite. The
+      // workspace package stays @proofcore/cli internally; this is the public face.
+      name: "proofcore",
       version,
       description: cliPackage.description,
       license: "MPL-2.0",
@@ -109,7 +111,10 @@ await writeFile(
       files: ["proofcore.js", "README.md", "LICENSE"],
       engines: { node: ">=22.18.0" },
       publishConfig: { access: "public" },
-      keywords: ["proofcore", "testing", "quality", "reliability", "cli"],
+      keywords: ["proofcore", "testing", "quality", "reliability", "cli", "e2e"],
+      repository: { type: "git", url: "git+https://github.com/laudesmassamba1-ai/PROOFSTACK.git" },
+      homepage: "https://proofstack-01z.pages.dev",
+      author: "PROOFCORE <laudesmassamba1-ai@users.noreply.github.com>",
     },
     null,
     2
@@ -120,6 +125,6 @@ await writeFile(
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 run(npm, ["pack", "--pack-destination", artifactsDir], releaseDir);
 
-const tarball = join(artifactsDir, `proofcore-cli-${version}.tgz`);
+const tarball = join(artifactsDir, `proofcore-${version}.tgz`);
 console.log(`\nCreated ${tarball}`);
 console.log(`Install: npm install -g ${tarball}`);
