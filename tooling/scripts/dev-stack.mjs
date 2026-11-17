@@ -8,7 +8,7 @@
  * spin the stack on alternate ports without editing configs.
  */
 import { spawn } from "node:child_process";
-import { join, resolve, dirname } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -66,8 +66,20 @@ async function waitFor(url, name) {
 }
 
 console.log(`PROOFCORE dev stack — api :${apiPort} · web :${webPort}`);
-start("api", join(root, "apps/api"), process.execPath, ["--experimental-sqlite", "--import", "tsx/esm", "src/node.ts"]);
-start("web", join(root, "apps/web"), "pnpm", ["exec", "vite", "--port", webPort, "--strictPort", "--host"]);
+start("api", join(root, "apps/api"), process.execPath, [
+  "--experimental-sqlite",
+  "--import",
+  "tsx/esm",
+  "src/node.ts",
+]);
+start("web", join(root, "apps/web"), "pnpm", [
+  "exec",
+  "vite",
+  "--port",
+  webPort,
+  "--strictPort",
+  "--host",
+]);
 
 await waitFor(`http://localhost:${apiPort}/health`, "api");
 await waitFor(`http://localhost:${webPort}/`, "web");

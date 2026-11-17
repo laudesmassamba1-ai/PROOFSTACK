@@ -11,10 +11,10 @@
  *   npm view proofcore version
  */
 import { spawnSync } from "node:child_process";
-import { Writable } from "node:stream";
-import { createInterface } from "node:readline";
 import { readFile, rm, writeFile } from "node:fs/promises";
-import { join, resolve, dirname } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { createInterface } from "node:readline";
+import { Writable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -58,7 +58,6 @@ if (!/^npm_[A-Za-z0-9_]{20,}$/.test((token ?? "").trim())) {
   process.exit(2);
 }
 
-
 rl.close();
 // A one-time 2FA code for accounts that enforce 2FA on publishing, passed as
 // --otp=123456. It goes straight to npm; it is not stored anywhere.
@@ -83,7 +82,9 @@ try {
   if (result.status !== 0) {
     console.error("npm publish failed. The temporary .npmrc was removed; nothing changed.");
     if (!otp) {
-      console.error("If the error mentions two-factor authentication, rerun with your one-time code:");
+      console.error(
+        "If the error mentions two-factor authentication, rerun with your one-time code:"
+      );
       console.error("  pnpm cli:publish -- --otp=CODE");
     }
     process.exit(result.status ?? 1);

@@ -1,7 +1,7 @@
+import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
-import { fileURLToPath } from "node:url";
 
 /**
  * lucide-react ships a CJS main; without this alias Rollup bundles the CJS
@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
  * ESM entry tree-shakes to the handful of icons each page actually imports.
  */
 const lucideAlias = fileURLToPath(
-  new URL("./node_modules/lucide-react/dist/esm/lucide-react.mjs", import.meta.url),
+  new URL("./node_modules/lucide-react/dist/esm/lucide-react.mjs", import.meta.url)
 );
 
 /**
