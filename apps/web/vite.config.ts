@@ -1,6 +1,16 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import { fileURLToPath } from "node:url";
+
+/**
+ * lucide-react ships a CJS main; without this alias Rollup bundles the CJS
+ * interop with every icon in the library (~220 kB loaded on every route). The
+ * ESM entry tree-shakes to the handful of icons each page actually imports.
+ */
+const lucideAlias = fileURLToPath(
+  new URL("./node_modules/lucide-react/dist/esm/lucide-react.mjs", import.meta.url),
+);
 
 /**
  * The web app consumes workspace packages as TypeScript sources, so no package
@@ -14,8 +24,34 @@ import { defineConfig } from "vite";
  */
 const apiPort = process.env.PORT ? Number(process.env.PORT) : 8787;
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  build: {
+    rollupOptions: {
+      output: {
+        // React ships CJS only. Without this, the CJS module is duplicated: one
+        // copy in the entry chunk and one hoisted into the shared async chunk of
+        // the lazy routes (~140 kB extra on every page). advancedChunks pins the
+        // react graph into one named chunk that both graphs share.
+        advancedChunks: {
+          groups: [
+            {
+              name: "reactVendor",
+              test: /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/,
+              priority: 10,
+            },
+          ],
+        },
+      },
+    },
+  },
   plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      "lucide-react": lucideAlias,
+    },
+    dedupe: ["react", "react-dom"],
+    preserveSymlinks: false,
+  },
   server: {
     port: process.env.DEV_PORT ? Number(process.env.DEV_PORT) : 5173,
     strictPort: true,
@@ -27,9 +63,6 @@ export default defineConfig({
     },
   },
   preview: { port: 5173, strictPort: true, host: true },
-  resolve: {
-    preserveSymlinks: false,
-  },
   optimizeDeps: {
     exclude: [
       "@proofcore/billing",
@@ -38,4 +71,4 @@ export default defineConfig({
       "@proofcore/module-world",
     ],
   },
-});
+}));
