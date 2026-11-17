@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router";
-
+import { TesterScene } from "../components/app/Testers.js";
 import { Mark } from "../components/brand/Logo.js";
 import { useI18n } from "../i18n/index.js";
 import { API_BASE, apiFetch } from "../lib/api.js";
