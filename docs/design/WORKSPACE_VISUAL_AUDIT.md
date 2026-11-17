@@ -81,9 +81,10 @@ cross the viewport. `FAILURES=0`.
 
 ## Remaining limits
 
-- Billing and Settings still contain English UI copy. Overview, Projects, WORLD/FLOW/
-  EXIT, CLI and the shell are localized in FR/EN; the remaining two screens are a
-  documented migration gap, not a completed translation.
+- The creator operations console (`/app/admin`) remains English-only operational copy.
+  Every customer workspace screen — shell, Overview, Projects, WORLD/FLOW/EXIT, CLI,
+  Billing and Settings — follows the FR/EN switch, including nested actions, tables,
+  empty states and confirmations.
 - The screenshots are representative, not an automated visual-regression suite.
 - Browser testing was performed against the local API with a real session and sandbox
   checkout. No production SasPay transaction was executed.

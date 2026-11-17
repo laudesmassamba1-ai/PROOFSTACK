@@ -2,6 +2,7 @@ import { ArrowLeft, FileJson, KeyRound, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { Card, Empty, ErrorState, Loading, StatusBadge } from "../../components/app/ui.js";
+import { useI18n } from "../../i18n/index.js";
 import { PageHeader } from "../../layouts/AppLayout.js";
 import { API_BASE, type ApiError, apiFetch } from "../../lib/api.js";
 import { duration, formatDate, relativeTime } from "../../lib/format.js";
@@ -37,6 +38,8 @@ interface Finding {
 export function ProjectDetail() {
   const { projectId } = useParams();
   const { workspaceId } = useSession();
+  const { locale } = useI18n();
+  const fr = locale === "fr";
   const navigate = useNavigate();
   const [project, setProject] = useState<Project | null>(null);
   const [runs, setRuns] = useState<Run[]>([]);
@@ -108,7 +111,7 @@ export function ProjectDetail() {
   };
 
   if (error) return <ErrorState error={error} onRetry={() => void load()} />;
-  if (!project) return <Loading label="Loading project…" />;
+  if (!project) return <Loading label={fr ? "Chargement du projet…" : "Loading project…"} />;
 
   const config = `import type { ProofstackConfig } from "@proofstack/contracts";
 
@@ -138,7 +141,7 @@ export default config;`;
         to="/app/projects"
         className="mb-4 inline-flex items-center gap-1.5 text-xs text-muted hover:text-ink"
       >
-        <ArrowLeft size={13} /> Projects
+        <ArrowLeft size={13} /> {fr ? "Projets" : "Projects"}
       </Link>
       <PageHeader
         eyebrow={`PROJECT / ${project.environment.toUpperCase()}`}
@@ -151,7 +154,7 @@ export default config;`;
             onClick={() => setConfirmingDelete(true)}
             disabled={busy}
           >
-            <Trash2 size={14} /> Delete
+            <Trash2 size={14} /> {fr ? "Supprimer" : "Delete"}
           </button>
         }
       />
@@ -159,11 +162,13 @@ export default config;`;
       {confirmingDelete ? (
         <Card className="mb-5 border-danger/40">
           <div className="px-5 py-4">
-            <p className="text-sm font-medium">Delete this project?</p>
+            <p className="text-sm font-medium">
+              {fr ? "Supprimer ce projet ?" : "Delete this project?"}
+            </p>
             <p className="mt-1 text-xs leading-relaxed text-muted">
-              The project disappears from the dashboard. Its stored runs are kept in the database
-              for audit but are no longer reachable from this page. This does not cancel anything
-              you paid for.
+              {fr
+                ? "Le projet disparaît du workspace. Ses runs restent en base pour l'audit mais ne sont plus accessibles depuis cette page. Cela n'annule aucun paiement."
+                : "The project disappears from the dashboard. Its stored runs are kept in the database for audit but are no longer reachable from this page. This does not cancel anything you paid for."}
             </p>
             <div className="mt-3 flex gap-2">
               <button
@@ -172,10 +177,10 @@ export default config;`;
                 onClick={() => void remove()}
                 disabled={busy}
               >
-                Delete project
+                {fr ? "Supprimer le projet" : "Delete project"}
               </button>
               <button type="button" className="app-btn" onClick={() => setConfirmingDelete(false)}>
-                Keep it
+                {fr ? "Le conserver" : "Keep it"}
               </button>
             </div>
           </div>
@@ -183,22 +188,33 @@ export default config;`;
       ) : null}
 
       <div className="grid gap-4 xl:grid-cols-[1.35fr_1fr]">
-        <Card title="Runs" description="Stored from CLI/CI uploads, one per run id.">
+        <Card
+          title={fr ? "Runs" : "Runs"}
+          description={
+            fr
+              ? "Enregistrés depuis les envois CLI/CI, un par identifiant de run."
+              : "Stored from CLI/CI uploads, one per run id."
+          }
+        >
           {runs.length === 0 ? (
             <Empty
-              title="No run yet"
-              body="Connect the CLI with the token below, then run `proofstack test`."
+              title={fr ? "Aucun run" : "No run yet"}
+              body={
+                fr
+                  ? "Connectez le CLI avec le jeton ci-dessous, puis lancez `proofstack test`."
+                  : "Connect the CLI with the token below, then run `proofstack test`."
+              }
             />
           ) : (
             <div className="overflow-x-auto">
               <table className="app-table">
                 <thead>
                   <tr>
-                    <th>Status</th>
-                    <th>Started</th>
-                    <th>Duration</th>
-                    <th>Findings</th>
-                    <th>Report</th>
+                    <th>{fr ? "État" : "Status"}</th>
+                    <th>{fr ? "Démarré" : "Started"}</th>
+                    <th>{fr ? "Durée" : "Duration"}</th>
+                    <th>{fr ? "Constats" : "Findings"}</th>
+                    <th>{fr ? "Rapport" : "Report"}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -217,7 +233,7 @@ export default config;`;
                           target="_blank"
                           rel="noreferrer"
                         >
-                          <FileJson size={13} /> open
+                          <FileJson size={13} /> {fr ? "ouvrir" : "open"}
                         </a>
                       </td>
                     </tr>
@@ -229,7 +245,14 @@ export default config;`;
         </Card>
 
         <div className="space-y-4">
-          <Card title="Project token" description="Bearer token for the CLI and CI. Shown once.">
+          <Card
+            title={fr ? "Jeton du projet" : "Project token"}
+            description={
+              fr
+                ? "Jeton Bearer pour le CLI et la CI. Affiché une seule fois."
+                : "Bearer token for the CLI and CI. Shown once."
+            }
+          >
             <div className="space-y-3 px-5 py-4">
               {token ? (
                 <>
@@ -237,14 +260,16 @@ export default config;`;
                     {token}
                   </pre>
                   <p className="text-xs text-muted">
-                    Copy it now. Only a hash is stored, so it cannot be shown again. Put it in CI
-                    secrets, never in the repo.
+                    {fr
+                      ? "Copiez-le maintenant. Seul un hash est stocké : il ne pourra plus être affiché. Placez-le dans les secrets CI, jamais dans le dépôt."
+                      : "Copy it now. Only a hash is stored, so it cannot be shown again. Put it in CI secrets, never in the repo."}
                   </p>
                 </>
               ) : (
                 <p className="text-xs leading-relaxed text-muted">
-                  Tokens require a plan with API access. The token is scoped to this project and can
-                  only upload runs and read reports.
+                  {fr
+                    ? "Les jetons exigent une offre avec accès API. Le jeton est limité à ce projet et ne peut qu'envoyer des runs et lire les rapports."
+                    : "Tokens require a plan with API access. The token is scoped to this project and can only upload runs and read reports."}
                 </p>
               )}
               <button
@@ -253,7 +278,14 @@ export default config;`;
                 onClick={() => void createKey()}
                 disabled={busy}
               >
-                <KeyRound size={14} /> {token ? "Create another token" : "Create project token"}
+                <KeyRound size={14} />{" "}
+                {token
+                  ? fr
+                    ? "Créer un autre jeton"
+                    : "Create another token"
+                  : fr
+                    ? "Créer le jeton du projet"
+                    : "Create project token"}
               </button>
               {keyError ? <ErrorState error={keyError} /> : null}
             </div>
@@ -261,7 +293,11 @@ export default config;`;
 
           <Card
             title="Configuration"
-            description="Copy into proofstack.config.ts at your project root."
+            description={
+              fr
+                ? "À copier dans proofstack.config.ts à la racine du projet."
+                : "Copy into proofstack.config.ts at your project root."
+            }
           >
             <pre className="overflow-x-auto px-5 py-4 app-mono leading-relaxed text-muted">
               {config}
@@ -271,22 +307,33 @@ export default config;`;
       </div>
 
       <Card
-        title="Findings"
-        description="Failed checks with the reproducing case id."
+        title={fr ? "Constats" : "Findings"}
+        description={
+          fr
+            ? "Vérifications en échec avec l'identifiant du cas reproductible."
+            : "Failed checks with the reproducing case id."
+        }
         className="mt-4"
       >
         {findings.length === 0 ? (
-          <Empty title="No finding" body="No failed check has been recorded for this project." />
+          <Empty
+            title={fr ? "Aucun constat" : "No finding"}
+            body={
+              fr
+                ? "Aucune vérification en échec n'a été enregistrée pour ce projet."
+                : "No failed check has been recorded for this project."
+            }
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="app-table">
               <thead>
                 <tr>
-                  <th>Finding</th>
+                  <th>{fr ? "Constat" : "Finding"}</th>
                   <th>Module</th>
-                  <th>Severity</th>
+                  <th>{fr ? "Gravité" : "Severity"}</th>
                   <th>Code</th>
-                  <th>Detected</th>
+                  <th>{fr ? "Détecté" : "Detected"}</th>
                 </tr>
               </thead>
               <tbody>
@@ -311,7 +358,9 @@ export default config;`;
 
       <Card title="CLI" className="mt-4">
         <div className="space-y-2 px-5 py-4">
-          <p className="text-xs text-muted">From your project root:</p>
+          <p className="text-xs text-muted">
+            {fr ? "Depuis la racine de votre projet :" : "From your project root:"}
+          </p>
           <pre className="overflow-x-auto rounded-[var(--radius)] bg-surface-alt px-3 py-2 app-mono">
             {`export PROOFSTACK_PROJECT_TOKEN=<token from above>
 pnpm proofstack doctor

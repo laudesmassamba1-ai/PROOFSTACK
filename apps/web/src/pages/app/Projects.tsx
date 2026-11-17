@@ -83,7 +83,7 @@ export function Projects() {
   };
 
   if (!workspaceId) {
-    return <Empty title="No workspace yet" body="Create a workspace before adding projects." />;
+    return <Empty title={t("ws.noWorkspace.title")} body={t("ws.noWorkspace.body")} />;
   }
   if (error) return <ErrorState error={error} onRetry={() => void load()} />;
 
@@ -212,7 +212,7 @@ export function Projects() {
       ) : null}
 
       {!projects ? (
-        <Loading label="Loading projects…" />
+        <Loading label={t("ws.projects.loading")} />
       ) : projects.length === 0 ? (
         <section className="app-sheet">
           <Empty

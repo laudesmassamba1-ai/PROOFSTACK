@@ -45,9 +45,9 @@ uses the Ink & Object direction; this file records what is true and what remains
 
 ## Known gaps
 
-- **Billing and Settings UI copy is still English.** Overview, Projects, modules, CLI and
-  the shell are FR/EN. This is the main i18n gap; do not describe the whole dashboard as
-  fully bilingual until those screens are migrated.
+- **The creator operations console (`/app/admin`) is still English.** The customer
+  workspace — shell, Overview, Projects, modules, CLI, Billing and Settings — is FR/EN.
+  The internal console is explicitly outside the language switch.
 - No email provider: verification, password reset and invitations are absent, not faked.
 - SasPay live path is untested without credentials; sandbox payments are tested.
 - Browser journeys for WORLD/FLOW remain HTTP/fixture based; no Playwright customer

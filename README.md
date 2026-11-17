@@ -35,9 +35,9 @@ with `/api/*`, `/v1/*` and `/health` proxied to the
 cookies stay same-origin. The Worker uses D1 (`proofstack`), migrations applied.
 
 The marketing shell, home page, pricing and account forms are bilingual. The workspace
-shell, Overview, Projects, WORLD/FLOW/EXIT and CLI are also FR/EN. Billing and Settings
-still contain English UI copy; that is the remaining i18n gap and is stated in Settings
-rather than hidden.
+shell, Overview, Projects, WORLD/FLOW/EXIT, CLI, Billing and Settings are FR/EN. The
+creator operations console (`/app/admin`) keeps English operational copy and is not part
+of the customer workspace language switch.
 
 The authenticated workspace uses the Ink & Object design system: paper frame, top
 navigation, state-driven display type and one data-bound object per module. Design

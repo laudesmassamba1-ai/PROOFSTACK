@@ -77,7 +77,8 @@ export function ModulePage() {
     raw === "world" || raw === "flow" || raw === "exit" ? raw : null
   ) as ModuleId | null;
   const { workspaceId } = useSession();
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
+  const fr = locale === "fr";
   const [runs, setRuns] = useState<ModuleRun[] | null>(null);
   const [findings, setFindings] = useState<Finding[]>([]);
   const [error, setError] = useState<ApiError | Error | null>(null);
@@ -106,8 +107,12 @@ export function ModulePage() {
   if (!module) {
     return (
       <Empty
-        title="Unknown module"
-        body="PROOFSTACK has three modules: WORLD, FLOW and EXIT."
+        title={fr ? "Module inconnu" : "Unknown module"}
+        body={
+          fr
+            ? "PROOFSTACK a trois modules : WORLD, FLOW et EXIT."
+            : "PROOFSTACK has three modules: WORLD, FLOW and EXIT."
+        }
         tester="lost"
       />
     );
@@ -124,7 +129,12 @@ export function ModulePage() {
       <Empty title={t("ws.noWorkspace.title")} body={t("ws.noWorkspace.body")} tester="empty" />
     );
   }
-  if (!runs) return <Loading label={`Loading ${meta.name} activity…`} />;
+  if (!runs)
+    return (
+      <Loading
+        label={fr ? `Chargement de l'activité ${meta.name}…` : `Loading ${meta.name} activity…`}
+      />
+    );
 
   const latest = runs[0];
   const latestTotals = latest?.totals[module] ?? ZERO;

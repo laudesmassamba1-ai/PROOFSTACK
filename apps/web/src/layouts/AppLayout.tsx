@@ -44,7 +44,7 @@ interface CommandEntry {
  */
 export function AppLayout() {
   const session = useSession();
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const location = useLocation();
   const navigate = useNavigate();
   const [projects, setProjects] = useState<ShellProject[]>([]);
@@ -396,7 +396,21 @@ export function AppLayout() {
                     </div>
                   </div>
                   <p className="app-account-meta">
-                    {workspace ? `${workspace.name} · ${workspace.role}` : "No workspace"}
+                    {workspace
+                      ? `${workspace.name} · ${
+                          locale === "fr"
+                            ? ((
+                                {
+                                  owner: "propriétaire",
+                                  admin: "administrateur",
+                                  member: "membre",
+                                } as Record<string, string>
+                              )[workspace.role] ?? workspace.role)
+                            : workspace.role
+                        }`
+                      : locale === "fr"
+                        ? "Aucun espace"
+                        : "No workspace"}
                   </p>
                   <NavLink to="/app/settings" className="app-account-link">
                     <SettingsIcon size={14} /> {t("ws.nav.settings")}

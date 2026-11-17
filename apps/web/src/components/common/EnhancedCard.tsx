@@ -1,8 +1,9 @@
 import React, { type ReactNode, useMemo, useRef, useState } from "react";
 
+// Non-destructive, opt-in 3D enhancement layer for cards.
 export function EnhancedCard({
   children,
-  enable3d = true,
+  enable3d = undefined,
   className = "",
 }: {
   children: ReactNode;
@@ -11,6 +12,22 @@ export function EnhancedCard({
 }) {
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const ref = useRef<HTMLDivElement | null>(null);
+
+  // Global toggle (localStorage or data-enhanced3d on body)
+  const isGloballyEnabled = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      const v = window.localStorage?.getItem("proofstack_3d_enabled");
+      if (v === "true") return true;
+      if (v === "false") return false;
+    } catch {
+      // ignore
+    }
+    const ds = (window.document?.body?.dataset?.enhanced3d as string) ?? null;
+    return ds === "true";
+  }, []);
+
+  const effectiveEnabled = enable3d !== undefined ? enable3d : isGloballyEnabled;
 
   const onMouseMove = (e: React.MouseEvent) => {
     const el = ref.current;
@@ -27,13 +44,13 @@ export function EnhancedCard({
 
   const style = useMemo(
     () =>
-      enable3d
+      effectiveEnabled
         ? {
             transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
-            transformStyle: "preserve-3d" as any,
+            transformStyle: "preserve-3d" as any
           }
         : undefined,
-    [tilt.x, tilt.y, enable3d]
+    [tilt.x, tilt.y, effectiveEnabled]
   );
 
   return (

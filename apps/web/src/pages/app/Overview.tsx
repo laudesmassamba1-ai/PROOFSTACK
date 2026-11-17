@@ -70,7 +70,8 @@ const EMPTY_TOTALS = { passed: 0, failed: 0, warnings: 0, errors: 0, skipped: 0,
 
 export function Overview() {
   const { workspaceId } = useSession();
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
+  const fr = locale === "fr";
   const [data, setData] = useState<Overview | null>(null);
   const [error, setError] = useState<ApiError | Error | null>(null);
 
@@ -89,10 +90,17 @@ export function Overview() {
   }, [load]);
 
   if (!workspaceId) {
-    return <Empty title="No workspace yet" body="Create a workspace to begin." tester={false} />;
+    return (
+      <Empty
+        title={fr ? "Aucun espace de travail" : "No workspace yet"}
+        body={fr ? "Créez un espace de travail pour commencer." : "Create a workspace to begin."}
+        tester={false}
+      />
+    );
   }
   if (error) return <ErrorState error={error} onRetry={() => void load()} />;
-  if (!data) return <Loading label="Loading the situation…" />;
+  if (!data)
+    return <Loading label={fr ? "Chargement de la situation…" : "Loading the situation…"} />;
 
   const latest = data.recentRuns[0];
   const failures = data.recentFailures.length;
@@ -146,7 +154,10 @@ export function Overview() {
           <h1 className="app-display app-situation-headline">{headline}</h1>
           <p className="app-support">{support}</p>
         </div>
-        <aside className="app-situation-stamp" aria-label="Real workspace facts">
+        <aside
+          className="app-situation-stamp"
+          aria-label={fr ? "Faits réels du workspace" : "Real workspace facts"}
+        >
           <p className="app-eyebrow">01 / {t("ws.overview.latest")}</p>
           <div className="app-stamp-facts">
             <div>

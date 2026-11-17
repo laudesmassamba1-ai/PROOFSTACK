@@ -53,8 +53,8 @@ const PENDING = [
     body: "Plans and prices are code-backed today. An admin interface for pricing, subscriptions, refunds and webhook history is not built.",
   },
   {
-    title: "Billing and Settings translation",
-    body: "Marketing pages, account forms, the workspace shell, Overview, Projects, modules and CLI are FR/EN. Billing and Settings UI copy is still being migrated and is not claimed as fully bilingual.",
+    title: "Translation coverage",
+    body: "Marketing pages, account forms and every customer workspace screen — shell, Overview, Projects, modules, CLI, Billing and Settings — are FR/EN. The creator operations console remains English operational copy.",
   },
 ];
 

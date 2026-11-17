@@ -268,7 +268,7 @@ export function Settings() {
             reason={
               fr
                 ? "Stockée dans ce navigateur. Le shell, l'Overview, les projets, les modules, la facturation et les paramètres suivent ce choix. Les rapports de run gardent la langue de la configuration du projet."
-                : "Stored in this browser. The shell, Overview, Projects, modules, Billing and Settings follow this choice. Run reports keep the language of the project config."
+                : "Stored in this browser. Every customer workspace screen follows this choice. Run reports and CLI output keep the language of the project config."
             }
           />
         </Card>

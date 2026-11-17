@@ -128,6 +128,7 @@ export const workspaceEn = {
   "ws.projects.description":
     "One project is one application under test: its base URL, environment and the modules allowed to check it.",
   "ws.projects.new": "New project",
+  "ws.projects.loading": "Loading projects…",
   "ws.projects.empty.title": "No projects yet",
   "ws.projects.empty.body":
     "Create a project to get a configuration and a project token for the CLI.",
@@ -341,6 +342,7 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
   "ws.projects.description":
     "Un projet est une application sous test : son URL de base, son environnement et les modules autorisés à la vérifier.",
   "ws.projects.new": "Nouveau projet",
+  "ws.projects.loading": "Chargement des projets…",
   "ws.projects.empty.title": "Aucun projet",
   "ws.projects.empty.body":
     "Créez un projet pour obtenir une configuration et un token projet pour la CLI.",
