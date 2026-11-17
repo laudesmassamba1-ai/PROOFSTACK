@@ -1,4 +1,4 @@
-import { Logger, MemorySink, maskValue, redactKey } from "@proofstack/core";
+import { Logger, MemorySink, maskValue, redactKey } from "@proofcore/core";
 import { describe, expect, it } from "vitest";
 
 describe("structured logging with redaction", () => {
@@ -31,7 +31,7 @@ describe("structured logging with redaction", () => {
       customer: { email: "awa@example.com", phone: "+22997505050" },
       plan: "developer",
     });
-    const line = JSON.stringify(sink.records[0]!.fields);
+    const line = JSON.stringify(sink.records[0]?.fields);
     expect(line).not.toContain("sk_test_abcdefghijklmnop");
     expect(line).not.toContain("sk_live_0123456789abcdef");
     expect(line).not.toContain("whsec_deadbeefcafebabe");
@@ -54,7 +54,7 @@ describe("structured logging with redaction", () => {
       payload: "x".repeat(5000),
       deep: { a: { b: { c: { d: { e: "too deep" } } } } },
     });
-    const fields = sink.records[0]!.fields as Record<string, unknown>;
+    const fields = (sink.records[0]?.fields ?? {}) as Record<string, unknown>;
     expect(String(fields.payload).length).toBeLessThan(700);
     expect(fields.deep).toBeDefined();
     expect(JSON.stringify(fields)).not.toContain("too deep");
@@ -75,7 +75,7 @@ describe("structured logging with redaction", () => {
     const log = new Logger({ sinks: [sink] });
     log.child({ runId: "run_1" }).info("started");
     log.info("global");
-    expect((sink.records[0]!.fields as Record<string, unknown>).runId).toBe("run_1");
-    expect((sink.records[1]!.fields as Record<string, unknown>).runId).toBeUndefined();
+    expect(((sink.records[0]?.fields ?? {}) as Record<string, unknown>).runId).toBe("run_1");
+    expect(((sink.records[1]?.fields ?? {}) as Record<string, unknown>).runId).toBeUndefined();
   });
 });

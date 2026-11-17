@@ -1,6 +1,6 @@
-import type { PaymentProvider, WebhookEvent } from "@proofstack/adapter-payments";
-import type { WebhookEventRecord } from "@proofstack/contracts";
-import { iso, ProofstackError, sha256Hex, uuid } from "@proofstack/core";
+import type { PaymentProvider, WebhookEvent } from "@proofcore/adapter-payments";
+import type { WebhookEventRecord } from "@proofcore/contracts";
+import { iso, ProofCoreError, sha256Hex, uuid } from "@proofcore/core";
 import type { CheckoutService } from "./checkout.js";
 import type { BillingStore } from "./store.js";
 
@@ -117,7 +117,7 @@ export class WebhookProcessor {
         body: { ok: true, eventId: event.eventId, intentId: intent.id, result: result.outcome },
       };
     } catch (error) {
-      if (error instanceof ProofstackError && error.code === "unknown_payment_status") {
+      if (error instanceof ProofCoreError && error.code === "unknown_payment_status") {
         // The provider invented a status. Refuse to credit, keep the intent as it was.
         await this.store.saveWebhook({
           ...record,

@@ -7,15 +7,15 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://proofstack-api.laudesmassamba1.workers.dev/api/:path*"
+      "destination": "https://proofcore-api.laudesmassamba1.workers.dev/api/:path*"
     },
     {
       "source": "/v1/:path*",
-      "destination": "https://proofstack-api.laudesmassamba1.workers.dev/v1/:path*"
+      "destination": "https://proofcore-api.laudesmassamba1.workers.dev/v1/:path*"
     },
     {
       "source": "/health",
-      "destination": "https://proofstack-api.laudesmassamba1.workers.dev/health"
+      "destination": "https://proofcore-api.laudesmassamba1.workers.dev/health"
     },
     { "source": "/(.*)", "destination": "/index.html" }
   ]

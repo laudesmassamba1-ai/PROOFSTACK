@@ -4,11 +4,10 @@ import http from "node:http";
  * Public webhook-only facade for n8n.
  *
  * The Cloudflare Quick Tunnel points here instead of at the n8n editor, so the
- * admin UI is never exposed. Only the signed PROOFSTACK webhook path is accepted;
+ * admin UI is never exposed. Only the signed PROOFCORE webhook path is accepted;
  * n8n still verifies the HMAC and the 300-second timestamp window.
  */
-const target =
-  process.env.N8N_WEBHOOK_TARGET ?? "http://127.0.0.1:5678/webhook/proofstack-payments";
+const target = process.env.N8N_WEBHOOK_TARGET ?? "http://127.0.0.1:5678/webhook/proofcore-payments";
 const allowedPath = new URL(target).pathname;
 const port = Number(process.env.PORT ?? 5681);
 const maxBytes = 64 * 1024;
@@ -44,8 +43,8 @@ const server = http.createServer((request, response) => {
         method: "POST",
         headers: {
           "content-type": request.headers["content-type"] ?? "application/json",
-          "x-proofstack-timestamp": request.headers["x-proofstack-timestamp"] ?? "",
-          "x-proofstack-signature": request.headers["x-proofstack-signature"] ?? "",
+          "x-proofcore-timestamp": request.headers["x-proofcore-timestamp"] ?? "",
+          "x-proofcore-signature": request.headers["x-proofcore-signature"] ?? "",
         },
         body: Buffer.concat(chunks),
         signal: controller.signal,

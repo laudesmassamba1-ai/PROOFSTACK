@@ -1,6 +1,6 @@
-import { proofstackConfigSchema } from "@proofstack/contracts";
-import { FixedClock, Logger } from "@proofstack/core";
-import { runEngine } from "@proofstack/engine";
+import { proofcoreConfigSchema } from "@proofcore/contracts";
+import { FixedClock, Logger } from "@proofcore/core";
+import { runEngine } from "@proofcore/engine";
 import { describe, expect, it } from "vitest";
 import {
   checkFieldType,
@@ -26,7 +26,7 @@ import {
  */
 
 function configWith(exit: Record<string, unknown>) {
-  return proofstackConfigSchema.parse({
+  return proofcoreConfigSchema.parse({
     project: { name: "EXIT fixture", baseUrl: "http://localhost:3000" },
     environment: "staging",
     modules: {

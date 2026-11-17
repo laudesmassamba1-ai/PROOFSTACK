@@ -1,5 +1,5 @@
-import type { PaymentProvider } from "@proofstack/adapter-payments";
-import { normalizeEmail } from "@proofstack/billing";
+import type { PaymentProvider } from "@proofcore/adapter-payments";
+import { normalizeEmail } from "@proofcore/billing";
 import { createPaymentProvider, hasSasPayCredentials } from "./providers.js";
 
 /**

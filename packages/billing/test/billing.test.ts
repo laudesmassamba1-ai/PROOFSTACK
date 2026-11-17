@@ -1,5 +1,5 @@
-import { SandboxProvider } from "@proofstack/adapter-payments";
-import { FixedClock } from "@proofstack/core";
+import { SandboxProvider } from "@proofcore/adapter-payments";
+import { FixedClock } from "@proofcore/core";
 import { describe, expect, it } from "vitest";
 import {
   CheckoutService,
@@ -570,7 +570,7 @@ describe("plan catalogue", () => {
     for (const key of ["developer", "studio", "agency"]) {
       const plan = findPlan(key);
       expect(plan).toBeDefined();
-      for (const price of plan!.prices) {
+      for (const price of plan?.prices ?? []) {
         expect(price.amount.minor).toMatch(/^\d+$/);
         expect(["USD", "EUR", "XOF"]).toContain(price.amount.currency);
       }
@@ -578,8 +578,8 @@ describe("plan catalogue", () => {
   });
 
   it("marks XOF prices as whole units, because XOF has no subunit", () => {
-    const plan = findPlan("developer")!;
-    const xof = plan.prices.find((p) => p.amount.currency === "XOF" && p.period === "monthly");
+    const plan = findPlan("developer");
+    const xof = plan?.prices.find((p) => p.amount.currency === "XOF" && p.period === "monthly");
     expect(xof?.amount.minor).toBe("15000");
   });
 });

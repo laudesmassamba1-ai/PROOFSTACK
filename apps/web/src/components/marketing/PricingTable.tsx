@@ -1,6 +1,6 @@
-import { PLANS, SUPPORTED_CURRENCIES, yearlySavingPercent } from "@proofstack/billing";
-import { type EntitlementKey, planSchema } from "@proofstack/contracts";
-import { Money } from "@proofstack/core";
+import { PLANS, SUPPORTED_CURRENCIES, yearlySavingPercent } from "@proofcore/billing";
+import { type EntitlementKey, planSchema } from "@proofcore/contracts";
+import { Money } from "@proofcore/core";
 import { Check, Minus } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";

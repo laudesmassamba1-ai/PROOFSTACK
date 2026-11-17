@@ -11,7 +11,7 @@ import { migrationFiles, NodeSqliteDatabase } from "./db/node-sqlite.js";
  */
 async function main(): Promise<void> {
   const path = resolve(
-    process.argv.find((arg) => arg.endsWith(".db")) ?? process.env.DATA_PATH ?? ".proofstack/api.db"
+    process.argv.find((arg) => arg.endsWith(".db")) ?? process.env.DATA_PATH ?? ".proofcore/api.db"
   );
   const db = NodeSqliteDatabase.open(path);
   const applied = await migrate(db, migrationFiles());

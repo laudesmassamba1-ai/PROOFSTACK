@@ -18,7 +18,7 @@
 
 ## AI integration (MCP, providers, agents)
 
-- PROOFSTACK consumes MCP servers; it is not an MCP server. Never claim otherwise.
+- PROOFCORE consumes MCP servers; it is not an MCP server. Never claim otherwise.
 - Every credential is read from an environment variable at call time. `apiKeyEnvVar` holds the NAME, never the key.
 - Commands are argv arrays passed to `spawn`/`execFile` with `shell: false`. Never build a shell string.
 - A tool is `read` only when the server annotates it `readOnlyHint: true`. Everything else is `write`.

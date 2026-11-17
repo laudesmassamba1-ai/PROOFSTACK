@@ -1,7 +1,7 @@
-import type { LocaleProfileData, ModuleId, ProofstackConfig } from "@proofstack/contracts";
-import { localeProfileFileSchema } from "@proofstack/contracts";
-import { ProofstackError } from "@proofstack/core";
-import type { ModuleProvider, SuiteInput, TestSuiteDef } from "@proofstack/engine";
+import type { LocaleProfileData, ModuleId, ProofCoreConfig } from "@proofcore/contracts";
+import { localeProfileFileSchema } from "@proofcore/contracts";
+import { ProofCoreError } from "@proofcore/core";
+import type { ModuleProvider, SuiteInput, TestSuiteDef } from "@proofcore/engine";
 import { buildWorldSuites } from "./checks.js";
 import { FIXTURE_CATEGORIES, type FixtureCategory } from "./fixtures.js";
 import type { ProductUnderTest } from "./harness.js";
@@ -43,7 +43,7 @@ export function createWorldProvider(options: WorldProviderOptions = {}): ModuleP
 }
 
 export function resolveProfiles(
-  config: ProofstackConfig,
+  config: ProofCoreConfig,
   options: WorldProviderOptions,
   requested?: string[]
 ): LocaleProfileData[] {
@@ -58,7 +58,7 @@ export function resolveProfiles(
     else missing.push(id);
   }
   if (missing.length > 0) {
-    throw new ProofstackError({
+    throw new ProofCoreError({
       message: `unknown locale profile(s): ${missing.join(", ")}`,
       category: "CONFIGURATION",
       code: "unknown_profile",
@@ -75,7 +75,7 @@ export function resolveProfiles(
 export function parseProfileFile(text: string): LocaleProfileData[] {
   const parsed = localeProfileFileSchema.safeParse(JSON.parse(text));
   if (!parsed.success) {
-    throw new ProofstackError({
+    throw new ProofCoreError({
       message: `invalid locale profile file: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`,
       category: "CONFIGURATION",
       code: "bad_profile_file",

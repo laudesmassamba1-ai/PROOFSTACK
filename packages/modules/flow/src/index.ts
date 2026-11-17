@@ -1,5 +1,5 @@
-import type { ModuleId, ProofstackConfig } from "@proofstack/contracts";
-import type { ModuleProvider, SuiteInput, TestSuiteDef } from "@proofstack/engine";
+import type { ModuleId, ProofCoreConfig } from "@proofcore/contracts";
+import type { ModuleProvider, SuiteInput, TestSuiteDef } from "@proofcore/engine";
 import { buildFlowSuites, type FlowCheckOptions } from "./checks.js";
 import type { FlowScenario, PaymentUnderTest } from "./harness.js";
 import { HttpPaymentTarget } from "./target.js";
@@ -49,7 +49,7 @@ export function createFlowProvider(options: FlowProviderOptions = {}): ModulePro
  * reason that is not about the product.
  */
 export function defaultFlowTarget(
-  config: ProofstackConfig,
+  config: ProofCoreConfig,
   tokenProvider?: () => string | undefined
 ): PaymentUnderTest | undefined {
   const target = new HttpPaymentTarget({

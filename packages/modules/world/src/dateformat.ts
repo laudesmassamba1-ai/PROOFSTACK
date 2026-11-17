@@ -1,5 +1,5 @@
-import type { WallClock } from "@proofstack/core";
-import { ProofstackError } from "@proofstack/core";
+import type { WallClock } from "@proofcore/core";
+import { ProofCoreError } from "@proofcore/core";
 
 /**
  * Reference date-pattern parser.
@@ -16,8 +16,16 @@ const FULLWIDTH = /[\uff10-\uff19]/g;
 
 export function toAsciiDigits(value: string): string {
   return value
-    .replace(ARABIC_INDIC, (d) => String(d.codePointAt(0)! - (d < "\u066a" ? 0x0660 : 0x06f0)))
-    .replace(FULLWIDTH, (d) => String(d.codePointAt(0)! - 0xff10));
+    .replace(ARABIC_INDIC, (d) => String(codePoint(d) - (d < "\u066a" ? 0x0660 : 0x06f0)))
+    .replace(FULLWIDTH, (d) => String(codePoint(d) - 0xff10));
+}
+
+/** Single-character regex matches always have a code point; assert it once, here. */
+function codePoint(character: string): number {
+  const value = character.codePointAt(0);
+  if (value === undefined)
+    throw new Error(`toAsciiDigits: empty match ${JSON.stringify(character)}`);
+  return value;
 }
 
 export interface ParsedDate {
@@ -63,7 +71,9 @@ export function parseWithPattern(value: string, pattern: string): ParsedDate | u
       cursor += expected.length;
       continue;
     }
-    const token = part.token!;
+    // A part carries either a literal or a token by construction; assert once.
+    const token = part.token;
+    if (token === undefined) continue;
     if (token === "YYYY") {
       const chunk = digits.slice(cursor, cursor + 4);
       if (!/^\d{4}$/.test(chunk)) return undefined;
@@ -163,7 +173,7 @@ export function parseJapaneseDate(value: string): ParsedDate | undefined {
 
 export function assertCalendarDate(wall: WallClock, label = "date"): void {
   if (!calendarExists(wall)) {
-    throw new ProofstackError({
+    throw new ProofCoreError({
       message: `${label} does not exist on the calendar: ${wall.year}-${wall.month}-${wall.day}`,
       category: "VALIDATION",
       code: "impossible_date",

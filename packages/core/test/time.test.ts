@@ -7,7 +7,7 @@ import {
   wallClockIn,
   zoneObservesDst,
   zoneOffsetMs,
-} from "@proofstack/core";
+} from "@proofcore/core";
 import { describe, expect, it } from "vitest";
 
 describe("time and time zones", () => {
@@ -63,7 +63,7 @@ describe("time and time zones", () => {
     expect(res.kind).toBe("ambiguous");
     if (res.kind === "ambiguous") {
       expect(res.instants.length).toBe(2);
-      expect(res.instants[1]! - res.instants[0]!).toBe(60 * 60_000);
+      expect((res.instants[1] ?? 0) - (res.instants[0] ?? 0)).toBe(60 * 60_000);
     }
   });
 
@@ -89,7 +89,7 @@ describe("time and time zones", () => {
   });
 
   it("rejects impossible ISO instants instead of rolling them over", () => {
-    // V8 silently rolls 2026-02-30 over to 2026-03-02; PROOFSTACK must not.
+    // V8 silently rolls 2026-02-30 over to 2026-03-02; PROOFCORE must not.
     expect(isIsoInstant("2026-02-30T00:00:00Z")).toBe(false);
     expect(() => parseIsoStrict("2026-02-30T00:00:00Z")).toThrowError(/not an ISO-8601 instant/);
     expect(isIsoInstant("2026-02-28T00:00:00Z")).toBe(true);

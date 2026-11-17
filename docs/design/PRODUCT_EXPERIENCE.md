@@ -1,4 +1,4 @@
-# Product experience — PROOFSTACK workspace
+# Product experience — PROOFCORE workspace
 
 ## Thesis
 

@@ -158,9 +158,10 @@ const HOMOGLYPH_GROUPS = [
 export function suspiciousHomoglyphs(value: string): string[] {
   const out: string[] = [];
   for (const ch of value) {
-    if (ch.codePointAt(0)! < 128) continue;
+    const code = ch.codePointAt(0) ?? 0;
+    if (code < 128) continue;
     for (const group of HOMOGLYPH_GROUPS) {
-      if (group.includes(ch) && group.some((c) => c.codePointAt(0)! < 128)) {
+      if (group.includes(ch) && group.some((c) => (c.codePointAt(0) ?? 0) < 128)) {
         out.push(ch);
         break;
       }

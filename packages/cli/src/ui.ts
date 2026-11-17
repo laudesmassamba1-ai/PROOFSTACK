@@ -5,21 +5,21 @@ import { stdin, stdout } from "node:process";
 import { createInterface } from "node:readline/promises";
 
 /**
- * The PROOFSTACK terminal console.
+ * The PROOFCORE terminal console.
  *
  * This is deliberately dependency-free: the CLI already ships as a Node package, and a
  * full-screen UI should not add an install step or a native dependency. It talks to the
  * same API as the browser with the same HttpOnly session cookie, but stores that cookie
  * locally with mode 0600 so a terminal session can survive a restart. Passwords are
- * never stored; `proofstack logout` removes the cookie file.
+ * never stored; `proofcore logout` removes the cookie file.
  *
  * The TUI is read-only except for explicit project creation. "Pilot the app" means
  * seeing the workspace, projects, runs, plan and payments without opening a browser;
  * creating a project is confirmed through a form, while test execution and uploads
- * still happen locally through `proofstack test` / `proofstack sync`.
+ * still happen locally through `proofcore test` / `proofcore sync`.
  */
 
-export const DEFAULT_API_URL = "https://proofstack-iota.vercel.app";
+export const DEFAULT_API_URL = "https://proofcore-iota.vercel.app";
 export const SCREENS = ["overview", "projects", "runs", "billing", "admin", "help"] as const;
 export type Screen = (typeof SCREENS)[number];
 
@@ -233,24 +233,24 @@ export class UiApiError extends Error {
 // ------------------------------------------------------------------- session files
 
 export function resolveApiUrl(explicit?: string): string {
-  const value = explicit ?? process.env.PROOFSTACK_API_URL ?? DEFAULT_API_URL;
+  const value = explicit ?? process.env.PROOFCORE_API_URL ?? DEFAULT_API_URL;
   return value.replace(/\/+$/, "");
 }
 
 export function sessionFilePath(): string {
-  if (process.env.PROOFSTACK_SESSION_FILE) return process.env.PROOFSTACK_SESSION_FILE;
+  if (process.env.PROOFCORE_SESSION_FILE) return process.env.PROOFCORE_SESSION_FILE;
   const root =
-    process.env.PROOFSTACK_CONFIG_HOME ?? process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config");
-  return join(root, "proofstack", "session.json");
+    process.env.PROOFCORE_CONFIG_HOME ?? process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config");
+  return join(root, "proofcore", "session.json");
 }
 
 export async function loadStoredSession(apiUrl = resolveApiUrl()): Promise<StoredSession | null> {
-  const envCookie = process.env.PROOFSTACK_SESSION_COOKIE?.trim();
+  const envCookie = process.env.PROOFCORE_SESSION_COOKIE?.trim();
   if (envCookie) {
     return {
       apiUrl,
       cookie: envCookie,
-      email: process.env.PROOFSTACK_SESSION_EMAIL ?? "environment",
+      email: process.env.PROOFCORE_SESSION_EMAIL ?? "environment",
       savedAt: new Date().toISOString(),
     };
   }
@@ -382,7 +382,7 @@ export async function loginInteractive(input: {
 }): Promise<StoredSession> {
   if (!stdin.isTTY) {
     throw new Error(
-      "Interactive login needs a terminal. Set PROOFSTACK_SESSION_COOKIE to use `proofstack ui` in scripts."
+      "Interactive login needs a terminal. Set PROOFCORE_SESSION_COOKIE to use `proofcore ui` in scripts."
     );
   }
   const rl = createInterface({ input: stdin, output: stdout });
@@ -460,7 +460,7 @@ export async function runUi(options: UiOptions): Promise<number> {
   }
   if (!session) {
     process.stderr.write(
-      `Not signed in. Run \`proofstack login\` (or set PROOFSTACK_SESSION_COOKIE for CI).\n`
+      `Not signed in. Run \`proofcore login\` (or set PROOFCORE_SESSION_COOKIE for CI).\n`
     );
     return 2;
   }
@@ -474,7 +474,7 @@ export async function runUi(options: UiOptions): Promise<number> {
   }
   if (!auth.user) {
     process.stderr.write(
-      "The stored session is no longer valid. Run `proofstack login` to sign in again.\n"
+      "The stored session is no longer valid. Run `proofcore login` to sign in again.\n"
     );
     return 2;
   }
@@ -488,7 +488,9 @@ export async function runUi(options: UiOptions): Promise<number> {
     screen,
     session,
     auth,
-    workspaceId: workspaces[0]!.id,
+    // workspaces.length is checked above (the command exits with guidance
+    // otherwise); use at() so no assertion is needed.
+    workspaceId: workspaces[0]?.id ?? "",
     overview: null,
     projects: null,
     runs: null,
@@ -522,7 +524,7 @@ export async function runUi(options: UiOptions): Promise<number> {
   }
 
   if (!stdin.isTTY) {
-    process.stderr.write("The full-screen console needs a TTY. Use `proofstack ui --once`.\n");
+    process.stderr.write("The full-screen console needs a TTY. Use `proofcore ui --once`.\n");
     return 2;
   }
 
@@ -563,7 +565,8 @@ function interactiveLoop(state: UiState, rerender: () => void): Promise<number> 
         return;
       }
       const index = list.findIndex((workspace) => workspace.id === state.workspaceId);
-      const next = list[(index + 1) % list.length]!;
+      const next = list[(index + 1) % list.length];
+      if (!next) return;
       state.workspaceId = next.id;
       state.overview = null;
       state.projects = null;
@@ -594,17 +597,19 @@ function interactiveLoop(state: UiState, rerender: () => void): Promise<number> 
         return;
       }
       if (chunk === "\t" || chunk === "\u001B[C") {
-        changeScreen(SCREENS[(SCREENS.indexOf(state.screen) + 1) % SCREENS.length]!);
+        const nextScreen = SCREENS[(SCREENS.indexOf(state.screen) + 1) % SCREENS.length];
+        if (nextScreen) changeScreen(nextScreen);
         return;
       }
       if (chunk === "\u001B[Z" || chunk === "\u001B[D") {
-        changeScreen(
-          SCREENS[(SCREENS.indexOf(state.screen) - 1 + SCREENS.length) % SCREENS.length]!
-        );
+        const previousScreen =
+          SCREENS[(SCREENS.indexOf(state.screen) - 1 + SCREENS.length) % SCREENS.length];
+        if (previousScreen) changeScreen(previousScreen);
         return;
       }
       if (/^[1-6]$/.test(chunk)) {
-        changeScreen(SCREENS[Number(chunk) - 1]!);
+        const screen = SCREENS[Number(chunk) - 1];
+        if (screen) changeScreen(screen);
         return;
       }
       if (chunk === "?") {
@@ -957,7 +962,7 @@ export function renderScreen(state: UiState, width = 100, height = 40, color = t
   };
   const workspace = (state.auth.workspaces ?? []).find((item) => item.id === state.workspaceId);
 
-  add(`${paint("1", "PROOFSTACK")} ${paint("2", "· terminal console")}`);
+  add(`${paint("1", "PROOFCORE")} ${paint("2", "· terminal console")}`);
   add(
     paint(
       "2",
@@ -1267,14 +1272,14 @@ function renderAdmin(
 
 export function renderHelp(width: number, _color = false): string {
   return [
-    "PROOFSTACK terminal console",
+    "PROOFCORE terminal console",
     "",
-    "  proofstack                 Open this console (TTY)",
-    "  proofstack ui              Same, explicit",
-    "  proofstack ui --once       Print one screen and exit",
-    "  proofstack status          One-shot account/workspace summary",
-    "  proofstack login           Sign in and store a 0600 session cookie",
-    "  proofstack logout          Remove the stored session",
+    "  proofcore                 Open this console (TTY)",
+    "  proofcore ui              Same, explicit",
+    "  proofcore ui --once       Print one screen and exit",
+    "  proofcore status          One-shot account/workspace summary",
+    "  proofcore login           Sign in and store a 0600 session cookie",
+    "  proofcore logout          Remove the stored session",
     "",
     "Screens",
     "  1 Overview   workspace, plan, projects, recent runs and failures",
@@ -1295,7 +1300,7 @@ export function renderHelp(width: number, _color = false): string {
     "  ?                       help    q / Ctrl-C   quit",
     "",
     "Projects can be created from the console. Test execution and uploads still run",
-    "locally with `proofstack test` and `proofstack sync`; billing/admin stay read-only.",
+    "locally with `proofcore test` and `proofcore sync`; billing/admin stay read-only.",
     "",
     `API default: ${DEFAULT_API_URL}`,
     `Session file: ${sessionFilePath()}`,
@@ -1379,7 +1384,7 @@ function money(minor: string, currency: string): string {
 function describeError(error: unknown): string {
   if (error instanceof UiApiError) {
     if (error.status === 401) {
-      return `${error.message} (session expired: run \`proofstack login\`)`;
+      return `${error.message} (session expired: run \`proofcore login\`)`;
     }
     if (error.code === "admin_required" || error.code === "admin_not_configured") {
       return `${error.message} (ADMIN_EMAILS must contain this account on the API)`;

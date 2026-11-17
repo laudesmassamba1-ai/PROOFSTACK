@@ -10,17 +10,17 @@ import {
   type TestRun,
   type TestStatus,
   testRunSchema,
-} from "@proofstack/contracts";
+} from "@proofcore/contracts";
 import {
   type Clock,
   durationMs,
   FixedClock,
   Logger,
-  ProofstackError,
+  ProofCoreError,
   sha256Hex,
   toFailureRecord,
   uuid,
-} from "@proofstack/core";
+} from "@proofcore/core";
 import {
   AssertionFailed,
   CaseContext,
@@ -83,7 +83,7 @@ export async function runEngine(options: EngineOptions): Promise<EngineRunResult
     .filter(Boolean);
 
   if (providers.length === 0) {
-    throw new ProofstackError({
+    throw new ProofCoreError({
       message: `no module provider selected (requested: ${[...only].join(", ") || "none"})`,
       category: "CONFIGURATION",
       code: "no_providers",
@@ -119,7 +119,7 @@ export async function runEngine(options: EngineOptions): Promise<EngineRunResult
   // A provider that legitimately emits no cases is left to the status model, where an
   // empty module is ERROR rather than a vacuous success.
   if (planned.length === 0 && onlyCases.length > 0) {
-    throw new ProofstackError({
+    throw new ProofCoreError({
       message: `no case matched --only ${onlyCases.join(", ")}`,
       category: "CONFIGURATION",
       code: "no_matching_cases",
@@ -161,7 +161,8 @@ export async function runEngine(options: EngineOptions): Promise<EngineRunResult
       if (controller.signal.aborted || stopRequested) return;
       const index = cursor++;
       if (index >= planned.length) return;
-      const item = planned[index]!;
+      const item = planned[index];
+      if (!item) return;
       emit({ type: "case-start", module: item.provider.id, name: item.caseDef.name });
       const outcome = await executeCase(item, {
         runId,
@@ -288,7 +289,7 @@ export async function runEngine(options: EngineOptions): Promise<EngineRunResult
     const issues = parsed.error.issues
       .map((i) => ` - ${i.path.join(".")}: ${i.message}`)
       .join("\n");
-    throw new ProofstackError({
+    throw new ProofCoreError({
       message: `engine produced a run that violates the shared contract:\n${issues}`,
       category: "INTERNAL",
       code: "contract_violation",
@@ -419,7 +420,7 @@ async function executeCase(item: Planned, deps: ExecuteDeps): Promise<CaseOutcom
     return { result, findings };
   }
 
-  throw new ProofstackError({
+  throw new ProofCoreError({
     message: "engine: unreachable retry exit",
     category: "INTERNAL",
     code: "unreachable",
@@ -534,7 +535,7 @@ async function buildFindings(
   const out: Finding[] = [];
   const repro = {
     summary: `Re-run only this case: ${result.id}`,
-    command: `proofstack test --module ${result.module} --only ${result.id}`,
+    command: `proofcore test --module ${result.module} --only ${result.id}`,
     fixtureIds: [] as string[],
     environment: result.environment,
   };
@@ -628,7 +629,7 @@ async function buildFindings(
       },
       reproduction: {
         summary: "The check could not be evaluated; this is not a product verdict.",
-        command: `proofstack doctor && proofstack test --module ${result.module} --only ${result.id}`,
+        command: `proofcore doctor && proofcore test --module ${result.module} --only ${result.id}`,
         fixtureIds: [],
         environment: result.environment,
         ...(result.failure.retryable === undefined

@@ -1,4 +1,4 @@
-import { ProofstackError } from "./errors.js";
+import { ProofCoreError } from "./errors.js";
 
 /**
  * Deterministic JSON. Used for manifests, checksums and report digests: two
@@ -18,7 +18,7 @@ export function stableStringify(value: unknown, indent = 0): string {
   const seen = new WeakSet<object>();
   const walk = (node: unknown, depth: number): string => {
     if (node === undefined)
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: "stableStringify: undefined is not a JSON value",
         category: "VALIDATION",
         code: "undefined_value",
@@ -28,7 +28,7 @@ export function stableStringify(value: unknown, indent = 0): string {
     if (seen.has(node as object)) {
       // A digest of a truncated structure would look authoritative and be wrong,
       // so a cycle is an error rather than a "[cyclic]" placeholder.
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: "stableStringify: cyclic structure cannot be canonicalized",
         category: "VALIDATION",
         code: "cyclic_structure",

@@ -1,5 +1,5 @@
-import type { ModuleId, ProofstackConfig } from "@proofstack/contracts";
-import type { ModuleProvider, SuiteInput, TestSuiteDef } from "@proofstack/engine";
+import type { ModuleId, ProofCoreConfig } from "@proofcore/contracts";
+import type { ModuleProvider, SuiteInput, TestSuiteDef } from "@proofcore/engine";
 import { buildExitSuites, type ExitCheckOptions } from "./checks.js";
 import type { ExportFormat, ExportSource, RoundTripTarget } from "./data.js";
 import { CommandExportSource, FileExportSource, HttpExportSource } from "./sources.js";
@@ -43,7 +43,7 @@ export function createExitProvider(options: ExitProviderOptions = {}): ModulePro
  * with a reason, which is honest about not having tested anything.
  */
 export function defaultExportSource(
-  config: ProofstackConfig,
+  config: ProofCoreConfig,
   tokenProvider?: () => string | undefined
 ): ExportSource | undefined {
   const source = config.modules.exit.exportSource;

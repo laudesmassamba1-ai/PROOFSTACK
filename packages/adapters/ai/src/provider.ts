@@ -1,4 +1,4 @@
-import { ProofstackError } from "@proofstack/core";
+import { ProofCoreError } from "@proofcore/core";
 
 /**
  * AI provider adapters.
@@ -150,7 +150,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
         signal: controller.signal,
       });
     } catch (error) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `AI provider "${this.name}" request failed: ${error instanceof Error ? error.message : String(error)}`,
         category: "NETWORK",
         code: "ai_network_error",
@@ -164,7 +164,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
 
     if (!response.ok) {
       const text = await response.text().catch(() => "");
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `AI provider "${this.name}" returned HTTP ${response.status}: ${text.slice(0, 400)}`,
         category: response.status === 429 ? "RATE_LIMITED" : "PROVIDER",
         code: `ai_http_${response.status}`,
@@ -188,7 +188,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
 
     const choice = payload.choices?.[0];
     if (!choice?.message) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `AI provider "${this.name}" returned no choices`,
         category: "PROVIDER",
         code: "ai_empty_response",
@@ -244,7 +244,7 @@ function parseArguments(raw: string | undefined, provider: string): Record<strin
     }
     return { value: parsed };
   } catch {
-    throw new ProofstackError({
+    throw new ProofCoreError({
       message: `AI provider "${provider}" emitted invalid JSON for tool arguments: ${raw.slice(0, 300)}`,
       category: "PROVIDER",
       code: "ai_bad_tool_arguments",
@@ -301,7 +301,7 @@ export function providerFromConfig(config: {
   if (config.apiKeyEnvVar) {
     apiKey = process.env[config.apiKeyEnvVar];
     if (!apiKey) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `AI provider "${config.name}" needs ${config.apiKeyEnvVar}, which is not set.`,
         category: "CONFIGURATION",
         code: "ai_key_missing",

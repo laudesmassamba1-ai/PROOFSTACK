@@ -6,7 +6,7 @@ themselves; this file covers the SaaS layer added on top of them.
 
 ## Runtime split
 
-PROOFSTACK is not a browser-testing service. That boundary is the central
+PROOFCORE is not a browser-testing service. That boundary is the central
 architectural decision:
 
 | Work                                                              | Runs on                   | Why                                                                      |

@@ -1,5 +1,5 @@
-import type { Assertion, Evidence, TestCaseResult } from "@proofstack/contracts";
-import { ProofstackError, sha256Hex } from "@proofstack/core";
+import type { Assertion, Evidence, TestCaseResult } from "@proofcore/contracts";
+import { ProofCoreError, sha256Hex } from "@proofcore/core";
 import type { EvidenceStore, ReportCall, TestContext } from "./types.js";
 
 /** Control-flow signals: they are not failures, and must never be reported as such. */
@@ -10,7 +10,7 @@ export class SkipRequested extends Error {
   }
 }
 
-export class AssertionFailed extends ProofstackError {
+export class AssertionFailed extends ProofCoreError {
   constructor(
     message: string,
     readonly details_: Record<string, unknown>,
@@ -27,7 +27,7 @@ export class AssertionFailed extends ProofstackError {
   }
 }
 
-export class TimeoutRequested extends ProofstackError {
+export class TimeoutRequested extends ProofCoreError {
   constructor(message: string, details: Record<string, unknown>) {
     super({ message, category: "TIMEOUT", code: "case_timeout", details, retryable: true });
     this.name = "TimeoutRequested";
@@ -212,7 +212,7 @@ export class CaseContext implements TestContext {
       const onAbort = () => {
         clearTimeout(timer);
         reject(
-          new ProofstackError({
+          new ProofCoreError({
             message: "cancelled",
             category: "TIMEOUT",
             code: "cancelled",
@@ -248,7 +248,7 @@ export class NullEvidenceStore implements EvidenceStore {
       label: input.label,
       ref: {
         storage: "local",
-        path: `.proofstack/evidence/${input.key}`,
+        path: `.proofcore/evidence/${input.key}`,
         sha256: digest,
         bytes: input.bytes.byteLength,
       },
@@ -283,7 +283,7 @@ export class MemoryEvidenceStore implements EvidenceStore {
       label: input.label,
       ref: {
         storage: "local",
-        path: `.proofstack/evidence/${input.key}`,
+        path: `.proofcore/evidence/${input.key}`,
         sha256: digest,
         bytes: input.bytes.byteLength,
       },

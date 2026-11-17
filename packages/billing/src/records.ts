@@ -6,12 +6,12 @@ import type {
   SubscriptionState,
   UsageEvent,
   WebhookEventRecord,
-} from "@proofstack/contracts";
+} from "@proofcore/contracts";
 
 /**
  * Billing rows.
  *
- * `@proofstack/contracts` owns the wire shapes that cross a boundary (Invoice,
+ * `@proofcore/contracts` owns the wire shapes that cross a boundary (Invoice,
  * UsageEvent, WebhookEventRecord). These are the storage-side records around them.
  * Every amount is a minor-unit *string* plus an explicit currency — never a float,
  * and never a number that can silently lose precision on its way to JSON.

@@ -4,7 +4,7 @@ import { chmod, cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 /**
- * Build a self-contained, globally installable PROOFSTACK CLI.
+ * Build a self-contained, globally installable PROOFCORE CLI.
  *
  * The workspace packages are ESM and reference each other with `workspace:*`.
  * Publishing them one by one would make `npm install -g` depend on twelve separate
@@ -32,9 +32,9 @@ function run(command, args, cwd) {
   }
 }
 
-console.log("PROOFSTACK CLI — build standalone release");
+console.log("PROOFCORE CLI — build standalone release");
 
-// Build every workspace package first: esbuild resolves @proofstack/* through the
+// Build every workspace package first: esbuild resolves @proofcore/* through the
 // package `main` fields, so their dist files must exist and match the source.
 run(process.execPath, [join(root, "tooling/scripts/build.mjs")], root);
 
@@ -42,7 +42,7 @@ await rm(releaseDir, { recursive: true, force: true });
 await mkdir(releaseDir, { recursive: true });
 await mkdir(artifactsDir, { recursive: true });
 
-const bundlePath = join(releaseDir, "proofstack.js");
+const bundlePath = join(releaseDir, "proofcore.js");
 await build({
   absWorkingDir: root,
   entryPoints: [join(cliDir, "src/index.ts")],
@@ -59,16 +59,16 @@ await chmod(bundlePath, 0o755);
 await cp(join(root, "LICENSE"), join(releaseDir, "LICENSE"));
 await writeFile(
   join(releaseDir, "README.md"),
-  `# PROOFSTACK CLI
+  `# PROOFCORE CLI
 
-The PROOFSTACK terminal client: project setup, module execution, reports, sync and
+The PROOFCORE terminal client: project setup, module execution, reports, sync and
 the interactive console.
 
 ## Install globally
 
 \`\`\`bash
-npm install -g ./proofstack-cli-${version}.tgz
-proofstack --version
+npm install -g ./proofcore-cli-${version}.tgz
+proofcore --version
 \`\`\`
 
 Requires Node.js 22.18 or newer. The tarball is self-contained: it has no runtime
@@ -77,17 +77,17 @@ npm dependencies.
 ## First use in an application
 
 \`\`\`bash
-proofstack --cwd /path/to/your/app init
-proofstack --cwd /path/to/your/app doctor
-proofstack --cwd /path/to/your/app test --module world,flow,exit
-proofstack --cwd /path/to/your/app report text
+proofcore --cwd /path/to/your/app init
+proofcore --cwd /path/to/your/app doctor
+proofcore --cwd /path/to/your/app test --module world,flow,exit
+proofcore --cwd /path/to/your/app report text
 \`\`\`
 
 The interactive console:
 
 \`\`\`bash
-proofstack login
-proofstack
+proofcore login
+proofcore
 \`\`\`
 
 A skipped case is not a pass. Exit codes: 0 pass, 1 defect, 2 harness error or
@@ -100,16 +100,16 @@ await writeFile(
   join(releaseDir, "package.json"),
   `${JSON.stringify(
     {
-      name: "@proofstack/cli",
+      name: "@proofcore/cli",
       version,
       description: cliPackage.description,
       license: "MPL-2.0",
       type: "module",
-      bin: { proofstack: "proofstack.js" },
-      files: ["proofstack.js", "README.md", "LICENSE"],
+      bin: { proofcore: "proofcore.js" },
+      files: ["proofcore.js", "README.md", "LICENSE"],
       engines: { node: ">=22.18.0" },
       publishConfig: { access: "public" },
-      keywords: ["proofstack", "testing", "quality", "reliability", "cli"],
+      keywords: ["proofcore", "testing", "quality", "reliability", "cli"],
     },
     null,
     2
@@ -120,6 +120,6 @@ await writeFile(
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 run(npm, ["pack", "--pack-destination", artifactsDir], releaseDir);
 
-const tarball = join(artifactsDir, `proofstack-cli-${version}.tgz`);
+const tarball = join(artifactsDir, `proofcore-cli-${version}.tgz`);
 console.log(`\nCreated ${tarball}`);
 console.log(`Install: npm install -g ${tarball}`);

@@ -20,21 +20,21 @@ const MODULES = {
     icon: Globe2,
     summary: "ws.module.world.summary",
     body: "ws.module.world.body",
-    command: "proofstack test --module world",
+    command: "proofcore test --module world",
   },
   flow: {
     name: "FLOW",
     icon: RouteIcon,
     summary: "ws.module.flow.summary",
     body: "ws.module.flow.body",
-    command: "proofstack test --module flow",
+    command: "proofcore test --module flow",
   },
   exit: {
     name: "EXIT",
     icon: PackageOpen,
     summary: "ws.module.exit.summary",
     body: "ws.module.exit.body",
-    command: "proofstack test --module exit",
+    command: "proofcore test --module exit",
   },
 } as const;
 
@@ -110,8 +110,8 @@ export function ModulePage() {
         title={fr ? "Module inconnu" : "Unknown module"}
         body={
           fr
-            ? "PROOFSTACK a trois modules : WORLD, FLOW et EXIT."
-            : "PROOFSTACK has three modules: WORLD, FLOW and EXIT."
+            ? "PROOFCORE a trois modules : WORLD, FLOW et EXIT."
+            : "PROOFCORE has three modules: WORLD, FLOW and EXIT."
         }
         tester="lost"
       />

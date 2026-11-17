@@ -1,5 +1,5 @@
 import { webcrypto } from "./crypto.js";
-import { ProofstackError } from "./errors.js";
+import { ProofCoreError } from "./errors.js";
 
 /**
  * Hashing on Web Crypto only (available in Node >= 19, Cloudflare Workers and the
@@ -29,7 +29,7 @@ export function toHex(bytes: Uint8Array): string {
 
 export function fromHex(value: string): Uint8Array {
   if (!/^([0-9a-fA-F]{2})+$/.test(value)) {
-    throw new ProofstackError({
+    throw new ProofCoreError({
       message: "not a hex string",
       category: "VALIDATION",
       code: "bad_hex",
@@ -67,7 +67,7 @@ export async function hmacSha256Hex(secret: string, message: string): Promise<st
 
 export function assertHexDigest(value: string, label = "digest"): void {
   if (!/^[0-9a-f]{64}$/i.test(value)) {
-    throw new ProofstackError({
+    throw new ProofCoreError({
       message: `${label} is not a SHA-256 hex digest`,
       category: "VALIDATION",
       code: "bad_digest",

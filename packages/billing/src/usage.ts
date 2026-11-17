@@ -1,5 +1,5 @@
-import type { EntitlementKey, UsageEvent, UsageEventKind } from "@proofstack/contracts";
-import { type Clock, deterministicId, iso, systemClock } from "@proofstack/core";
+import type { EntitlementKey, UsageEvent, UsageEventKind } from "@proofcore/contracts";
+import { type Clock, deterministicId, iso, systemClock } from "@proofcore/core";
 import {
   checkEntitlement,
   type EffectiveEntitlements,

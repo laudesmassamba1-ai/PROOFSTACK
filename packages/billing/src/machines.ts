@@ -3,7 +3,7 @@ import {
   type PaymentState,
   SUBSCRIPTION_STATES,
   type SubscriptionState,
-} from "@proofstack/contracts";
+} from "@proofcore/contracts";
 
 /**
  * State machines for money.

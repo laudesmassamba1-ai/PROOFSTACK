@@ -1,0 +1,8 @@
+{
+  "name": "@proofcore/shot",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "playwright": "1.65.1"
+  }
+}

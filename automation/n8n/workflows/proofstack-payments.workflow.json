@@ -1,26 +1,26 @@
 {
-  "id": "proofstack-payments",
-  "name": "PROOFSTACK — verified payment events",
+  "id": "proofcore-payments",
+  "name": "PROOFCORE — verified payment events",
   "active": false,
   "settings": { "executionOrder": "v1" },
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "proofstack-payments",
+        "path": "proofcore-payments",
         "responseMode": "responseNode",
         "options": { "rawBody": true }
       },
-      "id": "proofstack-webhook",
+      "id": "proofcore-webhook",
       "name": "Payment webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [0, 0],
-      "webhookId": "proofstack-payments"
+      "webhookId": "proofcore-payments"
     },
     {
       "parameters": {
-        "jsCode": "const crypto = require('crypto');\nconst item = items[0].json;\nconst raw = typeof item.body === 'string' ? item.body : JSON.stringify(item.body);\nconst timestamp = item.headers['x-proofstack-timestamp'];\nconst age = Math.abs(Date.now() / 1000 - Number(timestamp));\nif (!Number.isFinite(age) || age > 300) throw new Error('stale webhook timestamp');\nconst secret = process.env.PROOFSTACK_WEBHOOK_SECRET || '';\nconst expected = `sha256=${crypto.createHmac('sha256', secret).update(`${timestamp}.${raw}`).digest('hex')}`;\nconst supplied = item.headers['x-proofstack-signature'] || '';\nif (expected.length !== supplied.length || !crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(supplied))) throw new Error('invalid webhook signature');\nconst event = JSON.parse(raw);\nif (event.event !== 'payment.webhook.processed') throw new Error('unsupported event');\nreturn [{ json: { verified: true, receivedAt: new Date().toISOString(), event } }];"
+        "jsCode": "const crypto = require('crypto');\nconst item = items[0].json;\nconst raw = typeof item.body === 'string' ? item.body : JSON.stringify(item.body);\nconst timestamp = item.headers['x-proofcore-timestamp'];\nconst age = Math.abs(Date.now() / 1000 - Number(timestamp));\nif (!Number.isFinite(age) || age > 300) throw new Error('stale webhook timestamp');\nconst secret = process.env.PROOFCORE_WEBHOOK_SECRET || '';\nconst expected = `sha256=${crypto.createHmac('sha256', secret).update(`${timestamp}.${raw}`).digest('hex')}`;\nconst supplied = item.headers['x-proofcore-signature'] || '';\nif (expected.length !== supplied.length || !crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(supplied))) throw new Error('invalid webhook signature');\nconst event = JSON.parse(raw);\nif (event.event !== 'payment.webhook.processed') throw new Error('unsupported event');\nreturn [{ json: { verified: true, receivedAt: new Date().toISOString(), event } }];"
       },
       "id": "verify-signature",
       "name": "Verify signature",
@@ -30,7 +30,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const event = items[0].json.event;\nconst slackUrl = process.env.SLACK_WEBHOOK_URL || '';\nlet notification = 'skipped';\nif (slackUrl) {\n  const text = [`✅ PROOFSTACK payment verified`, `Provider: ${event.provider}`, `Result: ${event.result || 'verified'}`, `Intent: ${event.intentId || 'n/a'}`, `Provider event: ${event.providerEventId || 'n/a'}`, `Occurred: ${event.occurredAt}`].join('\\n');\n  const response = await fetch(slackUrl, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }) });\n  notification = response.ok ? 'sent' : `failed:${response.status}`;\n}\nreturn [{ json: { ...items[0].json, notification } }];"
+        "jsCode": "const event = items[0].json.event;\nconst slackUrl = process.env.SLACK_WEBHOOK_URL || '';\nlet notification = 'skipped';\nif (slackUrl) {\n  const text = [`✅ PROOFCORE payment verified`, `Provider: ${event.provider}`, `Result: ${event.result || 'verified'}`, `Intent: ${event.intentId || 'n/a'}`, `Provider event: ${event.providerEventId || 'n/a'}`, `Occurred: ${event.occurredAt}`].join('\\n');\n  const response = await fetch(slackUrl, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }) });\n  notification = response.ok ? 'sent' : `failed:${response.status}`;\n}\nreturn [{ json: { ...items[0].json, notification } }];"
       },
       "id": "notify-slack",
       "name": "Notify Slack",

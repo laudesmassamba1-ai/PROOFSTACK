@@ -1,5 +1,5 @@
-import type { ProofstackConfig } from "@proofstack/contracts";
-import { ProofstackError } from "@proofstack/core";
+import type { ProofCoreConfig } from "@proofcore/contracts";
+import { ProofCoreError } from "@proofcore/core";
 import type {
   CheckoutRequest,
   CheckoutResponse,
@@ -20,7 +20,7 @@ import type {
  */
 
 export interface HttpPaymentTargetOptions {
-  config: ProofstackConfig;
+  config: ProofCoreConfig;
   name?: string;
   fetchImpl?: typeof fetch;
   /** Resolves a bearer token. Injected so this package stays runtime-agnostic. */
@@ -40,12 +40,12 @@ export interface FlowTargetConfig {
 /**
  * Read the FLOW target settings out of the project config.
  *
- * The config schema is owned by `@proofstack/contracts`; FLOW reads the optional
+ * The config schema is owned by `@proofcore/contracts`; FLOW reads the optional
  * `modules.flow.target` block when it is present and reports a clear configuration
  * error when it is not. Keeping this in one function means the CLI, the API and the
  * tests all resolve the target the same way.
  */
-export function readFlowTargetConfig(config: ProofstackConfig): FlowTargetConfig {
+export function readFlowTargetConfig(config: ProofCoreConfig): FlowTargetConfig {
   const flow = config.modules.flow as unknown as {
     target?: {
       checkoutUrl?: string;
@@ -88,7 +88,7 @@ export class HttpPaymentTarget implements PaymentUnderTest {
 
   async checkout(input: CheckoutRequest): Promise<CheckoutResponse> {
     if (!this.target.checkoutUrl) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: "FLOW target has no checkoutUrl",
         category: "CONFIGURATION",
         code: "flow_checkout_unconfigured",
@@ -121,7 +121,7 @@ export class HttpPaymentTarget implements PaymentUnderTest {
     const response = await this.request("GET", url);
     if (response.status === 404) return undefined;
     if (!response.ok) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `order readback failed with HTTP ${response.status}`,
         category: "NETWORK",
         code: "flow_order_readback_failed",
@@ -156,7 +156,7 @@ export class HttpPaymentTarget implements PaymentUnderTest {
     headers: Record<string, string>;
   }): Promise<WebhookDelivery> {
     if (!this.target.webhookUrl) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: "FLOW target has no webhookUrl",
         category: "CONFIGURATION",
         code: "flow_webhook_unconfigured",
@@ -183,7 +183,7 @@ export class HttpPaymentTarget implements PaymentUnderTest {
     amount?: string;
   }): Promise<{ accepted: boolean; state?: string }> {
     if (!this.target.refundUrl) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: "FLOW target has no refundUrl",
         category: "CONFIGURATION",
         code: "flow_refund_unconfigured",
@@ -226,7 +226,7 @@ export class HttpPaymentTarget implements PaymentUnderTest {
         signal: controller.signal,
       });
     } catch (error) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `FLOW request to ${url} failed: ${error instanceof Error ? error.message : String(error)}`,
         category: "NETWORK",
         code: "flow_request_failed",

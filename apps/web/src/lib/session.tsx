@@ -47,7 +47,7 @@ interface SessionState {
 }
 
 const SessionContext = createContext<SessionState | null>(null);
-const WORKSPACE_KEY = "proofstack.workspace";
+const WORKSPACE_KEY = "proofcore.workspace";
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<SessionState["status"]>("loading");

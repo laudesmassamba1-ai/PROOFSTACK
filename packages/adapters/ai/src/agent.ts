@@ -1,4 +1,4 @@
-import { ProofstackError } from "@proofstack/core";
+import { ProofCoreError } from "@proofcore/core";
 import type { ChatMessage, ToolCall, ToolDefinition } from "./provider.js";
 
 /**
@@ -311,7 +311,7 @@ async function executeCall(
 }
 
 /**
- * The system prompt for a PROOFSTACK agent.
+ * The system prompt for a PROOFCORE agent.
  *
  * It states the rules the agent must follow, including the one that matters most: a
  * report is evidence, and a finding is not a suggestion. An agent that "fixes" a test
@@ -319,7 +319,7 @@ async function executeCall(
  */
 export function agentSystemPrompt(projectName: string): string {
   return [
-    "You are a software quality assistant working inside PROOFSTACK.",
+    "You are a software quality assistant working inside PROOFCORE.",
     `The project under test is "${projectName}".`,
     "",
     "You have tools. Use them to read real evidence before answering: run the suite,",
@@ -374,7 +374,7 @@ export function summarizeRunForAgent(run: {
   return lines.join("\n");
 }
 
-export class AgentBudgetError extends ProofstackError {
+export class AgentBudgetError extends ProofCoreError {
   constructor(used: number, limit: number) {
     super({
       message: `Agent session exceeded its token budget: ${used} of ${limit}`,

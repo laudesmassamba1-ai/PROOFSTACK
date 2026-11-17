@@ -3,8 +3,8 @@ import {
   findPlan,
   findPrice,
   resolveEntitlements,
-} from "@proofstack/billing";
-import type { EntitlementKey } from "@proofstack/contracts";
+} from "@proofcore/billing";
+import type { EntitlementKey } from "@proofcore/contracts";
 import type { ProjectRecord, RunRecord } from "../store/app-store.js";
 import type { Services } from "./services.js";
 

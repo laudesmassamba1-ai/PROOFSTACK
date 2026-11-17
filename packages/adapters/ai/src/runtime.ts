@@ -1,5 +1,5 @@
-import type { AiConfig, McpServerConfig } from "@proofstack/contracts";
-import { ProofstackError } from "@proofstack/core";
+import type { AiConfig, McpServerConfig } from "@proofcore/contracts";
+import { ProofCoreError } from "@proofcore/core";
 import type { AgentTool } from "./agent.js";
 import {
   connectMcp,
@@ -91,7 +91,13 @@ export async function buildAiRuntime(options: BuildAiRuntimeOptions): Promise<Ai
         ...(server.cwd ? { cwd: server.cwd } : {}),
         timeoutMs: server.timeoutMs,
         ...(options.onStderr
-          ? { onStderr: (chunk: string) => options.onStderr!(server.name, chunk) }
+          ? {
+              // Guarded by the spread condition; alias avoids the assertion.
+              onStderr: (chunk: string): void => {
+                const handler = options.onStderr;
+                if (handler) handler(server.name, chunk);
+              },
+            }
           : {}),
       });
       mcpClients.push(client);
@@ -139,7 +145,7 @@ async function toolsFromServer(client: McpClient, server: McpServerConfig): Prom
       async run(args: Record<string, unknown>): Promise<string> {
         const result = await client.callTool(tool.name, args);
         if (result.isError) {
-          throw new ProofstackError({
+          throw new ProofCoreError({
             message: `MCP tool ${server.name}/${tool.name} failed: ${result.text.slice(0, 500)}`,
             category: "PROVIDER",
             code: "mcp_tool_error",
@@ -153,7 +159,7 @@ async function toolsFromServer(client: McpClient, server: McpServerConfig): Prom
 }
 
 /**
- * Describe the runtime for `proofstack ai status`.
+ * Describe the runtime for `proofcore ai status`.
  *
  * Reads like a receipt: what is configured, what connected, what is missing. No
  * secrets, and no claims about anything that was not actually reached.

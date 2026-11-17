@@ -8,11 +8,11 @@ const RELEASES = [
     title: "Foundation",
     added: [
       "Monorepo: pnpm workspaces, topological TypeScript build, Biome, Vitest",
-      "@proofstack/core — exact money, Unicode/text, IANA time zones and DST wall-clock resolution, Web Crypto ids/hashing/HMAC, canonical JSON, secret-redacting structured logger",
-      "@proofstack/contracts — engine entities, statuses, configuration schema with safety refusals, billing state vocabularies, API DTOs, locale-profile schema",
-      "@proofstack/engine — one scheduler for all modules, ordered and parallel-safe, timeouts, retries limited to transient faults, cancellation, findings with fingerprints and reproduction commands, evidence digests, contract-validated output",
-      "@proofstack/module-world — 8 locale profiles with verified metadata, fixture expansion, HTTP and synthetic target drivers, storage-integrity comparison",
-      "@proofstack/billing — plan definitions as the single price source, sparse entitlement resolution, prepaid-only capability flag",
+      "@proofcore/core — exact money, Unicode/text, IANA time zones and DST wall-clock resolution, Web Crypto ids/hashing/HMAC, canonical JSON, secret-redacting structured logger",
+      "@proofcore/contracts — engine entities, statuses, configuration schema with safety refusals, billing state vocabularies, API DTOs, locale-profile schema",
+      "@proofcore/engine — one scheduler for all modules, ordered and parallel-safe, timeouts, retries limited to transient faults, cancellation, findings with fingerprints and reproduction commands, evidence digests, contract-validated output",
+      "@proofcore/module-world — 8 locale profiles with verified metadata, fixture expansion, HTTP and synthetic target drivers, storage-integrity comparison",
+      "@proofcore/billing — plan definitions as the single price source, sparse entitlement resolution, prepaid-only capability flag",
       "Brand identity, design tokens, dotted-wave hero, modular product visuals, English and French interfaces",
     ],
     known: [

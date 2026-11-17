@@ -3,7 +3,7 @@ import { environmentKindSchema, moduleIdSchema } from "./statuses.js";
 
 /**
  * One configuration file drives the CLI, the SDK and the cloud-side project
- * record: `proofstack.config.ts` (or `.json`, or `proofstack` in package.json).
+ * record: `proofcore.config.ts` (or `.json`, or `proofcore` in package.json).
  *
  * Safety rules are encoded here rather than left to callers, because the
  * dangerous case (pointing a destructive test at production) must fail at parse
@@ -294,7 +294,7 @@ export const syncConfigSchema = z
     enabled: z.boolean().default(false),
     apiUrl: z.string().url().optional(),
     /** Name of the environment variable holding the project token. Never the token itself. */
-    tokenEnvVar: z.string().default("PROOFSTACK_PROJECT_TOKEN"),
+    tokenEnvVar: z.string().default("PROOFCORE_PROJECT_TOKEN"),
     /** What leaves the machine. Metadata + results only unless evidence is opted in. */
     includeEvidence: z.boolean().default(false),
     maxPayloadBytes: z.number().int().positive().default(1_048_576),
@@ -305,16 +305,16 @@ export type SyncConfig = z.infer<typeof syncConfigSchema>;
 /**
  * AI integration.
  *
- * PROOFSTACK is not an AI product, but a quality platform is far more useful when an
+ * PROOFCORE is not an AI product, but a quality platform is far more useful when an
  * agent can drive it: read a failing run, propose a fix, or run the suite from a chat
  * client. This block configures *how* AI can reach the product, never *which* model
  * must be used, and never stores a key.
  *
  * Three integration shapes, because they solve different problems:
  *
- *   - **MCP servers** — PROOFSTACK acts as an MCP *client*. It connects to servers the
+ *   - **MCP servers** — PROOFCORE acts as an MCP *client*. It connects to servers the
  *     user configures (filesystem, GitHub, a database) and their tools become
- *     available to PROOFSTACK's own agent. Transport is stdio or HTTP.
+ *     available to PROOFCORE's own agent. Transport is stdio or HTTP.
  *   - **AI providers** — an OpenAI-compatible chat-completions endpoint. Perch, OpenAI,
  *     a local Ollama, vLLM, LM Studio: all speak the same shape, so one adapter covers
  *     them and the base URL is the only thing that changes.
@@ -427,7 +427,7 @@ export const aiConfigSchema = z
   .strict();
 export type AiConfig = z.infer<typeof aiConfigSchema>;
 
-export const proofstackConfigSchema = z
+export const proofcoreConfigSchema = z
   .object({
     /** Config format version, so old files keep working when the shape changes. */
     schemaVersion: z.literal(1).default(1),
@@ -455,21 +455,21 @@ export const proofstackConfigSchema = z
     engine: engineConfigSchema.prefault({ parallel: 4, timeoutMs: 120_000 }),
     output: z
       .object({
-        dir: z.string().default(".proofstack/reports"),
+        dir: z.string().default(".proofcore/reports"),
         formats: z.array(z.enum(["json", "junit", "html", "text"])).default(["json", "text"]),
         junitFile: z.string().default("junit.xml"),
         jsonFile: z.string().default("run.json"),
         htmlFile: z.string().default("run.html"),
       })
       .strict()
-      .prefault({ dir: ".proofstack/reports" }),
+      .prefault({ dir: ".proofcore/reports" }),
     sync: syncConfigSchema.prefault({ enabled: false }),
     ai: aiConfigSchema.prefault({ enabled: false }),
     enabledModules: z.array(moduleIdSchema).min(1).default(["world", "flow", "exit"]),
   })
   .strict();
 
-export type ProofstackConfig = z.infer<typeof proofstackConfigSchema>;
+export type ProofCoreConfig = z.infer<typeof proofcoreConfigSchema>;
 
 export interface ConfigValidationIssue {
   path: string;
@@ -481,7 +481,7 @@ export interface ConfigValidationIssue {
  * Cross-field rules zod cannot express, and safety refusals.
  * Returns issues; an empty array means the config is usable.
  */
-export function validateConfig(config: ProofstackConfig): ConfigValidationIssue[] {
+export function validateConfig(config: ProofCoreConfig): ConfigValidationIssue[] {
   const issues: ConfigValidationIssue[] = [];
   const enabled = new Set(config.enabledModules);
 
@@ -645,7 +645,7 @@ export function validateConfig(config: ProofstackConfig): ConfigValidationIssue[
   return issues;
 }
 
-export function assertSafeForAutomatedRun(config: ProofstackConfig): void {
+export function assertSafeForAutomatedRun(config: ProofCoreConfig): void {
   const issues = validateConfig(config).filter(
     (i) =>
       i.path.includes("live_charge") ||

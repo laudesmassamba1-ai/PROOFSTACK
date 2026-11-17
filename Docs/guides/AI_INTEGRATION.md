@@ -1,12 +1,12 @@
 # AI integration
 
-PROOFSTACK is a quality platform, not an AI product. But a quality platform is far more
+PROOFCORE is a quality platform, not an AI product. But a quality platform is far more
 useful when an agent can read a failing run, propose a fix, or drive the suite from a
-chat client. This document describes the three ways AI reaches PROOFSTACK, what each
+chat client. This document describes the three ways AI reaches PROOFCORE, what each
 one can and cannot do, and the safety rules that are enforced in code rather than
 documented as good intentions.
 
-**Nothing here is required.** With `ai.enabled` false (the default) PROOFSTACK is a
+**Nothing here is required.** With `ai.enabled` false (the default) PROOFCORE is a
 fully functional CLI and dashboard. No model is called, no key is read, no network
 request leaves the machine.
 
@@ -17,11 +17,11 @@ request leaves the machine.
 They solve different problems and are configured separately. You can use one, two, or
 all three.
 
-| Shape            | What it is                                                                                                                             | What it is for                                                  |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| **MCP servers**  | PROOFSTACK acts as a Model Context Protocol **client**. It connects to servers you configure and their tools become the agent's tools. | Give the agent hands: read a repo, query a database, open a PR. |
-| **AI providers** | An OpenAI-compatible chat-completions endpoint.                                                                                        | Give the agent a brain: Perch, OpenAI, Ollama, vLLM, LM Studio. |
-| **CLI agents**   | An external agent invoked as an argv array, prompt on stdin.                                                                           | Hand a failing run to the agent your team already uses.         |
+| Shape            | What it is                                                                                                                            | What it is for                                                  |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| **MCP servers**  | PROOFCORE acts as a Model Context Protocol **client**. It connects to servers you configure and their tools become the agent's tools. | Give the agent hands: read a repo, query a database, open a PR. |
+| **AI providers** | An OpenAI-compatible chat-completions endpoint.                                                                                       | Give the agent a brain: Perch, OpenAI, Ollama, vLLM, LM Studio. |
+| **CLI agents**   | An external agent invoked as an argv array, prompt on stdin.                                                                          | Hand a failing run to the agent your team already uses.         |
 
 The distinction matters. An MCP server gives the agent _capabilities_; a provider gives
 it _reasoning_; a CLI agent is _someone else's agent_ that you delegate to. Mixing them
@@ -32,12 +32,12 @@ vendor.
 
 ## 2. Configuration
 
-Add an `ai` block to `proofstack.config.ts`:
+Add an `ai` block to `proofcore.config.ts`:
 
 ```ts
-import type { ProofstackConfig } from "@proofstack/contracts";
+import type { ProofCoreConfig } from "@proofcore/contracts";
 
-const config: ProofstackConfig = {
+const config: ProofCoreConfig = {
   project: { name: "Acme checkout", baseUrl: "https://staging.acme.test" },
   environment: "staging",
   modules: {
@@ -146,13 +146,13 @@ export default config;
 ## 3. Commands
 
 ```bash
-proofstack ai status              # what is configured and what actually connected
-proofstack ai status --json       # same, machine-readable
-proofstack ai tools               # every MCP tool the agent may call, with its effect
-proofstack ai ask "why did the fr-BJ cases fail?"
-proofstack ai ask "…" --provider perch
-proofstack ai agent "find the cause of the duplicate-order failures"
-proofstack ai agent "…" --cli-agent local-coder
+proofcore ai status              # what is configured and what actually connected
+proofcore ai status --json       # same, machine-readable
+proofcore ai tools               # every MCP tool the agent may call, with its effect
+proofcore ai ask "why did the fr-BJ cases fail?"
+proofcore ai ask "…" --provider perch
+proofcore ai agent "find the cause of the duplicate-order failures"
+proofcore ai agent "…" --cli-agent local-coder
 ```
 
 `ai ask` and `ai agent` automatically attach the last run report as context, so you do
@@ -182,7 +182,7 @@ mcp tools: 2
 
 ## 4. MCP: what is implemented
 
-PROOFSTACK implements the Model Context Protocol as a **client**, over both transports:
+PROOFCORE implements the Model Context Protocol as a **client**, over both transports:
 
 - **stdio** — newline-delimited JSON-RPC 2.0 on the child's stdin/stdout.
 - **streamable HTTP** — a POST per message; responses may be plain JSON or an SSE
@@ -216,7 +216,7 @@ Deliberate behaviours:
 
 ### Not implemented
 
-- PROOFSTACK is **not an MCP server**. It consumes MCP servers; it does not expose its
+- PROOFCORE is **not an MCP server**. It consumes MCP servers; it does not expose its
   own tools to other clients.
 - Sampling and roots are not implemented (they are answered with `-32601`).
 - OAuth flows for remote MCP servers are not implemented. Use a bearer token in
@@ -341,7 +341,7 @@ TOGETHER_API_KEY=
 GITHUB_MCP_TOKEN=
 
 # Cloud sync (unrelated to AI, listed for completeness)
-PROOFSTACK_PROJECT_TOKEN=
+PROOFCORE_PROJECT_TOKEN=
 ```
 
 The config validator rejects an `apiKeyEnvVar` that looks like a key value rather than a
@@ -354,8 +354,8 @@ the wrong field is the mistake that leaks a secret into git.
 
 Stated plainly, because a capability list without limits is marketing:
 
-- PROOFSTACK does not host a model. It calls one you configure.
-- PROOFSTACK is not an MCP server. It consumes MCP servers.
+- PROOFCORE does not host a model. It calls one you configure.
+- PROOFCORE is not an MCP server. It consumes MCP servers.
 - There is no built-in chat UI. `ai ask` and `ai agent` are CLI commands; the dashboard
   does not yet embed an agent.
 - No OAuth flow for remote MCP servers.
@@ -371,8 +371,8 @@ Stated plainly, because a capability list without limits is marketing:
 A run fails with 64 WORLD defects. You want to know which ones are the same bug.
 
 ```bash
-proofstack test --module world
-proofstack ai agent "Group the failures by root cause and tell me which one to fix first"
+proofcore test --module world
+proofcore ai agent "Group the failures by root cause and tell me which one to fix first"
 ```
 
 What happens, in order:

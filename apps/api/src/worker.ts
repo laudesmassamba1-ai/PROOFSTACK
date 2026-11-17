@@ -1,4 +1,4 @@
-import type { PaymentProvider } from "@proofstack/adapter-payments";
+import type { PaymentProvider } from "@proofcore/adapter-payments";
 import { createApp } from "./app.js";
 import { d1Database } from "./db/d1.js";
 import type { Env } from "./env.js";

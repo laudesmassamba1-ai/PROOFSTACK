@@ -13,7 +13,7 @@ const SHARED = [
   {
     icon: Layers,
     title: "One execution engine",
-    body: "Scheduling, timeouts, retries, cancellation, evidence and status aggregation are implemented once, in @proofstack/engine, and validated against the shared contract.",
+    body: "Scheduling, timeouts, retries, cancellation, evidence and status aggregation are implemented once, in @proofcore/engine, and validated against the shared contract.",
   },
   {
     icon: GitBranch,
@@ -35,7 +35,7 @@ export function Product() {
         <SectionHeading
           eyebrow={t("modules.eyebrow")}
           title="An integrated suite, not three tools in a tab bar"
-          lede="PROOFSTACK validates three independent properties of a product — reach, reliability and reversibility — with shared machinery underneath and a module you can adopt alone."
+          lede="PROOFCORE validates three independent properties of a product — reach, reliability and reversibility — with shared machinery underneath and a module you can adopt alone."
         />
         <div className="mt-10">
           <ModuleShowcase />

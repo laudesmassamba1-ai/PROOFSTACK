@@ -1,6 +1,6 @@
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
-import { ProofstackError } from "@proofstack/core";
+import { ProofCoreError } from "@proofcore/core";
 import { expandEnv } from "./mcp.js";
 
 const exec = promisify(execFile);
@@ -10,7 +10,7 @@ const exec = promisify(execFile);
  *
  * Teams already have a coding agent they trust: a local model runner, a vendor CLI, a
  * script. This adapter hands that agent a prompt and reads its answer, without
- * reimplementing it and without pretending PROOFSTACK is the agent.
+ * reimplementing it and without pretending PROOFCORE is the agent.
  *
  * Two rules that matter:
  *
@@ -80,7 +80,7 @@ export class CliAgent {
 
     const file = argv[0];
     if (!file) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `CLI agent "${this.name}" has an empty command`,
         category: "CONFIGURATION",
         code: "agent_command_empty",
@@ -255,7 +255,7 @@ export function buildAgentArgv(
 ): { file: string; args: string[]; stdin?: string } {
   const [file, ...rest] = command;
   if (!file) {
-    throw new ProofstackError({
+    throw new ProofCoreError({
       message: "agent command is empty",
       category: "CONFIGURATION",
       code: "agent_command_empty",

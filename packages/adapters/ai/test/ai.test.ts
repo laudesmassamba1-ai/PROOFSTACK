@@ -84,7 +84,7 @@ rl.on("line", (line) => {
 `;
 
 async function mcpServerScript(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "proofstack-mcp-"));
+  const dir = await mkdtemp(join(tmpdir(), "proofcore-mcp-"));
   const path = join(dir, "server.mjs");
   await writeFile(path, MCP_SERVER, "utf8");
   return path;
@@ -120,7 +120,7 @@ describe("MCP client (real stdio transport)", () => {
     try {
       const tools = await client.listTools();
       expect(tools.map((t) => t.name)).toEqual(["echo", "delete_everything"]);
-      expect(tools[0]!.annotations?.readOnlyHint).toBe(true);
+      expect(tools[0]?.annotations?.readOnlyHint).toBe(true);
 
       const result = await client.callTool("echo", { text: "hello" });
       expect(result.isError).toBe(false);
@@ -147,7 +147,7 @@ describe("MCP client (real stdio transport)", () => {
     }
   });
 
-  it("turns a JSON-RPC error into a typed ProofstackError", async () => {
+  it("turns a JSON-RPC error into a typed ProofCoreError", async () => {
     const script = await mcpServerScript();
     const client = await connectMcp({
       name: "fixture",
@@ -180,7 +180,7 @@ describe("MCP client (real stdio transport)", () => {
   });
 
   it("returns an empty tool list for a server that advertises no tools capability", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "proofstack-mcp-"));
+    const dir = await mkdtemp(join(tmpdir(), "proofcore-mcp-"));
     const path = join(dir, "bare.mjs");
     await writeFile(
       path,
@@ -208,7 +208,7 @@ describe("MCP client (real stdio transport)", () => {
   });
 
   it("times out on a server that never answers, instead of hanging", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "proofstack-mcp-"));
+    const dir = await mkdtemp(join(tmpdir(), "proofcore-mcp-"));
     const path = join(dir, "silent.mjs");
     // Reads stdin and never replies.
     await writeFile(
@@ -328,8 +328,8 @@ describe("OpenAI-compatible provider", () => {
         const provider = new OpenAiCompatibleProvider({ name: "p", baseUrl: base, model: "m" });
         const response = await provider.chat({ messages: [{ role: "user", content: "x" }] });
         expect(response.message.toolCalls).toHaveLength(1);
-        expect(response.message.toolCalls![0]!.name).toBe("read_file");
-        expect(response.message.toolCalls![0]!.arguments).toEqual({ path: "a.txt" });
+        expect(response.message.toolCalls?.[0]?.name).toBe("read_file");
+        expect(response.message.toolCalls?.[0]?.arguments).toEqual({ path: "a.txt" });
         expect(response.usage?.totalTokens).toBe(15);
         expect(response.finishReason).toBe("tool_calls");
       }
@@ -449,7 +449,7 @@ describe("agent loop guards", () => {
       userPrompt: "hi",
     });
     expect(result.steps).toHaveLength(1);
-    expect(result.steps[0]!.output).toBe('echoed {"a":1}');
+    expect(result.steps[0]?.output).toBe('echoed {"a":1}');
     expect(result.answer).toBe("I echoed it.");
     expect(result.stopReason).toBe("completed");
   });
@@ -468,7 +468,7 @@ describe("agent loop guards", () => {
       userPrompt: "hi",
       autonomy: "read",
     });
-    expect(result.steps[0]!.refused).toContain('ai.autonomy is "read"');
+    expect(result.steps[0]?.refused).toContain('ai.autonomy is "read"');
     expect(result.stopReason).toBe("refused_all");
   });
 
@@ -493,7 +493,7 @@ describe("agent loop guards", () => {
       },
     });
     expect(approved).toEqual(["write_file"]);
-    expect(result.steps[0]!.output).toBe("wrote");
+    expect(result.steps[0]?.output).toBe("wrote");
   });
 
   it("does not run a write tool when the operator declines", async () => {
@@ -511,7 +511,7 @@ describe("agent loop guards", () => {
       autonomy: "propose",
       approve: async () => false,
     });
-    expect(result.steps[0]!.refused).toContain("declined");
+    expect(result.steps[0]?.refused).toContain("declined");
   });
 
   it("treats a tool with no declared effect as a write", async () => {
@@ -538,7 +538,7 @@ describe("agent loop guards", () => {
       userPrompt: "hi",
       autonomy: "read",
     });
-    expect(result.steps[0]!.refused).toBeDefined();
+    expect(result.steps[0]?.refused).toBeDefined();
   });
 
   it("stops at maxTurns when the model keeps calling tools", async () => {
@@ -605,7 +605,7 @@ describe("agent loop guards", () => {
       systemPrompt: "sys",
       userPrompt: "hi",
     });
-    expect(result.steps[0]!.refused).toContain("no such tool");
+    expect(result.steps[0]?.refused).toContain("no such tool");
   });
 });
 
@@ -625,11 +625,14 @@ describe("AI helpers", () => {
     expect(filterTools(tools, ["a", "b"], ["a"]).map((t) => t.name)).toEqual(["b"]);
   });
 
-  it("expands ${ENV} references and leaves unknown names alone", () => {
-    process.env.PROOFSTACK_TEST_TOKEN = "secret-value";
-    expect(expandEnv("Bearer ${PROOFSTACK_TEST_TOKEN}")).toBe("Bearer secret-value");
-    expect(expandEnv("${NOT_SET_ANYWHERE}")).toBe("${NOT_SET_ANYWHERE}");
-    delete process.env.PROOFSTACK_TEST_TOKEN;
+  it("expands the ENV placeholder and leaves unknown names alone", () => {
+    process.env.PROOFCORE_TEST_TOKEN = "secret-value";
+    // The placeholder syntax is written by concatenation so the linter does not
+    // mistake the test fixture for an accidental template string in source.
+    const placeholder = "$" + "{";
+    expect(expandEnv(`Bearer ${placeholder}PROOFCORE_TEST_TOKEN}`)).toBe("Bearer secret-value");
+    expect(expandEnv(`${placeholder}NOT_SET_ANYWHERE}`)).toBe(`${placeholder}NOT_SET_ANYWHERE}`);
+    delete process.env.PROOFCORE_TEST_TOKEN;
   });
 
   it("builds agent argv without a shell, substituting {prompt} only where present", () => {
@@ -658,7 +661,7 @@ describe("AI helpers", () => {
       title: `t${i}`,
       severity: "HIGH",
       detail: "d",
-      reproduction: { command: `proofstack test --only case_${i}` },
+      reproduction: { command: `proofcore test --only case_${i}` },
     }));
     const summary = summarizeRunForAgent({
       id: "run_1",
@@ -680,7 +683,7 @@ describe("AI helpers", () => {
 
 describe("external CLI agent", () => {
   it("delivers the prompt on stdin and returns stdout", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "proofstack-agent-"));
+    const dir = await mkdtemp(join(tmpdir(), "proofcore-agent-"));
     const script = join(dir, "agent.mjs");
     await writeFile(
       script,
@@ -701,7 +704,7 @@ describe("external CLI agent", () => {
   });
 
   it("reports a non-zero exit as a result, keeping stderr", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "proofstack-agent-"));
+    const dir = await mkdtemp(join(tmpdir(), "proofcore-agent-"));
     const script = join(dir, "fail.mjs");
     await writeFile(script, `process.stderr.write("it failed"); process.exit(3);`, "utf8");
 

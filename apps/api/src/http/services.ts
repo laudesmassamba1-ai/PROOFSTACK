@@ -1,5 +1,6 @@
-import type { PaymentProvider } from "@proofstack/adapter-payments";
-import { CheckoutService, UsageMeter, WebhookProcessor } from "@proofstack/billing";
+import type { PaymentProvider } from "@proofcore/adapter-payments";
+import { CheckoutService, UsageMeter, WebhookProcessor } from "@proofcore/billing";
+import type { PaymentAutomationEvent } from "../automation.js";
 import type { Database } from "../db/types.js";
 import type { AppConfig } from "../env.js";
 import {
@@ -17,7 +18,7 @@ import { SqlBillingStore } from "../store/billing-store.js";
  * so an integration test exercises the exact wiring production uses.
  */
 export interface Services {
-  n8n?: { trigger: (event: string, payload: any) => Promise<void> };
+  n8n?: { trigger: (event: string, payload: PaymentAutomationEvent) => Promise<void> };
 
   db: Database;
   config: AppConfig;

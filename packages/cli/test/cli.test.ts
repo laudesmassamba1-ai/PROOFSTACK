@@ -41,7 +41,7 @@ async function cli(
 }
 
 async function project(): Promise<string> {
-  return mkdtemp(join(tmpdir(), "proofstack-cli-"));
+  return mkdtemp(join(tmpdir(), "proofcore-cli-"));
 }
 
 describe("CLI", () => {
@@ -49,7 +49,7 @@ describe("CLI", () => {
     const dir = await project();
     const result = await cli(["--help"], dir);
     expect(result.code).toBe(0);
-    expect(result.stdout).toContain("PROOFSTACK");
+    expect(result.stdout).toContain("PROOFCORE");
     expect(result.stdout).toContain("exit codes");
   });
 
@@ -72,7 +72,7 @@ describe("CLI", () => {
     const first = await cli(["init", "--yes", "Test project"], dir);
     expect(first.code).toBe(0);
 
-    const config = await readFile(join(dir, "proofstack.config.ts"), "utf8");
+    const config = await readFile(join(dir, "proofcore.config.ts"), "utf8");
     expect(config).toContain("Test project");
     expect(config).toContain("export default config");
 
@@ -121,7 +121,7 @@ describe("CLI", () => {
     const dir = await project();
     // WORLD enabled with no target and no forms: a real warning, not an error.
     await writeFile(
-      join(dir, "proofstack.config.json"),
+      join(dir, "proofcore.config.json"),
       JSON.stringify({
         schemaVersion: 1,
         project: { name: "Warn", baseUrl: "http://localhost:3000" },
@@ -141,7 +141,7 @@ describe("CLI", () => {
 
   it("validate exits 2 when the config is structurally invalid", async () => {
     const dir = await project();
-    await writeFile(join(dir, "proofstack.config.json"), JSON.stringify({ project: {} }), "utf8");
+    await writeFile(join(dir, "proofcore.config.json"), JSON.stringify({ project: {} }), "utf8");
     const result = await cli(["validate"], dir);
     expect(result.code).toBe(2);
   });
@@ -240,7 +240,7 @@ describe("CLI", () => {
     try {
       const dir = await project();
       await writeFile(
-        join(dir, "proofstack.config.json"),
+        join(dir, "proofcore.config.json"),
         JSON.stringify({
           schemaVersion: 1,
           project: { name: "AI test", baseUrl: "http://localhost:3000" },
@@ -274,7 +274,7 @@ describe("CLI", () => {
       expect(answer.provider).toBe("local");
       expect(answer.answer).toContain("dernier run est vert");
       expect(received).toHaveLength(1);
-      const userMessage = received[0]!.messages?.find((message) => message.role === "user");
+      const userMessage = received[0]?.messages?.find((message) => message.role === "user");
       expect(userMessage?.content).toContain("Résume le dernier run");
       expect(userMessage?.content).not.toContain("local");
     } finally {
@@ -325,9 +325,9 @@ describe("CLI", () => {
 
     try {
       const dir = await project();
-      await mkdir(join(dir, ".proofstack", "reports"), { recursive: true });
+      await mkdir(join(dir, ".proofcore", "reports"), { recursive: true });
       await writeFile(
-        join(dir, ".proofstack", "reports", "run.json"),
+        join(dir, ".proofcore", "reports", "run.json"),
         JSON.stringify({
           id: "run_test",
           status: "COMPLETED",
@@ -344,7 +344,7 @@ describe("CLI", () => {
         "utf8"
       );
       await writeFile(
-        join(dir, "proofstack.config.json"),
+        join(dir, "proofcore.config.json"),
         JSON.stringify({
           schemaVersion: 1,
           project: { name: "Sync test", baseUrl: "http://localhost:3000" },
@@ -360,18 +360,18 @@ describe("CLI", () => {
       );
 
       const result = await cli(["sync", "--json"], dir, {
-        PROOFSTACK_PROJECT_TOKEN: "psk_test",
+        PROOFCORE_PROJECT_TOKEN: "psk_test",
       });
       expect(result.code).toBe(0);
       expect(received).toHaveLength(1);
       // Totals are keyed by module, not flat: a summary that cannot say which module
       // failed is not a summary.
-      expect(received[0]!.summary?.totals?.world?.total).toBe(3);
+      expect(received[0]?.summary?.totals?.world?.total).toBe(3);
       // The tenant is taken from the key, never from the local run payload.
-      expect(received[0]!.run?.workspaceId).toBe("ws_from_key");
-      expect(received[0]!.run?.projectId).toBe("prj_from_key");
+      expect(received[0]?.run?.workspaceId).toBe("ws_from_key");
+      expect(received[0]?.run?.projectId).toBe("prj_from_key");
       // A retried upload must present the same key or the run is counted twice.
-      expect(headersSeen[0]!.idempotencyKey).toBe("sync:run_test");
+      expect(headersSeen[0]?.idempotencyKey).toBe("sync:run_test");
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
@@ -381,7 +381,7 @@ describe("CLI", () => {
     const dir = await project();
     await cli(["init", "--yes", "Report run"], dir);
     await cli(["test", "--quiet", "--module", "exit"], dir);
-    const json = await readFile(join(dir, ".proofstack", "reports", "run.json"), "utf8");
+    const json = await readFile(join(dir, ".proofcore", "reports", "run.json"), "utf8");
     expect(JSON.parse(json)).toHaveProperty("moduleRuns");
   });
 
@@ -391,7 +391,7 @@ describe("CLI", () => {
     await cli(["test", "--quiet", "--module", "exit"], dir);
     const result = await cli(["report", "text"], dir);
     expect(result.code).toBe(0);
-    expect(result.stdout).toContain("PROOFSTACK run");
+    expect(result.stdout).toContain("PROOFCORE run");
   });
 
   it("report rejects an unknown format instead of falling back to text", async () => {
@@ -415,7 +415,7 @@ describe("CLI", () => {
     const dir = await project();
     await mkdir(join(dir, "sub"), { recursive: true });
     await writeFile(
-      join(dir, "proofstack.config.json"),
+      join(dir, "proofcore.config.json"),
       JSON.stringify({
         schemaVersion: 1,
         project: { name: "Sync", baseUrl: "http://localhost:3000" },
@@ -427,14 +427,14 @@ describe("CLI", () => {
     );
     const result = await cli(["sync"], dir);
     expect(result.code).toBe(2);
-    expect(result.stderr).toContain("PROOFSTACK_PROJECT_TOKEN");
+    expect(result.stderr).toContain("PROOFCORE_PROJECT_TOKEN");
   });
 
   it("login explains the token flow without writing a secret", async () => {
     const dir = await project();
     const result = await cli(["login"], dir);
     expect(result.code).toBe(0);
-    expect(result.stdout).toContain("PROOFSTACK_PROJECT_TOKEN");
+    expect(result.stdout).toContain("PROOFCORE_PROJECT_TOKEN");
     expect(result.stdout).toContain("No token is written to disk");
   });
 

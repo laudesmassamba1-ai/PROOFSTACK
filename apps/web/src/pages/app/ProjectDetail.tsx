@@ -113,9 +113,9 @@ export function ProjectDetail() {
   if (error) return <ErrorState error={error} onRetry={() => void load()} />;
   if (!project) return <Loading label={fr ? "Chargement du projet…" : "Loading project…"} />;
 
-  const config = `import type { ProofstackConfig } from "@proofstack/contracts";
+  const config = `import type { ProofCoreConfig } from "@proofcore/contracts";
 
-const config: ProofstackConfig = {
+const config: ProofCoreConfig = {
   schemaVersion: 1,
   project: { name: ${JSON.stringify(project.name)}, baseUrl: ${JSON.stringify(project.baseUrl)} },
   environment: ${JSON.stringify(project.environment)},
@@ -201,8 +201,8 @@ export default config;`;
               title={fr ? "Aucun run" : "No run yet"}
               body={
                 fr
-                  ? "Connectez le CLI avec le jeton ci-dessous, puis lancez `proofstack test`."
-                  : "Connect the CLI with the token below, then run `proofstack test`."
+                  ? "Connectez le CLI avec le jeton ci-dessous, puis lancez `proofcore test`."
+                  : "Connect the CLI with the token below, then run `proofcore test`."
               }
             />
           ) : (
@@ -295,8 +295,8 @@ export default config;`;
             title="Configuration"
             description={
               fr
-                ? "À copier dans proofstack.config.ts à la racine du projet."
-                : "Copy into proofstack.config.ts at your project root."
+                ? "À copier dans proofcore.config.ts à la racine du projet."
+                : "Copy into proofcore.config.ts at your project root."
             }
           >
             <pre className="overflow-x-auto px-5 py-4 app-mono leading-relaxed text-muted">
@@ -362,10 +362,10 @@ export default config;`;
             {fr ? "Depuis la racine de votre projet :" : "From your project root:"}
           </p>
           <pre className="overflow-x-auto rounded-[var(--radius)] bg-surface-alt px-3 py-2 app-mono">
-            {`export PROOFSTACK_PROJECT_TOKEN=<token from above>
-pnpm proofstack doctor
-pnpm proofstack test --module ${project.enabledModules.join(",") || "world"}
-pnpm proofstack sync`}
+            {`export PROOFCORE_PROJECT_TOKEN=<token from above>
+pnpm proofcore doctor
+pnpm proofcore test --module ${project.enabledModules.join(",") || "world"}
+pnpm proofcore sync`}
           </pre>
         </div>
       </Card>

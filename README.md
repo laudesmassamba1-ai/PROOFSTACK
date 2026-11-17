@@ -1,8 +1,8 @@
-# PROOFSTACK
+# PROOFCORE
 
 **Make software work everywhere.**
 
-PROOFSTACK is an integrated software quality and reliability suite with three
+PROOFCORE is an integrated software quality and reliability suite with three
 modules that share one execution engine, one report format, one CLI and one
 dashboard:
 
@@ -29,10 +29,10 @@ The creator's read-only operations console lives at `/app/admin`: users, workspa
 subscriptions, payments, runs and webhook delivery. It is gated by the API's
 `ADMIN_EMAILS` allowlist, which is empty by default and disables the page.
 
-Live: [proofstack-iota.vercel.app](https://proofstack-iota.vercel.app) for the web app,
+Live: [proofcore-iota.vercel.app](https://proofcore-iota.vercel.app) for the web app,
 with `/api/*`, `/v1/*` and `/health` proxied to the
-[Cloudflare Worker](https://proofstack-api.laudesmassamba1.workers.dev) so session
-cookies stay same-origin. The Worker uses D1 (`proofstack`), migrations applied.
+[Cloudflare Worker](https://proofcore-api.laudesmassamba1.workers.dev) so session
+cookies stay same-origin. The Worker uses D1 (`proofcore`), migrations applied.
 
 The marketing shell, home page, pricing and account forms are bilingual. The workspace
 shell, Overview, Projects, WORLD/FLOW/EXIT, CLI, Billing and Settings are FR/EN. The
@@ -63,14 +63,14 @@ pnpm web:dev            # http://localhost:5173
 ```
 
 Create an account at `/signup`, create a project, then create a project token from
-the project page. From the **PROOFSTACK repository root**:
+the project page. From the **PROOFCORE repository root**:
 
 ```bash
-pnpm proofstack                              # open the terminal console
-pnpm proofstack -- doctor                    # verify node, config and module wiring
-pnpm proofstack -- test --module world,flow,exit
-pnpm proofstack -- report text
-pnpm proofstack -- sync
+pnpm proofcore                              # open the terminal console
+pnpm proofcore -- doctor                    # verify node, config and module wiring
+pnpm proofcore -- test --module world,flow,exit
+pnpm proofcore -- report text
+pnpm proofcore -- sync
 ```
 
 ## Install the CLI globally
@@ -80,8 +80,8 @@ tarball with **no runtime npm dependencies**:
 
 ```bash
 pnpm cli:package
-npm install -g ./artifacts/proofstack-cli-0.1.0.tgz
-proofstack --version
+npm install -g ./artifacts/proofcore-cli-0.1.0.tgz
+proofcore --version
 ```
 
 Or build, install and check the global binary in one command:
@@ -94,43 +94,43 @@ Then open a terminal in the application you want to test and run it there:
 
 ```bash
 cd /path/to/your/app   # replace with a real, existing directory
-proofstack init
-proofstack doctor
-proofstack test --module world,flow,exit
+proofcore init
+proofcore doctor
+proofcore test --module world,flow,exit
 ```
 
 `init` writes the config in the current directory; it does not create the directory.
 `--cwd /path/to/your/app` is also supported, but the path must already exist.
 
 The package is not yet on the npm registry. Once npm authentication and ownership of
-the `@proofstack` scope are configured, the generated release is publishable:
+the `@proofcore` scope are configured, the generated release is publishable:
 
 ```bash
 npm publish ./packages/cli/release --access public
 ```
 
-`pnpm proofstack` remains the in-repo command. `pnpm cli` from an unrelated application
+`pnpm proofcore` remains the in-repo command. `pnpm cli` from an unrelated application
 still resolves nothing; use the generated global binary instead.
 
 ## Terminal console
 
-`pnpm proofstack` opens a full-screen console in a real terminal: Overview, Projects,
+`pnpm proofcore` opens a full-screen console in a real terminal: Overview, Projects,
 Runs, Billing, Admin (when the account is allowlisted) and Help. On Projects, press `n`
 to create a project (name, base URL, optional stack, environment). Use arrow keys, Enter
 to open a project, `w` to switch workspace, `r` to refresh and `q` to quit.
 
 ```bash
-pnpm proofstack                              # open the console
-pnpm proofstack -- status --json             # scriptable account/workspace summary
-pnpm proofstack -- ui --once --screen overview
-pnpm proofstack -- login                     # interactive sign-in
-pnpm proofstack -- logout                    # remove the stored session
+pnpm proofcore                              # open the console
+pnpm proofcore -- status --json             # scriptable account/workspace summary
+pnpm proofcore -- ui --once --screen overview
+pnpm proofcore -- login                     # interactive sign-in
+pnpm proofcore -- logout                    # remove the stored session
 ```
 
 Real one-shot rendering of the console (session credentials removed):
 
 ```text
-PROOFSTACK · terminal console
+PROOFCORE · terminal console
 design.qa.20261117@example.com · localhost:8787
  1 Overview   2 Projects   3 Runs   4 Billing   5 Admin   6 Help
 ──────────────────────────────────────────────────────────────
@@ -155,13 +155,13 @@ workspace: Design QA Shop
 1-6 screens · ↑/↓ select · Enter open · w workspace · r refresh · ? help · q quit
 ```
 
-`login` stores the HttpOnly session cookie in `~/.config/proofstack/session.json` with
+`login` stores the HttpOnly session cookie in `~/.config/proofcore/session.json` with
 mode `0600`; it never stores the password. Use
-`PROOFSTACK_API_URL=http://127.0.0.1:8787` for the local API, or pass `--api` to `login`,
-`ui` or `status`. For CI, `PROOFSTACK_SESSION_COOKIE` supplies the cookie without a file.
+`PROOFCORE_API_URL=http://127.0.0.1:8787` for the local API, or pass `--api` to `login`,
+`ui` or `status`. For CI, `PROOFCORE_SESSION_COOKIE` supplies the cookie without a file.
 The default API is the live Vercel deployment. Creating a project is the only mutating
 action in the console; test execution and uploads still run locally with
-`proofstack test` and `proofstack sync`, and billing/admin stay read-only.
+`proofcore test` and `proofcore sync`, and billing/admin stay read-only.
 
 Without `SASPAY_API_KEY` and `SASPAY_WEBHOOK_SECRET`, checkout uses the deterministic
 sandbox provider: no money moves, and paid access is still granted only after the
@@ -170,18 +170,18 @@ control, labelled as such.
 
 ## Commands
 
-| Command             | Purpose                           |
-| ------------------- | --------------------------------- |
-| `pnpm test`         | unit + integration tests (Vitest) |
-| `pnpm typecheck`    | TypeScript across every package   |
-| `pnpm lint`         | Biome                             |
-| `pnpm build`        | package build + web bundle        |
-| `pnpm api:dev`      | API + SQLite on `:8787`           |
-| `pnpm web:dev`      | Vite dev server on `:5173`        |
-| `pnpm cli -- <cmd>` | run the built CLI                 |
-| `pnpm proofstack`   | full-screen terminal console      |
-| `pnpm cli:package`  | build the standalone global tarball |
-| `pnpm cli:install`  | build and install `proofstack` globally |
+| Command             | Purpose                                |
+| ------------------- | -------------------------------------- |
+| `pnpm test`         | unit + integration tests (Vitest)      |
+| `pnpm typecheck`    | TypeScript across every package        |
+| `pnpm lint`         | Biome                                  |
+| `pnpm build`        | package build + web bundle             |
+| `pnpm api:dev`      | API + SQLite on `:8787`                |
+| `pnpm web:dev`      | Vite dev server on `:5173`             |
+| `pnpm cli -- <cmd>` | run the built CLI                      |
+| `pnpm proofcore`    | full-screen terminal console           |
+| `pnpm cli:package`  | build the standalone global tarball    |
+| `pnpm cli:install`  | build and install `proofcore` globally |
 
 Copy [`.env.example`](.env.example) to `.env.local` for local development. API
 environment variables are documented in

@@ -38,7 +38,7 @@ async function cli(
 }
 
 async function project(): Promise<string> {
-  return mkdtemp(join(tmpdir(), "proofstack-ui-"));
+  return mkdtemp(join(tmpdir(), "proofcore-ui-"));
 }
 
 function reply(response: ServerResponse, body: unknown): void {
@@ -133,8 +133,8 @@ describe("terminal console", () => {
     try {
       const dir = await project();
       const result = await cli(["ui", "--once", "--screen", "overview", "--api", server.url], dir, {
-        PROOFSTACK_SESSION_COOKIE: "ps_session=test",
-        PROOFSTACK_SESSION_FILE: join(dir, "session.json"),
+        PROOFCORE_SESSION_COOKIE: "ps_session=test",
+        PROOFCORE_SESSION_FILE: join(dir, "session.json"),
       });
       expect(result.code).toBe(0);
       expect(result.stdout).toContain("Acme");
@@ -151,7 +151,7 @@ describe("terminal console", () => {
     try {
       const dir = await project();
       const result = await cli(["status", "--json", "--api", server.url], dir, {
-        PROOFSTACK_SESSION_COOKIE: "ps_session=test",
+        PROOFCORE_SESSION_COOKIE: "ps_session=test",
       });
       expect(result.code, result.stderr).toBe(0);
       const body = JSON.parse(result.stdout) as {
@@ -170,16 +170,16 @@ describe("terminal console", () => {
   it("refuses to render without a session and points at login", async () => {
     const dir = await project();
     const result = await cli(["ui", "--once", "--api", "http://127.0.0.1:9"], dir, {
-      PROOFSTACK_SESSION_FILE: join(dir, "missing.json"),
+      PROOFCORE_SESSION_FILE: join(dir, "missing.json"),
     });
     expect(result.code).toBe(2);
-    expect(result.stderr).toContain("proofstack login");
+    expect(result.stderr).toContain("proofcore login");
   });
 
   it("prints help without requiring a session", async () => {
     const dir = await project();
     const result = await cli(["ui", "--once", "--screen", "help"], dir, {
-      PROOFSTACK_SESSION_FILE: join(dir, "missing.json"),
+      PROOFCORE_SESSION_FILE: join(dir, "missing.json"),
     });
     expect(result.code).toBe(0);
     expect(result.stdout).toContain("terminal console");
@@ -274,7 +274,7 @@ describe("terminal console", () => {
       "utf8"
     );
     expect(existsSync(path)).toBe(true);
-    const result = await cli(["logout"], dir, { PROOFSTACK_SESSION_FILE: path });
+    const result = await cli(["logout"], dir, { PROOFCORE_SESSION_FILE: path });
     expect(result.code).toBe(0);
     expect(existsSync(path)).toBe(false);
   });

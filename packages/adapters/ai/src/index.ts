@@ -1,11 +1,11 @@
 /**
  * AI integration.
  *
- * Three ways AI reaches PROOFSTACK, each independently useful and independently
+ * Three ways AI reaches PROOFCORE, each independently useful and independently
  * disableable:
  *
  *   - `mcp`        — a real Model Context Protocol client (stdio + streamable HTTP).
- *                    PROOFSTACK consumes MCP servers; their tools become the agent's
+ *                    PROOFCORE consumes MCP servers; their tools become the agent's
  *                    tools, namespaced `mcp__<server>__<tool>`.
  *   - `provider`   — OpenAI-compatible chat completions. One adapter covers Perch,
  *                    OpenAI, Ollama, vLLM and LM Studio; only the base URL changes.

@@ -1,4 +1,4 @@
-import type { LocaleProfileData, ProofstackConfig } from "@proofstack/contracts";
+import type { LocaleProfileData, ProofCoreConfig } from "@proofcore/contracts";
 import {
   currencyMeta,
   detectScripts,
@@ -9,8 +9,8 @@ import {
   resolveWallClock,
   textDirection,
   unicodeEquals,
-} from "@proofstack/core";
-import type { TestCaseDef, TestSuiteDef } from "@proofstack/engine";
+} from "@proofcore/core";
+import type { TestCaseDef, TestSuiteDef } from "@proofcore/engine";
 import { parseWithAnyPattern, toAsciiDigits } from "./dateformat.js";
 import { buildFixtures, type Fixture, type FixtureCategory } from "./fixtures.js";
 import type { ProductFields, ProductUnderTest } from "./harness.js";
@@ -28,7 +28,7 @@ import type { ProductFields, ProductUnderTest } from "./harness.js";
  */
 
 export interface WorldCheckOptions {
-  config: ProofstackConfig;
+  config: ProofCoreConfig;
   profiles: LocaleProfileData[];
   target?: ProductUnderTest;
   categories?: readonly FixtureCategory[];
@@ -196,7 +196,7 @@ async function collationCase(
   fixture: Fixture,
   profile: LocaleProfileData,
   target: ProductUnderTest,
-  ctx: import("@proofstack/engine").TestContext
+  ctx: import("@proofcore/engine").TestContext
 ): Promise<void> {
   if (!target.capabilities.sorted || !target.sorted) {
     ctx.skip(
@@ -388,13 +388,18 @@ export function preview(value: string, max = 48): string {
     .replace(
       // biome-ignore lint/suspicious/noControlCharactersInRegex: detecting control characters is the check itself
       /[\u0000-\u001f\u007f]/g,
-      (ch) => `\\u${ch.codePointAt(0)!.toString(16).padStart(4, "0")}`
+      (ch) => `\\u${cp(ch).toString(16).padStart(4, "0")}`
     )
-    .replace(
-      /\u202e|\u200e|\u200f/g,
-      (ch) => `< bidi U+${ch.codePointAt(0)!.toString(16).toUpperCase()} >`
-    );
+    .replace(/\u202e|\u200e|\u200f/g, (ch) => `< bidi U+${cp(ch).toString(16).toUpperCase()} >`);
   return visible.length > max
     ? `${visible.slice(0, max)}… (${graphemeLength(value)} graphemes)`
     : visible;
+}
+
+/** Regex single-char matches always carry a code point; assert that once, here. */
+function cp(character: string): number {
+  const value = character.codePointAt(0);
+  if (value === undefined)
+    throw new Error(`control-char escape: empty match ${JSON.stringify(character)}`);
+  return value;
 }

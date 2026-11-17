@@ -1,20 +1,16 @@
-import {
-  type ModuleId,
-  type ProofstackConfig,
-  proofstackConfigSchema,
-} from "@proofstack/contracts";
-import { FixedClock, Logger, MemorySink } from "@proofstack/core";
+import { type ModuleId, type ProofCoreConfig, proofcoreConfigSchema } from "@proofcore/contracts";
+import { FixedClock, Logger, MemorySink } from "@proofcore/core";
 import {
   ENGINE_VERSION,
   MemoryEvidenceStore,
   type ModuleProvider,
   runEngine,
   type TestContext,
-} from "@proofstack/engine";
+} from "@proofcore/engine";
 import { describe, expect, it } from "vitest";
 
-function baseConfig(overrides: Record<string, unknown> = {}): ProofstackConfig {
-  return proofstackConfigSchema.parse({
+function baseConfig(overrides: Record<string, unknown> = {}): ProofCoreConfig {
+  return proofcoreConfigSchema.parse({
     project: { name: "Demo SaaS", baseUrl: "http://localhost:3000" },
     ...overrides,
   });
@@ -62,7 +58,7 @@ describe("shared execution engine", () => {
     });
     expect(run.status).toBe("COMPLETED");
     expect(run.engineVersion).toBe(ENGINE_VERSION);
-    expect(run.moduleRuns[0]!.totals).toEqual({
+    expect(run.moduleRuns[0]?.totals).toEqual({
       total: 1,
       passed: 1,
       failed: 0,
@@ -92,13 +88,14 @@ describe("shared execution engine", () => {
       ],
     });
     expect(run.status).toBe("FAILED");
-    const result = run.moduleRuns[0]!.cases[0]!;
+    const result = run.moduleRuns[0]?.cases[0];
+    expect(result).toBeDefined();
     expect(result.status).toBe("FAILED");
     expect(result.failure?.category).toBe("ASSERTION");
     expect(run.findings).toHaveLength(1);
-    expect(run.findings[0]!.fingerprint).toMatch(/^ps1:[0-9a-f]{64}$/);
-    expect(run.findings[0]!.reproduction.command).toBe("proofstack test --module world --only w1");
-    expect(result.findingIds).toEqual([run.findings[0]!.id]);
+    expect(run.findings[0]?.fingerprint).toMatch(/^ps1:[0-9a-f]{64}$/);
+    expect(run.findings[0]?.reproduction.command).toBe("proofcore test --module world --only w1");
+    expect(result.findingIds).toEqual([run.findings[0]?.id]);
   });
 
   it("reports an exception as ERROR, never as a product failure", async () => {
@@ -115,9 +112,9 @@ describe("shared execution engine", () => {
         ]),
       ],
     });
-    expect(run.moduleRuns[0]!.cases[0]!.status).toBe("ERROR");
+    expect(run.moduleRuns[0]?.cases[0]?.status).toBe("ERROR");
     expect(run.status).toBe("ERROR");
-    expect(run.findings[0]!.detail).toContain("browser crashed");
+    expect(run.findings[0]?.detail).toContain("browser crashed");
   });
 
   it("enforces the per-case timeout and marks the case ERROR/TIMEOUT", async () => {
@@ -125,7 +122,8 @@ describe("shared execution engine", () => {
       config: baseConfig({ engine: { timeoutMs: 25 } }),
       providers: [provider("exit", [{ id: "e1", run: async (ctx) => ctx.sleep(5_000) }])],
     });
-    const caseResult = run.moduleRuns[0]!.cases[0]!;
+    const caseResult = run.moduleRuns[0]?.cases[0];
+    expect(caseResult).toBeDefined();
     expect(caseResult.status).toBe("ERROR");
     expect(caseResult.failure?.code).toBe("case_timeout");
   });
@@ -160,7 +158,7 @@ describe("shared execution engine", () => {
         },
       ],
     });
-    expect(run.moduleRuns[0]!.cases[0]!.failure?.code).toBe("case_timeout");
+    expect(run.moduleRuns[0]?.cases[0]?.failure?.code).toBe("case_timeout");
   });
 
   it("retries transient harness errors, never a real failure or an internal bug", async () => {
@@ -192,16 +190,16 @@ describe("shared execution engine", () => {
         ]),
       ],
     });
-    const cases = run.moduleRuns[0]!.cases;
-    expect(cases.find((c) => c.id === "transient")!.attempts).toBe(3);
+    const cases = run.moduleRuns[0]?.cases ?? [];
+    expect(cases.find((c) => c.id === "transient")?.attempts).toBe(3);
     expect(networkAttempts).toBe(3);
-    expect(cases.find((c) => c.id === "transient")!.status).toBe("PASSED");
+    expect(cases.find((c) => c.id === "transient")?.status).toBe("PASSED");
     // A product failure is attempted exactly once: retrying a defect does not hide it.
-    expect(cases.find((c) => c.id === "broken")!.attempts).toBe(1);
+    expect(cases.find((c) => c.id === "broken")?.attempts).toBe(1);
     // An engine bug is not retried either; it must surface, not loop.
-    expect(cases.find((c) => c.id === "bug")!.attempts).toBe(1);
+    expect(cases.find((c) => c.id === "bug")?.attempts).toBe(1);
     expect(internalAttempts).toBe(1);
-    expect(cases.find((c) => c.id === "bug")!.failure?.category).toBe("INTERNAL");
+    expect(cases.find((c) => c.id === "bug")?.failure?.category).toBe("INTERNAL");
   });
 
   it("produces the same ordering and identical output under parallel scheduling", async () => {
@@ -226,11 +224,11 @@ describe("shared execution engine", () => {
       providers: [build()],
       clock: new FixedClock(0),
     });
-    expect(a.run.moduleRuns[0]!.cases.map((c) => c.id)).toEqual(
+    expect(a.run.moduleRuns[0]?.cases.map((c) => c.id)).toEqual(
       Array.from({ length: 24 }, (_unused, i) => `c${String(i).padStart(2, "0")}`)
     );
-    expect(JSON.stringify(b.run.moduleRuns[0]!.cases.map((c) => [c.id, c.status]))).toBe(
-      JSON.stringify(a.run.moduleRuns[0]!.cases.map((c) => [c.id, c.status]))
+    expect(JSON.stringify(b.run.moduleRuns[0]?.cases.map((c) => [c.id, c.status]))).toBe(
+      JSON.stringify(a.run.moduleRuns[0]?.cases.map((c) => [c.id, c.status]))
     );
   });
 
@@ -255,9 +253,10 @@ describe("shared execution engine", () => {
     });
     expect(cancelled).toBe(true);
     expect(run.status).toBe("CANCELLED");
-    const statuses = run.moduleRuns[0]!.cases.map((c) => c.status);
+    const statuses = run.moduleRuns[0]?.cases.map((c) => c.status) ?? [];
     expect(statuses).toContain("SKIPPED");
-    const skipped = run.moduleRuns[0]!.cases.find((c) => c.status === "SKIPPED")!;
+    const skipped = run.moduleRuns[0]?.cases.find((c) => c.status === "SKIPPED");
+    expect(skipped).toBeDefined();
     expect(skipped.skippedReason).toContain("cancelled");
   });
 
@@ -276,8 +275,8 @@ describe("shared execution engine", () => {
       ],
     });
     expect(run.status).toBe("PARTIAL");
-    expect(run.moduleRuns[0]!.cases.find((c) => c.id === "later")!.status).toBe("SKIPPED");
-    expect(run.findings[0]!.severity).toBe("CRITICAL");
+    expect(run.moduleRuns[0]?.cases.find((c) => c.id === "later")?.status).toBe("SKIPPED");
+    expect(run.findings[0]?.severity).toBe("CRITICAL");
   });
 
   it("records warnings as WARNING status and keeps the finding", async () => {
@@ -300,10 +299,10 @@ describe("shared execution engine", () => {
         ]),
       ],
     });
-    expect(run.moduleRuns[0]!.cases[0]!.status).toBe("WARNING");
+    expect(run.moduleRuns[0]?.cases[0]?.status).toBe("WARNING");
     expect(run.status).toBe("PARTIAL");
-    expect(run.findings[0]!.status).toBe("WARNING");
-    expect(run.findings[0]!.field).toBe("full_name");
+    expect(run.findings[0]?.status).toBe("WARNING");
+    expect(run.findings[0]?.field).toBe("full_name");
   });
 
   it("skips explicitly, with the reason surfaced", async () => {
@@ -336,7 +335,8 @@ describe("shared execution engine", () => {
         },
       ],
     });
-    const c = run.moduleRuns[0]!.cases[0]!;
+    const c = run.moduleRuns[0]?.cases[0];
+    expect(c).toBeDefined();
     expect(c.status).toBe("SKIPPED");
     expect(c.skippedReason).toContain("Playwright");
   });
@@ -388,10 +388,11 @@ describe("shared execution engine", () => {
         ]),
       ],
     });
-    const c = run.moduleRuns[0]!.cases[0]!;
+    const c = run.moduleRuns[0]?.cases[0];
+    expect(c).toBeDefined();
     expect(c.evidence).toHaveLength(1);
-    expect(c.evidence[0]!.ref?.sha256).toMatch(/^[0-9a-f]{64}$/);
-    expect(run.findings[0]!.evidenceIds).toEqual([c.evidence[0]!.id]);
+    expect(c.evidence[0]?.ref?.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(run.findings[0]?.evidenceIds).toEqual([c.evidence[0]?.id]);
     expect(store.blobs.size).toBe(1);
   });
 
@@ -402,7 +403,7 @@ describe("shared execution engine", () => {
     // A suite that produced no checks is an ERROR, never a vacuous pass.
     const empty = await runEngine({ config: baseConfig(), providers: [provider("world", [])] });
     expect(empty.run.status).toBe("ERROR");
-    expect(empty.run.moduleRuns[0]!.status).toBe("ERROR");
+    expect(empty.run.moduleRuns[0]?.status).toBe("ERROR");
   });
 
   it("keeps module scoping: only the requested providers run", async () => {

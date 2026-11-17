@@ -10,7 +10,7 @@ import {
   stableStringify,
   timingSafeEqualHex,
   toHex,
-} from "@proofstack/core";
+} from "@proofcore/core";
 import { describe, expect, it } from "vitest";
 
 describe("canonical JSON", () => {
@@ -50,7 +50,7 @@ describe("hashing", () => {
     expect(toHex(bytes)).toBe("000fff");
     expect(fromHex("000fff")).toEqual(bytes);
     expect(timingSafeEqualHex("00".repeat(32), "00".repeat(32))).toBe(true);
-    expect(timingSafeEqualHex("00".repeat(32), "0f".repeat(31) + "00")).toBe(false);
+    expect(timingSafeEqualHex("00".repeat(32), `${"0f".repeat(31)}00`)).toBe(false);
     expect(timingSafeEqualHex("abc", "abcd")).toBe(false);
   });
 

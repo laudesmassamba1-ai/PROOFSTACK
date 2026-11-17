@@ -1,4 +1,4 @@
-import type { LocaleProfileData } from "@proofstack/contracts";
+import type { LocaleProfileData } from "@proofcore/contracts";
 import {
   currencyMeta,
   dstTransitions,
@@ -7,7 +7,7 @@ import {
   parseLocalizedDecimal,
   resolveWallClock,
   zoneOffsetMs,
-} from "@proofstack/core";
+} from "@proofcore/core";
 import type { CountryCode } from "libphonenumber-js";
 import { parsePhoneNumberFromString } from "libphonenumber-js/max";
 import { parseJapaneseDate, parseWithAnyPattern, toAsciiDigits } from "./dateformat.js";
@@ -159,8 +159,8 @@ function identityFixtures(profile: LocaleProfileData, push: Push): void {
 function phoneFixtures(profile: LocaleProfileData, push: Push): void {
   for (const value of profile.fixtures.phones) {
     const parsed = parsePhoneNumberFromString(value, profile.country as CountryCode);
-    if (!parsed || !parsed.isValid()) {
-      // A profile that ships an invalid "valid" number is a PROOFSTACK bug, not a
+    if (!parsed?.isValid()) {
+      // A profile that ships an invalid "valid" number is a PROOFCORE bug, not a
       // product bug: surface it instead of testing nonsense.
       push({
         id: fixtureId(profile.id, "phone", `metadata-${slug(value)}`),
@@ -497,7 +497,7 @@ function collationFixtures(profile: LocaleProfileData, push: Push): void {
   }
 }
 
-/** Human summary used by `proofstack doctor` and the CLI report header. */
+/** Human summary used by `proofcore doctor` and the CLI report header. */
 export function fixtureSummary(fixtures: readonly Fixture[]): Record<string, number> {
   const out: Record<string, number> = {};
   for (const fixture of fixtures) {

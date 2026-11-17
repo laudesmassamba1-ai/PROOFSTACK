@@ -1,12 +1,12 @@
-import type { PaymentProvider } from "@proofstack/adapter-payments";
+import type { PaymentProvider } from "@proofcore/adapter-payments";
 import type {
   BillingPeriod,
   Invoice,
   PaymentState,
   Plan,
   ProviderKind,
-} from "@proofstack/contracts";
-import { deterministicId, iso, Money, ProofstackError, sha256Hex, uuid } from "@proofstack/core";
+} from "@proofcore/contracts";
+import { deterministicId, iso, Money, ProofCoreError, sha256Hex, uuid } from "@proofcore/core";
 import { FREE_PLAN_KEY } from "./entitlements.js";
 import { assertPaymentTransition, assertSubscriptionTransition } from "./machines.js";
 import { findPlan, findPrice } from "./plans.js";
@@ -84,7 +84,7 @@ export class CheckoutService {
   private validate(plan: Plan, currency: string, period: BillingPeriod): Money {
     const price = findPrice(plan.key, currency, period);
     if (!price) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `Plan ${plan.key} has no configured price for ${currency}/${period}. Add it to the plan catalogue instead of sending a price from the client.`,
         category: "CONFIGURATION",
         code: "price_not_configured",
@@ -92,7 +92,7 @@ export class CheckoutService {
       });
     }
     if (price.minor <= 0n && plan.key !== FREE_PLAN_KEY) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `Price for ${plan.key}/${currency}/${period} must be greater than zero`,
         category: "CONFIGURATION",
         code: "invalid_price",
@@ -105,7 +105,7 @@ export class CheckoutService {
     const now = input.now ?? this.clock();
     const plan = findPlan(input.planKey);
     if (!plan) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `Unknown plan ${input.planKey}`,
         category: "VALIDATION",
         code: "unknown_plan",
@@ -113,7 +113,7 @@ export class CheckoutService {
       });
     }
     if (!plan.active || !plan.publiclyAvailable) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `Plan ${plan.key} is not purchasable`,
         category: "VALIDATION",
         code: "plan_not_purchasable",
@@ -125,7 +125,7 @@ export class CheckoutService {
     const automatedRenewal = capabilities.automatedRecurring;
 
     if (!capabilities.currencies.includes(input.currency)) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `${capabilities.displayName} does not declare support for ${input.currency}. Capability source: getCapabilities().`,
         category: "PROVIDER",
         code: "unsupported_currency",
@@ -143,7 +143,7 @@ export class CheckoutService {
         detail: { planKey: plan.key },
         at: iso(now),
       });
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: "The free plan needs no checkout",
         category: "VALIDATION",
         code: "free_plan_no_checkout",
@@ -178,7 +178,7 @@ export class CheckoutService {
     );
 
     const existing = await this.store.findIntentByIdempotencyKey(idempotencyKey);
-    if (existing && existing.providerReference) {
+    if (existing?.providerReference) {
       return {
         intentId: existing.id,
         subscriptionId: existing.subscriptionId,
@@ -220,7 +220,7 @@ export class CheckoutService {
     const checkout = await this.provider.createCheckout({
       idempotencyKey,
       amount,
-      description: `PROOFSTACK ${plan.name} (${input.period}) — workspace ${input.workspaceId}`,
+      description: `PROOFCORE ${plan.name} (${input.period}) — workspace ${input.workspaceId}`,
       customer: input.customer,
       metadata: {
         workspace_id: input.workspaceId,
@@ -280,7 +280,7 @@ export class CheckoutService {
     const now = this.clock();
     const intent = await this.store.getIntent(intentId);
     if (!intent) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `Unknown payment intent ${intentId}`,
         category: "NOT_FOUND",
         code: "intent_not_found",
@@ -345,7 +345,7 @@ export class CheckoutService {
     }
 
     if (!subscription) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `Subscription ${intent.subscriptionId} is missing for intent ${intent.id}`,
         category: "INTERNAL",
         code: "subscription_not_found",
@@ -401,7 +401,7 @@ export class CheckoutService {
     // downgrade is honoured here — at the boundary, on a verified payment, not on a timer.
     const paidPlan = findPlan(intent.planKey);
     if (!paidPlan) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `Intent ${intent.id} references unknown plan ${intent.planKey}`,
         category: "INTERNAL",
         code: "unknown_plan_on_intent",
@@ -491,7 +491,7 @@ export class CheckoutService {
       total: amount.toJSON(),
       lines: [
         {
-          description: `PROOFSTACK ${plan.name} — ${intent.period} period`,
+          description: `PROOFCORE ${plan.name} — ${intent.period} period`,
           quantity: 1,
           unitAmount: amount.toJSON(),
           totalAmount: amount.toJSON(),
@@ -535,7 +535,7 @@ export class CheckoutService {
     if (input.existingSubscriptionId) {
       const existing = await this.store.getSubscription(input.existingSubscriptionId);
       if (!existing) {
-        throw new ProofstackError({
+        throw new ProofCoreError({
           message: `Unknown subscription ${input.existingSubscriptionId}`,
           category: "NOT_FOUND",
           code: "subscription_not_found",
@@ -543,7 +543,7 @@ export class CheckoutService {
       }
       if (existing.workspaceId !== input.workspaceId) {
         // Tenant isolation: a subscription id from another workspace is not a handle.
-        throw new ProofstackError({
+        throw new ProofCoreError({
           message: "Subscription does not belong to this workspace",
           category: "PERMISSION",
           code: "subscription_workspace_mismatch",
@@ -690,7 +690,9 @@ export function normalizeEmail(email: string): string {
   const local = trimmed.slice(0, at);
   const domain = trimmed.slice(at + 1);
   if (domain === "gmail.com" || domain === "googlemail.com") {
-    return `${local.split("+")[0]!.replaceAll(".", "")}@gmail.com`;
+    // local cannot be empty for an accepted email; assert once, typed.
+    const gmailLocal = local.split("+")[0];
+    return `${(gmailLocal ?? "").replaceAll(".", "")}@gmail.com`;
   }
   return `${local}@${domain}`;
 }

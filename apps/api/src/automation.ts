@@ -36,8 +36,8 @@ export async function notifyPaymentEvent(
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "x-proofstack-timestamp": timestamp,
-        "x-proofstack-signature": `sha256=${signature}`,
+        "x-proofcore-timestamp": timestamp,
+        "x-proofcore-signature": `sha256=${signature}`,
       },
       body,
       signal: controller.signal,

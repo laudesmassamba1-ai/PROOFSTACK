@@ -1,6 +1,6 @@
-import type { PaymentProvider } from "@proofstack/adapter-payments";
-import { API_VERSION } from "@proofstack/contracts";
-import { iso, uuid } from "@proofstack/core";
+import type { PaymentProvider } from "@proofcore/adapter-payments";
+import { API_VERSION } from "@proofcore/contracts";
+import { iso, uuid } from "@proofcore/core";
 import { Hono } from "hono";
 import type { Database } from "./db/types.js";
 import { type Env, readConfig } from "./env.js";
@@ -104,7 +104,7 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
     return c.json(
       {
         status: database === "ok" ? "ok" : "degraded",
-        service: "proofstack-api",
+        service: "proofcore-api",
         apiVersion: API_VERSION,
         time: iso(services.clock()),
         database,

@@ -1,5 +1,5 @@
-import type { PaymentProvider } from "@proofstack/adapter-payments";
-import { iso, uuid } from "@proofstack/core";
+import type { PaymentProvider } from "@proofcore/adapter-payments";
+import { iso, uuid } from "@proofcore/core";
 import type { CheckoutService } from "./checkout.js";
 import type { BillingStore } from "./store.js";
 

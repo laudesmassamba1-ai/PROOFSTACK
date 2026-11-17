@@ -1,4 +1,4 @@
-import { normalizeUiLocale, type UiLocale } from "@proofstack/contracts";
+import { normalizeUiLocale, type UiLocale } from "@proofcore/contracts";
 import {
   createContext,
   type ReactNode,
@@ -21,7 +21,7 @@ const DICTIONARIES: Record<UiLocale, Messages> = {
   fr: { ...fr, ...marketingFr, ...workspaceFr },
 };
 
-const STORAGE_KEY = "proofstack.locale";
+const STORAGE_KEY = "proofcore.locale";
 
 interface I18nValue {
   locale: UiLocale;

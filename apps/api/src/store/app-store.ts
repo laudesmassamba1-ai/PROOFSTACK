@@ -5,8 +5,8 @@ import type {
   Severity,
   TestRun,
   TestStatus,
-} from "@proofstack/contracts";
-import { iso, ProofstackError, slugify, uuid } from "@proofstack/core";
+} from "@proofcore/contracts";
+import { iso, ProofCoreError, slugify, uuid } from "@proofcore/core";
 import {
   bool,
   type Database,
@@ -162,7 +162,7 @@ export class AppStore {
     } catch (error) {
       // The unique index is the authority on identity, not a prior SELECT.
       if (isUniqueViolation(error)) {
-        throw new ProofstackError({
+        throw new ProofCoreError({
           message: "An account with this email already exists",
           category: "VALIDATION",
           code: "email_taken",
@@ -359,7 +359,7 @@ export class AppStore {
       }
     }
 
-    throw new ProofstackError({
+    throw new ProofCoreError({
       message: `Could not allocate a unique workspace slug from "${input.name}" after 50 attempts`,
       category: "INTERNAL",
       code: "workspace_slug_exhausted",

@@ -1,5 +1,5 @@
-import { normalizeEmail } from "@proofstack/billing";
-import { ProofstackError, uuid } from "@proofstack/core";
+import { normalizeEmail } from "@proofcore/billing";
+import { ProofCoreError, uuid } from "@proofcore/core";
 import { Hono } from "hono";
 import { z } from "zod";
 import {
@@ -62,6 +62,7 @@ export function authRoutes(services: Services): Hono<AppEnv> {
 
   app.post("/sign-up/email", async (c) => {
     const address = clientAddress({ get: (name) => c.req.header(name) });
+    const userAgent = c.req.header("user-agent");
     const limited = signUpLimiter?.check(address) ?? { allowed: true, retryAfterSeconds: 0 };
     if (!limited.allowed) {
       c.header("Retry-After", String(limited.retryAfterSeconds));
@@ -92,7 +93,7 @@ export function authRoutes(services: Services): Hono<AppEnv> {
       userId: user.id,
       tokenHash,
       expiresAt,
-      ...(c.req.header("user-agent") ? { userAgent: c.req.header("user-agent")! } : {}),
+      ...(userAgent ? { userAgent } : {}),
       ...(address !== "local" ? { ip: address } : {}),
     });
     await services.store.appendAudit({
@@ -119,6 +120,7 @@ export function authRoutes(services: Services): Hono<AppEnv> {
 
   app.post("/sign-in/email", async (c) => {
     const address = clientAddress({ get: (name) => c.req.header(name) });
+    const userAgent = c.req.header("user-agent");
     const body = await readBody(c, signInSchema);
     const limited = signInLimiter.check(`${address}|${normalizeEmail(body.email)}`);
     if (!limited.allowed) {
@@ -144,7 +146,7 @@ export function authRoutes(services: Services): Hono<AppEnv> {
       userId: user.id,
       tokenHash,
       expiresAt,
-      ...(c.req.header("user-agent") ? { userAgent: c.req.header("user-agent")! } : {}),
+      ...(userAgent ? { userAgent } : {}),
       ...(address !== "local" ? { ip: address } : {}),
     });
 
@@ -188,7 +190,7 @@ export function authRoutes(services: Services): Hono<AppEnv> {
         isAdmin: isAdminEmail(services.config, found.user.email),
       });
     } catch (error) {
-      if (error instanceof ProofstackError) throw error;
+      if (error instanceof ProofCoreError) throw error;
       throw error;
     }
   });

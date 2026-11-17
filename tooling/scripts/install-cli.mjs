@@ -23,13 +23,13 @@ try {
 }
 
 const tarballs = entries
-  .filter((entry) => entry.isFile() && /^proofstack-cli-\d+\.\d+\.\d+\.tgz$/.test(entry.name))
+  .filter((entry) => entry.isFile() && /^proofcore-cli-\d+\.\d+\.\d+\.tgz$/.test(entry.name))
   .map((entry) => entry.name)
   .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
 const latest = tarballs.at(-1);
 if (!latest) {
-  console.error("No proofstack-cli-*.tgz found. Run `pnpm cli:package` first.");
+  console.error("No proofcore-cli-*.tgz found. Run `pnpm cli:package` first.");
   process.exit(2);
 }
 
@@ -43,14 +43,14 @@ if (result.error) {
 }
 if (result.status !== 0) process.exit(result.status ?? 1);
 
-const check = spawnSync("proofstack", ["--version"], {
+const check = spawnSync("proofcore", ["--version"], {
   stdio: "inherit",
   env: process.env,
   shell: process.platform === "win32",
 });
 if (check.error) {
-  console.error("The package installed, but `proofstack` is not on PATH.");
-  console.error("Add your npm global bin directory to PATH, then run `proofstack --version`.");
+  console.error("The package installed, but `proofcore` is not on PATH.");
+  console.error("Add your npm global bin directory to PATH, then run `proofcore --version`.");
   process.exit(1);
 }
 process.exit(check.status ?? 1);

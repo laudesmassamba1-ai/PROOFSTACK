@@ -1,4 +1,4 @@
-# PROOFSTACK — PRODUCT EXPERIENCE ENGINE v2
+# PROOFCORE — PRODUCT EXPERIENCE ENGINE v2
 
 ## Direction artistique « Ink & Object » : typographie géante, objets tangibles, personnalité
 
@@ -8,11 +8,11 @@ Script à coller dans l'agent de code. Rédigé en anglais pour l'agent ; les te
 
 # 00 — MISSION AND OPERATING MODE
 
-Transform the **authenticated PROOFSTACK workspace** (the route after login, typically `/app` — follow the real router) into a distinctive, art-directed product that nobody would mistake for a template.
+Transform the **authenticated PROOFCORE workspace** (the route after login, typically `/app` — follow the real router) into a distinctive, art-directed product that nobody would mistake for a template.
 
 Two mandatory stages:
 
-- **STAGE A — Create a project-specific skill** (`.agents/skills/proofstack-product-experience/SKILL.md`, or the project's existing skill convention).
+- **STAGE A — Create a project-specific skill** (`.agents/skills/proofcore-product-experience/SKILL.md`, or the project's existing skill convention).
 - **STAGE B — Load it, then execute it** on the real codebase: audit, redesign, implement, screenshot, critique, iterate.
 
 Do not stop after writing documentation. The result must be visible in the running application.
@@ -71,17 +71,17 @@ Create `docs/design/REFERENCE_DECODING.md` summarizing this section in your own 
 
 ## 2.2 Create the skill
 
-Path: `.agents/skills/proofstack-product-experience/SKILL.md` (or the existing convention).
+Path: `.agents/skills/proofcore-product-experience/SKILL.md` (or the existing convention).
 
 ```yaml
-name: proofstack-product-experience
+name: proofcore-product-experience
 description: >
   Art direction, UX engineering, design system, motion, contextual copywriting
-  and visual QA for the authenticated PROOFSTACK workspace. Activate for any
+  and visual QA for the authenticated PROOFCORE workspace. Activate for any
   change to workspace UI, copy, layout, illustration, motion or empty/error states.
 ```
 
-Identity: **PROOFSTACK Creative Director & Principal Product Experience Engineer.**
+Identity: **PROOFCORE Creative Director & Principal Product Experience Engineer.**
 
 The skill must contain, concretely (values, not adjectives):
 
@@ -108,7 +108,7 @@ Read the whole `SKILL.md`, activate it through the supported mechanism (or load 
 
 # 03 — PRODUCT TRUTH
 
-PROOFSTACK is a professional software quality and reliability suite:
+PROOFCORE is a professional software quality and reliability suite:
 
 - **WORLD** — international compatibility (names, addresses, phone numbers, encodings, formats).
 - **FLOW** — reliability of transaction and user journeys (checkout, payment, webhooks, confirmation).
@@ -196,12 +196,12 @@ Inspired by REF-3: a cast of tiny ink characters (24–40px, single-weight line,
 
 The giant headline is **generated from the real state**, not a slogan:
 
-| Real state         | Headline (FR)              | Support line                                                                  |
-| ------------------ | -------------------------- | ----------------------------------------------------------------------------- |
-| No project         | `AUCUN PROJET.`            | Créez un projet pour configurer vos premières vérifications.                  |
-| Project, no run    | `AUCUNE EXÉCUTION.`        | Lancez `proofstack test` depuis votre projet. Les résultats apparaîtront ici. |
-| Runs with failures | `{n} ÉCHEC(S) À EXAMINER.` | Dernière exécution : {project}, {module}, {time}.                             |
-| Runs, no failure   | `AUCUNE ANOMALIE.`         | Sur les {n} dernières exécutions. _(only if real runs support it)_            |
+| Real state         | Headline (FR)              | Support line                                                                 |
+| ------------------ | -------------------------- | ---------------------------------------------------------------------------- |
+| No project         | `AUCUN PROJET.`            | Créez un projet pour configurer vos premières vérifications.                 |
+| Project, no run    | `AUCUNE EXÉCUTION.`        | Lancez `proofcore test` depuis votre projet. Les résultats apparaîtront ici. |
+| Runs with failures | `{n} ÉCHEC(S) À EXAMINER.` | Dernière exécution : {project}, {module}, {time}.                            |
+| Runs, no failure   | `AUCUNE ANOMALIE.`         | Sur les {n} dernières exécutions. _(only if real runs support it)_           |
 
 Below the headline: the three module objects with real state and one action each; a recent-runs table (project, module, run, status, duration, time, report link); a next-action strip that adapts (new user: create project → install CLI → configure module → first run; established user: open failure → re-run → open report). No setup steps after setup is done.
 
@@ -292,7 +292,7 @@ Budget: no regression of first load on `/app`; report bundle size before/after. 
 
 **Tests to run on every key screen:**
 
-- **Swap test:** replace PROOFSTACK with another product name — does the screen still work as-is? If yes, it is too generic.
+- **Swap test:** replace PROOFCORE with another product name — does the screen still work as-is? If yes, it is too generic.
 - **Squint test:** blur the screenshot — is there one clear focal point (headline or object)?
 - **Type test:** is typography clearly the main visual on Overview and module headers?
 - **Object test:** is the module object bound to real state?

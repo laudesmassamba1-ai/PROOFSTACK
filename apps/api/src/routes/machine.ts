@@ -1,4 +1,4 @@
-import { runUploadRequestSchema } from "@proofstack/contracts";
+import { runUploadRequestSchema } from "@proofcore/contracts";
 import { type Context, Hono } from "hono";
 import { hashToken } from "../auth.js";
 import { HttpError } from "../http/errors.js";

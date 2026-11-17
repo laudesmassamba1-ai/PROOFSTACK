@@ -2,7 +2,7 @@
 <html lang="fr">
   <head>
     <meta charset="utf-8" />
-    <title>PROOFSTACK — Ce qu'il te reste à fournir</title>
+    <title>PROOFCORE — Ce qu'il te reste à fournir</title>
     <style>
       @page {
         size: A4;
@@ -425,7 +425,7 @@
   <body>
     <header class="cover">
       <div class="cover-top">
-        <div class="wordmark">PROOFSTACK</div>
+        <div class="wordmark">PROOFCORE</div>
         <div class="kicker">Dossier de passation · 17 novembre 2026</div>
       </div>
       <h1>Ce qu’il te reste<br />à fournir</h1>
@@ -435,7 +435,7 @@
         Aucun mot de passe de plateforme ne t’est demandé.
       </p>
       <div class="meta">
-        <span>PROOFSTACK / opérations</span>
+        <span>PROOFCORE / opérations</span>
         <span>Document sans secret — ne pas y ajouter de credentials</span>
       </div>
     </header>
@@ -556,7 +556,7 @@
         <li>
           Toujours dans le tableau de bord, ouvre <strong>Webhooks</strong> et crée un point de
           réception avec exactement cette URL :
-          <div class="url"><code>https://proofstack-api.laudesmassamba1.workers.dev/api/webhooks/saspay</code></div>
+          <div class="url"><code>https://proofcore-api.laudesmassamba1.workers.dev/api/webhooks/saspay</code></div>
           Choisis le même environnement que la clé (SANDBOX ou LIVE).
         </li>
         <li>
@@ -584,14 +584,14 @@ pnpm exec wrangler secret put SASPAY_WEBHOOK_SECRET</pre>
 
       <p class="small">
         Vérification sans exposer le secret :
-        <code>curl -s https://proofstack-api.laudesmassamba1.workers.dev/health</code>.
+        <code>curl -s https://proofcore-api.laudesmassamba1.workers.dev/health</code>.
         La réponse doit contenir
         <code>"payments":{"provider":"saspay","configured":true}</code>.
       </p>
 
       <div class="callout">
         <strong>Deux limites SasPay à connaître.</strong> La spécification ne propose ni débit
-        récurrent automatique ni remboursement par API : PROOFSTACK fonctionne en périodes
+        récurrent automatique ni remboursement par API : PROOFCORE fonctionne en périodes
         prépayées, renouvelées manuellement, et les remboursements restent administratifs. Les
         retraits exigent aussi l’IP du serveur en liste blanche, sinon l’API renvoie
         <code>403 ip_not_whitelisted</code>.
@@ -620,7 +620,7 @@ pnpm exec wrangler secret put SASPAY_WEBHOOK_SECRET</pre>
           <strong>Create New App</strong>, puis <strong>From scratch</strong>.
         </li>
         <li>
-          Nomme l’application <strong>PROOFSTACK Alerts</strong> et choisis le workspace qui
+          Nomme l’application <strong>PROOFCORE Alerts</strong> et choisis le workspace qui
           recevra les notifications.
         </li>
         <li>
@@ -629,7 +629,7 @@ pnpm exec wrangler secret put SASPAY_WEBHOOK_SECRET</pre>
         </li>
         <li>
           Clique sur <strong>Add New Webhook to Workspace</strong>, choisis le canal
-          (par exemple <code>#proofstack-payments</code>) puis autorise l’installation.
+          (par exemple <code>#proofcore-payments</code>) puis autorise l’installation.
         </li>
         <li>
           Copie l’URL générée. Garde-la dans ton gestionnaire de secrets ; ne la mets ni dans
@@ -643,7 +643,7 @@ pnpm exec wrangler secret put SASPAY_WEBHOOK_SECRET</pre>
       <pre><span class="comment"># Test visuel : un message doit apparaître dans le canal Slack.</span>
 curl -sS -X POST \
   -H 'Content-type: application/json' \
-  --data '{"text":"PROOFSTACK — test de notification"}' \
+  --data '{"text":"PROOFCORE — test de notification"}' \
   "$SLACK_WEBHOOK_URL"</pre>
 
       <div class="callout">
@@ -662,13 +662,13 @@ curl -sS -X POST \
 
       <p>
         Le webhook public actuel utilise un <strong>Cloudflare Quick Tunnel</strong>. Son adresse
-        est de la forme <code>https://&lt;nom-aléatoire&gt;.trycloudflare.com/webhook/proofstack-payments</code>
+        est de la forme <code>https://&lt;nom-aléatoire&gt;.trycloudflare.com/webhook/proofcore-payments</code>
         et <strong>change à chaque redémarrage</strong> du tunnel ou de la machine. Le Worker
         pointerait alors vers une adresse morte.
       </p>
       <p class="small muted">
         Pour retrouver l’URL courante sans exposer de secret :
-        <code>docker logs proofstack-n8n-tunnel 2&gt;&amp;1 | grep -o 'https://[^ ]*trycloudflare.com' | tail -1</code>
+        <code>docker logs proofcore-n8n-tunnel 2&gt;&amp;1 | grep -o 'https://[^ ]*trycloudflare.com' | tail -1</code>
       </p>
 
       <div class="grid-2">
@@ -718,7 +718,7 @@ curl -sS -X POST \
       <p>
         La console <code>/app/admin</code> est désactivée tant que <code>ADMIN_EMAILS</code> est
         vide : l’API répond <code>503 admin_not_configured</code>. Indique l’email du compte
-        PROOFSTACK qui doit voir les utilisateurs, abonnements, paiements, runs et webhooks.
+        PROOFCORE qui doit voir les utilisateurs, abonnements, paiements, runs et webhooks.
         Plusieurs emails sont possibles, séparés par des virgules.
       </p>
 
@@ -767,7 +767,7 @@ curl -sS -X POST \
           <tr>
             <td><strong>Jeton de projet CLI</strong></td>
             <td>Pour automatiser les envois de runs depuis un client ou la CI.</td>
-            <td>Créer un token <code>psk_…</code> dans le dashboard PROOFSTACK ; ce n’est pas un accès administrateur.</td>
+            <td>Créer un token <code>psk_…</code> dans le dashboard PROOFCORE ; ce n’est pas un accès administrateur.</td>
           </tr>
         </tbody>
       </table>
@@ -833,7 +833,7 @@ curl -sS -X POST \
     </section>
 
     <div class="footer-note">
-      <span>PROOFSTACK — dossier de passation · 17/11/2026</span>
+      <span>PROOFCORE — dossier de passation · 17/11/2026</span>
       <span>Document sans secret · ne pas y ajouter de credentials</span>
     </div>
   </body>

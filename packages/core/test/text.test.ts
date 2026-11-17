@@ -16,7 +16,7 @@ import {
   textDirection,
   truncateGraphemes,
   unicodeEquals,
-} from "@proofstack/core";
+} from "@proofcore/core";
 import { describe, expect, it } from "vitest";
 
 describe("international text primitives", () => {

@@ -4,7 +4,7 @@ import type {
   EntitlementValue,
   ModuleId,
   SubscriptionState,
-} from "@proofstack/contracts";
+} from "@proofcore/contracts";
 import { grantsAccess } from "./machines.js";
 import { entitlementsFor, findPlan, PLANS, planRank } from "./plans.js";
 import type { Subscription } from "./records.js";

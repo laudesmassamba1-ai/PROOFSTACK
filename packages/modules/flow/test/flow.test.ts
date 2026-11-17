@@ -1,6 +1,6 @@
-import { proofstackConfigSchema } from "@proofstack/contracts";
-import { FixedClock, Logger } from "@proofstack/core";
-import { runEngine } from "@proofstack/engine";
+import { proofcoreConfigSchema } from "@proofcore/contracts";
+import { FixedClock, Logger } from "@proofcore/core";
+import { runEngine } from "@proofcore/engine";
 import { describe, expect, it } from "vitest";
 import {
   buildSignedWebhook,
@@ -24,7 +24,7 @@ import {
  * the run reports FAILED with the right code.
  */
 
-const config = proofstackConfigSchema.parse({
+const config = proofcoreConfigSchema.parse({
   project: { name: "FLOW fixture", baseUrl: "http://localhost:3000" },
   environment: "staging",
   modules: {

@@ -63,7 +63,7 @@ export function AppLayout() {
   // Non-destructive 3D toggle (UI test)
   const [threeDEnabled, setThreeDEnabled] = useState<boolean>((): boolean => {
     try {
-      const v = window.localStorage?.getItem("proofstack_3d_enabled");
+      const v = window.localStorage?.getItem("proofcore_3d_enabled");
       return v === "true";
     } catch {
       // ignore
@@ -75,7 +75,7 @@ export function AppLayout() {
     const next = !threeDEnabled;
     setThreeDEnabled(next);
     try {
-      window.localStorage?.setItem("proofstack_3d_enabled", next ? "true" : "false");
+      window.localStorage?.setItem("proofcore_3d_enabled", next ? "true" : "false");
     } catch {}
     if (typeof document !== "undefined") {
       document.body.dataset.enhanced3d = next ? "true" : "";
@@ -109,6 +109,8 @@ export function AppLayout() {
     };
   }, [session.workspaceId]);
 
+  // Close transient overlays on navigation. pathname is the trigger by design.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: pathname IS the dependency
   useEffect(() => {
     setMobileOpen(false);
     setAccountOpen(false);
@@ -171,8 +173,10 @@ export function AppLayout() {
       if (event.key !== "Tab") return;
       const list = focusables();
       if (list.length === 0) return;
-      const first = list[0]!;
-      const last = list[list.length - 1]!;
+      // list.length > 0 is checked above; use at() so no assertion is needed.
+      const first = list[0];
+      const last = list.at(-1);
+      if (!first || !last) return;
       if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
         last.focus();
@@ -240,8 +244,8 @@ export function AppLayout() {
     return (
       <div className="app-shell app-centered-shell">
         <div className="app-frame app-loading-frame">
-          <div className="app-loader" aria-label={t("ws.loading")} aria-live="polite">
-            <span className="sr-only">Loading</span>
+          <div className="app-loader" role="status" aria-live="polite" aria-label={t("ws.loading")}>
+            <span className="sr-only">{t("ws.loading")}</span>
           </div>
           <p className="app-eyebrow">{t("ws.loading")}</p>
         </div>
@@ -257,7 +261,7 @@ export function AppLayout() {
     return (
       <div className="app-shell app-centered-shell">
         <div className="app-frame app-service-frame">
-          <p className="app-eyebrow">PROOFSTACK / 503</p>
+          <p className="app-eyebrow">PROOFCORE / 503</p>
           <h1 className="app-display app-service-title">{t("ws.service.title")}</h1>
           <p className="app-support">{t("ws.service.body")}</p>
           <button
@@ -293,7 +297,7 @@ export function AppLayout() {
     <div className="app-shell">
       <div className="app-frame">
         <header className="app-topbar">
-          <NavLink to="/app" className="app-brand-lockup" aria-label="PROOFSTACK workspace">
+          <NavLink to="/app" className="app-brand-lockup" aria-label="PROOFCORE workspace">
             <Mark size={34} variant="onLight" />
             <span className="wordmark app-brand-word">ROOFSTACK</span>
             <span className="app-beta">{t("ws.shell.beta")}</span>
@@ -482,7 +486,7 @@ export function AppLayout() {
         </main>
 
         <footer className="app-footer">
-          <span>PROOFSTACK / {workspace?.name ?? "workspace"}</span>
+          <span>PROOFCORE / {workspace?.name ?? "workspace"}</span>
           <span>LOCAL EXECUTION / CLOUD EVIDENCE</span>
         </footer>
       </div>
@@ -569,7 +573,8 @@ export function AppLayout() {
                   setSelected((value) => Math.max(0, value - 1));
                 } else if (event.key === "Enter" && filtered[selected]) {
                   event.preventDefault();
-                  activate(filtered[selected]!);
+                  const command = filtered[selected];
+                  if (command) activate(command);
                 }
               }}
               placeholder={t("ws.search.placeholder")}
@@ -630,7 +635,7 @@ export function PageHeader({
 }) {
   const { locale } = useI18n();
   const sectionLabel =
-    eyebrow ?? (locale === "fr" ? "PROOFSTACK / espace de travail" : "PROOFSTACK / workspace");
+    eyebrow ?? (locale === "fr" ? "PROOFCORE / espace de travail" : "PROOFCORE / workspace");
   return (
     <header className="app-page-head">
       <p className="app-eyebrow">{sectionLabel}</p>

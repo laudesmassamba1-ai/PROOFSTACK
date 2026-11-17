@@ -1,6 +1,6 @@
-import { checkEntitlement, resolveEntitlements } from "@proofstack/billing";
-import type { ModuleId } from "@proofstack/contracts";
-import { moduleIdSchema } from "@proofstack/contracts";
+import { checkEntitlement, resolveEntitlements } from "@proofcore/billing";
+import type { ModuleId } from "@proofcore/contracts";
+import { moduleIdSchema } from "@proofcore/contracts";
 import { Hono } from "hono";
 import { z } from "zod";
 import {
@@ -247,12 +247,12 @@ export function workspaceRoutes(services: Services): Hono<AppEnv> {
           `<tr><td>${escapeHtml(module)}</td><td>${escapeHtml(testCase.name)}</td><td>${escapeHtml(testCase.status)}</td><td><code>${escapeHtml(testCase.id)}</code></td></tr>`
       )
       .join("");
-    const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>PROOFSTACK report ${escapeHtml(payload.id)}</title>
+    const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>PROOFCORE report ${escapeHtml(payload.id)}</title>
 <style>body{font-family:system-ui,sans-serif;margin:2rem;color:#142033}table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #e4e9f0;padding:.5rem;text-align:left;font-size:.85rem}code{font-family:ui-monospace,monospace}</style>
-</head><body><h1>PROOFSTACK report</h1>
+</head><body><h1>PROOFCORE report</h1>
 <p><strong>Run ${escapeHtml(payload.id)}</strong> — ${escapeHtml(payload.status)} — ${payload.moduleRuns.reduce((sum, m) => sum + m.totals.total, 0)} cases</p>
 <table><thead><tr><th>Module</th><th>Case</th><th>Status</th><th>Id</th></tr></thead><tbody>${rows}</tbody></table>
-<p style="color:#68778a;font-size:.8rem">Generated from the stored report payload. Reproduce with the CLI: <code>proofstack test</code>.</p></body></html>`;
+<p style="color:#68778a;font-size:.8rem">Generated from the stored report payload. Reproduce with the CLI: <code>proofcore test</code>.</p></body></html>`;
     return c.html(html);
   });
 

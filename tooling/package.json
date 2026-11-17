@@ -1,5 +1,5 @@
 {
-  "name": "@proofstack/tooling",
+  "name": "@proofcore/tooling",
   "version": "0.1.0",
   "private": true,
   "type": "module"

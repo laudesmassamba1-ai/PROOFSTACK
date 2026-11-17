@@ -1,5 +1,5 @@
 import { type CurrencyMeta, currencyMeta } from "./currency.js";
-import { ProofstackError } from "./errors.js";
+import { ProofCoreError } from "./errors.js";
 
 /**
  * Exact money.
@@ -7,7 +7,7 @@ import { ProofstackError } from "./errors.js";
  * A Money value is an integer number of *minor units* plus a currency code whose
  * exponent comes from ISO 4217 metadata. There is no `number` anywhere in the
  * arithmetic path: `0.1 + 0.2 !== 0.3` is not a rounding detail, it is a billing
- * defect, and PROOFSTACK is not allowed to ship one in its own checkout flow.
+ * defect, and PROOFCORE is not allowed to ship one in its own checkout flow.
  *
  * `toNumber()` and `format()` exist for display only and are documented as such.
  */
@@ -18,7 +18,7 @@ const DECIMAL_RE = /^([+-]?)(\d+)(?:\.(\d+))?$/;
 
 function divRound(a: bigint, b: bigint, mode: RoundingMode): bigint {
   if (b === 0n) {
-    throw new ProofstackError({
+    throw new ProofCoreError({
       message: "divRound: zero denominator",
       category: "VALIDATION",
       code: "divide_by_zero",
@@ -98,7 +98,7 @@ export class Money {
     const text = input.trim();
     const match = DECIMAL_RE.exec(text);
     if (!match) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `Not a plain decimal money amount: ${JSON.stringify(input)}`,
         category: "VALIDATION",
         code: "bad_money_string",
@@ -120,7 +120,7 @@ export class Money {
     const total = sign * (base * den + BigInt(rest));
     const minor = divRound(total, den, rounding);
     if (opts.exact && minor * den !== total) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `Amount ${input} has more precision than ${code} can represent (${exponent} decimal digit(s))`,
         category: "VALIDATION",
         code: "money_precision_loss",
@@ -148,7 +148,7 @@ export class Money {
 
   private same(other: Money): void {
     if (this.currency !== other.currency) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `Currency mismatch: ${this.currency} vs ${other.currency}`,
         category: "VALIDATION",
         code: "currency_mismatch",
@@ -202,7 +202,7 @@ export class Money {
    */
   allocate(weights: readonly bigint[]): Money[] {
     if (weights.length === 0) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: "allocate: no weights",
         category: "VALIDATION",
         code: "empty_weights",
@@ -210,17 +210,19 @@ export class Money {
     }
     const total = weights.reduce((acc, w) => acc + w, 0n);
     if (total <= 0n) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: "allocate: weights must sum to a positive number",
         category: "VALIDATION",
         code: "bad_weights",
       });
     }
+    // floors is built from the same weights array, so index alignment is a
+    // construction invariant; use at() so no assertion is needed.
     const floors = weights.map((w) => (this.minor * w) / total);
     const remainders = weights.map((w, i) => ({
       index: i,
       frac: (((this.minor * w) % total) * 1000n) / total,
-      value: floors[i]!,
+      value: floors[i] ?? 0n,
     }));
     let left = this.minor - floors.reduce((acc, v) => acc + v, 0n);
     const ordered = [...remainders].sort((a, b) => Number(b.frac - a.frac) || a.index - b.index);
@@ -239,7 +241,7 @@ export class Money {
   /** Equal split across `parts`, remainder given to the first parts. */
   splitEvenly(parts: number): Money[] {
     if (!Number.isInteger(parts) || parts <= 0) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `splitEvenly: bad part count ${parts}`,
         category: "VALIDATION",
         code: "bad_parts",
@@ -256,7 +258,7 @@ export class Money {
   toDecimalString(decimals = this.exponent): string {
     const exp = this.exponent;
     if (decimals < exp) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `Cannot render ${this.currency} with ${decimals} decimals (exponent ${exp}) without rounding`,
         category: "VALIDATION",
         code: "bad_decimals",
@@ -376,7 +378,9 @@ export function parseLocalizedDecimal(
     if (!/^\d+$/.test(fracPart)) return { ok: false, reason: "non_digit_fraction" };
   }
 
-  const signMatch = /^([+-]?)(.*)$/.exec(intPart)!;
+  // The pattern always matches (it is a full catch-all); assert once, typed.
+  const signMatch = /^([+-]?)(.*)$/.exec(intPart);
+  if (!signMatch) return { ok: false, reason: "empty_integer" };
   const sign = signMatch[1] ?? "";
   let digits = signMatch[2] ?? "";
   if (digits.length === 0) return { ok: false, reason: "empty_integer" };

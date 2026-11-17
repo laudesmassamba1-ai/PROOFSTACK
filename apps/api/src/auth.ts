@@ -1,4 +1,4 @@
-import { hmacSha256Hex, sha256Hex, timingSafeEqualHex } from "@proofstack/core";
+import { hmacSha256Hex, sha256Hex, timingSafeEqualHex } from "@proofcore/core";
 
 /**
  * Password and session primitives.
@@ -93,7 +93,7 @@ export async function verifyPassword(password: string, stored: string): Promise<
   const actual = await derive(password, fromBase64(saltRaw), iterations);
   if (actual.length !== expected.length) return false;
   let difference = 0;
-  for (let i = 0; i < actual.length; i += 1) difference |= actual[i]! ^ expected[i]!;
+  for (let i = 0; i < actual.length; i += 1) difference |= (actual[i] ?? 0) ^ (expected[i] ?? 0);
   return difference === 0;
 }
 

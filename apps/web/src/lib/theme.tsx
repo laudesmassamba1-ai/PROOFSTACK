@@ -7,7 +7,7 @@ import { createContext, type ReactNode, useContext, useEffect, useMemo, useState
  */
 export type Theme = "light" | "dark";
 
-const STORAGE_KEY = "proofstack.theme";
+const STORAGE_KEY = "proofcore.theme";
 
 interface ThemeValue {
   theme: Theme;

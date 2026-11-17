@@ -69,8 +69,8 @@ const CONTENT: Record<ModuleName, ModuleContent> = {
   expected  "Kòfí Sossou"
   actual    "Kof? Sossou"
   column    full_name  (utf8mb3 truncation at byte 5)
-  reproduce proofstack test --module world --only fr-BJ/identity/Sossou-14`,
-    command: "proofstack test --module world --profiles fr-BJ,ar-EG,ja-JP",
+  reproduce proofcore test --module world --only fr-BJ/identity/Sossou-14`,
+    command: "proofcore test --module world --profiles fr-BJ,ar-EG,ja-JP",
   },
   flow: {
     name: "flow",
@@ -111,7 +111,7 @@ const CONTENT: Record<ModuleName, ModuleContent> = {
     sample: `flow/webhook/duplicate  PASSED   idempotent: 2 deliveries, 1 entitlement change
 flow/webhook/forged     PASSED   signature mismatch rejected (401)
 flow/checkout/declined  FAILED   subscription activated on PENDING`,
-    command: "proofstack test --module flow --payment-mode sandbox",
+    command: "proofcore test --module flow --payment-mode sandbox",
   },
   exit: {
     name: "exit",
@@ -151,7 +151,7 @@ flow/checkout/declined  FAILED   subscription activated on PENDING`,
     sample: `exit/roundtrip/orders  FAILED   2 of 500 records differ
   order_118  total: 1234.56 -> 1234.5599999999999 (float coercion)
   order_402  customer_id: "c_9" -> null (orphan dropped by LEFT JOIN)`,
-    command: "proofstack test --module exit --formats json,csv,zip",
+    command: "proofcore test --module exit --formats json,csv,zip",
   },
 };
 

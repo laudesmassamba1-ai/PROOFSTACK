@@ -2,7 +2,7 @@
 
 Overview:
 
-- PROOFSTACK CLI should feel premium, with a consistent visual language and clear process flows.
+- PROOFCORE CLI should feel premium, with a consistent visual language and clear process flows.
 - The CLI uses the same design tokens as UI (color palette tokens translated to terminal colors).
 
 Requirements:

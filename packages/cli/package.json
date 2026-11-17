@@ -1,11 +1,12 @@
 {
-  "name": "@proofstack/cli",
+  "name": "@proofcore/cli",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "license": "MPL-2.0",
-  "description": "The PROOFSTACK command line: init, doctor, validate, test, report, sync, and the interactive terminal console. Exit codes are a contract: 0 pass, 1 defect, 2 harness error, 3 cancelled.",
+  "description": "The PROOFCORE command line: init, doctor, validate, test, report, sync, and the interactive terminal console. Exit codes are a contract: 0 pass, 1 defect, 2 harness error, 3 cancelled.",
   "bin": {
+    "proofcore": "./dist/index.js",
     "proofstack": "./dist/index.js"
   },
   "main": "./dist/index.js",
@@ -19,14 +20,14 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@proofstack/adapter-ai": "workspace:*",
-    "@proofstack/adapter-reporting": "workspace:*",
-    "@proofstack/config": "workspace:*",
-    "@proofstack/contracts": "workspace:*",
-    "@proofstack/core": "workspace:*",
-    "@proofstack/engine": "workspace:*",
-    "@proofstack/module-exit": "workspace:*",
-    "@proofstack/module-flow": "workspace:*",
-    "@proofstack/module-world": "workspace:*"
+    "@proofcore/adapter-ai": "workspace:*",
+    "@proofcore/adapter-reporting": "workspace:*",
+    "@proofcore/config": "workspace:*",
+    "@proofcore/contracts": "workspace:*",
+    "@proofcore/core": "workspace:*",
+    "@proofcore/engine": "workspace:*",
+    "@proofcore/module-exit": "workspace:*",
+    "@proofcore/module-flow": "workspace:*",
+    "@proofcore/module-world": "workspace:*"
   }
 }

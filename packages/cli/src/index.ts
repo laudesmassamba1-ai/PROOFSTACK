@@ -11,22 +11,22 @@ import {
   describeRuntime,
   runAgent,
   summarizeRunForAgent,
-} from "@proofstack/adapter-ai";
-import { exitCodeFor, renderReport, runTotals } from "@proofstack/adapter-reporting";
+} from "@proofcore/adapter-ai";
+import { exitCodeFor, renderReport, runTotals } from "@proofcore/adapter-reporting";
 import {
   CONFIG_FILE_NAMES,
   type LoadedConfig,
   loadConfig,
   renderConfigFile,
   starterConfig,
-} from "@proofstack/config";
-import type { ModuleId, ReportFormat, TestRun } from "@proofstack/contracts";
-import { iso, Logger, ProofstackError, stableStringify } from "@proofstack/core";
-import { ENGINE_VERSION, type EngineEvent, runEngine } from "@proofstack/engine";
-import { createExitProvider, defaultExportSource } from "@proofstack/module-exit";
-import { createFlowProvider, defaultFlowTarget } from "@proofstack/module-flow";
-import * as worldProfiles from "@proofstack/module-world";
-import { createWorldProvider, HttpProductUnderTest } from "@proofstack/module-world";
+} from "@proofcore/config";
+import type { ModuleId, ReportFormat, TestRun } from "@proofcore/contracts";
+import { iso, Logger, ProofCoreError, stableStringify } from "@proofcore/core";
+import { ENGINE_VERSION, type EngineEvent, runEngine } from "@proofcore/engine";
+import { createExitProvider, defaultExportSource } from "@proofcore/module-exit";
+import { createFlowProvider, defaultFlowTarget } from "@proofcore/module-flow";
+import * as worldProfiles from "@proofcore/module-world";
+import { createWorldProvider, HttpProductUnderTest } from "@proofcore/module-world";
 import {
   apiGet,
   clearStoredSession,
@@ -43,7 +43,7 @@ import {
 } from "./ui.js";
 
 /**
- * The PROOFSTACK CLI.
+ * The PROOFCORE CLI.
  *
  * Design rules, because a test CLI is trusted with a release decision:
  *
@@ -80,7 +80,7 @@ function parseGlobalFlags(argv: string[]): { flags: GlobalFlags; rest: string[] 
   const rest: string[] = [];
 
   for (let i = 0; i < argv.length; i += 1) {
-    const arg = argv[i]!;
+    const arg = argv[i] ?? "";
     switch (arg) {
       case "--json":
         flags.json = true;
@@ -137,7 +137,7 @@ function err(_flags: GlobalFlags, text: string): void {
 
 async function main(argv: string[]): Promise<number> {
   const { flags, rest } = parseGlobalFlags(argv);
-  // `pnpm cli -- test` and `npm exec -- proofstack` forward the separator literally.
+  // `pnpm cli -- test` and `npm exec -- proofcore` forward the separator literally.
   const [command, ...args] = rest[0] === "--" ? rest.slice(1) : rest;
 
   const cwdCommands = new Set([
@@ -248,7 +248,7 @@ async function commandInit(flags: GlobalFlags, args: string[]): Promise<number> 
   }
 
   const config = starterConfig(projectName, baseUrl);
-  const path = join(root, "proofstack.config.ts");
+  const path = join(root, "proofcore.config.ts");
   try {
     await writeFile(path, renderConfigFile(config), "utf8");
   } catch (error) {
@@ -270,8 +270,8 @@ async function commandInit(flags: GlobalFlags, args: string[]): Promise<number> 
   out(flags, dim(flags, "       modules.world.target  → your form/record endpoint"));
   out(flags, dim(flags, "       modules.flow.target   → your checkout + webhook receiver"));
   out(flags, dim(flags, "       modules.exit.exportSource → your export endpoint"));
-  out(flags, dim(flags, "  2. Run `proofstack doctor` to check the wiring."));
-  out(flags, dim(flags, "  3. Run `proofstack test`."));
+  out(flags, dim(flags, "  2. Run `proofcore doctor` to check the wiring."));
+  out(flags, dim(flags, "  3. Run `proofcore test`."));
   out(flags, "");
   out(flags, yellow(flags, "Until a module has a target, its cases are SKIPPED — not passed."));
   return 0;
@@ -281,7 +281,7 @@ async function commandDoctor(flags: GlobalFlags): Promise<number> {
   const problems: string[] = [];
   const notes: string[] = [];
 
-  out(flags, bold(flags, "PROOFSTACK doctor"));
+  out(flags, bold(flags, "PROOFCORE doctor"));
   out(flags, "");
 
   // Runtime
@@ -449,14 +449,14 @@ function resolveProfileIds(ids: string[]) {
   const byId = new Map(PROFILES.map((profile) => [profile.id, profile]));
   const missing = ids.filter((id) => !byId.has(id));
   if (missing.length > 0) {
-    throw new ProofstackError({
+    throw new ProofCoreError({
       message: `Unknown locale profile(s): ${missing.join(", ")}. Available: ${PROFILES.map((p) => p.id).join(", ")}`,
       category: "CONFIGURATION",
       code: "unknown_profile",
       details: { missing },
     });
   }
-  return ids.map((id) => byId.get(id)!);
+  return ids.map((id) => byId.get(id)).filter((def) => def !== undefined);
 }
 
 function readFlowTarget(config: LoadedConfig["config"]): {
@@ -515,8 +515,8 @@ interface TestArgs {
 const TEST_MODULES = ["world", "flow", "exit"] as const;
 const REPORT_FORMATS = ["json", "junit", "html", "text"] as const;
 
-function flagError(message: string): ProofstackError {
-  return new ProofstackError({ message, category: "CONFIGURATION", code: "bad_flag" });
+function flagError(message: string): ProofCoreError {
+  return new ProofCoreError({ message, category: "CONFIGURATION", code: "bad_flag" });
 }
 
 function parseTestArgs(args: string[]): TestArgs {
@@ -529,7 +529,7 @@ function parseTestArgs(args: string[]): TestArgs {
     failOnWarning: false,
   };
   for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i]!;
+    const arg = args[i] ?? "";
     const next = () => {
       const value = args[++i];
       if (value === undefined || value.startsWith("--")) {
@@ -812,13 +812,13 @@ async function commandTest(flags: GlobalFlags, args: string[]): Promise<number> 
     out(flags, dim(flags, '  modules.world.target.kind = "http"  (with submitUrl)'));
     out(flags, dim(flags, "  modules.flow.target.checkoutUrl"));
     out(flags, dim(flags, "  modules.exit.exportSource"));
-    out(flags, dim(flags, "`proofstack doctor` lists exactly what is missing."));
+    out(flags, dim(flags, "`proofcore doctor` lists exactly what is missing."));
   }
 
   if (!flags.json && !flags.quiet) {
     out(flags, "");
     out(flags, bold(flags, "Next action"));
-    out(flags, "  proofstack report");
+    out(flags, "  proofcore report");
   }
 
   if (testArgs.failOnWarning && code === 0 && runTotals(run).warnings > 0) return 1;
@@ -853,7 +853,7 @@ async function commandReport(flags: GlobalFlags, args: string[]): Promise<number
   if (!path || !existsSync(path)) {
     err(
       flags,
-      red(flags, `No run report found${path ? ` at ${path}` : ""}. Run \`proofstack test\` first.`)
+      red(flags, `No run report found${path ? ` at ${path}` : ""}. Run \`proofcore test\` first.`)
     );
     return 2;
   }
@@ -912,7 +912,7 @@ async function commandProjects(flags: GlobalFlags): Promise<number> {
     flags,
     dim(
       flags,
-      "Cloud projects require a project token (PROOFSTACK_PROJECT_TOKEN) and a running API."
+      "Cloud projects require a project token (PROOFCORE_PROJECT_TOKEN) and a running API."
     )
   );
   return 0;
@@ -938,7 +938,7 @@ async function commandAuth(
   if (stdin.isTTY && !flags.json) {
     try {
       await loginInteractive({ apiUrl });
-      out(flags, dim(flags, "Next: run `proofstack` to open the terminal console."));
+      out(flags, dim(flags, "Next: run `proofcore` to open the terminal console."));
       return 0;
     } catch (error) {
       err(flags, red(flags, describeError(error).message));
@@ -946,16 +946,16 @@ async function commandAuth(
     }
   }
 
-  out(flags, bold(flags, "proofstack login"));
+  out(flags, bold(flags, "proofcore login"));
   out(flags, "");
-  out(flags, "Interactive login needs a terminal. For CI, set PROOFSTACK_SESSION_COOKIE.");
+  out(flags, "Interactive login needs a terminal. For CI, set PROOFCORE_SESSION_COOKIE.");
   out(flags, "");
-  out(flags, "Project tokens are separate: they authorize `proofstack sync`, not login.");
+  out(flags, "Project tokens are separate: they authorize `proofcore sync`, not login.");
   out(flags, "");
   out(flags, "  1. Create a project token in the dashboard (Integrations → API keys).");
   out(flags, "  2. Export it in your shell or CI secret store:");
-  out(flags, dim(flags, "       export PROOFSTACK_PROJECT_TOKEN=psk_..."));
-  out(flags, "  3. Enable sync in proofstack.config.ts:");
+  out(flags, dim(flags, "       export PROOFCORE_PROJECT_TOKEN=psk_..."));
+  out(flags, "  3. Enable sync in proofcore.config.ts:");
   out(flags, dim(flags, '       sync: { enabled: true, apiUrl: "https://your-api.example" }'));
   out(flags, "");
   out(flags, yellow(flags, "No token is written to disk by this command, by design."));
@@ -964,7 +964,7 @@ async function commandAuth(
     flags,
     dim(
       flags,
-      `For the interactive console, run \`proofstack\` (or \`proofstack ui\`) in a terminal. API default: ${DEFAULT_API_URL}`
+      `For the interactive console, run \`proofcore\` (or \`proofcore ui\`) in a terminal. API default: ${DEFAULT_API_URL}`
     )
   );
   return 0;
@@ -979,7 +979,7 @@ interface UiArgs {
 function parseUiArgs(args: string[]): UiArgs {
   const parsed: UiArgs = { once: false, screen: "overview" };
   for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i]!;
+    const arg = args[i] ?? "";
     if (arg === "--once") {
       parsed.once = true;
       continue;
@@ -1024,13 +1024,13 @@ async function commandStatus(flags: GlobalFlags, args: string[]): Promise<number
   const apiUrl = resolveApiUrl(flagValue(args, "--api"));
   const session = await loadStoredSession(apiUrl);
   if (!session) {
-    err(flags, red(flags, "Not signed in. Run `proofstack login` in a terminal first."));
+    err(flags, red(flags, "Not signed in. Run `proofcore login` in a terminal first."));
     return 2;
   }
   try {
     const auth = await apiGet<SessionPayload>(session, "/api/auth/session");
     if (!auth.user) {
-      err(flags, red(flags, "The stored session is no longer valid. Run `proofstack login`."));
+      err(flags, red(flags, "The stored session is no longer valid. Run `proofcore login`."));
       return 2;
     }
     const requested = flagValue(args, "--workspace");
@@ -1049,7 +1049,7 @@ async function commandStatus(flags: GlobalFlags, args: string[]): Promise<number
       );
       return 0;
     }
-    out(flags, bold(flags, "PROOFSTACK status"));
+    out(flags, bold(flags, "PROOFCORE status"));
     out(flags, `account    ${auth.user.email}`);
     out(flags, `api        ${apiUrl}`);
     out(
@@ -1065,7 +1065,7 @@ async function commandStatus(flags: GlobalFlags, args: string[]): Promise<number
       );
     }
     out(flags, "");
-    out(flags, dim(flags, "Interactive console: `proofstack ui` · machine-readable: `--json`"));
+    out(flags, dim(flags, "Interactive console: `proofcore ui` · machine-readable: `--json`"));
     return 0;
   } catch (error) {
     err(flags, red(flags, describeError(error).message));
@@ -1095,10 +1095,7 @@ async function commandSync(flags: GlobalFlags, args: string[]): Promise<number> 
   if (!token) {
     err(
       flags,
-      red(
-        flags,
-        `${config.sync.tokenEnvVar} is not set. Run \`proofstack login\` for instructions.`
-      )
+      red(flags, `${config.sync.tokenEnvVar} is not set. Run \`proofcore login\` for instructions.`)
     );
     return 2;
   }
@@ -1107,7 +1104,7 @@ async function commandSync(flags: GlobalFlags, args: string[]): Promise<number> 
     args.find((a) => a.endsWith(".json")) ?? join(config.output.dir, config.output.jsonFile);
   const path = resolve(loaded.root, runPath);
   if (!existsSync(path)) {
-    err(flags, red(flags, `No run report at ${path}. Run \`proofstack test\` first.`));
+    err(flags, red(flags, `No run report at ${path}. Run \`proofcore test\` first.`));
     return 2;
   }
 
@@ -1219,7 +1216,7 @@ async function commandSync(flags: GlobalFlags, args: string[]): Promise<number> 
 // ------------------------------------------------------------------------ ai commands
 
 /**
- * `proofstack ai …`
+ * `proofcore ai …`
  *
  * Four subcommands, each of which does exactly one thing and says when it cannot:
  *
@@ -1392,7 +1389,7 @@ async function commandAi(flags: GlobalFlags, args: string[]): Promise<number> {
     case "ask": {
       const question = aiPositionals(rest).join(" ").trim();
       if (!question) {
-        err(flags, red(flags, 'Usage: proofstack ai ask "your question"'));
+        err(flags, red(flags, 'Usage: proofcore ai ask "your question"'));
         return 64;
       }
       const providerName = flagValue(rest, "--provider");
@@ -1448,7 +1445,7 @@ async function commandAi(flags: GlobalFlags, args: string[]): Promise<number> {
     case "agent": {
       const task = aiPositionals(rest).join(" ").trim();
       if (!task) {
-        err(flags, red(flags, 'Usage: proofstack ai agent "what to investigate"'));
+        err(flags, red(flags, 'Usage: proofcore ai agent "what to investigate"'));
         return 64;
       }
       const providerName = flagValue(rest, "--provider");
@@ -1582,7 +1579,7 @@ async function commandAi(flags: GlobalFlags, args: string[]): Promise<number> {
 
     default:
       err(flags, red(flags, `Unknown ai subcommand: ${sub}`));
-      out(flags, '  proofstack ai status | tools | ask "..." | agent "..."');
+      out(flags, '  proofcore ai status | tools | ask "..." | agent "..."');
       return 64;
   }
 }
@@ -1653,13 +1650,14 @@ function connectServers(args: string[]): string[] | undefined {
 function aiPositionals(args: string[]): string[] {
   const out: string[] = [];
   for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i]!;
+    const arg = args[i] ?? "";
     if (arg === "--provider" || arg === "--cli-agent") {
       i += 1;
       continue;
     }
     if (arg === "--connect") {
-      if (args[i + 1] !== undefined && !args[i + 1]!.startsWith("--")) i += 1;
+      const next = args[i + 1];
+      if (next !== undefined && !next.startsWith("--")) i += 1;
       continue;
     }
     if (arg.startsWith("--")) continue;
@@ -1683,23 +1681,25 @@ async function lastRunSummary(loaded: LoadedConfig): Promise<string | null> {
 // ------------------------------------------------------------------------ helpers
 
 function describeError(error: unknown): { message: string; code?: string; category?: string } {
-  if (error instanceof ProofstackError) {
+  if (error instanceof ProofCoreError) {
     return { message: error.message, code: error.code, category: error.category };
   }
   return { message: error instanceof Error ? error.message : String(error) };
 }
 
 function printBanner(flags: GlobalFlags): void {
-  const signedIn =
-    Boolean(process.env.PROOFSTACK_SESSION_COOKIE?.trim()) || existsSync(sessionFilePath());
+  // Session cookie env, with the pre-rebrand name as a read-only fallback.
+  const sessionCookie =
+    process.env.PROOFCORE_SESSION_COOKIE ?? process.env.PROOFSTACK_SESSION_COOKIE;
+  const signedIn = Boolean(sessionCookie?.trim()) || existsSync(sessionFilePath());
   const mark = ["  ██████╗ ", "  ██╔══██╗", "  ██████╔╝", "  ██╔═══╝ ", "  ██║     ", "  ╚═╝     "];
   stdout.write(`${mark.map((line) => cyan(flags, line)).join("\n")}\n`);
   stdout.write(
-    `${bold(flags, "PROOFSTACK")} ${dim(flags, `v${CLI_VERSION}`)}  ${dim(flags, "software quality & reliability")}\n`
+    `${bold(flags, "PROOFCORE")} ${dim(flags, `v${CLI_VERSION}`)}  ${dim(flags, "software quality & reliability")}\n`
   );
   stdout.write(`${dim(flags, "Make software work everywhere.")}\n`);
   stdout.write(
-    `${dim(flags, `session: ${signedIn ? "signed in locally" : "not signed in · proofstack login"}`)}\n\n`
+    `${dim(flags, `session: ${signedIn ? "signed in locally" : "not signed in · proofcore login"}`)}\n\n`
   );
 }
 
@@ -1708,10 +1708,10 @@ function printHelp(flags: GlobalFlags): void {
     stdout.write(`${text}\n`);
   };
   printBanner(flags);
-  w("Usage: proofstack <command> [options]");
+  w("Usage: proofcore <command> [options]");
   w("");
   w(bold(flags, "Commands"));
-  w("  init                     Create proofstack.config.ts in this directory");
+  w("  init                     Create proofcore.config.ts in this directory");
   w("  doctor                   Check the runtime, config and module wiring");
   w("  validate                 Validate the configuration and exit");
   w("  test                     Run the enabled modules");
@@ -1730,7 +1730,7 @@ function printHelp(flags: GlobalFlags): void {
   w("  --only <pattern>         Run only cases matching a fixture id or category");
   w("  --profiles <ids>         Locale profiles, e.g. en-US,fr-FR,fr-BJ");
   w("  --format <formats>       json,junit,html,text");
-  w("  --out <dir>              Report directory (default: .proofstack/reports)");
+  w("  --out <dir>              Report directory (default: .proofcore/reports)");
   w("  --no-report              Do not write report files");
   w("  --fail-on-warning        Exit 1 when a case produced a warning");
   w("");
@@ -1752,7 +1752,7 @@ function printHelp(flags: GlobalFlags): void {
 
 // --------------------------------------------------------------------------- entry
 
-// `proofstack --help | head` closes stdout early; that is normal shell behaviour, not
+// `proofcore --help | head` closes stdout early; that is normal shell behaviour, not
 // a crash. Without this handler Node throws an unhandled EPIPE and exits non-zero.
 for (const stream of [process.stdout, process.stderr]) {
   stream.on("error", (error: NodeJS.ErrnoException) => {
@@ -1766,7 +1766,7 @@ main(process.argv.slice(2))
   })
   .catch((error: unknown) => {
     process.stderr.write(
-      `proofstack: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`
+      `proofcore: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`
     );
     process.exitCode = 2;
   });

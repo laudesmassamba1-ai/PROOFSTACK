@@ -1,11 +1,11 @@
-import { PaymentProviderError } from "@proofstack/adapter-payments";
-import type { ErrorResponse } from "@proofstack/contracts";
-import { ProofstackError } from "@proofstack/core";
+import { PaymentProviderError } from "@proofcore/adapter-payments";
+import type { ErrorResponse } from "@proofcore/contracts";
+import { ProofCoreError } from "@proofcore/core";
 
 /**
  * HTTP error envelope.
  *
- * A `ProofstackError` already carries a machine-readable category; this maps the
+ * A `ProofCoreError` already carries a machine-readable category; this maps the
  * category onto the status the client should see, once, in one place. Routes throw
  * either kind of error and never build an error response by hand.
  */
@@ -21,7 +21,7 @@ export class HttpError extends Error {
   }
 }
 
-const STATUS_BY_CATEGORY: Record<ProofstackError["category"], number> = {
+const STATUS_BY_CATEGORY: Record<ProofCoreError["category"], number> = {
   VALIDATION: 400,
   CONFIGURATION: 500,
   NOT_FOUND: 404,
@@ -72,7 +72,7 @@ export function toErrorResponse(
     };
   }
 
-  if (error instanceof ProofstackError) {
+  if (error instanceof ProofCoreError) {
     // A handful of business conflicts are not expressible in the error taxonomy:
     // a taken email or an already-subscribed workspace is a 409, not a 400.
     const conflict = error.code === "email_taken" || error.code === "already_subscribed";

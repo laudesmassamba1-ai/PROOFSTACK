@@ -4,7 +4,7 @@ import {
   Money,
   numberSeparators,
   parseLocalizedDecimal,
-} from "@proofstack/core";
+} from "@proofcore/core";
 import { describe, expect, it } from "vitest";
 
 describe("Money — exact minor-unit arithmetic", () => {

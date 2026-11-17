@@ -1,9 +1,9 @@
 {
-  "name": "@proofstack/api",
+  "name": "@proofcore/api",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "PROOFSTACK API: accounts, workspaces, projects, reports, usage and billing. Runs on Cloudflare Workers (D1) and on Node 22 (SQLite) for local development.",
+  "description": "PROOFCORE API: accounts, workspaces, projects, reports, usage and billing. Runs on Cloudflare Workers (D1) and on Node 22 (SQLite) for local development.",
   "main": "src/worker.ts",
   "scripts": {
     "dev": "node --experimental-sqlite --import tsx/esm src/node.ts",
@@ -11,15 +11,15 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "deploy": "wrangler deploy",
     "db:migrate:local": "node --experimental-sqlite --import tsx/esm src/migrate.ts --local",
-    "db:migrate:remote": "wrangler d1 migrations apply proofstack --remote"
+    "db:migrate:remote": "wrangler d1 migrations apply proofcore --remote"
   },
   "dependencies": {
-    "@proofstack/adapter-payments": "workspace:*",
-    "@proofstack/adapter-reporting": "workspace:*",
-    "@proofstack/billing": "workspace:*",
-    "@proofstack/contracts": "workspace:*",
-    "@proofstack/core": "workspace:*",
-    "@proofstack/engine": "workspace:*",
+    "@proofcore/adapter-payments": "workspace:*",
+    "@proofcore/adapter-reporting": "workspace:*",
+    "@proofcore/billing": "workspace:*",
+    "@proofcore/contracts": "workspace:*",
+    "@proofcore/core": "workspace:*",
+    "@proofcore/engine": "workspace:*",
     "hono": "4.13.19",
     "zod": "4.6.7"
   },

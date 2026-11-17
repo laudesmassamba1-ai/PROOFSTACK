@@ -49,6 +49,9 @@ export function WorldObject({ passed, failed, total }: ObjectProps) {
   const items = Array.from({ length: shown }, (_, index) => {
     const angle = (index / Math.max(1, shown)) * Math.PI * 2 - Math.PI / 2;
     return {
+      // Stable within a run: position + state. Index alone changes when a result
+      // lands and would remount the SVG node mid-animation.
+      key: `sat-${index}-${index < passedShown ? "pass" : "fail"}`,
       x: 140 + Math.cos(angle) * 94,
       y: 108 + Math.sin(angle) * 42,
       passed: index < passedShown,
@@ -126,8 +129,8 @@ export function WorldObject({ passed, failed, total }: ObjectProps) {
         />
         {hasData ? (
           <g className="world-satellites">
-            {items.map((item, index) => (
-              <g key={index}>
+            {items.map((item) => (
+              <g key={item.key}>
                 <circle cx={item.x} cy={item.y} r="7" fill="#ffffff" opacity="0.16" />
                 <circle
                   cx={item.x}
@@ -175,6 +178,8 @@ export function FlowObject({ passed, failed, total }: ObjectProps) {
     const x = 58 + (index % 4) * 55;
     const y = 148 - Math.floor(index / 4) * 48 + (index % 2) * 9;
     return {
+      // Stable within a run: position + state, not array index.
+      key: `link-${index}-${hasData && index >= passedShown ? "fail" : index < passedShown ? "pass" : "idle"}`,
       x,
       y,
       rotate: -16 + index * 4,
@@ -220,9 +225,9 @@ export function FlowObject({ passed, failed, total }: ObjectProps) {
         opacity="0.16"
         filter={`url(#${uid}-shadow)`}
       />
-      {links.map((link, index) => (
+      {links.map((link) => (
         <g
-          key={index}
+          key={link.key}
           transform={`translate(${link.x} ${link.y}) rotate(${link.rotate})`}
           className={link.failed ? "flow-link-broken" : undefined}
         >
@@ -274,6 +279,7 @@ export function ExitObject({ passed, failed, total }: ObjectProps) {
   const failedShown = Math.min(failed, count);
   const hasData = total > 0;
   const slabs = Array.from({ length: count }, (_, index) => ({
+    key: `slab-${index}-${index < failedShown ? "fail" : "pass"}`,
     y: 166 - index * 24,
     failed: index < failedShown,
   }));
@@ -327,8 +333,8 @@ export function ExitObject({ passed, failed, total }: ObjectProps) {
         </g>
       ) : (
         <g className="exit-stack">
-          {slabs.map((slab, index) => (
-            <g key={index} transform={`translate(${slab.failed ? 9 : 0} ${slab.y})`}>
+          {slabs.map((slab) => (
+            <g key={slab.key} transform={`translate(${slab.failed ? 9 : 0} ${slab.y})`}>
               <path
                 d="M58 0l82-37 82 37-82 37z"
                 fill={`url(#${uid}-amber)`}

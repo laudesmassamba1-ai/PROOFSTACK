@@ -2,7 +2,7 @@
 
 Purpose:
 
-- Validate design is consistent across landing and app, and the new particle identity aligns with PROOFSTACK brand.
+- Validate design is consistent across landing and app, and the new particle identity aligns with PROOFCORE brand.
 
 Process:
 

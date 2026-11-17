@@ -1,4 +1,4 @@
-import type { LocaleProfileData } from "@proofstack/contracts";
+import type { LocaleProfileData } from "@proofcore/contracts";
 
 /**
  * Shipped locale profiles.

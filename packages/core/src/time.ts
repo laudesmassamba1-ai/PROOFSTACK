@@ -1,9 +1,9 @@
-import { ProofstackError } from "./errors.js";
+import { ProofCoreError } from "./errors.js";
 
 /**
  * Time primitives.
  *
- * Everything in PROOFSTACK stores instants as UTC epoch milliseconds and renders
+ * Everything in PROOFCORE stores instants as UTC epoch milliseconds and renders
  * them through an explicit IANA time zone. Wall-clock arithmetic is never done on
  * a local machine's implicit zone: that is exactly the class of bug the WORLD
  * module is meant to find in other people's software.
@@ -25,7 +25,7 @@ export class FixedClock implements Clock {
   constructor(start: number | string = Date.UTC(2026, 0, 1)) {
     this.ms = typeof start === "string" ? Date.parse(start) : start;
     if (!Number.isFinite(this.ms))
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `FixedClock: unparseable start ${start}`,
         category: "VALIDATION",
         code: "bad_instant",
@@ -88,7 +88,7 @@ export function isIsoInstant(value: string): boolean {
 /** Strict parse: rejects strings that are not full ISO-8601 instants. */
 export function parseIsoStrict(value: string, label = "instant"): number {
   if (!isIsoInstant(value)) {
-    throw new ProofstackError({
+    throw new ProofCoreError({
       message: `${label} is not an ISO-8601 instant: ${JSON.stringify(value)}`,
       category: "VALIDATION",
       code: "bad_instant",
@@ -138,7 +138,7 @@ export function zoneOffsetMs(zone: string, instant: number): number {
   const get = (type: Intl.DateTimeFormatPartTypes): number => {
     const found = parts.find((p) => p.type === type);
     if (!found) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `Intl did not return ${type} for zone ${zone}`,
         category: "INTERNAL",
         code: "intl_part_missing",
@@ -164,7 +164,7 @@ export function assertZone(zone: string): void {
     // take tens of seconds.
     zoneFormatter(zone);
   } catch {
-    throw new ProofstackError({
+    throw new ProofCoreError({
       message: `Unknown IANA time zone: ${JSON.stringify(zone)}`,
       category: "VALIDATION",
       code: "bad_time_zone",
@@ -209,7 +209,8 @@ export function resolveWallClock(zone: string, wall: WallClock): WallClockResolu
     if (zoneOffsetMs(zone, instant) === off) matches.push(off);
   }
   if (matches.length === 1) {
-    return { kind: "unique", instant: naive - matches[0]!, offsetMs: matches[0]! };
+    const offset = matches[0];
+    if (offset !== undefined) return { kind: "unique", instant: naive - offset, offsetMs: offset };
   }
   if (matches.length > 1) {
     // Ascending instants: the first is the earlier (summer-time) reading.

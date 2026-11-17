@@ -1,6 +1,6 @@
-import type { PaymentState } from "@proofstack/contracts";
-import type { Money } from "@proofstack/core";
-import { hmacSha256Hex, sha256Hex, timingSafeEqualHex } from "@proofstack/core";
+import type { PaymentState } from "@proofcore/contracts";
+import type { Money } from "@proofcore/core";
+import { hmacSha256Hex, sha256Hex, timingSafeEqualHex } from "@proofcore/core";
 import type {
   CheckoutInput,
   CheckoutResult,
@@ -21,7 +21,7 @@ import type {
  * an automated test can never reach real money. Outcomes are scripted, not random.
  */
 export class SandboxProvider implements PaymentProvider {
-  static readonly SECRET = "proofstack_sandbox_webhook_secret";
+  static readonly SECRET = "proofcore_sandbox_webhook_secret";
 
   private readonly transactions = new Map<string, SandboxTransaction>();
   private readonly seenIdempotency = new Map<string, string>();
@@ -38,7 +38,7 @@ export class SandboxProvider implements PaymentProvider {
   getCapabilities(): PaymentCapabilities {
     return {
       provider: "sandbox",
-      displayName: "PROOFSTACK sandbox",
+      displayName: "PROOFCORE sandbox",
       automatedRecurring: false,
       hostedCheckout: true,
       pushToPhone: false,
@@ -53,7 +53,7 @@ export class SandboxProvider implements PaymentProvider {
       apiVersion: "sandbox-1",
       rateLimitPerMinute: 6000,
       notes: [
-        "No network, no money. Outcomes are scripted by the caller or by the `x-proofstack-outcome` metadata.",
+        "No network, no money. Outcomes are scripted by the caller or by the `x-proofcore-outcome` metadata.",
         "Refunds are supported here so the refund state machine is testable; that does NOT mean the production provider supports refunds.",
       ],
     };
@@ -63,7 +63,7 @@ export class SandboxProvider implements PaymentProvider {
     input: CheckoutInput & { flow: "hosted" | "push" }
   ): Promise<CheckoutResult> {
     const scripted =
-      (input.metadata["x-proofstack-outcome"] as
+      (input.metadata["x-proofcore-outcome"] as
         | "success"
         | "declined"
         | "pending"

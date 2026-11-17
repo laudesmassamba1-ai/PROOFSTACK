@@ -1,4 +1,4 @@
-import { ProofstackError } from "./errors.js";
+import { ProofCoreError } from "./errors.js";
 
 /**
  * Currency metadata.
@@ -6,7 +6,7 @@ import { ProofstackError } from "./errors.js";
  * The exponent (ISO 4217 minor units) is *data*, not a guess: XOF and XAF have no
  * subunit, JOD/KWD/BHD/OMR have three decimal digits, everything else in this set
  * has two. Treating every currency as 2-decimal is the single most common money bug
- * in software that claims to be international — which is why PROOFSTACK tests for it.
+ * in software that claims to be international — which is why PROOFCORE tests for it.
  *
  * Unknown codes throw instead of defaulting. A silent default would let a wrong
  * amount reach a payment provider.
@@ -94,8 +94,8 @@ export function currencyMeta(code: string): CurrencyMeta {
   const upper = code.toUpperCase();
   const meta = BY_CODE.get(upper);
   if (!meta) {
-    throw new ProofstackError({
-      message: `Unknown currency code ${JSON.stringify(code)}: PROOFSTACK refuses to guess a subunit exponent`,
+    throw new ProofCoreError({
+      message: `Unknown currency code ${JSON.stringify(code)}: PROOFCORE refuses to guess a subunit exponent`,
       category: "VALIDATION",
       code: "unknown_currency",
       details: { code },

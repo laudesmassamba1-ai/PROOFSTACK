@@ -1,3 +1,4 @@
+/* biome-ignore-all lint/style/noDescendingSpecificity: section-ordered stylesheet, no cascade conflicts */
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/jetbrains-mono";
 @import "@fontsource-variable/bricolage-grotesque";
@@ -5,7 +6,7 @@
 @import "./animations-3d.css";
 
 /* ============================================================
-   PROOFSTACK design tokens — single source for the whole app.
+   PROOFCORE design tokens — single source for the whole app.
    Component files must not carry arbitrary hex values.
    ============================================================ */
 
@@ -135,11 +136,18 @@ html {
   html {
     scroll-behavior: auto;
   }
+  /* The !important flags here are the canonical reduced-motion reset: they must
+   * beat every animation/transition rule regardless of specificity. Not a style
+   * accident — an accessibility contract.
+   */
   *,
   *::before,
   *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: reduced-motion reset must override everything */
     animation-duration: 0.001ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: reduced-motion reset must override everything */
     animation-iteration-count: 1 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: reduced-motion reset must override everything */
     transition-duration: 0.001ms !important;
   }
 }
@@ -282,19 +290,71 @@ pre,
   pointer-events: none;
 }
 
+/*
+ * Concentric rings behind the tiles, decoded from reference da2: huge soft circles
+ * that structure the gradient without competing with the cards. Pure CSS, zero cost.
+ */
+.spectrum-field::before {
+  content: "";
+  position: absolute;
+  inset: -12%;
+  background:
+    radial-gradient(
+      closest-side circle at 30% 42%,
+      transparent 58%,
+      rgba(255, 255, 255, 0.055) 58.5%,
+      rgba(255, 255, 255, 0.055) 60%,
+      transparent 60.5%
+    ),
+    radial-gradient(
+      closest-side circle at 30% 42%,
+      transparent 42%,
+      rgba(255, 255, 255, 0.045) 42.5%,
+      rgba(255, 255, 255, 0.045) 44%,
+      transparent 44.5%
+    ),
+    radial-gradient(
+      closest-side circle at 72% 62%,
+      transparent 50%,
+      rgba(255, 255, 255, 0.05) 50.5%,
+      rgba(255, 255, 255, 0.05) 51.5%,
+      transparent 52%
+    ),
+    radial-gradient(
+      closest-side circle at 72% 62%,
+      transparent 34%,
+      rgba(255, 255, 255, 0.04) 34.5%,
+      rgba(255, 255, 255, 0.04) 36%,
+      transparent 36.5%
+    );
+  pointer-events: none;
+}
+
 .tile {
   position: relative;
   background: linear-gradient(180deg, #ffffff 0%, #f4f6fb 100%);
   border-radius: 18px;
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 -2px 6px -3px rgba(255, 255, 255, 0.7) inset,
     0 18px 34px -18px rgba(12, 18, 40, 0.55),
-    0 42px 70px -40px rgba(12, 18, 40, 0.45);
+    0 42px 70px -40px rgba(12, 18, 40, 0.45),
+    0 90px 120px -60px rgba(20, 10, 40, 0.35);
   color: #142033;
   transform: translateZ(0);
   transition:
     transform 420ms cubic-bezier(0.2, 0.7, 0.2, 1),
     box-shadow 420ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* Glossy highlight along the top edge, like a bevelled extrusion. */
+.tile::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 18%);
+  pointer-events: none;
 }
 
 /* Touch devices keep the resting state: a hover that sticks looks like a layout bug. */
@@ -3065,6 +3125,8 @@ pre,
   }
 
   .app-form-sheet > * {
+    /* Mobile stacking must win over the two-column layout's explicit grid-column. */
+    /* biome-ignore lint/complexity/noImportantStyles: responsive override must beat explicit placement */
     grid-column: 1 !important;
   }
 
@@ -3094,6 +3156,7 @@ pre,
   .module-object-flow.has-data .flow-link-broken,
   .module-object-exit.has-data .exit-stack,
   .tester-sway {
+    /* biome-ignore lint/complexity/noImportantStyles: reduced-motion override must beat animation rules */
     animation: none !important;
   }
 
@@ -3291,5 +3354,7 @@ pre,
   margin: 0 auto;
 }
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }

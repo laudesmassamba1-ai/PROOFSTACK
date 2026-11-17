@@ -5,7 +5,7 @@
  */
 export const marketingEn = {
   "mkt.skip": "Skip to content",
-  "mkt.homeLabel": "PROOFSTACK home",
+  "mkt.homeLabel": "PROOFCORE home",
   "mkt.menu.open": "Open menu",
   "mkt.menu.close": "Close menu",
   "mkt.footer.trust": "Trust",
@@ -68,7 +68,7 @@ export const marketingEn = {
     "TypeScript on Node 22 LTS. Fixtures, module execution and report generation happen on the developer's machine or in their CI. The cloud receives results, never a browser session.",
   "mkt.platform.stack.engine.title": "Engine",
   "mkt.platform.stack.engine.body":
-    "@proofstack/engine: ordered scheduling, controlled parallelism, timeouts, cancellation, retry policy limited to transient harness faults.",
+    "@proofcore/engine: ordered scheduling, controlled parallelism, timeouts, cancellation, retry policy limited to transient harness faults.",
   "mkt.platform.stack.budget.title": "Budget",
   "mkt.platform.stack.budget.body":
     "Free-tier first: GitHub Free, Cloudflare Workers/D1 free quotas, open-source libraries. No paid LLM, no browser farm, no Redis, no Kubernetes.",
@@ -80,13 +80,37 @@ export const marketingEn = {
   "mkt.platform.evidence.title": "Evidence policy",
   "mkt.platform.evidence.body":
     "Logs, steps, comparison summaries, checksums and metadata. Large artefacts stay in CI artifacts or local storage; D1 receives a pointer and a SHA-256 digest, never a trace file.",
+
+  "home.flow.eyebrow": "Developer workflow",
+  "home.flow.title": "From install to report in three commands.",
+  "home.flow.lede":
+    "The CLI runs the same engine the dashboard shows: a local project file, three modules, one report. Nothing is faked in the preview below — it is a recorded example, clearly labelled.",
+  "home.flow.step.1.k": "STEP 01 — INIT",
+  "home.flow.step.1.t": "Describe the product under test",
+  "home.flow.step.1.d":
+    "proofcore init asks for the URL, the modules and the environment, then writes proofcore.config.json. Non-interactive flags cover CI.",
+  "home.flow.step.2.k": "STEP 02 — TEST",
+  "home.flow.step.2.t": "Run one module or all three",
+  "home.flow.step.2.d":
+    "proofcore test schedules the cases, times them out, retries only transient harness faults and prints a live progress view.",
+  "home.flow.step.3.k": "STEP 03 — REPORT",
+  "home.flow.step.3.t": "Read the result where you work",
+  "home.flow.step.3.d":
+    "Text in the terminal, JSON and JUnit for CI, HTML for humans. Every finding carries the command that reproduces it.",
+
+  "home.cta.eyebrow": "Start today",
+  "home.cta.title": "Put your software to the proof.",
+  "home.cta.lede":
+    "Create a workspace, install the CLI, run your first suite. The free plan covers one project and the three modules — no card required.",
+  "home.cta.primary": "Create a free workspace",
+  "home.cta.pricing": "See pricing",
 } as const;
 
 export type MarketingKey = keyof typeof marketingEn;
 
 export const marketingFr: Record<MarketingKey, string> = {
   "mkt.skip": "Aller au contenu",
-  "mkt.homeLabel": "Accueil PROOFSTACK",
+  "mkt.homeLabel": "Accueil PROOFCORE",
   "mkt.menu.open": "Ouvrir le menu",
   "mkt.menu.close": "Fermer le menu",
   "mkt.footer.trust": "Confiance",
@@ -149,7 +173,7 @@ export const marketingFr: Record<MarketingKey, string> = {
     "TypeScript sur Node 22 LTS. Les jeux de données, l'exécution des modules et la génération des rapports se font sur la machine du développeur ou dans sa CI. Le cloud reçoit les résultats, jamais une session de navigateur.",
   "mkt.platform.stack.engine.title": "Moteur",
   "mkt.platform.stack.engine.body":
-    "@proofstack/engine : ordonnancement, parallélisme contrôlé, délais, annulation, reprise limitée aux défauts transitoires du harnais.",
+    "@proofcore/engine : ordonnancement, parallélisme contrôlé, délais, annulation, reprise limitée aux défauts transitoires du harnais.",
   "mkt.platform.stack.budget.title": "Budget",
   "mkt.platform.stack.budget.body":
     "Gratuit d'abord : GitHub Free, quotas gratuits Cloudflare Workers/D1, bibliothèques open source. Pas de LLM payant, pas de ferme de navigateurs, pas de Redis, pas de Kubernetes.",
@@ -161,6 +185,30 @@ export const marketingFr: Record<MarketingKey, string> = {
   "mkt.platform.evidence.title": "Politique de preuves",
   "mkt.platform.evidence.body":
     "Journaux, étapes, résumés de comparaison, empreintes et métadonnées. Les gros artefacts restent dans les artefacts de CI ou en local ; D1 reçoit un pointeur et un condensat SHA-256, jamais un fichier de trace.",
+
+  "home.flow.eyebrow": "Parcours développeur",
+  "home.flow.title": "De l'installation au rapport en trois commandes.",
+  "home.flow.lede":
+    "Le CLI exécute le même moteur que le tableau de bord : un fichier projet local, trois modules, un rapport. Rien n'est simulé dans l'aperçu ci-dessous — c'est un exemple enregistré, signalé comme tel.",
+  "home.flow.step.1.k": "ÉTAPE 01 — INIT",
+  "home.flow.step.1.t": "Décrire le produit à tester",
+  "home.flow.step.1.d":
+    "proofcore init demande l'URL, les modules et l'environnement, puis écrit proofcore.config.json. Des options non interactives couvrent la CI.",
+  "home.flow.step.2.k": "ÉTAPE 02 — TEST",
+  "home.flow.step.2.t": "Exécuter un module ou les trois",
+  "home.flow.step.2.d":
+    "proofcore test ordonnance les cas, applique les délais, ne reprend que les défauts transitoires du harnais et affiche une progression en direct.",
+  "home.flow.step.3.k": "ÉTAPE 03 — REPORT",
+  "home.flow.step.3.t": "Lire le résultat là où on travaille",
+  "home.flow.step.3.d":
+    "Texte dans le terminal, JSON et JUnit pour la CI, HTML pour les humains. Chaque constat porte la commande qui le reproduit.",
+
+  "home.cta.eyebrow": "Commencer aujourd'hui",
+  "home.cta.title": "Mettez votre logiciel à l'épreuve.",
+  "home.cta.lede":
+    "Créez un espace de travail, installez le CLI, lancez une première suite. Le plan gratuit couvre un projet et les trois modules — sans carte bancaire.",
+  "home.cta.primary": "Créer un espace gratuit",
+  "home.cta.pricing": "Voir les tarifs",
 };
 
 export type MarketingFr = typeof marketingFr;

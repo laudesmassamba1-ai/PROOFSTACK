@@ -1,5 +1,5 @@
 /**
- * PROOFSTACK UI strings. English is the source; French is a real translation, not a
+ * PROOFCORE UI strings. English is the source; French is a real translation, not a
  * machine echo. Keys are flat so a missing string is obvious in a diff.
  */
 export const en = {
@@ -21,7 +21,7 @@ export const en = {
   "hero.cta.primary": "Start Building",
   "hero.cta.explore": "Explore the Platform",
   "hero.cta.docs": "Read the docs",
-  "hero.cli": "$ npm i -D @proofstack/cli && npx proofstack init",
+  "hero.cli": "$ npm i -D @proofcore/cli && npx proofcore init",
   "hero.status": "Engine v0.1 · runs locally, in CI, or against staging",
   "home.signal": "Three systems. One proof.",
   "home.engine.eyebrow": "Unified engine",
@@ -122,10 +122,10 @@ export const en = {
   "footer.developers": "Developers",
   "footer.company": "Company",
   "footer.status": "Status",
-  "footer.rights": "© {year} PROOFSTACK. Name provisional pending trademark and domain checks.",
+  "footer.rights": "© {year} PROOFCORE. Name provisional pending trademark and domain checks.",
   "footer.notAffiliated":
-    "PROOFSTACK is an independent product and is not affiliated with any brand shown in its visual research.",
-  "auth.signin.title": "Sign in to PROOFSTACK",
+    "PROOFCORE is an independent product and is not affiliated with any brand shown in its visual research.",
+  "auth.signin.title": "Sign in to PROOFCORE",
   "auth.signup.title": "Create your account",
   "auth.email": "Email",
   "auth.password": "Password",
@@ -192,7 +192,7 @@ export const fr: Messages = {
   "hero.cta.primary": "Commencer à construire",
   "hero.cta.explore": "Explorer la plateforme",
   "hero.cta.docs": "Lire la documentation",
-  "hero.cli": "$ npm i -D @proofstack/cli && npx proofstack init",
+  "hero.cli": "$ npm i -D @proofcore/cli && npx proofcore init",
   "hero.status": "Moteur v0.1 · s'exécute en local, en CI ou sur une préproduction",
   "home.signal": "Trois systèmes. Une preuve.",
   "home.engine.eyebrow": "Moteur unifié",
@@ -298,10 +298,10 @@ export const fr: Messages = {
   "footer.company": "Entreprise",
   "footer.status": "Statut",
   "footer.rights":
-    "© {year} PROOFSTACK. Nom provisoire, en attente des vérifications de marque et de domaine.",
+    "© {year} PROOFCORE. Nom provisoire, en attente des vérifications de marque et de domaine.",
   "footer.notAffiliated":
-    "PROOFSTACK est un produit indépendant et n'est affilié à aucune marque présente dans sa recherche visuelle.",
-  "auth.signin.title": "Connectez-vous à PROOFSTACK",
+    "PROOFCORE est un produit indépendant et n'est affilié à aucune marque présente dans sa recherche visuelle.",
+  "auth.signin.title": "Connectez-vous à PROOFCORE",
   "auth.signup.title": "Créez votre compte",
   "auth.email": "E-mail",
   "auth.password": "Mot de passe",

@@ -1,4 +1,4 @@
-import { ProofstackError, sha256Hex } from "@proofstack/core";
+import { ProofCoreError, sha256Hex } from "@proofcore/core";
 
 /**
  * The EXIT data surface.
@@ -65,14 +65,16 @@ export interface RoundTripTarget {
 export function parseCsv(text: string): { headers: string[]; records: Record<string, string>[] } {
   const rows = readCsvRows(text);
   if (rows.length === 0) return { headers: [], records: [] };
-  const headers = rows[0]!.map((h) => h.trim());
+  // rows.length > 0 is checked above; use at() so no assertion is needed.
+  const headers = (rows[0] ?? []).map((h) => h.trim());
   const records: Record<string, string>[] = [];
   for (let i = 1; i < rows.length; i += 1) {
-    const row = rows[i]!;
+    const row = rows[i];
+    if (!row) continue;
     // A trailing newline produces one empty row; that is not a record.
     if (row.length === 1 && row[0] === "") continue;
     if (row.length !== headers.length) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `CSV row ${i + 1} has ${row.length} fields but the header has ${headers.length}`,
         category: "VALIDATION",
         code: "csv_ragged_row",
@@ -80,7 +82,11 @@ export function parseCsv(text: string): { headers: string[]; records: Record<str
       });
     }
     const record: Record<string, string> = {};
-    for (let c = 0; c < headers.length; c += 1) record[headers[c]!] = row[c] ?? "";
+    for (let c = 0; c < headers.length; c += 1) {
+      const header = headers[c];
+      if (header === undefined) continue;
+      record[header] = row[c] ?? "";
+    }
     records.push(record);
   }
   return { headers, records };
@@ -95,7 +101,7 @@ function readCsvRows(text: string): string[][] {
   const input = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
 
   for (let i = 0; i < input.length; i += 1) {
-    const char = input[i]!;
+    const char = input[i] ?? "";
     if (inQuotes) {
       if (char === '"') {
         if (input[i + 1] === '"') {
@@ -141,7 +147,7 @@ export function parseJsonRecords(text: string): Record<string, unknown>[] {
   try {
     parsed = JSON.parse(text);
   } catch (error) {
-    throw new ProofstackError({
+    throw new ProofCoreError({
       message: `export is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
       category: "VALIDATION",
       code: "json_invalid",
@@ -156,7 +162,7 @@ export function parseJsonRecords(text: string): Record<string, unknown>[] {
     // A single record is a legitimate one-row export.
     return [parsed];
   }
-  throw new ProofstackError({
+  throw new ProofCoreError({
     message: "export JSON is neither an array of records nor an object containing one",
     category: "VALIDATION",
     code: "json_shape_unexpected",
@@ -187,7 +193,7 @@ export function readZipEntries(bytes: Uint8Array): ZipEntry[] {
     }
   }
   if (eocd < 0) {
-    throw new ProofstackError({
+    throw new ProofCoreError({
       message: "file does not contain a ZIP end-of-central-directory record",
       category: "VALIDATION",
       code: "zip_invalid",
@@ -251,7 +257,7 @@ function syncDigest(bytes: Uint8Array): string {
   const prime = 0x100000001b3n;
   const mask = 0xffffffffffffffffn;
   for (let i = 0; i < bytes.length; i += 1) {
-    hash ^= BigInt(bytes[i]!);
+    hash ^= BigInt(bytes[i] ?? 0);
     hash = (hash * prime) & mask;
   }
   return hash.toString(16).padStart(16, "0");

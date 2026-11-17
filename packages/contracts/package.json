@@ -1,10 +1,10 @@
 {
-  "name": "@proofstack/contracts",
+  "name": "@proofcore/contracts",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "license": "MPL-2.0",
-  "description": "Single source of truth for PROOFSTACK data shapes: engine entities, module payloads, billing state machines, API DTOs and configuration schema. Shared by CLI, SDK, API and web.",
+  "description": "Single source of truth for PROOFCORE data shapes: engine entities, module payloads, billing state machines, API DTOs and configuration schema. Shared by CLI, SDK, API and web.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -22,7 +22,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@proofstack/core": "workspace:*",
+    "@proofcore/core": "workspace:*",
     "zod": "4.6.7"
   }
 }

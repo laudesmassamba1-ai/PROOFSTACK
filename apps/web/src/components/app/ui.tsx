@@ -81,7 +81,7 @@ export function Card({
   enhanced?: boolean;
 }) {
   return (
-    <section className={`app-card ${className} ${enhanced ? 'enhanced-3d' : ''}`}>
+    <section className={`app-card ${className} ${enhanced ? "enhanced-3d" : ""}`}>
       {title ? (
         <header className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-4">
           <div>

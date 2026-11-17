@@ -1,9 +1,9 @@
 import { Copy, Terminal } from "lucide-react";
 import { useState } from "react";
 
-const COMMAND = "proofstack test --module world,flow,exit";
+const COMMAND = "proofcore test --module world,flow,exit";
 
-const OUTPUT = `PROOFSTACK / EXECUTION
+const OUTPUT = `PROOFCORE / EXECUTION
 
 WORLD   ▰▰▰▰▰▰▰▰▱▱  80%
 FLOW    ▰▰▰▰▱▱▱▱▱▱  40%
@@ -22,7 +22,7 @@ Exit        9 passed   0 failed
 Total      29 passed   3 failed
 Duration   00:18.42
 
-Next: proofstack report`;
+Next: proofcore report`;
 
 /**
  * This is intentionally a static example. The browser cannot execute a local

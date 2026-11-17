@@ -1,5 +1,5 @@
 import { webcrypto } from "./crypto.js";
-import { ProofstackError } from "./errors.js";
+import { ProofCoreError } from "./errors.js";
 import { sha256Hex } from "./hash.js";
 
 /**
@@ -17,7 +17,7 @@ const ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
 /** URL-safe short id from crypto randomness (default 16 chars ≈ 82 bits). */
 export function shortId(length = 16): string {
   if (length < 4 || length > 64) {
-    throw new ProofstackError({
+    throw new ProofCoreError({
       message: `shortId length must be between 4 and 64, received ${length}`,
       category: "VALIDATION",
       code: "bad_length",

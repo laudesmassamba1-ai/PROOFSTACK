@@ -6,7 +6,7 @@ import { localeProfileSchema } from "./config.js";
  *
  * A profile is *test data*, not a claim of national coverage: eight profiles are
  * shipped, each versioned and extensible, and the schema refuses fixture keys that
- * would look like national identity numbers. PROOFSTACK must never generate real
+ * would look like national identity numbers. PROOFCORE must never generate real
  * personal records, so the prohibition is enforced by the contract, not by a note
  * in a README.
  */
@@ -98,7 +98,7 @@ export const localeProfileFileSchema = z
   .strict();
 export type LocaleProfileFile = z.infer<typeof localeProfileFileSchema>;
 
-/** PROOFSTACK's own UI languages. Kept separate from WORLD test profiles. */
+/** PROOFCORE's own UI languages. Kept separate from WORLD test profiles. */
 export const UI_LOCALES = ["en", "fr"] as const;
 export type UiLocale = (typeof UI_LOCALES)[number];
 

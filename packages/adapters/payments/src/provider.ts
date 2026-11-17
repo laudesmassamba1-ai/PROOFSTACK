@@ -1,5 +1,5 @@
-import type { PaymentState, ProviderKind } from "@proofstack/contracts";
-import type { Money } from "@proofstack/core";
+import type { PaymentState, ProviderKind } from "@proofcore/contracts";
+import type { Money } from "@proofcore/core";
 
 /**
  * The provider boundary.

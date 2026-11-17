@@ -29,6 +29,9 @@ export function Nav() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Close the mobile menu on navigation. `location.pathname` is the trigger the
+  // effect deliberately listens to; suppress the exhaustive-deps advisory.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: pathname IS the dependency
   useEffect(() => setOpen(false), [location.pathname]);
 
   return (

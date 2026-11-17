@@ -1,6 +1,6 @@
 # Workspace visual audit
 
-Audit of the authenticated PROOFSTACK workspace after the Ink & Object redesign.
+Audit of the authenticated PROOFCORE workspace after the Ink & Object redesign.
 Screenshots are in `docs/design/screenshots/`.
 
 ## Before
@@ -24,29 +24,29 @@ First captured screens:
 
 Findings from pass 1 and fixes:
 
-| Finding | Decision |
-| --- | --- |
-| Headline wrapped “À” alone at 390px | Reduced mobile display scale and removed the narrow max-width; now breaks as “2 ÉCHEC(S)” / “À EXAMINER.” |
-| Command palette opened at the top-left | Native dialog reset the UA margin; added `position: fixed; inset: 0; margin: auto` and a max-height. |
-| Status words stayed English in a French shell | `StatusBadge` now reads the centralized workspace dictionary; `FAILED` → `Échec`, `PARTIAL` → `Partiel`. |
-| Relative dates stayed English | `format.ts` follows the selected locale via `Intl.RelativeTimeFormat`; “9 min ago” → “il y a 9 minutes”. |
-| Lockup read “PPROOFSTACK” | The text beside the P mark is now “ROOFSTACK”; `Wordmark` and the animated hero follow the same rule. The logo itself was not changed. |
-| The old KPI row and line chart remained | Removed from Overview. Module totals are read from the latest run; no trend is inferred. |
+| Finding                                       | Decision                                                                                                                               |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Headline wrapped “À” alone at 390px           | Reduced mobile display scale and removed the narrow max-width; now breaks as “2 ÉCHEC(S)” / “À EXAMINER.”                              |
+| Command palette opened at the top-left        | Native dialog reset the UA margin; added `position: fixed; inset: 0; margin: auto` and a max-height.                                   |
+| Status words stayed English in a French shell | `StatusBadge` now reads the centralized workspace dictionary; `FAILED` → `Échec`, `PARTIAL` → `Partiel`.                               |
+| Relative dates stayed English                 | `format.ts` follows the selected locale via `Intl.RelativeTimeFormat`; “9 min ago” → “il y a 9 minutes”.                               |
+| Lockup read “PPROOFCORE”                      | The text beside the P mark is now “ROOFSTACK”; `Wordmark` and the animated hero follow the same rule. The logo itself was not changed. |
+| The old KPI row and line chart remained       | Removed from Overview. Module totals are read from the latest run; no trend is inferred.                                               |
 
 ## After — pass 2 and 3
 
 Re-captured after each fix. No console or page errors were emitted by the capture
 script. The final browser checks covered:
 
-| Viewport | Routes checked | Horizontal overflow |
-| --- | --- | --- |
-| 1920×1080 | Overview, Projects, WORLD, CLI, Billing, Settings | 0 |
-| 1440×900 | same | 0 |
-| 1366×768 | same | 0 |
-| 1024×768 | same | 0 |
-| 768×1024 | same | 0 |
-| 390×844 | same | 0 |
-| 375×812 | same | 0 |
+| Viewport  | Routes checked                                    | Horizontal overflow |
+| --------- | ------------------------------------------------- | ------------------- |
+| 1920×1080 | Overview, Projects, WORLD, CLI, Billing, Settings | 0                   |
+| 1440×900  | same                                              | 0                   |
+| 1366×768  | same                                              | 0                   |
+| 1024×768  | same                                              | 0                   |
+| 768×1024  | same                                              | 0                   |
+| 390×844   | same                                              | 0                   |
+| 375×812   | same                                              | 0                   |
 
 The matrix is 42 route/viewport combinations. Each result was checked for
 `document.scrollWidth - innerWidth` and that the display headline’s right edge did not

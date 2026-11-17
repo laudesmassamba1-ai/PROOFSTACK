@@ -1,8 +1,8 @@
-# Particle system design (Proofstack)
+# Particle system design (ProofCore)
 
 Goal:
 
-- Provide an original, performant particle-based identity that forms the PROOFSTACK symbol.
+- Provide an original, performant particle-based identity that forms the PROOFCORE symbol.
 - Use a Canvas 2D engine with deterministic particle distribution and smooth transitions.
 
 Architecture:

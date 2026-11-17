@@ -1,5 +1,5 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
-import { ProofstackError } from "@proofstack/core";
+import { ProofCoreError } from "@proofcore/core";
 
 /**
  * A Model Context Protocol client.
@@ -134,7 +134,7 @@ class StdioMcpClient implements McpClient {
   async initialize(): Promise<void> {
     const command = this.options.command;
     if (!command || command.length === 0) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `MCP server "${this.name}" has no command`,
         category: "CONFIGURATION",
         code: "mcp_command_missing",
@@ -143,7 +143,7 @@ class StdioMcpClient implements McpClient {
 
     const [file, ...args] = command;
     if (!file) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `MCP server "${this.name}" has an empty command`,
         category: "CONFIGURATION",
         code: "mcp_command_empty",
@@ -174,7 +174,7 @@ class StdioMcpClient implements McpClient {
     this.child.on("exit", (code, signal) => {
       if (!this.closed) {
         this.failAll(
-          new ProofstackError({
+          new ProofCoreError({
             message: `MCP server "${this.name}" exited (code ${code ?? "null"}, signal ${signal ?? "none"})`,
             category: "PROVIDER",
             code: "mcp_server_exited",
@@ -187,7 +187,7 @@ class StdioMcpClient implements McpClient {
     const result = (await this.request("initialize", {
       protocolVersion: MCP_PROTOCOL_VERSION,
       capabilities: { tools: {}, resources: {}, prompts: {} },
-      clientInfo: { name: "proofstack", version: "0.1.0" },
+      clientInfo: { name: "proofcore", version: "0.1.0" },
     })) as {
       protocolVersion?: string;
       capabilities?: Record<string, unknown>;
@@ -215,7 +215,7 @@ class StdioMcpClient implements McpClient {
 
   async callTool(name: string, args: Record<string, unknown>): Promise<McpToolResult> {
     if (!this.supports("tools")) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `MCP server "${this.name}" does not advertise tools`,
         category: "UNSUPPORTED",
         code: "mcp_tools_unsupported",
@@ -252,7 +252,7 @@ class StdioMcpClient implements McpClient {
 
   async readResource(uri: string): Promise<string> {
     if (!this.supports("resources")) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `MCP server "${this.name}" does not advertise resources`,
         category: "UNSUPPORTED",
         code: "mcp_resources_unsupported",
@@ -310,7 +310,7 @@ class StdioMcpClient implements McpClient {
       }
     });
     this.failAll(
-      new ProofstackError({
+      new ProofCoreError({
         message: `MCP server "${this.name}" closed`,
         category: "INTERNAL",
         code: "mcp_closed",
@@ -359,7 +359,7 @@ class StdioMcpClient implements McpClient {
       if (record.error) {
         const error = record.error as { message?: string; code?: number; data?: unknown };
         pending.reject(
-          new ProofstackError({
+          new ProofCoreError({
             message: `MCP "${this.name}": ${error.message ?? "unknown error"}`,
             category: "PROVIDER",
             code: `mcp_error_${error.code ?? "unknown"}`,
@@ -378,7 +378,7 @@ class StdioMcpClient implements McpClient {
       this.write({
         jsonrpc: "2.0",
         id: record.id,
-        error: { code: -32601, message: `PROOFSTACK does not implement ${record.method}` },
+        error: { code: -32601, message: `PROOFCORE does not implement ${record.method}` },
       });
     }
   }
@@ -389,7 +389,7 @@ class StdioMcpClient implements McpClient {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(
-          new ProofstackError({
+          new ProofCoreError({
             message: `MCP "${this.name}" did not answer ${method} within ${this.timeoutMs}ms`,
             category: "TIMEOUT",
             code: "mcp_timeout",
@@ -410,8 +410,8 @@ class StdioMcpClient implements McpClient {
 
   private write(message: unknown): void {
     const child = this.child;
-    if (!child || !child.stdin.writable) {
-      throw new ProofstackError({
+    if (!child?.stdin.writable) {
+      throw new ProofCoreError({
         message: `MCP server "${this.name}" is not accepting input`,
         category: "PROVIDER",
         code: "mcp_stdin_closed",
@@ -453,7 +453,7 @@ class HttpMcpClient implements McpClient {
 
   async initialize(): Promise<void> {
     if (!this.options.url) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `MCP server "${this.name}" has no url`,
         category: "CONFIGURATION",
         code: "mcp_url_missing",
@@ -463,7 +463,7 @@ class HttpMcpClient implements McpClient {
     const result = (await this.request("initialize", {
       protocolVersion: MCP_PROTOCOL_VERSION,
       capabilities: { tools: {}, resources: {}, prompts: {} },
-      clientInfo: { name: "proofstack", version: "0.1.0" },
+      clientInfo: { name: "proofcore", version: "0.1.0" },
     })) as {
       protocolVersion?: string;
       capabilities?: Record<string, unknown>;
@@ -539,7 +539,7 @@ class HttpMcpClient implements McpClient {
     const message = await readRpcMessage(response);
     if (message.error) {
       const error = message.error as { message?: string; code?: number };
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `MCP "${this.name}": ${error.message ?? "unknown error"}`,
         category: "PROVIDER",
         code: `mcp_error_${error.code ?? "unknown"}`,
@@ -553,6 +553,15 @@ class HttpMcpClient implements McpClient {
   }
 
   private async post(body: unknown): Promise<Response> {
+    // Constructor guarantees a url for the http transport; assert once, typed.
+    const url = this.options.url;
+    if (!url) {
+      throw new ProofCoreError({
+        message: "MCP http transport started without a url",
+        category: "CONFIGURATION",
+        code: "mcp_url_missing",
+      });
+    }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     const headers: Record<string, string> = {
@@ -565,7 +574,7 @@ class HttpMcpClient implements McpClient {
     if (this.sessionId) headers["mcp-session-id"] = this.sessionId;
 
     try {
-      const response = await fetch(this.options.url!, {
+      const response = await fetch(url, {
         method: "POST",
         headers,
         body: JSON.stringify(body),
@@ -574,7 +583,7 @@ class HttpMcpClient implements McpClient {
       const session = response.headers.get("mcp-session-id");
       if (session) this.sessionId = session;
       if (!response.ok) {
-        throw new ProofstackError({
+        throw new ProofCoreError({
           message: `MCP "${this.name}" returned HTTP ${response.status}`,
           category: "PROVIDER",
           code: "mcp_http_error",
@@ -584,8 +593,8 @@ class HttpMcpClient implements McpClient {
       }
       return response;
     } catch (error) {
-      if (error instanceof ProofstackError) throw error;
-      throw new ProofstackError({
+      if (error instanceof ProofCoreError) throw error;
+      throw new ProofCoreError({
         message: `MCP "${this.name}" request failed: ${error instanceof Error ? error.message : String(error)}`,
         category: "NETWORK",
         code: "mcp_network_error",
@@ -607,7 +616,7 @@ async function readRpcMessage(response: Response): Promise<Record<string, unknow
     // Take the last `data:` line that parses as a JSON-RPC message.
     const lines = text.split("\n").filter((line) => line.startsWith("data:"));
     for (let i = lines.length - 1; i >= 0; i -= 1) {
-      const payload = lines[i]!.slice(5).trim();
+      const payload = (lines[i] ?? "").slice(5).trim();
       if (!payload) continue;
       try {
         const parsed = JSON.parse(payload) as Record<string, unknown>;
@@ -616,7 +625,7 @@ async function readRpcMessage(response: Response): Promise<Record<string, unknow
         // Not a message; keep looking.
       }
     }
-    throw new ProofstackError({
+    throw new ProofCoreError({
       message: "MCP server sent an event stream with no JSON-RPC response",
       category: "PROVIDER",
       code: "mcp_sse_no_response",
@@ -627,7 +636,7 @@ async function readRpcMessage(response: Response): Promise<Record<string, unknow
   try {
     return JSON.parse(text) as Record<string, unknown>;
   } catch {
-    throw new ProofstackError({
+    throw new ProofCoreError({
       message: `MCP server returned non-JSON: ${text.slice(0, 200)}`,
       category: "PROVIDER",
       code: "mcp_bad_response",

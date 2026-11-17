@@ -1,5 +1,5 @@
-import type { PaymentState } from "@proofstack/contracts";
-import { iso, Money, ProofstackError } from "@proofstack/core";
+import type { PaymentState } from "@proofcore/contracts";
+import { iso, Money, ProofCoreError } from "@proofcore/core";
 import type {
   CheckoutInput,
   CheckoutResult,
@@ -57,14 +57,14 @@ export class SasPayProvider implements PaymentProvider {
 
   constructor(config: SasPayConfig) {
     if (!config.apiKey) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: "SASPAY_API_KEY is empty; the SasPay adapter refuses to start without a key",
         category: "CONFIGURATION",
         code: "saspay_key_missing",
       });
     }
     if (!config.webhookSecret) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: "SASPAY_WEBHOOK_SECRET is empty; unsigned webhook acceptance is not an option",
         category: "CONFIGURATION",
         code: "saspay_webhook_secret_missing",
@@ -117,7 +117,7 @@ export class SasPayProvider implements PaymentProvider {
     const amount = input.amount.toProviderDecimal();
     if (input.flow === "push") {
       if (!input.push) {
-        throw new ProofstackError({
+        throw new ProofCoreError({
           message: "softpay requires country and network",
           category: "VALIDATION",
           code: "saspay_push_incomplete",
@@ -366,7 +366,7 @@ export function mapPaymentStatus(status: string): PaymentState {
       return "REFUNDED";
     default:
       // An unknown provider status is not a success. It is surfaced, not guessed.
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `Unmapped SasPay status ${JSON.stringify(status)}`,
         category: "PROVIDER",
         code: "unknown_payment_status",

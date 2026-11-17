@@ -23,7 +23,7 @@ export const ERROR_CATEGORIES = [
 
 export type ErrorCategory = (typeof ERROR_CATEGORIES)[number];
 
-export interface ProofstackErrorInit {
+export interface ProofCoreErrorInit {
   message: string;
   category?: ErrorCategory;
   code?: string;
@@ -32,16 +32,16 @@ export interface ProofstackErrorInit {
   cause?: unknown;
 }
 
-export class ProofstackError extends Error {
+export class ProofCoreError extends Error {
   readonly category: ErrorCategory;
   readonly code: string;
   readonly retryable: boolean;
   readonly details: Record<string, unknown>;
   override readonly cause?: unknown;
 
-  constructor(init: ProofstackErrorInit) {
+  constructor(init: ProofCoreErrorInit) {
     super(init.message);
-    this.name = "ProofstackError";
+    this.name = "ProofCoreError";
     this.category = init.category ?? "INTERNAL";
     this.code = init.code ?? `${this.category.toLowerCase()}_error`;
     this.retryable = init.retryable ?? false;
@@ -61,8 +61,8 @@ export class ProofstackError extends Error {
   }
 }
 
-export function isProofstackError(value: unknown): value is ProofstackError {
-  return value instanceof ProofstackError;
+export function isProofCoreError(value: unknown): value is ProofCoreError {
+  return value instanceof ProofCoreError;
 }
 
 /**
@@ -79,7 +79,7 @@ export interface FailureRecord {
 }
 
 export function toFailureRecord(error: unknown, opts: { stack?: boolean } = {}): FailureRecord {
-  if (isProofstackError(error)) {
+  if (isProofCoreError(error)) {
     const record: FailureRecord = {
       message: error.message,
       category: error.category,
@@ -124,7 +124,7 @@ function classifyByName(error: Error): ErrorCategory {
 }
 
 export function assertNever(value: never, label = "exhaustive check"): never {
-  throw new ProofstackError({
+  throw new ProofCoreError({
     message: `${label}: unexpected value ${JSON.stringify(value)}`,
     category: "INTERNAL",
     code: "not_exhaustive",

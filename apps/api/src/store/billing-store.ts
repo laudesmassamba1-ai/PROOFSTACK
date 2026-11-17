@@ -7,8 +7,8 @@ import type {
   StoredUsageEvent,
   StoredWebhookRecord,
   Subscription,
-} from "@proofstack/billing";
-import { iso } from "@proofstack/core";
+} from "@proofcore/billing";
+import { iso } from "@proofcore/core";
 import {
   bool,
   type Database,
@@ -23,7 +23,7 @@ import {
 /**
  * The production billing store.
  *
- * It is the SQL implementation of the guarantees `@proofstack/billing` relies on:
+ * It is the SQL implementation of the guarantees `@proofcore/billing` relies on:
  *
  *   - `payment_intents.idempotency_key` UNIQUE      → one charge per billing period
  *   - `webhook_events(provider, provider_event_id)` → replay is a no-op

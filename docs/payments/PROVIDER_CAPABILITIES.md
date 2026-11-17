@@ -1,6 +1,6 @@
 # SasPay provider capabilities
 
-This document describes the capabilities of the SasPay payment provider integration used by PROOFSTACK. It reflects the OpenAPI-based specification available at the repository and the implemented adapters (SasPay native and Sandbox).
+This document describes the capabilities of the SasPay payment provider integration used by PROOFCORE. It reflects the OpenAPI-based specification available at the repository and the implemented adapters (SasPay native and Sandbox).
 
 1. Provider identity
 

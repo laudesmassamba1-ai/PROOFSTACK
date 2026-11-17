@@ -15,7 +15,7 @@ const RUNTIME_RULE = `Workers do NOT run test sessions.
 
   customer laptop / CI                Cloudflare Workers
   ┌──────────────────────────┐        ┌───────────────────────────┐
-  │ proofstack test          │  HTTPS │ auth · projects · billing │
+  │ proofcore test          │  HTTPS │ auth · projects · billing │
   │  ├ engine (world/flow/   │ ─────► │ reports · usage · webhooks│
   │  │  exit)                │        └───────────────────────────┘
   │  ├ local fixtures        │

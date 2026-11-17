@@ -4,12 +4,12 @@ import type {
   Evidence,
   Finding,
   ModuleId,
-  ProofstackConfig,
+  ProofCoreConfig,
   Severity,
   TestCaseResult,
   TestStatus,
-} from "@proofstack/contracts";
-import type { Clock, Logger } from "@proofstack/core";
+} from "@proofcore/contracts";
+import type { Clock, Logger } from "@proofcore/core";
 import type { Rng } from "./rng.js";
 
 /**
@@ -51,7 +51,7 @@ export interface TestContext {
   readonly suiteId: string;
   readonly module: ModuleId;
   readonly environment: EnvironmentKind;
-  readonly config: ProofstackConfig;
+  readonly config: ProofCoreConfig;
   readonly profile?: string;
   readonly clock: Clock;
   readonly log: Logger;
@@ -128,7 +128,7 @@ export interface TestSuiteDef {
 }
 
 export interface SuiteInput {
-  config: ProofstackConfig;
+  config: ProofCoreConfig;
   environment: EnvironmentKind;
   /** Only these profiles, when the caller narrowed the run. */
   profiles?: string[];
@@ -152,7 +152,7 @@ export interface EngineEvent {
 }
 
 export interface EngineOptions {
-  config: ProofstackConfig;
+  config: ProofCoreConfig;
   providers: ModuleProvider[];
   /** Restrict which providers participate; defaults to config.enabledModules. */
   only?: ModuleId[];

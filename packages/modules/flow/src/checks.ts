@@ -1,5 +1,6 @@
-import type { ProofstackConfig } from "@proofstack/contracts";
-import type { TestCaseDef, TestSuiteDef } from "@proofstack/engine";
+import type { ProofCoreConfig } from "@proofcore/contracts";
+import { ProofCoreError } from "@proofcore/core";
+import type { TestCaseDef, TestSuiteDef } from "@proofcore/engine";
 import {
   buildForgedWebhook,
   buildSignedWebhook,
@@ -31,7 +32,7 @@ import {
  */
 
 export interface FlowCheckOptions {
-  config: ProofstackConfig;
+  config: ProofCoreConfig;
   target?: PaymentUnderTest;
   /** Narrow the scenario set; defaults to `modules.flow.scenarios`. */
   scenarios?: readonly FlowScenario[];
@@ -69,7 +70,40 @@ function flowCase(scenario: FlowScenario, options: FlowCheckOptions): TestCaseDe
     suiteId: "flow:transactions",
     ...(skipReason ? { skip: skipReason } : {}),
     execute: async (ctx) => {
-      if (!target) return; // unreachable: skipped above
+      // unreachable: `skipFor` skips the case before execute when the target or
+      // its checkout surface is absent. Assert once, for the type checker.
+      if (!target?.checkout) return;
+      // skipFor() guarantees the optional surfaces exist for the scenarios that
+      // need them. If one is missing here, the skip table and the switch have
+      // drifted: fail the harness loudly instead of silently passing.
+      const deliver = target.deliverWebhook;
+      if (!deliver)
+        throw new ProofCoreError({
+          message: "flow harness drift: webhook receiver missing for a webhook scenario",
+          category: "INTERNAL",
+          code: "harness_drift",
+        });
+      const checkout = target.checkout;
+      if (!checkout)
+        throw new ProofCoreError({
+          message: "flow harness drift: checkout missing for a checkout scenario",
+          category: "INTERNAL",
+          code: "harness_drift",
+        });
+      const readback = target.readOrder;
+      if (!readback)
+        throw new ProofCoreError({
+          message: "flow harness drift: order readback missing",
+          category: "INTERNAL",
+          code: "harness_drift",
+        });
+      const refundFn = target.refund;
+      if (!refundFn)
+        throw new ProofCoreError({
+          message: "flow harness drift: refund surface missing",
+          category: "INTERNAL",
+          code: "harness_drift",
+        });
 
       const orderReference = syntheticOrderReference(options.runId, scenario);
       const currency = "XOF";
@@ -80,7 +114,7 @@ function flowCase(scenario: FlowScenario, options: FlowCheckOptions): TestCaseDe
         case "checkout_declined":
         case "checkout_cancelled":
         case "checkout_timeout": {
-          const response = await target.checkout!({
+          const response = await target.checkout({
             amount,
             currency,
             orderReference,
@@ -139,7 +173,7 @@ function flowCase(scenario: FlowScenario, options: FlowCheckOptions): TestCaseDe
         case "webhook_duplicate":
         case "webhook_delayed":
         case "webhook_out_of_order": {
-          const checkout = await target.checkout!({
+          const checkout = await target.checkout({
             amount,
             currency,
             orderReference,
@@ -168,8 +202,8 @@ function flowCase(scenario: FlowScenario, options: FlowCheckOptions): TestCaseDe
           });
 
           if (scenario === "webhook_duplicate") {
-            const first = await target.deliverWebhook!(successEvent);
-            const second = await target.deliverWebhook!(successEvent);
+            const first = await deliver(successEvent);
+            const second = await deliver(successEvent);
             ctx.check(first.status < 500, {
               description: "the first webhook delivery is accepted",
               expected: "< 500",
@@ -189,7 +223,7 @@ function flowCase(scenario: FlowScenario, options: FlowCheckOptions): TestCaseDe
           if (scenario === "webhook_delayed") {
             // Delivered well after the redirect would have returned.
             await ctx.sleep(Math.min(options.config.engine.timeoutMs / 4, 2_000));
-            const late = await target.deliverWebhook!(successEvent);
+            const late = await deliver(successEvent);
             ctx.check(late.status < 500, {
               description: "a delayed webhook is still accepted",
               expected: "< 500",
@@ -200,7 +234,7 @@ function flowCase(scenario: FlowScenario, options: FlowCheckOptions): TestCaseDe
           }
 
           if (scenario === "webhook_out_of_order") {
-            await target.deliverWebhook!(successEvent);
+            await deliver(successEvent);
             const stale = await buildSignedWebhook({
               secret,
               event: "payment.pending",
@@ -212,7 +246,7 @@ function flowCase(scenario: FlowScenario, options: FlowCheckOptions): TestCaseDe
                 reference: orderReference,
               },
             });
-            const staleResult = await target.deliverWebhook!(stale);
+            const staleResult = await deliver(stale);
             ctx.check(staleResult.status < 500, {
               description: "a late PENDING event is handled without erroring",
               expected: "< 500",
@@ -246,7 +280,7 @@ function flowCase(scenario: FlowScenario, options: FlowCheckOptions): TestCaseDe
           // Open a checkout that is still awaiting payment. Using a settled checkout
           // here would make "the order is not paid" vacuously false and the case
           // could never pass, which would be a broken test rather than a finding.
-          const checkout = await target.checkout!({
+          const checkout = await target.checkout({
             amount,
             currency,
             orderReference,
@@ -272,7 +306,7 @@ function flowCase(scenario: FlowScenario, options: FlowCheckOptions): TestCaseDe
             event: "payment.success",
             data: { id: paymentId, status: "SUCCESS", amount, currency, reference: orderReference },
           });
-          const result = await target.deliverWebhook!(forged);
+          const result = await deliver(forged);
 
           ctx.check(result.status >= 400, {
             description: "a forged signature is rejected with a 4xx",
@@ -295,7 +329,7 @@ function flowCase(scenario: FlowScenario, options: FlowCheckOptions): TestCaseDe
         }
 
         case "order_duplicate": {
-          const first = await target.checkout!({
+          const first = await checkout({
             amount,
             currency,
             orderReference,
@@ -303,7 +337,7 @@ function flowCase(scenario: FlowScenario, options: FlowCheckOptions): TestCaseDe
             idempotencyKey: orderReference,
           });
           // Same idempotency key, same body: the product must not create a second order.
-          const second = await target.checkout!({
+          const second = await checkout({
             amount,
             currency,
             orderReference,
@@ -342,14 +376,14 @@ function flowCase(scenario: FlowScenario, options: FlowCheckOptions): TestCaseDe
         }
 
         case "order_missing_confirmation": {
-          const checkout = await target.checkout!({
+          const checkout = await target.checkout({
             amount,
             currency,
             orderReference,
             scenario: "checkout_success",
             idempotencyKey: orderReference,
           });
-          const order = await target.readOrder!(orderReference);
+          const order = await readback(orderReference);
           if (!order) {
             ctx.check(false, {
               description: "a paid payment has a readable order",
@@ -380,7 +414,7 @@ function flowCase(scenario: FlowScenario, options: FlowCheckOptions): TestCaseDe
         }
 
         case "refund_flow": {
-          const checkout = await target.checkout!({
+          const checkout = await target.checkout({
             amount,
             currency,
             orderReference,
@@ -393,7 +427,7 @@ function flowCase(scenario: FlowScenario, options: FlowCheckOptions): TestCaseDe
             return;
           }
 
-          const refund = await target.refund!({ paymentId, amount });
+          const refund = await refundFn({ paymentId, amount });
           ctx.check(refund.accepted, {
             description: "the refund is accepted",
             expected: "accepted",
@@ -402,7 +436,7 @@ function flowCase(scenario: FlowScenario, options: FlowCheckOptions): TestCaseDe
             severity: "HIGH",
           });
 
-          const order = await target.readOrder!(orderReference);
+          const order = await readback(orderReference);
           if (!order) {
             // The order existed before the refund (checkout returned an id) and is gone
             // after it. A refund must never delete the record: the customer's history is
@@ -439,7 +473,7 @@ function flowCase(scenario: FlowScenario, options: FlowCheckOptions): TestCaseDe
         }
 
         case "inconsistent_state": {
-          const checkout = await target.checkout!({
+          const checkout = await target.checkout({
             amount,
             currency,
             orderReference,

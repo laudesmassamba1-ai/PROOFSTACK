@@ -1,4 +1,4 @@
-import { sha256Hex } from "@proofstack/core";
+import { sha256Hex } from "@proofcore/core";
 
 /**
  * Finding identity across runs.

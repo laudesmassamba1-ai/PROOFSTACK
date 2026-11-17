@@ -1,16 +1,16 @@
-name = "proofstack-api"
+name = "proofcore-api"
 main = "src/worker.ts"
 compatibility_date = "2026-11-01"
 # D1 is the production database. Local development uses the same SQL through
 # node:sqlite (see src/node.ts), so a migration that works locally works on D1.
 #
 # Create the database once with:
-#   wrangler d1 create proofstack
+#   wrangler d1 create proofcore
 # then paste the returned database_id below.
 
 [[d1_databases]]
 binding = "DB"
-database_name = "proofstack"
+database_name = "proofcore"
 database_id = "4dd9116b-df79-47f4-99ef-eb19aa019405"
 migrations_dir = "migrations"
 
@@ -25,8 +25,8 @@ enabled = true
 
 [vars]
 NODE_ENV = "production"
-WEB_ORIGIN = "https://proofstack-iota.vercel.app,https://proofstack-01z.pages.dev"
-API_ORIGIN = "https://proofstack-api.laudesmassamba1.workers.dev"
+WEB_ORIGIN = "https://proofcore-iota.vercel.app,https://proofcore-01z.pages.dev"
+API_ORIGIN = "https://proofcore-api.laudesmassamba1.workers.dev"
 
 # Comma-separated allowlist for the read-only /app/admin operations console.
 # This is an authorization list, not a secret. Empty disables the console; there is

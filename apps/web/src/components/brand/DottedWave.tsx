@@ -30,18 +30,20 @@ interface Dot {
   glow: number;
 }
 
-const MINT = [120, 227, 203];
-const CYAN = [112, 201, 219];
-const PALE = [220, 245, 227];
+type Rgb = readonly [number, number, number];
 
-function mix(a: number[], b: number[], t: number): string {
-  const r = Math.round(a[0]! + (b[0]! - a[0]!) * t);
-  const g = Math.round(a[1]! + (b[1]! - a[1]!) * t);
-  const bl = Math.round(a[2]! + (b[2]! - a[2]!) * t);
+const MINT: Rgb = [120, 227, 203];
+const CYAN: Rgb = [112, 201, 219];
+const PALE: Rgb = [220, 245, 227];
+
+function mix(a: Rgb, b: Rgb, t: number): string {
+  const r = Math.round(a[0] + (b[0] - a[0]) * t);
+  const g = Math.round(a[1] + (b[1] - a[1]) * t);
+  const bl = Math.round(a[2] + (b[2] - a[2]) * t);
   return `rgb(${r} ${g} ${bl})`;
 }
 
-export function DottedWave({ className, step = 16, intensity = 1, bias = 0.62 }: DottedWaveProps) {
+export function DottedWave({ className, step = 16, intensity = 1 }: DottedWaveProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const reduced = usePrefersReducedMotion();
 
@@ -180,7 +182,9 @@ export function DottedWave({ className, step = 16, intensity = 1, bias = 0.62 }:
       window.removeEventListener("resize", onResize);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [bias, intensity, reduced, step]);
+    // `bias` is part of the public prop API but no longer read by this effect;
+    // excluding it here is what the exhaustive-deps rule asks for.
+  }, [intensity, reduced, step]);
 
   return <canvas ref={canvasRef} className={className} aria-hidden="true" tabIndex={-1} />;
 }

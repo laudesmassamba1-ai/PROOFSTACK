@@ -82,7 +82,7 @@ characters 24–40px; bubble text 10–12px; primary controls 44px tall.
 5. Microtext is tiny, uppercase, tracked; controls are pills.
 6. A point of view and dry humour exist, but never at the expense of truth.
 
-## Translation into PROOFSTACK
+## Translation into PROOFCORE
 
 | Reference principle | Product decision                                                            |
 | ------------------- | --------------------------------------------------------------------------- |

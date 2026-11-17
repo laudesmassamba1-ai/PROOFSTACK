@@ -1,4 +1,4 @@
-import type { UsageEventKind } from "@proofstack/contracts";
+import type { UsageEventKind } from "@proofcore/contracts";
 import type {
   Customer,
   PaymentIntent,

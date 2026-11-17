@@ -1,8 +1,8 @@
 {
-  "name": "proofstack",
+  "name": "proofcore",
   "version": "0.1.0",
   "private": true,
-  "description": "PROOFSTACK — integrated software quality and reliability suite: WORLD (global compatibility), FLOW (transaction reliability), EXIT (data portability).",
+  "description": "PROOFCORE — integrated software quality and reliability suite: WORLD (global compatibility), FLOW (transaction reliability), EXIT (data portability).",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "engines": {
@@ -20,12 +20,12 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test --config tests/playwright.config.ts",
-    "db:generate": "pnpm --filter @proofstack/db generate",
-    "db:migrate:local": "pnpm --filter @proofstack/db migrate:local",
-    "web:dev": "pnpm --filter @proofstack/web dev",
-    "api:dev": "pnpm --filter @proofstack/api dev",
+    "db:generate": "pnpm --filter @proofcore/db generate",
+    "db:migrate:local": "pnpm --filter @proofcore/db migrate:local",
+    "web:dev": "pnpm --filter @proofcore/web dev",
+    "api:dev": "pnpm --filter @proofcore/api dev",
     "cli": "node packages/cli/dist/index.js",
-    "proofstack": "node packages/cli/dist/index.js",
+    "proofcore": "node packages/cli/dist/index.js",
     "cli:package": "node tooling/scripts/package-cli.mjs",
     "cli:install": "pnpm cli:package && node tooling/scripts/install-cli.mjs",
     "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"

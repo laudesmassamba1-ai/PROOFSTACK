@@ -1,11 +1,11 @@
-import type { PaymentState } from "@proofstack/contracts";
+import type { PaymentState } from "@proofcore/contracts";
 import {
   hmacSha256Hex,
   Money,
-  ProofstackError,
+  ProofCoreError,
   sha256Hex,
   timingSafeEqualHex,
-} from "@proofstack/core";
+} from "@proofcore/core";
 
 /**
  * The FLOW payment surface.
@@ -398,7 +398,7 @@ export function scenarioAmount(currency = "XOF"): string {
   return Money.of(currency, 2500n).toProviderDecimal();
 }
 
-export class FlowHarnessError extends ProofstackError {
+export class FlowHarnessError extends ProofCoreError {
   constructor(message: string, code: string, details?: Record<string, unknown>) {
     super({ message, category: "CONFIGURATION", code, ...(details ? { details } : {}) });
     this.name = "FlowHarnessError";

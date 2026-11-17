@@ -1,7 +1,7 @@
-import { ProofstackError } from "./errors.js";
+import { ProofCoreError } from "./errors.js";
 
 /**
- * Minimal structural types for the Web Crypto surface PROOFSTACK depends on.
+ * Minimal structural types for the Web Crypto surface PROOFCORE depends on.
  *
  * Declaring them here (instead of adding the DOM lib) keeps every package free of
  * a DOM dependency while still type-checking in the three real runtimes: Node 22,
@@ -36,9 +36,9 @@ export interface CryptoLike {
 export function webcrypto(): CryptoLike {
   const c = (globalThis as { crypto?: CryptoLike }).crypto;
   if (!c || typeof c.randomUUID !== "function" || !c.subtle) {
-    throw new ProofstackError({
+    throw new ProofCoreError({
       message:
-        "globalThis.crypto is unavailable in this runtime; PROOFSTACK needs Web Crypto for identifiers, checksums and signature checks",
+        "globalThis.crypto is unavailable in this runtime; PROOFCORE needs Web Crypto for identifiers, checksums and signature checks",
       category: "CONFIGURATION",
       code: "crypto_unavailable",
     });

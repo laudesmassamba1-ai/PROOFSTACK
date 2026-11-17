@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Topological TypeScript build orchestrator for the PROOFSTACK monorepo.
+ * Topological TypeScript build orchestrator for the PROOFCORE monorepo.
  *
  * Internal packages are ESM/NodeNext: a package can only be emitted after every
- * @proofstack/* dependency it imports has been emitted (its .d.ts must exist).
+ * @proofcore/* dependency it imports has been emitted (its .d.ts must exist).
  * Packages at the same topological level are built in parallel.
  *
  * Usage:
@@ -45,7 +45,7 @@ async function collect() {
       // Apps that are not plain-tsc packages (web) opt out with "buildOrder": false
       if (pkg.buildOrder === false) continue;
       const deps = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }).filter((d) =>
-        d.startsWith("@proofstack/")
+        d.startsWith("@proofcore/")
       );
       nodes.set(pkg.name, { name: pkg.name, dir, deps });
     }
@@ -90,7 +90,7 @@ if (nodes.size === 0) {
 }
 const levels = topo(nodes);
 console.log(
-  `proofstack build (${noEmit ? "typecheck" : "emit"}) — ${nodes.size} packages, ${levels.length} levels`
+  `proofcore build (${noEmit ? "typecheck" : "emit"}) — ${nodes.size} packages, ${levels.length} levels`
 );
 for (const [i, level] of levels.entries()) {
   console.log(`\n── level ${i + 1}: ${level.join(", ")}`);

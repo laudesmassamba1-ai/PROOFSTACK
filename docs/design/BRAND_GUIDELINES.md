@@ -1,4 +1,4 @@
-# Brand guidelines (Proofstack)
+# Brand guidelines (ProofCore)
 
 Color palette:
 

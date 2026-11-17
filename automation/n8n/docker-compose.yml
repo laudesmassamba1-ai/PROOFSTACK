@@ -1,7 +1,7 @@
 services:
   n8n:
     image: n8nio/n8n:latest
-    container_name: proofstack-n8n
+    container_name: proofcore-n8n
     restart: unless-stopped
     ports:
       - "5678:5678"
@@ -12,7 +12,7 @@ services:
       N8N_SECURE_COOKIE: "false"
       N8N_DIAGNOSTICS_ENABLED: "false"
       GENERIC_TIMEZONE: Africa/Porto-Novo
-      PROOFSTACK_WEBHOOK_SECRET: dev-only-change-me
+      PROOFCORE_WEBHOOK_SECRET: dev-only-change-me
       # Optional Slack Incoming Webhook; leave empty to skip notifications.
       SLACK_WEBHOOK_URL: ""
     volumes:

@@ -16,7 +16,7 @@ async function main(): Promise<void> {
   // `:memory:` is a SQLite sentinel, not a path. Resolving it first turns it into
   // `/abs/path/:memory:`, which SQLite happily creates as a *file* — so a run meant to
   // be throwaway silently persists to disk. Keep the sentinel intact.
-  const requested = process.env.DATA_PATH ?? ".proofstack/api.db";
+  const requested = process.env.DATA_PATH ?? ".proofcore/api.db";
   const dataPath = requested === ":memory:" ? ":memory:" : resolve(requested);
   if (dataPath !== ":memory:") mkdirSync(dirname(dataPath), { recursive: true });
 

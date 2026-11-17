@@ -1,5 +1,5 @@
-import type { ProofstackConfig } from "@proofstack/contracts";
-import { ProofstackError } from "@proofstack/core";
+import type { ProofCoreConfig } from "@proofcore/contracts";
+import { ProofCoreError } from "@proofcore/core";
 
 /**
  * The surface WORLD drives against.
@@ -55,12 +55,12 @@ export class HttpProductUnderTest implements ProductUnderTest {
   readonly name: string;
   readonly capabilities = { submit: true as const, readback: true, sorted: false };
 
-  private readonly cfg: ProofstackConfig["modules"]["world"]["target"];
+  private readonly cfg: ProofCoreConfig["modules"]["world"]["target"];
   private readonly fetchImpl: FetchLike;
   private readonly tokenProvider?: () => string | undefined;
 
   constructor(options: {
-    config: ProofstackConfig;
+    config: ProofCoreConfig;
     name?: string;
     fetchImpl?: FetchLike;
     /** Resolves `target.tokenEnvVar`. Injected so the package stays runtime-agnostic. */
@@ -71,7 +71,7 @@ export class HttpProductUnderTest implements ProductUnderTest {
     this.fetchImpl = options.fetchImpl ?? ((input, init) => fetch(input, init));
     this.tokenProvider = options.tokenProvider;
     if (this.cfg.kind !== "http" || !this.cfg.submitUrl) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: 'HttpProductUnderTest requires modules.world.target.kind="http" and a submitUrl',
         category: "CONFIGURATION",
         code: "world_target_unconfigured",
@@ -86,7 +86,7 @@ export class HttpProductUnderTest implements ProductUnderTest {
     if (this.cfg.tokenEnvVar) {
       const token = this.tokenProvider?.();
       if (!token) {
-        throw new ProofstackError({
+        throw new ProofCoreError({
           message: `WORLD target needs the ${this.cfg.tokenEnvVar} environment variable`,
           category: "CONFIGURATION",
           code: "world_token_missing",
@@ -125,7 +125,7 @@ export class HttpProductUnderTest implements ProductUnderTest {
         rawSample: text.slice(0, 400),
       };
     } catch (error) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `WORLD could not reach the product: ${error instanceof Error ? error.message : String(error)}`,
         category: "NETWORK",
         code: "world_target_unreachable",
@@ -152,7 +152,7 @@ export class HttpProductUnderTest implements ProductUnderTest {
   async sorted(input: { profile: string; field: string; values: string[] }): Promise<string[]> {
     const url = this.cfg.sortUrl;
     if (!url)
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: "WORLD collation checks need modules.world.target.sortUrl",
         category: "CONFIGURATION",
         code: "world_sort_url_missing",
@@ -165,7 +165,7 @@ export class HttpProductUnderTest implements ProductUnderTest {
     const parsed = safeJson(await response.text()) as { items?: unknown } | null;
     const items = parsed?.items;
     if (!Array.isArray(items) || items.some((i) => typeof i !== "string")) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: "sort endpoint returned an unexpected shape",
         category: "PROVIDER",
         code: "world_sort_shape",
@@ -247,8 +247,8 @@ function extractErrors(parsed: unknown, errorField: string): Record<string, stri
 }
 
 /**
- * A target that answers from memory. Used by PROOFSTACK's own test suite to prove
- * the detectors actually detect, and by `proofstack init --demo`.
+ * A target that answers from memory. Used by PROOFCORE's own test suite to prove
+ * the detectors actually detect, and by `proofcore init --demo`.
  */
 export class SyntheticProductUnderTest implements ProductUnderTest {
   readonly name: string;

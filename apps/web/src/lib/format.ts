@@ -17,7 +17,8 @@ export function setFormatLocale(locale: string): void {
 }
 
 export function currencyExponent(currency: string): number {
-  if (currency in CURRENCY_EXPONENT) return CURRENCY_EXPONENT[currency]!;
+  const known = CURRENCY_EXPONENT[currency];
+  if (known !== undefined) return known;
   try {
     return (
       new Intl.NumberFormat("en-US", { style: "currency", currency }).resolvedOptions()

@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { promisify } from "node:util";
-import { ProofstackError } from "@proofstack/core";
+import { ProofCoreError } from "@proofcore/core";
 import {
   digestArtifact,
   type ExportArtifact,
@@ -74,7 +74,7 @@ export class HttpExportSource implements ExportSource {
         signal: controller.signal,
       });
       if (!response.ok) {
-        throw new ProofstackError({
+        throw new ProofCoreError({
           message: `export endpoint returned HTTP ${response.status}`,
           category: "NETWORK",
           code: "export_http_failed",
@@ -116,7 +116,7 @@ export class FileExportSource implements ExportSource {
     try {
       buffer = new Uint8Array(await readFile(path));
     } catch (error) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `cannot read export at ${path}: ${error instanceof Error ? error.message : String(error)}`,
         category: "NOT_FOUND",
         code: "export_file_missing",
@@ -159,7 +159,7 @@ export class CommandExportSource implements ExportSource {
     const argv = this.options.argv.map((arg) => arg.replaceAll("<format>", format));
     const [file, ...args] = argv;
     if (!file) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: "export command is empty",
         category: "CONFIGURATION",
         code: "export_command_empty",
@@ -177,7 +177,7 @@ export class CommandExportSource implements ExportSource {
       });
       stdout = result.stdout as Buffer;
     } catch (error) {
-      throw new ProofstackError({
+      throw new ProofCoreError({
         message: `export command failed: ${error instanceof Error ? error.message : String(error)}`,
         category: "CONFIGURATION",
         code: "export_command_failed",

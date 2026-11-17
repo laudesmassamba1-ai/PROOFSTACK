@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="512" height="512" role="img" aria-label="PROOFSTACK">
-  <title>PROOFSTACK avatar</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="512" height="512" role="img" aria-label="PROOFCORE">
+  <title>PROOFCORE avatar</title>
   <rect width="96" height="96" rx="22" fill="#0A1014"/>
   <g transform="translate(10 10) scale(0.79)">
     <path d="M18 84V12H50C73 12 86 25 86 44C86 61 74 72 52 72H32V84ZM32 26V58H50C61 58 68 51 68 44C68 33 61 26 50 26Z" fill="#70C9DB" fill-rule="evenodd" opacity=".58" stroke="#0A1014" stroke-width="2.4" transform="translate(9 9)"/>

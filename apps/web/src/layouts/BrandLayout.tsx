@@ -5,6 +5,8 @@ import { Nav } from "../components/marketing/Nav.js";
 
 export function BrandLayout() {
   const { pathname } = useLocation();
+  // Reset scroll on navigation. pathname is the trigger by design.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: pathname IS the dependency
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
   }, [pathname]);

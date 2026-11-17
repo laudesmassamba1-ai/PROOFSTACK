@@ -1,8 +1,4 @@
-import {
-  type PaymentProvider,
-  SandboxProvider,
-  SasPayProvider,
-} from "@proofstack/adapter-payments";
+import { type PaymentProvider, SandboxProvider, SasPayProvider } from "@proofcore/adapter-payments";
 import type { Env } from "./env.js";
 
 /**
@@ -24,10 +20,14 @@ export function hasSasPayCredentials(env: Env): boolean {
 }
 
 export function createPaymentProvider(env: Env): PaymentProvider {
-  if (hasSasPayCredentials(env)) {
+  const apiKey = env.SASPAY_API_KEY;
+  const webhookSecret = env.SASPAY_WEBHOOK_SECRET;
+  // The guard and the locals are the same expression: the provider is never
+  // constructed with an assertion that the type system cannot prove.
+  if (apiKey && webhookSecret) {
     return new SasPayProvider({
-      apiKey: env.SASPAY_API_KEY!,
-      webhookSecret: env.SASPAY_WEBHOOK_SECRET!,
+      apiKey,
+      webhookSecret,
       ...(env.SASPAY_BASE_URL ? { baseUrl: env.SASPAY_BASE_URL } : {}),
       ...(env.SASPAY_FEE_CHARGE_MODE === "DEDUCTED" ? { feeChargeMode: "DEDUCTED" as const } : {}),
     });

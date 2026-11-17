@@ -1,5 +1,5 @@
-import type { ProofstackConfig } from "@proofstack/contracts";
-import type { TestCaseDef, TestSuiteDef } from "@proofstack/engine";
+import type { ProofCoreConfig } from "@proofcore/contracts";
+import type { TestCaseDef, TestSuiteDef } from "@proofcore/engine";
 import {
   checkFieldType,
   compareRecords,
@@ -27,7 +27,7 @@ import {
  */
 
 export interface ExitCheckOptions {
-  config: ProofstackConfig;
+  config: ProofCoreConfig;
   source?: ExportSource;
   roundTrip?: RoundTripTarget;
   /** Narrow the format set; defaults to `modules.exit.formats`. */

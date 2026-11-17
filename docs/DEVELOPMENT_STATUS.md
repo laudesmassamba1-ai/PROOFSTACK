@@ -21,7 +21,7 @@ uses the Ink & Object direction; this file records what is true and what remains
 
 ## Design records
 
-- `.agents/skills/proofstack-product-experience/SKILL.md`
+- `.agents/skills/proofcore-product-experience/SKILL.md`
 - `docs/design/REFERENCE_DECODING.md` — includes exact notes on all six images in
   `ref_visuelles/`.
 - `docs/design/DESIGN_TOKENS.md`
@@ -36,7 +36,7 @@ uses the Ink & Object direction; this file records what is true and what remains
 
 - `pnpm typecheck`: passes across the workspace.
 - `pnpm test`: 223 tests pass.
-- `pnpm --filter @proofstack/web build`: passes; route-level chunks replace the previous
+- `pnpm --filter @proofcore/web build`: passes; route-level chunks replace the previous
   single 554 kB bundle.
 - Visual QA: 42 route/viewport combinations from 1920×1080 to 375×812, zero horizontal
   overflow; screenshots generated with no console/page errors.
@@ -50,7 +50,7 @@ uses the Ink & Object direction; this file records what is true and what remains
   The internal console is explicitly outside the language switch.
 - No email provider: verification, password reset and invitations are absent, not faked.
 - The CLI is distributable as a self-contained global tarball (`pnpm cli:install`), but
-  `@proofstack/cli` is not published on the npm registry yet.
+  `@proofcore/cli` is not published on the npm registry yet.
 - SasPay live path is untested without credentials; sandbox payments are tested.
 - Browser journeys for WORLD/FLOW remain HTTP/fixture based; no Playwright customer
   journey driver.

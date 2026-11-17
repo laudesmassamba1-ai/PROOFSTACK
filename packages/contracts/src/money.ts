@@ -1,4 +1,4 @@
-import { isKnownCurrency } from "@proofstack/core";
+import { isKnownCurrency } from "@proofcore/core";
 import { z } from "zod";
 
 /**

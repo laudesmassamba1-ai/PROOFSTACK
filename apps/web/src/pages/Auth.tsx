@@ -1,4 +1,4 @@
-import { findPlan } from "@proofstack/billing";
+import { findPlan } from "@proofcore/billing";
 import { CircleAlert, CircleCheck, LoaderCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";

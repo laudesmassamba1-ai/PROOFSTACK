@@ -4,7 +4,7 @@ import { moduleIdSchema } from "./statuses.js";
 
 /**
  * Billing vocabulary. The *behaviour* of these state machines lives in
- * `@proofstack/billing`; the *names* live here so the CLI, the API, the web app and
+ * `@proofcore/billing`; the *names* live here so the CLI, the API, the web app and
  * the provider adapters can never drift into inventing their own status strings.
  */
 

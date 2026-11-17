@@ -19,7 +19,7 @@ import {
 } from "./statuses.js";
 
 /**
- * HTTP contracts for the PROOFSTACK API. The web app and the CLI/SDK both consume
+ * HTTP contracts for the PROOFCORE API. The web app and the CLI/SDK both consume
  * these; the server validates inbound bodies with the same schemas.
  */
 

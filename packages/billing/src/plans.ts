@@ -1,4 +1,4 @@
-import { type EntitlementKey, type Plan, type PlanSeed, planSchema } from "@proofstack/contracts";
+import { type EntitlementKey, type Plan, type PlanSeed, planSchema } from "@proofcore/contracts";
 
 /**
  * Plan definitions.

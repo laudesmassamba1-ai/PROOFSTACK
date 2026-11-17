@@ -14,7 +14,7 @@ The AI integration adds three new trust boundaries to a product that previously 
 talked to the customer's own endpoints:
 
 ```
-   PROOFSTACK CLI
+   PROOFCORE CLI
         │
         ├── (1) → MCP server (a process we spawn, or an HTTP endpoint)
         │            └── tools that read and write the world
@@ -98,7 +98,7 @@ and "we do not understand it" must not mean "it is safe".
 never finishes.
 
 **Controls.** Every request has a deadline (`timeoutMs`, default 30s). A timeout
-produces a `ProofstackError` with `category: "TIMEOUT"` and `retryable: true`, not a
+produces a `ProofCoreError` with `category: "TIMEOUT"` and `retryable: true`, not a
 hang. Shutdown sends `SIGTERM`, then `SIGKILL` after 2 seconds, and always resolves.
 
 ### T1.5 A server corrupts the JSON-RPC channel
@@ -153,7 +153,7 @@ There is no code path in which a configured command is parsed as a shell string.
 **Threat.** The model emits `{not json`, and a naive client substitutes `{}` — running a
 tool with the wrong inputs, which for a write tool can be destructive.
 
-**Controls.** `parseArguments` throws a `ProofstackError` naming the raw text. An empty
+**Controls.** `parseArguments` throws a `ProofCoreError` naming the raw text. An empty
 string is treated as "no arguments" (legitimate); anything else that fails to parse is
 refused, never silently defaulted.
 

@@ -1,10 +1,10 @@
 {
-  "name": "@proofstack/config",
+  "name": "@proofcore/config",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "license": "MPL-2.0",
-  "description": "Project configuration loading and validation: proofstack.config.ts/js/json or a package.json key, with cross-field safety rules applied at load time.",
+  "description": "Project configuration loading and validation: proofcore.config.ts/js/json or a package.json key, with cross-field safety rules applied at load time.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -22,7 +22,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@proofstack/contracts": "workspace:*",
-    "@proofstack/core": "workspace:*"
+    "@proofcore/contracts": "workspace:*",
+    "@proofcore/core": "workspace:*"
   }
 }

@@ -1,9 +1,10 @@
 import type React from "react";
 
-// Simple stylized PROOFSTACK monogram, designed to be recognizable at small sizes.
+// Simple stylized PROOFCORE monogram, designed to be recognizable at small sizes.
 // This is intentionally minimal and scalable via viewBox.
 export const MonogramP: React.FC<{ color?: string; stroke?: string; size?: number }> = ({
-  color = "#9af0e0",
+  // `color` stays in the prop type for API compatibility but the mark is drawn
+  // from the brand gradient; it is intentionally not destructured.
   stroke = "#9af0e0",
   size = 120,
 }) => {
@@ -13,7 +14,7 @@ export const MonogramP: React.FC<{ color?: string; stroke?: string; size?: numbe
       width={sz}
       height={sz}
       viewBox="0 0 120 120"
-      aria-label="Proofstack monogram"
+      aria-label="ProofCore monogram"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >

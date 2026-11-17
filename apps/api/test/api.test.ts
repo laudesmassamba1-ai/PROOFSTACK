@@ -1,4 +1,4 @@
-import type { TestRun } from "@proofstack/contracts";
+import type { TestRun } from "@proofcore/contracts";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { migrate } from "../src/db/d1.js";
@@ -16,7 +16,7 @@ import type { Services } from "../src/http/services.js";
 
 const ENV = {
   NODE_ENV: "test",
-  WEB_ORIGIN: "http://localhost:5173,https://proofstack-01z.pages.dev",
+  WEB_ORIGIN: "http://localhost:5173,https://proofcore-01z.pages.dev",
   API_ORIGIN: "http://localhost:8787",
 };
 
@@ -53,7 +53,7 @@ function harness(): Harness {
     const body = (await response.json()) as { workspace: { id: string }; user: { id: string } };
     const cookie = response.headers.get("set-cookie")?.split(";")[0];
     expect(cookie).toBeTruthy();
-    return { cookie: cookie!, workspaceId: body.workspace.id, userId: body.user.id };
+    return { cookie: cookie ?? "", workspaceId: body.workspace.id, userId: body.user.id };
   };
 
   return { services: built.services, request, signUp };
@@ -152,7 +152,7 @@ function sampleRun(input: {
               },
               reproduction: {
                 summary: "Run the fr-BJ profile",
-                command: `proofstack test --module ${module}`,
+                command: `proofcore test --module ${module}`,
                 fixtureIds: [],
               },
               evidenceIds: [],
@@ -270,10 +270,10 @@ describe("health and public catalogue", () => {
 
   it("allows the configured Cloudflare Pages origin", async () => {
     const response = await h.request("/health", {
-      headers: { origin: "https://proofstack-01z.pages.dev" },
+      headers: { origin: "https://proofcore-01z.pages.dev" },
     });
     expect(response.headers.get("access-control-allow-origin")).toBe(
-      "https://proofstack-01z.pages.dev"
+      "https://proofcore-01z.pages.dev"
     );
     expect(response.headers.get("access-control-allow-credentials")).toBe("true");
   });

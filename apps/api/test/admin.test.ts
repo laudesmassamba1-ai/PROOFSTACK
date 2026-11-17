@@ -47,7 +47,7 @@ function harness(env: Record<string, string | undefined> = ENV): Harness {
     const body = (await response.json()) as { workspace: { id: string } };
     const cookie = response.headers.get("set-cookie")?.split(";")[0];
     expect(cookie).toBeTruthy();
-    return { cookie: cookie!, workspaceId: body.workspace.id };
+    return { cookie: cookie ?? "", workspaceId: body.workspace.id };
   };
   return { services: built.services, request, signUp };
 }
@@ -167,9 +167,9 @@ describe("operations console", () => {
       credited: true,
       currency: "USD",
     });
-    expect(Number(body.payments[0]!.amountMinor)).toBeGreaterThan(0);
+    expect(Number(body.payments[0]?.amountMinor ?? 0)).toBeGreaterThan(0);
     expect(body.revenue).toEqual([expect.objectContaining({ currency: "USD", payments: 1 })]);
-    expect(Number(body.revenue[0]!.minor)).toBeGreaterThan(0);
+    expect(Number(body.revenue[0]?.minor ?? 0)).toBeGreaterThan(0);
     expect(body.totals.activeSubscriptions).toBe(1);
   });
 });

@@ -5,9 +5,9 @@ import {
   findPrice,
   planRank,
   resolveEntitlements,
-} from "@proofstack/billing";
-import type { BillingPeriod } from "@proofstack/contracts";
-import { iso } from "@proofstack/core";
+} from "@proofcore/billing";
+import type { BillingPeriod } from "@proofcore/contracts";
+import { iso } from "@proofcore/core";
 import { Hono } from "hono";
 import { z } from "zod";
 import { createApiKeyToken } from "../auth.js";
@@ -428,7 +428,7 @@ export function planRoutes(services: Services): Hono<AppEnv> {
   app.get("/plans", async (c) => {
     const currency = c.req.query("currency")?.toUpperCase() ?? "USD";
     return c.json({
-      items: (await import("@proofstack/billing")).plansForDisplay(),
+      items: (await import("@proofcore/billing")).plansForDisplay(),
       displayCurrency: findPrice("developer", currency, "monthly") ? currency : "USD",
       recurringSupported: capabilities.automatedRecurring,
       provider: capabilities.provider,

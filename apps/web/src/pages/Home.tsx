@@ -1,8 +1,9 @@
 import { ArrowRight, Globe2, PackageOpen, Route as RouteIcon, Terminal } from "lucide-react";
 import { Link } from "react-router";
-import { DottedWave } from "../components/brand/DottedWave.js";
 import { HeroLockup } from "../components/brand/Logo.js";
 import { ParticleLogo } from "../components/brand/ParticleLogo.js";
+import { CliPreview } from "../components/marketing/CliPreview.js";
+import { EngineDiagram } from "../components/marketing/EngineDiagram.js";
 import { ModuleShowcase } from "../components/marketing/ModuleShowcase.js";
 import { useI18n } from "../i18n/index.js";
 import { Section, SectionHeading } from "../layouts/BrandLayout.js";
@@ -26,18 +27,18 @@ export function Home() {
           the hero's main visual — but it sits *behind* a scrim and never over the copy.
           A static SVG mark renders when motion is reduced or Canvas is unavailable.
         */}
-        <ParticleLogo focus="right" density={1} waveIntensity={1} className="z-0" />
-        <DottedWave
-          className="absolute inset-0 size-full opacity-45"
-          step={17}
-          intensity={0.7}
-          bias={0.6}
+        <ParticleLogo
+          focus="right"
+          density={1}
+          waveIntensity={1.05}
+          particleSize={1.9}
+          className="z-0"
         />
         <div
           className="pointer-events-none absolute inset-0 z-[1]"
           style={{
             background:
-              "radial-gradient(72% 62% at 26% 46%, rgba(5,7,8,0.92), rgba(5,7,8,0.55) 55%, rgba(5,7,8,0.15) 78%)",
+              "radial-gradient(56% 64% at 20% 42%, rgba(5,7,8,0.92), rgba(5,7,8,0.55) 52%, rgba(5,7,8,0) 76%)",
           }}
         />
         <div className="relative z-[2] mx-auto flex min-h-[86vh] max-w-[1240px] flex-col justify-center gap-12 px-5 py-20 sm:py-24 lg:px-8">
@@ -126,8 +127,65 @@ export function Home() {
               ))}
             </ul>
           </div>
-          {/* The engine diagram is drawn below; this anchor keeps the grid balanced. */}
-          <div role="presentation" />
+          <EngineDiagram />
+        </div>
+      </Section>
+
+      {/* ---------- developer workflow ---------- */}
+      <Section id="workflow">
+        <SectionHeading
+          eyebrow={t("home.flow.eyebrow")}
+          title={t("home.flow.title")}
+          lede={t("home.flow.lede")}
+        />
+        <ol className="mt-10 grid gap-3 md:grid-cols-3">
+          {(["1", "2", "3"] as const).map((index) => (
+            <li key={index} className="brand-panel p-5">
+              <p className="font-mono text-[0.68rem] tracking-[0.2em] text-brand-mint/80">
+                {t(`home.flow.step.${index}.k` as const)}
+              </p>
+              <p className="mt-2 text-[0.98rem] font-medium text-white/88">
+                {t(`home.flow.step.${index}.t` as const)}
+              </p>
+              <p className="mt-1.5 text-[0.85rem] leading-relaxed text-white/52">
+                {t(`home.flow.step.${index}.d` as const)}
+              </p>
+            </li>
+          ))}
+        </ol>
+        <div className="mt-10">
+          <CliPreview />
+        </div>
+      </Section>
+
+      {/* ---------- final CTA ---------- */}
+      <Section tone="deeper">
+        <div className="brand-panel relative overflow-hidden px-6 py-14 text-center sm:px-10">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(46% 60% at 50% 0%, rgba(120,227,203,0.12), transparent 70%), radial-gradient(40% 52% at 82% 100%, rgba(112,201,219,0.1), transparent 70%)",
+            }}
+          />
+          <div className="relative">
+            <p className="eyebrow">{t("home.cta.eyebrow")}</p>
+            <h2 className="mx-auto mt-4 max-w-[22ch] text-balance text-[clamp(1.9rem,4.6vw,3.4rem)] font-semibold leading-[1.02] tracking-[-0.035em] text-white">
+              {t("home.cta.title")}
+            </h2>
+            <p className="mx-auto mt-5 max-w-[56ch] text-[0.95rem] leading-relaxed text-white/58">
+              {t("home.cta.lede")}
+            </p>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+              <Link to="/signup" className="btn btn-primary">
+                {t("home.cta.primary")} <ArrowRight size={16} />
+              </Link>
+              <Link to="/pricing" className="btn btn-ghost">
+                {t("home.cta.pricing")}
+              </Link>
+            </div>
+          </div>
         </div>
       </Section>
     </>

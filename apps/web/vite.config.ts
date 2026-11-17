@@ -24,10 +24,10 @@ export default defineConfig({
   },
   optimizeDeps: {
     exclude: [
-      "@proofstack/billing",
-      "@proofstack/contracts",
-      "@proofstack/core",
-      "@proofstack/module-world",
+      "@proofcore/billing",
+      "@proofcore/contracts",
+      "@proofcore/core",
+      "@proofcore/module-world",
     ],
   },
 });

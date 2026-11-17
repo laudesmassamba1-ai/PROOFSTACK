@@ -5,7 +5,7 @@
  * HttpOnly session cookie stays first-party. Those paths are forwarded to the API
  * Worker; every other request is served from the static build.
  */
-const API_ORIGIN = "https://proofstack-api.laudesmassamba1.workers.dev";
+const API_ORIGIN = "https://proofcore-api.laudesmassamba1.workers.dev";
 
 export default {
   async fetch(request, env) {

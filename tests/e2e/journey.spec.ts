@@ -27,7 +27,7 @@ const PASSWORD = "correct-horse-battery-staple";
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     if (!window.sessionStorage.getItem("e2e.localePinned")) {
-      window.localStorage.setItem("proofstack.locale", "en");
+      window.localStorage.setItem("proofcore.locale", "en");
       window.sessionStorage.setItem("e2e.localePinned", "1");
     }
   });
@@ -54,7 +54,7 @@ async function signUp(page: Page, email: string): Promise<void> {
 test.describe("marketing site", () => {
   test("the homepage renders its hero and the three modules", async ({ page }) => {
     await page.goto("/");
-    await expect(page).toHaveTitle(/PROOFSTACK/i);
+    await expect(page).toHaveTitle(/PROOFCORE/i);
     // The headline is the brand promise; if it is missing the page is broken.
     await expect(page.getByRole("heading", { level: 1 })).toContainText(/Everywhere|partout/i);
 
