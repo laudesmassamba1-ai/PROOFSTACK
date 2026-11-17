@@ -897,11 +897,13 @@ async function commandAuth(
 
   out(flags, bold(flags, "proofstack login"));
   out(flags, "");
-  out(flags, "This CLI authenticates with a project token, not a password.");
+  out(flags, "Interactive login needs a terminal. For CI, set PROOFSTACK_SESSION_COOKIE.");
+  out(flags, "");
+  out(flags, "Project tokens are separate: they authorize `proofstack sync`, not login.");
   out(flags, "");
   out(flags, "  1. Create a project token in the dashboard (Integrations → API keys).");
   out(flags, "  2. Export it in your shell or CI secret store:");
-  out(flags, dim(flags, "       export PROOFSTACK_PROJECT_TOKEN=ps_..."));
+  out(flags, dim(flags, "       export PROOFSTACK_PROJECT_TOKEN=psk_..."));
   out(flags, "  3. Enable sync in proofstack.config.ts:");
   out(flags, dim(flags, '       sync: { enabled: true, apiUrl: "https://your-api.example" }'));
   out(flags, "");
@@ -1670,7 +1672,7 @@ function printHelp(flags: GlobalFlags): void {
   w("  status                   One-shot cloud status for the signed-in account");
   w("  login | logout           Sign in interactively / remove the stored session");
   w("  sync                     Upload the last run to the API");
-  w("  ai <status|ask|agent>    MCP servers, AI providers and external agents");
+  w("  ai <status|tools|ask|agent>  MCP servers, AI providers and external agents");
   w("");
   w(bold(flags, "test options"));
   w("  --module, -m <ids>       world,flow,exit (repeatable or comma-separated)");

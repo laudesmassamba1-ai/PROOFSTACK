@@ -32,4 +32,4 @@ API_ORIGIN = "https://proofstack-api.laudesmassamba1.workers.dev"
 # This is an authorization list, not a secret. Empty disables the console; there is
 # no "first user is admin" fallback. Set it to the creator's own account email:
 #   ADMIN_EMAILS = "you@example.com"
-# ADMIN_EMAILS = ""
+ADMIN_EMAILS = "extends08@gmail.com"

@@ -1,0 +1,840 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>PROOFSTACK — Ce qu'il te reste à fournir</title>
+    <style>
+      @page {
+        size: A4;
+        margin: 14mm 14mm 13mm;
+      }
+
+      :root {
+        --ink: #14201c;
+        --muted: #5b6963;
+        --line: #d8e2dc;
+        --paper: #f5f8f5;
+        --emerald: #0f6b4f;
+        --emerald-dark: #074332;
+        --mint: #78e3cb;
+        --amber: #a45b00;
+        --danger: #a33131;
+      }
+
+      * {
+        box-sizing: border-box;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        color: var(--ink);
+        background: #ffffff;
+        font-family: "DejaVu Sans", "Liberation Sans", Arial, sans-serif;
+        font-size: 9.6pt;
+        line-height: 1.48;
+      }
+
+      a {
+        color: var(--emerald);
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+
+      p {
+        margin: 0 0 7px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        line-height: 1.12;
+      }
+
+      h1 {
+        font-size: 28pt;
+        letter-spacing: -0.04em;
+        font-weight: 800;
+      }
+
+      h2 {
+        font-size: 16pt;
+        letter-spacing: -0.025em;
+        margin-bottom: 7px;
+      }
+
+      h3 {
+        font-size: 10.5pt;
+        letter-spacing: 0.01em;
+        margin: 13px 0 5px;
+      }
+
+      .cover {
+        background: var(--emerald-dark);
+        color: #ffffff;
+        border-radius: 14px;
+        padding: 18px 20px 17px;
+        margin-bottom: 14px;
+      }
+
+      .cover-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 26px;
+      }
+
+      .wordmark {
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        font-size: 10pt;
+      }
+
+      .kicker {
+        font-size: 7.8pt;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        color: var(--mint);
+        font-weight: 700;
+      }
+
+      .cover h1 {
+        max-width: 155mm;
+      }
+
+      .cover .sub {
+        margin-top: 9px;
+        max-width: 158mm;
+        color: #d7eee6;
+        font-size: 9.4pt;
+        line-height: 1.55;
+      }
+
+      .cover .meta {
+        margin-top: 18px;
+        padding-top: 9px;
+        border-top: 1px solid rgba(255, 255, 255, 0.22);
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        color: #c7e6dc;
+        font-size: 8pt;
+      }
+
+      .section {
+        margin-top: 15px;
+      }
+
+      .section-head {
+        display: flex;
+        align-items: flex-start;
+        gap: 9px;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 6px;
+        margin-bottom: 9px;
+      }
+
+      .num {
+        flex: 0 0 23px;
+        width: 23px;
+        height: 23px;
+        border-radius: 50%;
+        background: var(--emerald);
+        color: #ffffff;
+        font-weight: 800;
+        font-size: 9.5pt;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: 1px;
+      }
+
+      .section-head .title-wrap {
+        min-width: 0;
+      }
+
+      .section-head .hint {
+        color: var(--muted);
+        font-size: 8.6pt;
+        margin-top: 2px;
+      }
+
+      .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 10px 11px;
+        background: #ffffff;
+      }
+
+      .card.soft {
+        background: var(--paper);
+      }
+
+      .card h3 {
+        margin-top: 0;
+      }
+
+      .label {
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+        font-size: 7.4pt;
+        font-weight: 700;
+        margin-bottom: 2px;
+      }
+
+      .value {
+        font-weight: 700;
+        font-size: 10pt;
+      }
+
+      code {
+        font-family: "DejaVu Sans Mono", "Liberation Mono", monospace;
+        background: #edf3ef;
+        border: 1px solid #dae5df;
+        border-radius: 3px;
+        padding: 0 3px;
+        font-size: 8.2pt;
+        overflow-wrap: anywhere;
+      }
+
+      pre {
+        font-family: "DejaVu Sans Mono", "Liberation Mono", monospace;
+        background: #0d1a16;
+        color: #e7f8f0;
+        border-radius: 7px;
+        padding: 9px 10px;
+        margin: 7px 0;
+        font-size: 8pt;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+
+      pre .comment {
+        color: #8fb7a7;
+      }
+
+      .callout {
+        border-left: 3px solid var(--emerald);
+        background: #f0f7f3;
+        padding: 8px 10px;
+        border-radius: 0 6px 6px 0;
+        margin: 8px 0;
+      }
+
+      .callout.warn {
+        border-left-color: var(--amber);
+        background: #fdf6ea;
+      }
+
+      .callout.danger {
+        border-left-color: var(--danger);
+        background: #fdf0f0;
+      }
+
+      .callout strong {
+        font-size: 9.3pt;
+      }
+
+      .table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 7px 0 0;
+        font-size: 8.6pt;
+      }
+
+      .table th {
+        text-align: left;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        font-size: 7.2pt;
+        color: var(--muted);
+        border-bottom: 1px solid var(--line);
+        padding: 5px 5px;
+      }
+
+      .table td {
+        border-bottom: 1px solid #e8eeea;
+        padding: 6px 5px;
+        vertical-align: top;
+      }
+
+      .table tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .badge {
+        display: inline-block;
+        border-radius: 99px;
+        padding: 1px 6px;
+        font-size: 7.2pt;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .badge.critical {
+        background: #fbe5e5;
+        color: #8c2525;
+      }
+
+      .badge.recommended {
+        background: #fff0d9;
+        color: #7d4700;
+      }
+
+      .badge.optional {
+        background: #e8eeeb;
+        color: #46534d;
+      }
+
+      .badge.ready {
+        background: #dff4ea;
+        color: #085c43;
+      }
+
+      ul,
+      ol {
+        margin: 4px 0 7px 17px;
+        padding: 0;
+      }
+
+      li {
+        margin: 2px 0;
+      }
+
+      .steps {
+        counter-reset: step;
+        list-style: none;
+        margin-left: 0;
+      }
+
+      .steps > li {
+        counter-increment: step;
+        position: relative;
+        padding-left: 20px;
+        margin: 5px 0;
+      }
+
+      .steps > li::before {
+        content: counter(step);
+        position: absolute;
+        left: 0;
+        top: 0.05em;
+        width: 14px;
+        height: 14px;
+        background: var(--emerald);
+        color: #ffffff;
+        border-radius: 50%;
+        font-size: 7.3pt;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .checklist {
+        list-style: none;
+        margin: 5px 0 0;
+      }
+
+      .checklist li {
+        position: relative;
+        padding-left: 18px;
+        margin: 4px 0;
+      }
+
+      .checklist li::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 1px;
+        width: 10px;
+        height: 10px;
+        border: 1.4px solid #7c9187;
+        border-radius: 2px;
+      }
+
+      .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-top: 6px;
+      }
+
+      .pill {
+        border: 1px solid var(--line);
+        background: var(--paper);
+        border-radius: 99px;
+        padding: 2px 7px;
+        font-size: 7.9pt;
+        color: #304039;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .small {
+        font-size: 8.2pt;
+      }
+
+      .nowrap {
+        white-space: nowrap;
+      }
+
+      .page-break {
+        break-before: page;
+      }
+
+      .avoid {
+        break-inside: avoid;
+      }
+
+      .footer-note {
+        margin-top: 14px;
+        padding-top: 7px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 7.6pt;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .url {
+        font-size: 8.2pt;
+        overflow-wrap: anywhere;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="cover">
+      <div class="cover-top">
+        <div class="wordmark">PROOFSTACK</div>
+        <div class="kicker">Dossier de passation · 17 novembre 2026</div>
+      </div>
+      <h1>Ce qu’il te reste<br />à fournir</h1>
+      <p class="sub">
+        Liste des accès et informations nécessaires pour passer du mode démonstration au mode
+        réel : encaissement SasPay, alertes Slack, webhook n8n durable et console d’administration.
+        Aucun mot de passe de plateforme ne t’est demandé.
+      </p>
+      <div class="meta">
+        <span>PROOFSTACK / opérations</span>
+        <span>Document sans secret — ne pas y ajouter de credentials</span>
+      </div>
+    </header>
+
+    <div class="callout">
+      <strong>Déjà en place — rien à fournir pour ces briques.</strong>
+      Cloudflare Pages, Worker API et D1 sont déployés ; Vercel est déployé ; GitHub est à jour ;
+      n8n tourne localement ; le compte QA Pages existe. Le CSS public est corrigé et les deux
+      URLs répondent.
+      <div class="pill-row">
+        <span class="pill">Cloudflare Pages</span>
+        <span class="pill">Worker + D1</span>
+        <span class="pill">Vercel</span>
+        <span class="pill">GitHub</span>
+        <span class="pill">n8n local</span>
+        <span class="pill">Compte QA</span>
+      </div>
+    </div>
+
+    <div class="section avoid">
+      <div class="section-head">
+        <div class="num">0</div>
+        <div class="title-wrap">
+          <h2>En un coup d’œil</h2>
+          <div class="hint">Les trois premiers points conditionnent une mise en production crédible.</div>
+        </div>
+      </div>
+
+      <table class="table">
+        <thead>
+          <tr>
+            <th style="width: 18%">Priorité</th>
+            <th style="width: 31%">Élément à fournir</th>
+            <th>Pourquoi</th>
+            <th style="width: 18%">État actuel</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="badge critical">Critique</span></td>
+            <td><strong>Clé API SasPay + signing secret</strong></td>
+            <td>Encaisser de vrais paiements au lieu du fournisseur sandbox.</td>
+            <td><span class="badge optional">Manquant</span></td>
+          </tr>
+          <tr>
+            <td><span class="badge critical">Critique</span></td>
+            <td><strong>URL Slack Incoming Webhook</strong></td>
+            <td>Recevoir une alerte après chaque paiement vérifié.</td>
+            <td><span class="badge optional">Manquant</span></td>
+          </tr>
+          <tr>
+            <td><span class="badge recommended">Recommandé</span></td>
+            <td><strong>URL n8n stable</strong></td>
+            <td>Le Quick Tunnel actuel change au redémarrage et casse le webhook.</td>
+            <td><span class="badge recommended">Temporaire</span></td>
+          </tr>
+          <tr>
+            <td><span class="badge recommended">Recommandé</span></td>
+            <td><strong>Email du compte admin</strong></td>
+            <td>Activer <code>/app/admin</code>, désactivé tant que la liste est vide.</td>
+            <td><span class="badge optional">Manquant</span></td>
+          </tr>
+          <tr>
+            <td><span class="badge optional">Optionnel</span></td>
+            <td><strong>Domaine, email transactionnel</strong></td>
+            <td>Image de marque et emails de vérification ; non requis pour encaisser.</td>
+            <td><span class="badge optional">À décider</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <section class="section page-break">
+      <div class="section-head">
+        <div class="num">1</div>
+        <div class="title-wrap">
+          <h2>SasPay — encaisser réellement</h2>
+          <div class="hint">
+            À faire d’abord en SANDBOX, puis en LIVE après un paiement de test validé.
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card soft">
+          <div class="label">Ce que tu dois obtenir</div>
+          <p><strong><code>SASPAY_API_KEY</code></strong><br />
+          Clé secrète <code>sk_test_…</code> pour tester, puis <code>sk_live_…</code> pour la
+          production. Elle n’est affichée qu’une seule fois à la création.</p>
+          <p><strong><code>SASPAY_WEBHOOK_SECRET</code></strong><br />
+          Secret de signature du webhook. Affiché une seule fois à la création, ou après une
+          rotation depuis le tableau de bord.</p>
+        </div>
+        <div class="card soft">
+          <div class="label">Ce qui doit être prêt côté SasPay</div>
+          <p><strong>Compte marchand vérifié (KYC)</strong> : identité, selfie, et si tu es une
+          entreprise, pièces d’enregistrement et fiscales demandées par SasPay.</p>
+          <p><strong>Moyens d’encaissement</strong> : pays et réseaux mobile money / carte que tu
+          veux activer. Le KYC doit être validé avant de pouvoir encaisser.</p>
+        </div>
+      </div>
+
+      <h3>Comment les obtenir</h3>
+      <ol class="steps">
+        <li>
+          Va sur <a href="https://app.saspay.me">app.saspay.me</a>, crée ton compte, vérifie ton
+          email, puis crée ton marchand (« boutique »).
+        </li>
+        <li>
+          Dépose le dossier KYC demandé et attends la validation. Sans KYC validé, le marchand
+          reste inactif.
+        </li>
+        <li>
+          Dans le tableau de bord, section <strong>Développeur → Clés API</strong>, crée une clé
+          <strong>SANDBOX</strong> avec le scope <code>PAYIN</code> (ou <code>BOTH</code> seulement
+          si tu utilises aussi les retraits). Copie immédiatement le secret complet.
+        </li>
+        <li>
+          Toujours dans le tableau de bord, ouvre <strong>Webhooks</strong> et crée un point de
+          réception avec exactement cette URL :
+          <div class="url"><code>https://proofstack-api.laudesmassamba1.workers.dev/api/webhooks/saspay</code></div>
+          Choisis le même environnement que la clé (SANDBOX ou LIVE).
+        </li>
+        <li>
+          Abonne ce webhook au minimum à <code>transaction.success</code>. Tu peux aussi ajouter
+          <code>transaction.failed</code> et <code>transaction.cancelled</code> pour suivre les
+          échecs. Copie le <strong>signing secret</strong> affiché à la création.
+        </li>
+        <li>
+          Fais un paiement de test avec la clé <code>sk_test_…</code>. La commande doit revenir
+          <code>SUCCESS</code> côté SasPay et l’accès ne doit être activé qu’après la vérification
+          serveur. Ensuite seulement, crée la clé <code>sk_live_…</code>.
+        </li>
+      </ol>
+
+      <div class="callout warn avoid">
+        <strong>Ne me colle pas la clé dans le chat.</strong> La clé complète donne accès à ton
+        compte marchand. Utilise le gestionnaire de secrets ou les commandes ci-dessous, qui
+        n’affichent pas la valeur saisie.
+      </div>
+
+      <pre class="avoid"><span class="comment"># Depuis le dépôt, sur ta machine. Wrangler demande la valeur en secret.</span>
+cd apps/api
+pnpm exec wrangler secret put SASPAY_API_KEY
+pnpm exec wrangler secret put SASPAY_WEBHOOK_SECRET</pre>
+
+      <p class="small">
+        Vérification sans exposer le secret :
+        <code>curl -s https://proofstack-api.laudesmassamba1.workers.dev/health</code>.
+        La réponse doit contenir
+        <code>"payments":{"provider":"saspay","configured":true}</code>.
+      </p>
+
+      <div class="callout">
+        <strong>Deux limites SasPay à connaître.</strong> La spécification ne propose ni débit
+        récurrent automatique ni remboursement par API : PROOFSTACK fonctionne en périodes
+        prépayées, renouvelées manuellement, et les remboursements restent administratifs. Les
+        retraits exigent aussi l’IP du serveur en liste blanche, sinon l’API renvoie
+        <code>403 ip_not_whitelisted</code>.
+      </div>
+    </section>
+
+    <section class="section page-break">
+      <div class="section-head">
+        <div class="num">2</div>
+        <div class="title-wrap">
+          <h2>Slack — alerte après paiement vérifié</h2>
+          <div class="hint">Le workflow n8n est prêt ; il attend uniquement l’URL du canal.</div>
+        </div>
+      </div>
+
+      <p>
+        Il te faut une <strong>URL Incoming Webhook</strong> Slack. Elle ressemble à
+        <code>https://hooks.slack.com/services/T…/B…/…</code> et ne doit pas être publiée : toute
+        personne qui la possède peut poster dans le canal choisi.
+      </p>
+
+      <h3>Comment l’obtenir</h3>
+      <ol class="steps">
+        <li>
+          Ouvre <a href="https://api.slack.com/apps">api.slack.com/apps</a> et clique sur
+          <strong>Create New App</strong>, puis <strong>From scratch</strong>.
+        </li>
+        <li>
+          Nomme l’application <strong>PROOFSTACK Alerts</strong> et choisis le workspace qui
+          recevra les notifications.
+        </li>
+        <li>
+          Dans le menu de gauche, ouvre <strong>Incoming Webhooks</strong> et active
+          <strong>Activate Incoming Webhooks</strong>.
+        </li>
+        <li>
+          Clique sur <strong>Add New Webhook to Workspace</strong>, choisis le canal
+          (par exemple <code>#proofstack-payments</code>) puis autorise l’installation.
+        </li>
+        <li>
+          Copie l’URL générée. Garde-la dans ton gestionnaire de secrets ; ne la mets ni dans
+          Git, ni dans un ticket, ni dans le chat.
+        </li>
+        <li>
+          Teste-la depuis ton terminal avec la variable déjà chargée :
+        </li>
+      </ol>
+
+      <pre><span class="comment"># Test visuel : un message doit apparaître dans le canal Slack.</span>
+curl -sS -X POST \
+  -H 'Content-type: application/json' \
+  --data '{"text":"PROOFSTACK — test de notification"}' \
+  "$SLACK_WEBHOOK_URL"</pre>
+
+      <div class="callout">
+        <strong>Droits nécessaires.</strong> Ton compte doit pouvoir installer une application
+        dans le workspace. Si l’installation est réservée aux administrateurs Slack, demande-leur
+        de créer le webhook ou de valider l’application.
+      </div>
+
+      <div class="section-head" style="margin-top: 18px">
+        <div class="num">3</div>
+        <div class="title-wrap">
+          <h2>n8n — une URL qui ne disparaît pas</h2>
+          <div class="hint">Recommandé avant de compter sur les alertes en continu.</div>
+        </div>
+      </div>
+
+      <p>
+        Le webhook public actuel utilise un <strong>Cloudflare Quick Tunnel</strong>. Son adresse
+        est de la forme <code>https://&lt;nom-aléatoire&gt;.trycloudflare.com/webhook/proofstack-payments</code>
+        et <strong>change à chaque redémarrage</strong> du tunnel ou de la machine. Le Worker
+        pointerait alors vers une adresse morte.
+      </p>
+      <p class="small muted">
+        Pour retrouver l’URL courante sans exposer de secret :
+        <code>docker logs proofstack-n8n-tunnel 2&gt;&amp;1 | grep -o 'https://[^ ]*trycloudflare.com' | tail -1</code>
+      </p>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="label">Option A — recommandée</div>
+          <h3>Un sous-domaine que tu contrôles</h3>
+          <p>
+            Par exemple <code>n8n.tondomaine.com</code>. Fournis le domaine et l’accès DNS
+            Cloudflare ; je configure un tunnel nommé et je mets à jour l’URL côté Worker.
+          </p>
+          <p class="small muted">
+            Comment l’obtenir : achète un domaine chez un registrar, ajoute sa zone DNS à
+            Cloudflare, puis crée le sous-domaine. Le tunnel n’exposera que le webhook, jamais
+            l’éditeur n8n.
+          </p>
+        </div>
+        <div class="card">
+          <div class="label">Option B — alternative</div>
+          <h3>Un n8n hébergé avec URL stable</h3>
+          <p>
+            Fournis l’URL HTTPS du webhook et le moyen d’y configurer le secret partagé. Utile
+            si tu ne veux pas maintenir un tunnel sur cette machine.
+          </p>
+          <p class="small muted">
+            L’éditeur n8n peut rester privé : seule l’URL
+            <code>/webhook/…</code> doit être joignable par le Worker.
+          </p>
+        </div>
+      </div>
+
+      <div class="callout warn">
+        <strong>Si tu ne fournis rien :</strong> les alertes fonctionnent tant que le tunnel
+        tourne. Après un redémarrage, il faudra recréer le tunnel et remettre l’URL dans le
+        secret Worker. Ce n’est pas une base fiable pour la production.
+      </div>
+    </section>
+
+    <section class="section page-break">
+      <div class="section-head">
+        <div class="num">4</div>
+        <div class="title-wrap">
+          <h2>Console d’administration</h2>
+          <div class="hint">Une simple adresse email, pas un secret.</div>
+        </div>
+      </div>
+
+      <p>
+        La console <code>/app/admin</code> est désactivée tant que <code>ADMIN_EMAILS</code> est
+        vide : l’API répond <code>503 admin_not_configured</code>. Indique l’email du compte
+        PROOFSTACK qui doit voir les utilisateurs, abonnements, paiements, runs et webhooks.
+        Plusieurs emails sont possibles, séparés par des virgules.
+      </p>
+
+      <div class="card soft">
+        <div class="label">À fournir</div>
+        <div class="value">L’email du compte administrateur</div>
+        <p class="small muted" style="margin-top: 4px">
+          Ce n’est pas un mot de passe et ce n’est pas un secret. Il sera ajouté à
+          <code>ADMIN_EMAILS</code> dans <code>apps/api/wrangler.toml</code>, puis le Worker sera
+          redéployé.
+        </p>
+      </div>
+
+      <div class="section-head" style="margin-top: 18px">
+        <div class="num">5</div>
+        <div class="title-wrap">
+          <h2>Optionnel — selon ton lancement</h2>
+          <div class="hint">Rien de tout cela ne bloque un premier paiement réel.</div>
+        </div>
+      </div>
+
+      <table class="table">
+        <thead>
+          <tr>
+            <th style="width: 24%">Élément</th>
+            <th>Quand en avoir besoin</th>
+            <th style="width: 34%">Comment l’obtenir</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Domaine de l’application</strong></td>
+            <td>Pour remplacer <code>pages.dev</code> / <code>vercel.app</code> par une adresse de marque.</td>
+            <td>Acheter un domaine, déléguer le DNS à Cloudflare, puis ajouter le domaine dans Pages et Vercel.</td>
+          </tr>
+          <tr>
+            <td><strong>Email transactionnel</strong></td>
+            <td>Pour la vérification d’adresse et les emails de compte ; non intégré aujourd’hui.</td>
+            <td>Créer un compte chez un fournisseur d’email transactionnel, vérifier le domaine expéditeur (SPF/DKIM), fournir la clé API et l’adresse d’envoi.</td>
+          </tr>
+          <tr>
+            <td><strong>Retraits SasPay</strong></td>
+            <td>Uniquement si l’application doit payer des bénéficiaires ou retirer le solde.</td>
+            <td>Configurer les méthodes de retrait dans le dashboard SasPay et whitelister l’IP du serveur.</td>
+          </tr>
+          <tr>
+            <td><strong>Jeton de projet CLI</strong></td>
+            <td>Pour automatiser les envois de runs depuis un client ou la CI.</td>
+            <td>Créer un token <code>psk_…</code> dans le dashboard PROOFSTACK ; ce n’est pas un accès administrateur.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="section-head" style="margin-top: 18px">
+        <div class="num">6</div>
+        <div class="title-wrap">
+          <h2>Remise sécurisée</h2>
+          <div class="hint">Comment me transmettre les accès sans les exposer.</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <h3>À faire</h3>
+          <ul class="small">
+            <li>Utiliser un gestionnaire de secrets (1Password, Bitwarden, Vault…).</li>
+            <li>Pour SasPay, lancer toi-même <code>wrangler secret put</code> : la valeur reste hors de l’historique du shell.</li>
+            <li>Pour Slack, conserver l’URL dans le gestionnaire et me prévenir quand elle est prête.</li>
+            <li>Faire les tests avec la clé <code>sk_test_…</code> avant toute clé <code>sk_live_…</code>.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>À ne pas faire</h3>
+          <ul class="small">
+            <li>Coller une clé, un secret ou le mot de passe QA dans le chat.</li>
+            <li>Committer un fichier <code>.env</code> ou un PDF contenant des secrets.</li>
+            <li>Mettre la clé SasPay dans le frontend, un log ou un rapport.</li>
+            <li>Utiliser la clé LIVE avant d’avoir vérifié un paiement test de bout en bout.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="callout">
+        <strong>Ce que je vérifie sans voir les secrets :</strong> le fournisseur actif dans
+        <code>/health</code>, la réception d’un webhook signé, l’exécution du workflow n8n et
+        l’arrivée du message dans Slack. Les secrets restent dans les stockages prévus.
+      </div>
+
+      <h3 class="page-break">Checklist finale</h3>
+      <p class="small muted">
+        À cocher au fur et à mesure. Une case ne se coche qu’après vérification réelle, pas après
+        simple lecture du code ou d’un dashboard.
+      </p>
+      <ul class="checklist">
+        <li>Compte SasPay créé, email vérifié et KYC validé.</li>
+        <li>Clé <code>sk_test_…</code> créée et copiée dans le gestionnaire de secrets.</li>
+        <li>Webhook SasPay créé vers <code>/api/webhooks/saspay</code>, abonné à <code>transaction.success</code>, signing secret copié.</li>
+        <li>Paiement sandbox vérifié : <code>SUCCESS</code>, accès activé seulement après vérification serveur.</li>
+        <li>Clé <code>sk_live_…</code> créée après le test.</li>
+        <li>Application Slack installée, URL Incoming Webhook copiée, message de test reçu.</li>
+        <li>URL n8n stable fournie, ou décision assumée de garder le Quick Tunnel temporaire.</li>
+        <li>Email admin fourni pour <code>ADMIN_EMAILS</code>.</li>
+        <li>Aucun secret dans Git, le chat, les logs ou le frontend.</li>
+      </ul>
+
+      <div class="callout warn">
+        <strong>Après réception :</strong> je configure les secrets, je vérifie le fournisseur,
+        je fais un paiement test, je contrôle la notification Slack et l’exécution n8n, puis je
+        passe seulement ensuite à la clé LIVE. Les étapes seront validées une par une, pas
+        déclarées actives sur simple lecture du code.
+      </div>
+    </section>
+
+    <div class="footer-note">
+      <span>PROOFSTACK — dossier de passation · 17/11/2026</span>
+      <span>Document sans secret · ne pas y ajouter de credentials</span>
+    </div>
+  </body>
+</html>

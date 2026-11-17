@@ -180,7 +180,7 @@ export const workspaceEn = {
   "ws.cli.prove": "Prove",
   "ws.cli.checking": "Checking the workspace connection…",
   "ws.cli.step.install.body":
-    "The package is private in this build. Run it from this repository, or use the published name once it is released.",
+    "The npm package is private in this build. Clone this repository, install and build it, then run the CLI from that checkout with --cwd pointing at your application.",
   "ws.cli.step.configure.body":
     "Point the modules at localhost or staging, then validate the targets before the first run.",
   "ws.cli.step.prove.body":
@@ -395,7 +395,7 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
   "ws.cli.prove": "Prouver",
   "ws.cli.checking": "Vérification de la connexion à l'espace…",
   "ws.cli.step.install.body":
-    "Le paquet est privé dans cette version. Lancez-le depuis ce dépôt, ou utilisez le nom publié quand il le sera.",
+    "Le paquet npm est privé dans cette version. Clonez ce dépôt, installez et construisez-le, puis lancez la CLI depuis ce checkout avec --cwd pointant vers votre application.",
   "ws.cli.step.configure.body":
     "Pointez les modules vers localhost ou la préproduction, puis validez les cibles avant la première exécution.",
   "ws.cli.step.prove.body":
