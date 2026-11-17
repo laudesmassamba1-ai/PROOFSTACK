@@ -299,7 +299,7 @@ export function AppLayout() {
         <header className="app-topbar">
           <NavLink to="/app" className="app-brand-lockup" aria-label="PROOFCORE workspace">
             <Mark size={34} variant="onLight" />
-            <span className="wordmark app-brand-word">ROOFSTACK</span>
+            <span className="wordmark app-brand-word">ROOFCORE</span>
             <span className="app-beta">{t("ws.shell.beta")}</span>
           </NavLink>
 
@@ -502,7 +502,7 @@ export function AppLayout() {
           <div className="app-mobile-head">
             <div className="app-brand-lockup">
               <Mark size={38} variant="onLight" />
-              <span className="wordmark app-brand-word">ROOFSTACK</span>
+              <span className="wordmark app-brand-word">ROOFCORE</span>
             </div>
             <button
               type="button"
