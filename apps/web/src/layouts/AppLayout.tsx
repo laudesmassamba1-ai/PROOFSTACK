@@ -13,6 +13,7 @@ import {
   Settings as SettingsIcon,
   ShieldCheck,
   Terminal,
+  Cube,
   X,
 } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -58,6 +59,27 @@ export function AppLayout() {
   const paletteInputRef = useRef<HTMLInputElement>(null);
   const mobileRef = useRef<HTMLDivElement>(null);
   const accountRef = useRef<HTMLDivElement>(null);
+
+  // Non-destructive 3D toggle (UI test)
+  const [threeDEnabled, setThreeDEnabled] = useState<boolean>((): boolean => {
+    try {
+      const v = window.localStorage?.getItem("proofstack_3d_enabled");
+      return v === "true";
+    } catch {
+      // ignore
+    }
+    return false;
+  });
+
+  const toggleThreeD = () => {
+    const next = !threeDEnabled;
+    setThreeDEnabled(next);
+    try { window.localStorage?.setItem("proofstack_3d_enabled", next ? "true" : "false"); } catch {}
+    if (typeof document !== "undefined") {
+      document.body.dataset.enhanced3d = next ? "true" : "";
+    }
+  };
+
 
   useEffect(() => {
     // Read through a local so `noUncheckedIndexedAccess` is satisfied honestly: an empty
@@ -217,7 +239,9 @@ export function AppLayout() {
     return (
       <div className="app-shell app-centered-shell">
         <div className="app-frame app-loading-frame">
-          <TesterScene variant="working" bubble="Ça arrive…" />
+          <div className="app-loader" aria-label={t("ws.loading")} aria-live="polite">
+            <span className="sr-only">Loading</span>
+          </div>
           <p className="app-eyebrow">{t("ws.loading")}</p>
         </div>
       </div>
@@ -374,6 +398,17 @@ export function AppLayout() {
               <Search size={14} />
               <span>{t("ws.shell.command")}</span>
               <kbd>⌘K</kbd>
+            </button>
+
+            <button
+              type="button"
+              className="app-btn"
+              aria-label={t("ws.shell.enable3d")}
+              onClick={toggleThreeD}
+              aria-pressed={threeDEnabled}
+              title="3D mode"
+            >
+              <Cube size={14} /> 3D
             </button>
 
             <div className="app-account-wrap" ref={accountRef}>
