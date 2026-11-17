@@ -1,4 +1,5 @@
 import {
+  Box,
   ChevronDown,
   Command,
   CreditCard,
@@ -13,7 +14,6 @@ import {
   Settings as SettingsIcon,
   ShieldCheck,
   Terminal,
-  Cube,
   X,
 } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -74,12 +74,13 @@ export function AppLayout() {
   const toggleThreeD = () => {
     const next = !threeDEnabled;
     setThreeDEnabled(next);
-    try { window.localStorage?.setItem("proofstack_3d_enabled", next ? "true" : "false"); } catch {}
+    try {
+      window.localStorage?.setItem("proofstack_3d_enabled", next ? "true" : "false");
+    } catch {}
     if (typeof document !== "undefined") {
       document.body.dataset.enhanced3d = next ? "true" : "";
     }
   };
-
 
   useEffect(() => {
     // Read through a local so `noUncheckedIndexedAccess` is satisfied honestly: an empty
@@ -408,7 +409,7 @@ export function AppLayout() {
               aria-pressed={threeDEnabled}
               title="3D mode"
             >
-              <Cube size={14} /> 3D
+              <Box size={14} /> 3D
             </button>
 
             <div className="app-account-wrap" ref={accountRef}>
