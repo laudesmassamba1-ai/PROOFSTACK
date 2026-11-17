@@ -146,7 +146,8 @@ export function Overview() {
 
   return (
     <div className="app-page app-overview">
-      <section className="app-situation">
+      <EnhancedCard className="app-situation" enable3d={undefined}>
+        <section className="app-situation">
         <div className="app-situation-copy">
           <p className="app-eyebrow">
             {t("ws.overview.eyebrow")} / {data.workspace.name}

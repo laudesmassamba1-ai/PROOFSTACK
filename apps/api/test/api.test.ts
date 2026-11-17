@@ -16,7 +16,7 @@ import type { Services } from "../src/http/services.js";
 
 const ENV = {
   NODE_ENV: "test",
-  WEB_ORIGIN: "http://localhost:5173",
+  WEB_ORIGIN: "http://localhost:5173,https://proofstack-01z.pages.dev",
   API_ORIGIN: "http://localhost:8787",
 };
 
@@ -266,6 +266,16 @@ describe("health and public catalogue", () => {
   it("does not hand CORS headers to an unknown origin", async () => {
     const response = await h.request("/health", { headers: { origin: "https://evil.example" } });
     expect(response.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
+  it("allows the configured Cloudflare Pages origin", async () => {
+    const response = await h.request("/health", {
+      headers: { origin: "https://proofstack-01z.pages.dev" },
+    });
+    expect(response.headers.get("access-control-allow-origin")).toBe(
+      "https://proofstack-01z.pages.dev"
+    );
+    expect(response.headers.get("access-control-allow-credentials")).toBe("true");
   });
 });
 
