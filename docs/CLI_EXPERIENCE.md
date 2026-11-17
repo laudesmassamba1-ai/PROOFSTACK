@@ -1,5 +1,9 @@
 # CLI experience design
 
+Published package: **`proofcore`** on npm (`npm install -g proofcore`). The workspace
+package is `@proofcore/cli`; the release bundle is self-contained with no runtime
+npm dependencies and requires Node.js ≥ 22.18.
+
 Overview:
 
 - PROOFCORE CLI should feel premium, with a consistent visual language and clear process flows.

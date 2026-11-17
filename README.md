@@ -75,13 +75,27 @@ pnpm proofcore -- sync
 
 ## Install the CLI globally
 
-The CLI is still private in the workspace, but the repository builds a self-contained
-tarball with **no runtime npm dependencies**:
+The CLI is published on npm as the unscoped package `proofcore` — a self-contained
+bundle with **no runtime npm dependencies**:
+
+```bash
+npm install -g proofcore
+proofcore --version
+```
+
+To build the tarball locally instead (same bytes, no registry needed):
 
 ```bash
 pnpm cli:package
-npm install -g ./artifacts/proofcore-cli-0.1.0.tgz
+npm install -g ./artifacts/proofcore-0.1.0.tgz
 proofcore --version
+```
+
+To publish a new version (reads the npm token from `NPM_TOKEN` or a hidden prompt,
+accepts `-- --otp=123456` for 2FA-enforced accounts):
+
+```bash
+pnpm cli:publish
 ```
 
 Or build, install and check the global binary in one command:
