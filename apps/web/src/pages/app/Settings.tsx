@@ -232,7 +232,7 @@ export function Settings() {
           <Cannot
             reason={
               fr
-                ? "Le workspace suit votre choix ; le site marketing reste sombre par conception."
+                ? "L'espace de travail suit votre choix ; le site marketing reste sombre par conception."
                 : "The dashboard follows your choice; the marketing site stays dark by design."
             }
           />
@@ -267,7 +267,7 @@ export function Settings() {
           <Cannot
             reason={
               fr
-                ? "Stockée dans ce navigateur. Le shell, l'Overview, les projets, les modules, la facturation et les paramètres suivent ce choix. Les rapports de run gardent la langue de la configuration du projet."
+                ? "Stockée dans ce navigateur. L'espace de travail, la vue d'ensemble, les projets, les modules, le CLI, la facturation et les paramètres suivent ce choix. Les rapports d'exécution gardent la langue de la configuration du projet."
                 : "Stored in this browser. Every customer workspace screen follows this choice. Run reports and CLI output keep the language of the project config."
             }
           />

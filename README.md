@@ -63,17 +63,28 @@ pnpm web:dev            # http://localhost:5173
 ```
 
 Create an account at `/signup`, create a project, then create a project token from
-the project page. In your own application repository:
+the project page. From the **PROOFSTACK repository root**:
 
 ```bash
-pnpm cli -- init
-pnpm cli -- doctor
-pnpm cli -- test --module world,flow,exit
-pnpm cli -- sync
+pnpm proofstack                              # open the terminal console
+pnpm proofstack -- doctor                    # verify node, config and module wiring
+pnpm proofstack -- test --module world,flow,exit
+pnpm proofstack -- report text
+pnpm proofstack -- sync
 ```
 
-`@proofstack/cli` is private to this workspace for now; `pnpm cli -- <command>` runs the
-built binary. When it is published, the same commands are `proofstack <command>`.
+`@proofstack/cli` is private to this workspace and is **not published on npm**.
+`pnpm proofstack` runs `packages/cli/dist/index.js` from this checkout; it is the
+supported command today. Do not use `pnpm cli` from an unrelated application
+repository — that would resolve a different package. For another local project, pass
+its directory to the CLI:
+
+```bash
+pnpm proofstack -- --cwd /path/to/your/app init
+pnpm proofstack -- --cwd /path/to/your/app doctor
+```
+
+When the package is published, the same commands become `proofstack <command>`.
 
 ## Terminal console
 
@@ -88,6 +99,34 @@ pnpm proofstack -- status --json             # scriptable account/workspace summ
 pnpm proofstack -- ui --once --screen overview
 pnpm proofstack -- login                     # interactive sign-in
 pnpm proofstack -- logout                    # remove the stored session
+```
+
+Real one-shot rendering of the console (session credentials removed):
+
+```text
+PROOFSTACK · terminal console
+design.qa.20261117@example.com · localhost:8787
+ 1 Overview   2 Projects   3 Runs   4 Billing   5 Admin   6 Help
+──────────────────────────────────────────────────────────────
+Design QA Shop (owner)
+plan       Developer · ACTIVE
+projects   2
+usage      2 / 1000 test runs this period
+
+Projects
+  Storefront         local      world,flow,exi http://localhost:3000
+  Checkout API       staging    flow           https://staging.example.test
+
+Recent runs
+  FAILED Storefront           2026-11-17 02:56 8.3s     6 finding(s)
+  COMPLETED Storefront        2026-11-17 01:34 8.3s     0 finding(s)
+
+Recent failures
+  CRITICAL Duplicate webhook confirms the order twice
+  HIGH Accented surname rejected at checkout
+
+workspace: Design QA Shop
+1-6 screens · ↑/↓ select · Enter open · w workspace · r refresh · ? help · q quit
 ```
 
 `login` stores the HttpOnly session cookie in `~/.config/proofstack/session.json` with

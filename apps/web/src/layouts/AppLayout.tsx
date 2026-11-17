@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router";
-import { TesterScene } from "../components/app/Testers.js";
+
 import { Mark } from "../components/brand/Logo.js";
 import { useI18n } from "../i18n/index.js";
 import { API_BASE, apiFetch } from "../lib/api.js";
@@ -585,16 +585,19 @@ export function PageHeader({
   title,
   description,
   actions,
-  eyebrow = "PROOFSTACK / workspace",
+  eyebrow,
 }: {
   title: string;
   description?: string;
   actions?: ReactNode;
   eyebrow?: string;
 }) {
+  const { locale } = useI18n();
+  const sectionLabel =
+    eyebrow ?? (locale === "fr" ? "PROOFSTACK / espace de travail" : "PROOFSTACK / workspace");
   return (
     <header className="app-page-head">
-      <p className="app-eyebrow">{eyebrow}</p>
+      <p className="app-eyebrow">{sectionLabel}</p>
       <div className="app-page-head-row">
         <h1 className="app-page-title">{title}</h1>
         {actions ? <div className="app-page-actions">{actions}</div> : null}

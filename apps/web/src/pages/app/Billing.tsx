@@ -465,12 +465,32 @@ export function Billing() {
             <tbody>
               {data.usage.map((counter) => (
                 <tr key={counter.key}>
-                  <td>{counter.label}</td>
+                  <td>
+                    {fr
+                      ? ((
+                          {
+                            monthly_test_runs: "Tests exécutés cette période",
+                            projects: "Projets",
+                          } as Record<string, string>
+                        )[counter.key] ??
+                        (counter.key.includes("project") || counter.label === "Projects"
+                          ? "Projets"
+                          : counter.label))
+                      : counter.label}
+                  </td>
                   <td className="text-right tabular-nums">{counter.used}</td>
                   <td className="text-right tabular-nums">
                     {counter.limit === -1 ? (fr ? "illimité" : "unlimited") : counter.limit}
                   </td>
-                  <td className="text-xs text-muted">{counter.counted.replaceAll("_", " ")}</td>
+                  <td className="text-xs text-muted">
+                    {fr
+                      ? counter.key === "monthly_test_runs"
+                        ? "Un par identifiant de run ; les réessais et échecs d'envoi ne comptent pas deux fois."
+                        : counter.key.includes("project") || counter.counted === "Live count"
+                          ? "Comptage en direct"
+                          : counter.counted.replaceAll("_", " ")
+                      : counter.counted.replaceAll("_", " ")}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -501,7 +521,20 @@ export function Billing() {
               return (
                 <div key={plan.key} className="rounded-[var(--radius)] border border-line p-4">
                   <p className="text-sm font-semibold">{plan.name}</p>
-                  <p className="mt-1 text-xs leading-relaxed text-muted">{plan.description}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">
+                    {fr
+                      ? ((
+                          {
+                            developer:
+                              "Toute la profondeur des modules, la synchronisation cloud depuis le CLI et des rapports étendus.",
+                            studio:
+                              "Collaboration d'équipe, configurations partagées et intégrations CI.",
+                            agency:
+                              "Plusieurs espaces clients, des rapports clients et les limites les plus hautes.",
+                          } as Record<string, string>
+                        )[plan.key] ?? plan.description)
+                      : plan.description}
+                  </p>
                   <p className="mt-3 text-lg font-semibold">
                     {monthly ? formatMinor(monthly.amount.minor, monthly.amount.currency) : "—"}
                     <span className="ml-1 text-xs font-normal text-muted">
