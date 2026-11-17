@@ -8,6 +8,7 @@ Status: in-progress – UI redesign and particle identity in-flight. The followi
 - ParticleLogo.tsx component added for reusable particle-based visuals.
 
 Next steps:
+
 - Integrate ParticleLogo into more landing sections (hero, testimonials) with responsive sizing.
 - Start refactoring common UI primitives (Card, Section, Button) into a small design system module.
 - Create a design review checklist and start visual QA loops.

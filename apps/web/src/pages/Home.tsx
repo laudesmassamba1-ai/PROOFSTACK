@@ -1,4 +1,4 @@
-import { ArrowRight, Terminal, Globe2, Route as RouteIcon, PackageOpen } from "lucide-react";
+import { ArrowRight, Globe2, PackageOpen, Route as RouteIcon, Terminal } from "lucide-react";
 import { Link } from "react-router";
 import { DottedWave } from "../components/brand/DottedWave.js";
 import { HeroLockup } from "../components/brand/Logo.js";
@@ -56,12 +56,18 @@ export function Home() {
 
           <div className="grid gap-3 border-t border-white/10 py-5 sm:grid-cols-3">
             {MODULE_CARDS.map((module) => {
-              const Icon = module.icon as any;
+              const Icon = module.icon;
               return (
-                <a key={module.id} href={`#${module.id}`} className={`module-card ${module.className} group flex items-center justify-between px-4 py-3.5`}>
+                <a
+                  key={module.id}
+                  href={`#${module.id}`}
+                  className={`module-card ${module.className} group flex items-center justify-between px-4 py-3.5`}
+                >
                   <span className="flex items-center gap-3">
                     <Icon size={15} className="module-accent-text" />
-                    <span className="font-mono text-[0.68rem] tracking-[0.16em] text-white/62">{module.id.toUpperCase()}</span>
+                    <span className="font-mono text-[0.68rem] tracking-[0.16em] text-white/62">
+                      {module.id.toUpperCase()}
+                    </span>
                   </span>
                   <span className="text-white/25">›</span>
                 </a>
@@ -92,15 +98,19 @@ export function Home() {
               lede={t("home.engine.lede")}
             />
             <ul className="mt-8 space-y-3">
-              {(["1","2","3"] as const).map((index) => (
+              {(["1", "2", "3"] as const).map((index) => (
                 <li key={index} className="flex gap-3 text-[0.9rem] leading-relaxed text-white/56">
-                  <span className="mt-0.5 shrink-0 rounded-full bg-brand-emerald" style={{ width: 10, height: 10 }} />
+                  <span
+                    className="mt-0.5 shrink-0 rounded-full bg-brand-emerald"
+                    style={{ width: 10, height: 10 }}
+                  />
                   <span>{t(`home.engine.${index}` as const)}</span>
                 </li>
               ))}
             </ul>
           </div>
-          <div aria-label="engine diagram placeholder" />
+          {/* The engine diagram is drawn below; this anchor keeps the grid balanced. */}
+          <div role="presentation" />
         </div>
       </Section>
     </>

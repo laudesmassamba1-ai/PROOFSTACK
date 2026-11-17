@@ -14,7 +14,11 @@ const output = "docs/design/screenshots";
 
 await mkdir(output, { recursive: true });
 
-const browser = await chromium.launch({ channel: "chrome", headless: true, args: ["--no-sandbox"] });
+const browser = await chromium.launch({
+  channel: "chrome",
+  headless: true,
+  args: ["--no-sandbox"],
+});
 const errors = [];
 
 async function context(options = {}) {

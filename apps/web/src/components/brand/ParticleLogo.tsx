@@ -24,7 +24,8 @@ import { LOGO_LAYERS, LOGO_PATH, LOGO_VIEWBOX } from "./logoGeometry.js";
 export type ParticlePalette = readonly [string, string, string];
 
 export interface ParticleLogoProps {
-  className?: string;\n  style?: React.CSSProperties;
+  className?: string;
+  style?: React.CSSProperties;
   /** 0..1; multiplies the sampled logo point count. Default 1. */
   density?: number;
   /** 0..1; wave displacement. Default 1. */

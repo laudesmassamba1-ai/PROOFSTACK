@@ -1,10 +1,12 @@
 # Particle system design (Proofstack)
 
 Goal:
+
 - Provide an original, performant particle-based identity that forms the PROOFSTACK symbol.
 - Use a Canvas 2D engine with deterministic particle distribution and smooth transitions.
 
 Architecture:
+
 - Particle data model: position, velocity, target, size, color.
 - Canvas-based rendering with requestAnimationFrame.
 - A soft physics-like attraction towards logo target coordinates to form the symbol.
@@ -17,6 +19,7 @@ Architecture:
   - State F: scroll interaction.
 
 Configuration:
+
 - density: particle count per area.
 - waveIntensity: strength of wave fields.
 - particleSize: visual size of particles.
@@ -28,6 +31,7 @@ Configuration:
 - performanceMode: reduces workload on low-end devices.
 
 Implementation notes:
+
 - Prefer Canvas 2D over WebGL for simplicity and reliability.
 - Expose a reusable component ParticleLogo with props for customization.
 - Provide a static SVG fallback for non-Canvas environments.

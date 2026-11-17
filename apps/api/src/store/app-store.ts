@@ -323,32 +323,47 @@ export class AppStore {
     userId: string;
   }): Promise<WorkspaceRecord & { role: Role }> {
     const base = slugify(input.name, 40) || "workspace";
+
+    // Slug allocation is a read-then-write, which is a race: two sign-ups with the same
+    // workspace name both see the slug as free and the second INSERT fails on the unique
+    // index. That surfaced as a 500 on sign-up, which is the worst possible place for
+    // one — the account exists but the customer sees an error. The fix is to treat the
+    // unique constraint as the authority and retry, rather than to trust the read.
     let slug = base;
-    for (let attempt = 1; attempt < 50; attempt += 1) {
-      const taken = await this.db
-        .prepare("SELECT 1 FROM workspaces WHERE slug = ?")
-        .bind(slug)
-        .first<Row>();
-      if (!taken) break;
-      slug = `${base}-${attempt + 1}`;
+    let inserted = false;
+    for (let attempt = 0; attempt < 50 && !inserted; attempt += 1) {
+      slug = attempt === 0 ? base : `${base}-${attempt + 1}`;
+      const workspace: WorkspaceRecord = {
+        id: `ws_${uuid().replaceAll("-", "").slice(0, 20)}`,
+        name: input.name,
+        slug,
+        createdAt: iso(this.clock()),
+      };
+      try {
+        await this.db
+          .prepare("INSERT INTO workspaces (id, name, slug, created_at) VALUES (?, ?, ?, ?)")
+          .bind(workspace.id, workspace.name, workspace.slug, workspace.createdAt)
+          .run();
+        inserted = true;
+        await this.db
+          .prepare(
+            "INSERT INTO workspace_members (workspace_id, user_id, role, created_at) VALUES (?, ?, ?, ?)"
+          )
+          .bind(workspace.id, input.userId, "owner", workspace.createdAt)
+          .run();
+        return { ...workspace, role: "owner" };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        // Only a slug collision is retryable; anything else is a real failure.
+        if (!message.includes("UNIQUE constraint failed: workspaces.slug")) throw error;
+      }
     }
-    const workspace: WorkspaceRecord = {
-      id: `ws_${uuid().replaceAll("-", "").slice(0, 20)}`,
-      name: input.name,
-      slug,
-      createdAt: iso(this.clock()),
-    };
-    await this.db
-      .prepare("INSERT INTO workspaces (id, name, slug, created_at) VALUES (?, ?, ?, ?)")
-      .bind(workspace.id, workspace.name, workspace.slug, workspace.createdAt)
-      .run();
-    await this.db
-      .prepare(
-        "INSERT INTO workspace_members (workspace_id, user_id, role, created_at) VALUES (?, ?, ?, ?)"
-      )
-      .bind(workspace.id, input.userId, "owner", workspace.createdAt)
-      .run();
-    return { ...workspace, role: "owner" };
+
+    throw new ProofstackError({
+      message: `Could not allocate a unique workspace slug from "${input.name}" after 50 attempts`,
+      category: "INTERNAL",
+      code: "workspace_slug_exhausted",
+    });
   }
 
   async workspaceMemberCount(workspaceId: string): Promise<number> {

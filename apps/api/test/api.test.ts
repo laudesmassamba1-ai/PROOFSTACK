@@ -355,6 +355,41 @@ describe("tenancy and entitlements", () => {
     h = await bootstrap();
   });
 
+  /**
+   * Regression: two accounts choosing the same workspace name crashed sign-up with a
+   * 500 (`UNIQUE constraint failed: workspaces.slug`). The slug was allocated with a
+   * read-then-write, so the second sign-up saw it as free and the INSERT failed on the
+   * unique index — after the account had already been created. The customer saw an
+   * error for an account that existed.
+   */
+  it("creates a second workspace with the same name instead of failing", async () => {
+    const first = await h.request("/api/auth/sign-up/email", {
+      method: "POST",
+      body: JSON.stringify({
+        email: "first@example.com",
+        password: "correct-horse-battery",
+        name: "First",
+        workspace: "Acme",
+      }),
+    });
+    expect(first.status).toBe(201);
+
+    const second = await h.request("/api/auth/sign-up/email", {
+      method: "POST",
+      body: JSON.stringify({
+        email: "second@example.com",
+        password: "correct-horse-battery",
+        name: "Second",
+        workspace: "Acme",
+      }),
+    });
+    expect(second.status).toBe(201);
+    const body = await json<{ workspace: { slug: string } }>(second);
+    // The slug is disambiguated, not rejected: the customer keeps the name they chose.
+    expect(body.workspace.slug).toMatch(/^acme(-\d+)?$/);
+    expect(body.workspace.slug).not.toBe("acme");
+  });
+
   it("answers 404 for another user's workspace and project", async () => {
     const alice = await h.signUp("alice@example.com");
     const bob = await h.signUp("bob@example.com");

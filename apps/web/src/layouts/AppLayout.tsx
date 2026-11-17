@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Terminal,
 } from "lucide-react";
+import { useEffect } from "react";
 import { Navigate, NavLink, Outlet, useLocation } from "react-router";
 import { Wordmark } from "../components/brand/Logo.js";
 import { API_BASE } from "../lib/api.js";
@@ -26,6 +27,15 @@ import { useSession } from "../lib/session.js";
 export function AppLayout() {
   const session = useSession();
   const location = useLocation();
+  // Auto-select a workspace if none is selected but workspaces exist (login flow).
+  // The first element is read through a local so `noUncheckedIndexedAccess` is satisfied
+  // honestly: if the list is empty there is nothing to select, and we do nothing.
+  useEffect(() => {
+    const first = session.workspaces[0];
+    if (session.status === "ready" && !session.workspaceId && first) {
+      session.setWorkspaceId(first.id);
+    }
+  }, [session.status, session.workspaceId, session.workspaces, session.setWorkspaceId]);
 
   if (session.status === "loading") {
     return (
