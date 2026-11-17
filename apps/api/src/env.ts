@@ -9,8 +9,10 @@ import { createPaymentProvider, hasSasPayCredentials } from "./providers.js";
  */
 export interface AppConfig {
   environment: "development" | "production" | "test";
-  /** Public origin of the web app: used for cookies, origin checks and return URLs. */
+  /** Primary public origin of the web app: used for cookies and default return URLs. */
   webOrigin: string;
+  /** Every web origin allowed to make credentialed calls (Vercel and Cloudflare Pages). */
+  webOrigins: string[];
   apiOrigin: string;
   secureCookies: boolean;
   paymentProvider: "saspay" | "sandbox";
@@ -29,19 +31,30 @@ export function readConfig(env: Env): AppConfig {
   const environment = (
     env.NODE_ENV === "production" ? "production" : env.NODE_ENV === "test" ? "test" : "development"
   ) as AppConfig["environment"];
-  const webOrigin = (env.WEB_ORIGIN ?? "http://localhost:5173").replace(/\/+$/, "");
+  const webOrigins = parseWebOrigins(env.WEB_ORIGIN);
+  const webOrigin = webOrigins[0] ?? "http://localhost:5173";
   const apiOrigin = (env.API_ORIGIN ?? "http://localhost:8787").replace(/\/+$/, "");
   return {
     environment,
     webOrigin,
+    webOrigins,
     apiOrigin,
     // Secure cookies are mandatory in production and on any https origin. Loopback
     // http is the only case where they are omitted, because a Secure cookie on
     // http://localhost would make local sign-in impossible.
-    secureCookies: environment === "production" || webOrigin.startsWith("https://"),
+    secureCookies:
+      environment === "production" || webOrigins.some((origin) => origin.startsWith("https://")),
     paymentProvider: hasSasPayCredentials(env) ? "saspay" : "sandbox",
     adminEmails: parseAdminEmails(env.ADMIN_EMAILS),
   };
+}
+
+function parseWebOrigins(raw: string | undefined): string[] {
+  const values = (raw ?? "http://localhost:5173")
+    .split(",")
+    .map((value) => value.trim().replace(/\/+$/, ""))
+    .filter((value) => value.length > 0);
+  return [...new Set(values)];
 }
 
 function parseAdminEmails(raw: string | undefined): string[] {

@@ -93,7 +93,7 @@ export async function readBody<T>(c: Context<AppEnv>, schema: ZodType<T>): Promi
 export function assertSameOrigin(c: Context<AppEnv>, services: Services): void {
   const origin = c.req.header("origin");
   if (!origin) return;
-  if (origin !== services.config.webOrigin) {
+  if (!services.config.webOrigins.includes(origin)) {
     throw new HttpError(403, "cross_origin_denied", "This origin is not allowed to call the API.");
   }
 }

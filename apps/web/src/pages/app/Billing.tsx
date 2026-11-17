@@ -167,7 +167,13 @@ export function Billing() {
         plan.prices.find((price) => price.period === "monthly")?.amount.currency ?? "USD";
       const start = await postJson<{ intent: { id: string }; redirectUrl?: string }>(
         "/api/v1/checkout/start",
-        { workspaceId, planKey: plan.key, period: "monthly", currency }
+        {
+          workspaceId,
+          planKey: plan.key,
+          period: "monthly",
+          currency,
+          returnUrl: `${window.location.origin}/app/billing`,
+        }
       );
       setCheckout({
         intentId: start.intent.id,

@@ -52,16 +52,17 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
     await next();
   });
 
-  // Credentialed CORS for the one allowed web origin, and nothing else.
+  // Credentialed CORS for the configured web origins, and nothing else. Production
+  // runs both Vercel and Cloudflare Pages against the same Worker.
   //
   // Mounted on `*` rather than `/api/*` because `/health` is the endpoint the web app
   // probes on load. Scoping CORS to `/api/*` left the probe answering 200 with no
   // `Access-Control-Allow-Origin`, which the browser refuses to read — so a running
   // API looked unreachable and the UI told the user to start a server that was already
-  // up. The origin allow-list is still exactly one origin; only the path scope widened.
+  // up.
   app.use("*", async (c, next) => {
     const origin = c.req.header("origin");
-    if (origin === config.webOrigin) {
+    if (origin && config.webOrigins.includes(origin)) {
       c.header("Access-Control-Allow-Origin", origin);
       c.header("Access-Control-Allow-Credentials", "true");
       c.header("Vary", "Origin");
@@ -82,7 +83,7 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
   app.use("/api/v1/*", async (c, next) => {
     if (c.req.method !== "GET" && c.req.method !== "HEAD" && c.req.method !== "OPTIONS") {
       const origin = c.req.header("origin");
-      if (origin && origin !== config.webOrigin) {
+      if (origin && !config.webOrigins.includes(origin)) {
         throw new HttpError(
           403,
           "cross_origin_denied",

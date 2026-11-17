@@ -23,7 +23,7 @@ enabled = true
 
 [vars]
 NODE_ENV = "production"
-WEB_ORIGIN = "https://proofstack-iota.vercel.app"
+WEB_ORIGIN = "https://proofstack-iota.vercel.app,https://proofstack-01z.pages.dev"
 API_ORIGIN = "https://proofstack-api.laudesmassamba1.workers.dev"
 
 # Comma-separated allowlist for the read-only /app/admin operations console.
