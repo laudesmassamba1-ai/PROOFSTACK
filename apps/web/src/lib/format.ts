@@ -9,6 +9,13 @@
 
 const CURRENCY_EXPONENT: Record<string, number> = { XOF: 0, XAF: 0, JPY: 0, KRW: 0 };
 
+/** Set once by the i18n provider; date display follows the selected UI language. */
+let formatLocale = "en-US";
+
+export function setFormatLocale(locale: string): void {
+  formatLocale = locale === "fr" ? "fr-FR" : "en-US";
+}
+
 export function currencyExponent(currency: string): number {
   if (currency in CURRENCY_EXPONENT) return CURRENCY_EXPONENT[currency]!;
   try {
@@ -37,14 +44,14 @@ export function formatMinor(minor: string, currency: string, locale = "en-US"): 
   }).format(numeric);
 }
 
-export function formatDate(iso: string | null | undefined, locale = "en-US"): string {
+export function formatDate(iso: string | null | undefined, locale = formatLocale): string {
   if (!iso) return "—";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
   return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
-export function formatDay(iso: string | null | undefined, locale = "en-US"): string {
+export function formatDay(iso: string | null | undefined, locale = formatLocale): string {
   if (!iso) return "—";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
@@ -52,15 +59,16 @@ export function formatDay(iso: string | null | undefined, locale = "en-US"): str
 }
 
 export function relativeTime(iso: string | null | undefined): string {
-  if (!iso) return "never";
+  if (!iso) return formatLocale === "fr-FR" ? "jamais" : "never";
   const diff = Date.now() - new Date(iso).getTime();
   const minutes = Math.round(diff / 60_000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes} min ago`;
+  const formatter = new Intl.RelativeTimeFormat(formatLocale, { numeric: "auto" });
+  if (minutes < 1) return formatter.format(0, "second");
+  if (minutes < 60) return formatter.format(-minutes, "minute");
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} h ago`;
+  if (hours < 24) return formatter.format(-hours, "hour");
   const days = Math.round(hours / 24);
-  return days === 1 ? "yesterday" : `${days} days ago`;
+  return formatter.format(-days, "day");
 }
 
 export function duration(ms: number): string {

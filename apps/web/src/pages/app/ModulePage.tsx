@@ -117,6 +117,13 @@ export function ModulePage() {
   const Icon = meta.icon;
 
   if (error) return <ErrorState error={error} onRetry={() => void load()} />;
+  // No workspace selected means the fetch never started. Saying "loading" forever is a
+  // lie the user cannot act on; name the real state instead.
+  if (!workspaceId) {
+    return (
+      <Empty title={t("ws.noWorkspace.title")} body={t("ws.noWorkspace.body")} tester="empty" />
+    );
+  }
   if (!runs) return <Loading label={`Loading ${meta.name} activity…`} />;
 
   const latest = runs[0];

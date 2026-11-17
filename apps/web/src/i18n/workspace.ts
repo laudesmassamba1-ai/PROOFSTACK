@@ -67,6 +67,26 @@ export const workspaceEn = {
   "ws.overview.latest": "Latest run",
   "ws.overview.projectMeta": "{count} project(s) · {plan}",
   "ws.status.notTested": "Not tested",
+  "ws.status.passed": "Passed",
+  "ws.status.failed": "Failed",
+  "ws.status.completed": "Completed",
+  "ws.status.partial": "Partial",
+  "ws.status.warning": "Warning",
+  "ws.status.skipped": "Skipped",
+  "ws.status.error": "Error",
+  "ws.status.nothingVerified": "Nothing verified",
+  "ws.status.pending": "Pending",
+  "ws.status.running": "Running",
+  "ws.status.cancelled": "Cancelled",
+  "ws.status.active": "Active",
+  "ws.status.succeeded": "Succeeded",
+  "ws.status.paid": "Paid",
+  "ws.status.expired": "Expired",
+  "ws.status.pastDue": "Past due",
+  "ws.status.gracePeriod": "Grace period",
+  "ws.status.processing": "Processing",
+  "ws.status.free": "Free",
+  "ws.status.none": "None",
   "ws.module.eyebrow": "Module / evidence",
   "ws.module.world.summary": "Can users from different countries use the software correctly?",
   "ws.module.world.body":
@@ -126,6 +146,12 @@ export const workspaceEn = {
   "ws.projects.noRuns": "no runs",
   "ws.projects.open": "Open project",
   "ws.projects.count": "{count} project(s) in this workspace.",
+  "ws.billing.title": "Billing",
+  "ws.billing.description":
+    "Your plan, what it grants, and every payment attempt with its verified state.",
+  "ws.settings.title": "Settings",
+  "ws.settings.description":
+    "Account, workspace membership and the credentials that can reach this workspace.",
   "ws.cli.eyebrow": "Developer setup",
   "ws.cli.title": "CONNECT THE CLI.",
   "ws.cli.description":
@@ -150,6 +176,36 @@ export const workspaceEn = {
   "ws.cli.install": "Install",
   "ws.cli.configure": "Configure",
   "ws.cli.prove": "Prove",
+  "ws.cli.checking": "Checking the workspace connection…",
+  "ws.cli.step.install.body":
+    "The package is private in this build. Run it from this repository, or use the published name once it is released.",
+  "ws.cli.step.configure.body":
+    "Point the modules at localhost or staging, then validate the targets before the first run.",
+  "ws.cli.step.prove.body":
+    "Run the checks, read the finding, reproduce it. Uploading the result is a separate, explicit step.",
+  "ws.cli.lastUpload.body":
+    "{time} · the status is the uploaded run status, not a local test result.",
+  "ws.cli.noRun.body":
+    "The projects exist, but the CLI has not uploaded a run. Create a scoped token, run the checks, then sync.",
+  "ws.cli.what.1": "Runs on your machine or CI — not in the browser or the API.",
+  "ws.cli.what.2": "One engine, one report schema, three modules.",
+  "ws.cli.what.3": "The cloud stores results you explicitly sync; no silent upload.",
+  "ws.cli.what.4": "Every failed finding includes a reproducible command.",
+  "ws.cli.copied": "Copied.",
+  "ws.cli.copy": "Copy {title} command",
+  "ws.cli.trouble.title": "Installation troubleshooting",
+  "ws.cli.trouble.command.title": "Command not found?",
+  "ws.cli.trouble.command.body":
+    "Use this form from the repository root; the npm package is not published yet.",
+  "ws.cli.trouble.sync.title": "401 on sync?",
+  "ws.cli.trouble.sync.body": "The token is scoped to one project and must be supplied as",
+  "ws.cli.trouble.api.title": "API unreachable?",
+  "ws.cli.trouble.api.body": "Set",
+  "ws.cli.trouble.api.body2": "for the dashboard and",
+  "ws.cli.trouble.api.body3": "for the CLI.",
+  "ws.cli.trouble.upload.title": "No run appears?",
+  "ws.cli.trouble.upload.body": "is local;",
+  "ws.cli.trouble.upload.body2": "is the explicit upload step.",
 } as const;
 
 export type WorkspaceKey = keyof typeof workspaceEn;
@@ -223,6 +279,26 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
   "ws.overview.latest": "Dernière exécution",
   "ws.overview.projectMeta": "{count} projet(s) · {plan}",
   "ws.status.notTested": "Non testé",
+  "ws.status.passed": "Réussi",
+  "ws.status.failed": "Échec",
+  "ws.status.completed": "Terminé",
+  "ws.status.partial": "Partiel",
+  "ws.status.warning": "Avertissement",
+  "ws.status.skipped": "Ignoré",
+  "ws.status.error": "Erreur",
+  "ws.status.nothingVerified": "Rien vérifié",
+  "ws.status.pending": "En attente",
+  "ws.status.running": "En cours",
+  "ws.status.cancelled": "Annulé",
+  "ws.status.active": "Actif",
+  "ws.status.succeeded": "Réussi",
+  "ws.status.paid": "Payé",
+  "ws.status.expired": "Expiré",
+  "ws.status.pastDue": "En retard",
+  "ws.status.gracePeriod": "Délai de grâce",
+  "ws.status.processing": "Traitement",
+  "ws.status.free": "Gratuit",
+  "ws.status.none": "Aucun",
   "ws.module.eyebrow": "Module / preuves",
   "ws.module.world.summary":
     "Les utilisateurs de différents pays peuvent-ils utiliser le logiciel correctement ?",
@@ -283,6 +359,12 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
   "ws.projects.noRuns": "aucune exécution",
   "ws.projects.open": "Ouvrir le projet",
   "ws.projects.count": "{count} projet(s) dans cet espace.",
+  "ws.billing.title": "Facturation",
+  "ws.billing.description":
+    "Votre offre, ce qu'elle accorde, et chaque tentative de paiement avec son état vérifié.",
+  "ws.settings.title": "Paramètres",
+  "ws.settings.description":
+    "Compte, membres de l'espace de travail et identifiants qui peuvent y accéder.",
   "ws.cli.eyebrow": "Configuration développeur",
   "ws.cli.title": "CONNECTER LA CLI.",
   "ws.cli.description":
@@ -307,4 +389,35 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
   "ws.cli.install": "Installer",
   "ws.cli.configure": "Configurer",
   "ws.cli.prove": "Prouver",
+  "ws.cli.checking": "Vérification de la connexion à l'espace…",
+  "ws.cli.step.install.body":
+    "Le paquet est privé dans cette version. Lancez-le depuis ce dépôt, ou utilisez le nom publié quand il le sera.",
+  "ws.cli.step.configure.body":
+    "Pointez les modules vers localhost ou la préproduction, puis validez les cibles avant la première exécution.",
+  "ws.cli.step.prove.body":
+    "Lancez les contrôles, lisez le constat, reproduisez-le. Le téléversement du résultat est une étape explicite et séparée.",
+  "ws.cli.lastUpload.body":
+    "{time} · le statut est celui du run téléversé, pas un résultat de test local.",
+  "ws.cli.noRun.body":
+    "Les projets existent, mais la CLI n'a téléversé aucune exécution. Créez un token limité, lancez les contrôles, puis synchronisez.",
+  "ws.cli.what.1": "Tourne sur votre machine ou en CI — pas dans le navigateur ni dans l'API.",
+  "ws.cli.what.2": "Un moteur, un schéma de rapport, trois modules.",
+  "ws.cli.what.3":
+    "Le cloud stocke les résultats que vous synchronisez explicitement ; aucun envoi silencieux.",
+  "ws.cli.what.4": "Chaque constat en échec inclut une commande reproductible.",
+  "ws.cli.copied": "Copié.",
+  "ws.cli.copy": "Copier la commande {title}",
+  "ws.cli.trouble.title": "Dépannage de l'installation",
+  "ws.cli.trouble.command.title": "Commande introuvable ?",
+  "ws.cli.trouble.command.body":
+    "Utilisez cette forme depuis la racine du dépôt ; le paquet npm n'est pas encore publié.",
+  "ws.cli.trouble.sync.title": "401 à la synchronisation ?",
+  "ws.cli.trouble.sync.body": "Le token est limité à un projet et doit être fourni via",
+  "ws.cli.trouble.api.title": "API injoignable ?",
+  "ws.cli.trouble.api.body": "Définissez",
+  "ws.cli.trouble.api.body2": "pour le tableau de bord et",
+  "ws.cli.trouble.api.body3": "pour la CLI.",
+  "ws.cli.trouble.upload.title": "Aucune exécution n'apparaît ?",
+  "ws.cli.trouble.upload.body": "est local ;",
+  "ws.cli.trouble.upload.body2": "est l'étape de téléversement explicite.",
 };

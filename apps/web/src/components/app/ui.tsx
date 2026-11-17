@@ -1,5 +1,6 @@
 import { CircleAlert } from "lucide-react";
 import type { ReactNode } from "react";
+import { useI18n } from "../../i18n/index.js";
 import type { ApiError } from "../../lib/api.js";
 import { TesterScene, type TesterVariant } from "./Testers.js";
 
@@ -9,8 +10,33 @@ import { TesterScene, type TesterVariant } from "./Testers.js";
  * Status colours are semantic, not decorative: success for a verified pass, danger
  * for a product defect, warning for something that ran but proved nothing.
  */
+const STATUS_LABELS = {
+  PASSED: "ws.status.passed",
+  FAILED: "ws.status.failed",
+  COMPLETED: "ws.status.completed",
+  PARTIAL: "ws.status.partial",
+  WARNING: "ws.status.warning",
+  SKIPPED: "ws.status.skipped",
+  ERROR: "ws.status.error",
+  NOTHING_VERIFIED: "ws.status.nothingVerified",
+  PENDING: "ws.status.pending",
+  RUNNING: "ws.status.running",
+  CANCELLED: "ws.status.cancelled",
+  ACTIVE: "ws.status.active",
+  SUCCEEDED: "ws.status.succeeded",
+  PAID: "ws.status.paid",
+  EXPIRED: "ws.status.expired",
+  PAST_DUE: "ws.status.pastDue",
+  GRACE_PERIOD: "ws.status.gracePeriod",
+  PROCESSING: "ws.status.processing",
+  FREE: "ws.status.free",
+  NONE: "ws.status.none",
+} as const;
+
 export function StatusBadge({ status }: { status: string }) {
+  const { t } = useI18n();
   const normalized = status.toUpperCase();
+  const labelKey = STATUS_LABELS[normalized as keyof typeof STATUS_LABELS];
   const tone =
     normalized === "PASSED" ||
     normalized === "COMPLETED" ||
@@ -33,7 +59,9 @@ export function StatusBadge({ status }: { status: string }) {
             ? ""
             : "app-badge-accent";
   return (
-    <span className={`app-badge ${tone}`}>{normalized.replaceAll("_", " ").toLowerCase()}</span>
+    <span className={`app-badge ${tone}`}>
+      {labelKey ? t(labelKey) : normalized.replaceAll("_", " ").toLowerCase()}
+    </span>
   );
 }
 
@@ -43,15 +71,17 @@ export function Card({
   actions,
   children,
   className = "",
+  enhanced = false,
 }: {
   title?: string;
   description?: string;
   actions?: ReactNode;
   children: ReactNode;
   className?: string;
+  enhanced?: boolean;
 }) {
   return (
-    <section className={`app-card ${className}`}>
+    <section className={`app-card ${className} ${enhanced ? 'enhanced-3d' : ''}`}>
       {title ? (
         <header className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-4">
           <div>

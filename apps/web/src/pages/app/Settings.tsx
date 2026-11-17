@@ -27,7 +27,8 @@ interface ApiKey {
 
 export function Settings() {
   const { theme, setTheme } = useTheme();
-  const { locale, setLocale } = useI18n();
+  const { locale, setLocale, t } = useI18n();
+  const fr = locale === "fr";
   const session = useSession();
   const [members, setMembers] = useState<Member[] | null>(null);
   const [workspace, setWorkspace] = useState<{ name: string; slug: string; myRole: string } | null>(
@@ -74,7 +75,11 @@ export function Settings() {
       await apiFetch(`/api/v1/api-keys/${id}?workspaceId=${session.workspaceId}`, {
         method: "DELETE",
       });
-      setNotice("Token revoked. CI using it will receive 401 on its next upload.");
+      setNotice(
+        fr
+          ? "Jeton révoqué. La CI qui l'utilise recevra 401 à son prochain envoi."
+          : "Token revoked. CI using it will receive 401 on its next upload."
+      );
       await load();
     } catch (caught) {
       setError(caught as ApiError);
@@ -83,17 +88,24 @@ export function Settings() {
     }
   };
 
-  if (!session.workspaceId) return <Empty title="No workspace" body="Create a workspace first." />;
+  if (!session.workspaceId)
+    return (
+      <Empty
+        title={fr ? "Aucun espace de travail" : "No workspace"}
+        body={fr ? "Créez d'abord un espace de travail." : "Create a workspace first."}
+      />
+    );
   if (error) return <ErrorState error={error} onRetry={() => void load()} />;
 
   const canManage = workspace ? ["owner", "admin"].includes(workspace.myRole) : false;
+  const roleLabel = (role: string) =>
+    fr
+      ? ({ owner: "propriétaire", admin: "administrateur", member: "membre" }[role] ?? role)
+      : role;
 
   return (
     <>
-      <PageHeader
-        title="Settings"
-        description="Account, workspace membership and the credentials that can reach this workspace."
-      />
+      <PageHeader title={t("ws.settings.title")} description={t("ws.settings.description")} />
 
       {notice ? (
         <p
@@ -105,10 +117,10 @@ export function Settings() {
       ) : null}
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <Card title="Account">
+        <Card title={fr ? "Compte" : "Account"} enhanced>
           <dl className="grid gap-3 px-5 py-4 text-sm">
             <div>
-              <dt className="text-xs text-muted">Name</dt>
+              <dt className="text-xs text-muted">{fr ? "Nom" : "Name"}</dt>
               <dd className="mt-0.5">{session.user?.name}</dd>
             </div>
             <div>
@@ -116,39 +128,53 @@ export function Settings() {
               <dd className="mt-0.5">{session.user?.email}</dd>
             </div>
             <div>
-              <dt className="text-xs text-muted">Email verification</dt>
+              <dt className="text-xs text-muted">
+                {fr ? "Vérification de l'e-mail" : "Email verification"}
+              </dt>
               <dd className="mt-0.5">
                 {session.user?.emailVerified
-                  ? "Verified"
-                  : "Not configured — no email provider is wired to this deployment."}
+                  ? fr
+                    ? "Vérifié"
+                    : "Verified"
+                  : fr
+                    ? "Non configurée — aucun fournisseur d'e-mail n'est relié à ce déploiement."
+                    : "Not configured — no email provider is wired to this deployment."}
               </dd>
             </div>
             <div>
-              <dt className="text-xs text-muted">Member since</dt>
+              <dt className="text-xs text-muted">{fr ? "Membre depuis" : "Member since"}</dt>
               <dd className="mt-0.5">{formatDay(session.user?.createdAt)}</dd>
             </div>
           </dl>
-          <Cannot reason="Profile edits are not exposed yet: the API has no endpoint that would store them honestly. The form was not added instead of being shown disabled." />
+          <Cannot
+            reason={
+              fr
+                ? "La modification du profil n'est pas exposée : l'API n'a aucun endpoint qui l'enregistrerait honnêtement. Le formulaire n'a pas été ajouté plutôt que d'être affiché désactivé."
+                : "Profile edits are not exposed yet: the API has no endpoint that would store them honestly. The form was not added instead of being shown disabled."
+            }
+          />
         </Card>
 
         <Card
-          title="Workspace"
+          title={fr ? "Espace de travail" : "Workspace"}
           description={
             workspace
-              ? `${workspace.name} · ${workspace.slug} · you are ${workspace.myRole}`
+              ? fr
+                ? `${workspace.name} · ${workspace.slug} · vous êtes ${roleLabel(workspace.myRole)}`
+                : `${workspace.name} · ${workspace.slug} · you are ${workspace.myRole}`
               : undefined
           }
         >
           {!members ? (
-            <Loading label="Loading members…" />
+            <Loading label={fr ? "Chargement des membres…" : "Loading members…"} />
           ) : (
             <div className="overflow-x-auto">
               <table className="app-table">
                 <thead>
                   <tr>
-                    <th>Member</th>
-                    <th>Role</th>
-                    <th>Joined</th>
+                    <th>{fr ? "Membre" : "Member"}</th>
+                    <th>{fr ? "Rôle" : "Role"}</th>
+                    <th>{fr ? "Arrivée" : "Joined"}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -159,7 +185,7 @@ export function Settings() {
                         <p className="text-xs text-muted">{member.email}</p>
                       </td>
                       <td>
-                        <span className="app-badge">{member.role}</span>
+                        <span className="app-badge">{roleLabel(member.role)}</span>
                       </td>
                       <td className="text-muted">{formatDay(member.joinedAt)}</td>
                     </tr>
@@ -168,17 +194,28 @@ export function Settings() {
               </table>
             </div>
           )}
-          <Cannot reason="Inviting a teammate requires an email delivery provider, which is not configured. The API does not create invitations that could never be delivered." />
+          <Cannot
+            reason={
+              fr
+                ? "Inviter un coéquipier exige un fournisseur d'e-mail, qui n'est pas configuré. L'API ne crée pas d'invitations qui ne pourraient jamais être livrées."
+                : "Inviting a teammate requires an email delivery provider, which is not configured. The API does not create invitations that could never be delivered."
+            }
+          />
         </Card>
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-2">
-        <Card title="Appearance" description="Applies to this browser only.">
+        <Card
+          title={fr ? "Apparence" : "Appearance"}
+          description={
+            fr ? "S'applique uniquement à ce navigateur." : "Applies to this browser only."
+          }
+        >
           <div className="flex flex-wrap gap-2 px-5 py-4">
             {(
               [
-                { value: "light", label: "Light", icon: Sun },
-                { value: "dark", label: "Dark", icon: Moon },
+                { value: "light", label: fr ? "Clair" : "Light", icon: Sun },
+                { value: "dark", label: fr ? "Sombre" : "Dark", icon: Moon },
               ] as const
             ).map((option) => (
               <button
@@ -192,12 +229,22 @@ export function Settings() {
               </button>
             ))}
           </div>
-          <Cannot reason="The dashboard follows your choice; the marketing site stays dark by design." />
+          <Cannot
+            reason={
+              fr
+                ? "Le workspace suit votre choix ; le site marketing reste sombre par conception."
+                : "The dashboard follows your choice; the marketing site stays dark by design."
+            }
+          />
         </Card>
 
         <Card
-          title="Language"
-          description="Interface language. Reports and CLI output are unaffected."
+          title={fr ? "Langue" : "Language"}
+          description={
+            fr
+              ? "Langue de l'interface. Les rapports et la sortie du CLI ne changent pas."
+              : "Interface language. Reports and CLI output are unaffected."
+          }
         >
           <div className="flex flex-wrap gap-2 px-5 py-4">
             {(
@@ -217,28 +264,47 @@ export function Settings() {
               </button>
             ))}
           </div>
-          <Cannot reason="Stored in this browser. The marketing shell, home page, pricing and account forms follow this choice. Long-form technical pages and the authenticated dashboard are English-only; run reports keep the language of the project config." />
+          <Cannot
+            reason={
+              fr
+                ? "Stockée dans ce navigateur. Le shell, l'Overview, les projets, les modules, la facturation et les paramètres suivent ce choix. Les rapports de run gardent la langue de la configuration du projet."
+                : "Stored in this browser. The shell, Overview, Projects, modules, Billing and Settings follow this choice. Run reports keep the language of the project config."
+            }
+          />
         </Card>
       </div>
 
       <Card
         className="mt-4"
-        title="API keys"
-        description="Project tokens for the CLI and CI. Only a hash is stored."
+        title={fr ? "Jetons API" : "API keys"}
+        description={
+          fr
+            ? "Jetons de projet pour le CLI et la CI. Seul un hash est stocké."
+            : "Project tokens for the CLI and CI. Only a hash is stored."
+        }
       >
         {!canManage ? (
           <Cannot
-            reason={`Only owners and admins can manage tokens. Your role is ${workspace?.myRole ?? "unknown"}.`}
+            reason={
+              fr
+                ? `Seuls les propriétaires et administrateurs gèrent les jetons. Votre rôle est ${roleLabel(workspace?.myRole ?? "unknown")}.`
+                : `Only owners and admins can manage tokens. Your role is ${workspace?.myRole ?? "unknown"}.`
+            }
           />
         ) : !keys ? (
-          <Loading label="Loading tokens…" />
+          <Loading label={fr ? "Chargement des jetons…" : "Loading tokens…"} />
         ) : keys.length === 0 ? (
           <Empty
-            title="No token yet"
-            body="Create one from a project page. Tokens are scoped to that project and shown once."
+            title={fr ? "Aucun jeton" : "No token yet"}
+            body={
+              fr
+                ? "Créez-en un depuis la page d'un projet. Le jeton est limité à ce projet et affiché une seule fois."
+                : "Create one from a project page. Tokens are scoped to that project and shown once."
+            }
             action={
               <span className="app-badge">
-                <KeyRound size={12} /> Projects → open a project
+                <KeyRound size={12} />{" "}
+                {fr ? "Projets → ouvrir un projet" : "Projects → open a project"}
               </span>
             }
           />
@@ -247,10 +313,10 @@ export function Settings() {
             <table className="app-table">
               <thead>
                 <tr>
-                  <th>Label</th>
-                  <th>Prefix</th>
-                  <th>Scopes</th>
-                  <th>Last used</th>
+                  <th>{fr ? "Libellé" : "Label"}</th>
+                  <th>{fr ? "Préfixe" : "Prefix"}</th>
+                  <th>{fr ? "Portées" : "Scopes"}</th>
+                  <th>{fr ? "Dernier usage" : "Last used"}</th>
                   <th />
                 </tr>
               </thead>
@@ -261,11 +327,11 @@ export function Settings() {
                     <td className="app-mono text-muted">{key.prefix}…</td>
                     <td className="text-xs text-muted">{key.scopes.join(", ")}</td>
                     <td className="text-muted">
-                      {key.revokedAt ? "revoked" : relativeTime(key.lastUsedAt)}
+                      {key.revokedAt ? (fr ? "révoqué" : "revoked") : relativeTime(key.lastUsedAt)}
                     </td>
                     <td>
                       {key.revokedAt ? (
-                        <span className="app-badge">revoked</span>
+                        <span className="app-badge">{fr ? "révoqué" : "revoked"}</span>
                       ) : (
                         <button
                           type="button"
@@ -273,7 +339,7 @@ export function Settings() {
                           onClick={() => void revoke(key.id)}
                           disabled={busy}
                         >
-                          <Trash2 size={13} /> Revoke
+                          <Trash2 size={13} /> {fr ? "Révoquer" : "Revoke"}
                         </button>
                       )}
                     </td>

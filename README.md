@@ -21,9 +21,9 @@ not implemented yet — see the status file.
 
 Implemented and tested: the shared engine and all three modules, the CLI with JSON/
 JUnit/HTML reports, the SaaS API (auth, workspaces, projects, run ingestion, API keys,
-billing, webhooks), the authenticated dashboard and the terminal console. `pnpm test`
-runs 219 tests;
-`pnpm typecheck`, `pnpm lint` (warnings only) and `pnpm build` pass.
+billing, webhooks), the authenticated workspace and the terminal console. `pnpm test`
+runs 220 tests; `pnpm typecheck` and `pnpm build` pass. Biome still reports pre-existing
+diagnostics, so `pnpm lint` is not claimed as clean.
 
 The creator's read-only operations console lives at `/app/admin`: users, workspaces,
 subscriptions, payments, runs and webhook delivery. It is gated by the API's
@@ -34,9 +34,15 @@ with `/api/*`, `/v1/*` and `/health` proxied to the
 [Cloudflare Worker](https://proofstack-api.laudesmassamba1.workers.dev) so session
 cookies stay same-origin. The Worker uses D1 (`proofstack`), migrations applied.
 
-The marketing shell, home page, pricing and account forms are bilingual. Long-form
-technical pages and the authenticated dashboard are English-only; the Settings page
-says so instead of implying a translation that does not exist.
+The marketing shell, home page, pricing and account forms are bilingual. The workspace
+shell, Overview, Projects, WORLD/FLOW/EXIT and CLI are also FR/EN. Billing and Settings
+still contain English UI copy; that is the remaining i18n gap and is stated in Settings
+rather than hidden.
+
+The authenticated workspace uses the Ink & Object design system: paper frame, top
+navigation, state-driven display type and one data-bound object per module. Design
+records and real captures live under [`docs/design`](docs/design), including
+[`WORKSPACE_VISUAL_AUDIT.md`](docs/design/WORKSPACE_VISUAL_AUDIT.md).
 
 Not yet true: no email provider is configured (verification, reset and invitations are
 therefore absent), SasPay's live path is untested without credentials, and prices
@@ -110,7 +116,8 @@ control, labelled as such.
 | `pnpm cli -- <cmd>` | run the built CLI                 |
 | `pnpm proofstack`   | full-screen terminal console      |
 
-API environment variables are documented in
+Copy [`.env.example`](.env.example) to `.env.local` for local development. API
+environment variables are documented in
 [`docs/deployment/ENVIRONMENT_VARIABLES.md`](docs/deployment/ENVIRONMENT_VARIABLES.md).
 Runtime and security decisions are in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md);
 SasPay capabilities are in
@@ -135,6 +142,5 @@ Docs/ + docs/ research, guides and operational documentation
 
 ## Licensing
 
-The package manifests declare MPL-2.0, but a root `LICENSE` file has not been added
-yet. Do not treat the project as formally licensed until that file exists and the
-dependency licence audit is complete.
+The package manifests declare MPL-2.0 and the root `LICENSE` file is present. Audit the
+dependency licences before a public distribution.

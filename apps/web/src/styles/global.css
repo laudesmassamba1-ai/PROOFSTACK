@@ -2,6 +2,7 @@
 @import "@fontsource-variable/jetbrains-mono";
 @import "@fontsource-variable/bricolage-grotesque";
 @import "tailwindcss";
+@import "./animations-3d.css";
 
 /* ============================================================
    PROOFSTACK design tokens — single source for the whole app.
@@ -2582,8 +2583,13 @@ pre,
 /* ---------- command palette ---------- */
 
 .app-command-dialog {
+  position: fixed;
+  inset: 0;
   width: min(620px, calc(100% - 28px));
   max-width: 620px;
+  height: fit-content;
+  max-height: calc(100vh - 28px);
+  margin: auto;
   border: 0;
   padding: 0;
   background: transparent;
@@ -2944,7 +2950,8 @@ pre,
   }
 
   .app-situation-headline {
-    font-size: clamp(3.3rem, 17vw, 5.2rem);
+    max-width: none;
+    font-size: clamp(2.9rem, 13vw, 4.6rem);
   }
 
   .app-situation-stamp {

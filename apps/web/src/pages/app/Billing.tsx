@@ -1,6 +1,7 @@
 import { CreditCard, Download, RefreshCw, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { Card, ErrorState, Loading, Metric, StatusBadge } from "../../components/app/ui.js";
+import { Card, Empty, ErrorState, Loading, Metric, StatusBadge } from "../../components/app/ui.js";
+import { useI18n } from "../../i18n/index.js";
 import { PageHeader } from "../../layouts/AppLayout.js";
 import { type ApiError, apiFetch, postJson } from "../../lib/api.js";
 import { formatDate, formatDay, formatMinor } from "../../lib/format.js";
@@ -90,6 +91,8 @@ interface PlanOption {
 
 export function Billing() {
   const { workspaceId } = useSession();
+  const { locale, t } = useI18n();
+  const fr = locale === "fr";
   const [data, setData] = useState<BillingData | null>(null);
   const [plans, setPlans] = useState<PlanOption[]>([]);
   const [error, setError] = useState<ApiError | Error | null>(null);
@@ -151,7 +154,9 @@ export function Billing() {
       await act(
         plan.key,
         () => postJson("/api/v1/billing/change-plan", { workspaceId, planKey: plan.key }),
-        `${plan.name} queued for the end of this period.`
+        fr
+          ? `${plan.name} sera appliqué à la fin de cette période.`
+          : `${plan.name} queued for the end of this period.`
       );
       return;
     }
@@ -172,7 +177,9 @@ export function Billing() {
       });
       setNotice({
         tone: "ok",
-        text: "Checkout opened. The plan changes only when the provider confirms the payment to the server.",
+        text: fr
+          ? "Paiement ouvert. L'offre ne change que lorsque le fournisseur confirme le paiement au serveur."
+          : "Checkout opened. The plan changes only when the provider confirms the payment to the server.",
       });
     } catch (caught) {
       setNotice({ tone: "bad", text: caught instanceof Error ? caught.message : String(caught) });
@@ -212,7 +219,9 @@ export function Billing() {
       );
       setNotice({
         tone: result.outcome === "credited" ? "ok" : "bad",
-        text: `Sandbox provider reported ${result.state}. The subscription was recalculated from that verified state.`,
+        text: fr
+          ? `Le fournisseur sandbox a renvoyé ${result.state}. L'abonnement a été recalculé depuis cet état vérifié.`
+          : `Sandbox provider reported ${result.state}. The subscription was recalculated from that verified state.`,
       });
       if (result.outcome === "credited") setCheckout(null);
       await load();
@@ -223,9 +232,23 @@ export function Billing() {
     }
   };
 
-  if (!workspaceId) return <Loading label="Select a workspace…" />;
+  // No workspace means no request was made. A spinner would be a lie the user cannot
+  // act on, so the page names the real state.
+  if (!workspaceId) {
+    return (
+      <Empty
+        title={fr ? "Aucun espace sélectionné" : "No workspace selected"}
+        body={
+          fr
+            ? "Choisissez un espace dans l'en-tête, ou créez-en un. Rien n'est chargé avant ce choix."
+            : "Pick a workspace in the header, or create one. Nothing is loaded until a workspace is chosen."
+        }
+        tester="empty"
+      />
+    );
+  }
   if (error) return <ErrorState error={error} onRetry={() => void load()} />;
-  if (!data) return <Loading label="Loading billing…" />;
+  if (!data) return <Loading label={fr ? "Chargement de la facturation…" : "Loading billing…"} />;
 
   const sub = data.subscription;
   const currentRank = plans.find((plan) => plan.key === sub.planKey)?.rank ?? 0;
@@ -233,8 +256,8 @@ export function Billing() {
   return (
     <>
       <PageHeader
-        title="Billing"
-        description="Your plan, what it grants, and every payment attempt with its verified state."
+        title={t("ws.billing.title")}
+        description={t("ws.billing.description")}
         actions={
           <button
             type="button"
@@ -242,7 +265,8 @@ export function Billing() {
             onClick={() => void load()}
             disabled={busy !== null}
           >
-            <RefreshCw size={14} className={busy === "reload" ? "animate-spin" : ""} /> Refresh
+            <RefreshCw size={14} className={busy === "reload" ? "animate-spin" : ""} />{" "}
+            {fr ? "Actualiser" : "Refresh"}
           </button>
         }
       />
@@ -261,18 +285,25 @@ export function Billing() {
       {checkout ? (
         <Card
           className="mb-4"
-          title="Checkout in progress"
-          description="Nothing is credited from this page or from a redirect: the state below is the server's verification of the provider."
+          title={fr ? "Paiement en cours" : "Checkout in progress"}
+          description={
+            fr
+              ? "Rien n'est crédité depuis cette page ni depuis une redirection : l'état ci-dessous est la vérification du fournisseur par le serveur."
+              : "Nothing is credited from this page or from a redirect: the state below is the server's verification of the provider."
+          }
         >
           <div className="px-5 py-4">
             <p className="text-sm">
-              Plan <strong>{checkout.planKey}</strong> · attempt{" "}
+              {fr ? "Offre" : "Plan"} <strong>{checkout.planKey}</strong> ·{" "}
+              {fr ? "tentative" : "attempt"}{" "}
               <code className="app-mono text-xs">{checkout.intentId}</code>
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {checkout.sandbox ? (
                 <>
-                  <span className="text-xs text-muted">Sandbox outcome:</span>
+                  <span className="text-xs text-muted">
+                    {fr ? "Résultat sandbox :" : "Sandbox outcome:"}
+                  </span>
                   {(["success", "declined", "cancelled", "expired"] as const).map((outcome) => (
                     <button
                       key={outcome}
@@ -292,7 +323,7 @@ export function Billing() {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Continue to payment
+                  {fr ? "Continuer vers le paiement" : "Continue to payment"}
                 </a>
               ) : null}
               <button
@@ -301,7 +332,7 @@ export function Billing() {
                 disabled={busy !== null}
                 onClick={() => void checkStatus()}
               >
-                I have paid — check status
+                {fr ? "J'ai payé — vérifier l'état" : "I have paid — check status"}
               </button>
             </div>
           </div>
@@ -310,12 +341,20 @@ export function Billing() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Metric
-          label="Plan"
+          label={fr ? "Offre" : "Plan"}
           value={sub.planName}
-          hint={sub.entitled ? "Paid access is active" : "Resolving to Free"}
+          hint={
+            sub.entitled
+              ? fr
+                ? "L'accès payant est actif"
+                : "Paid access is active"
+              : fr
+                ? "Retour à Free"
+                : "Resolving to Free"
+          }
         />
         <Metric
-          label="Status"
+          label={fr ? "État" : "Status"}
           value={
             <StatusBadge
               status={sub.entitled ? sub.state : sub.state === "NONE" ? "FREE" : sub.state}
@@ -323,26 +362,50 @@ export function Billing() {
           }
           hint={
             sub.cancelAtPeriodEnd
-              ? "Cancels at period end"
+              ? fr
+                ? "Se termine à la fin de la période"
+                : "Cancels at period end"
               : sub.pendingPlanKey
-                ? `Change queued: ${sub.pendingPlanKey}`
-                : "No pending change"
+                ? fr
+                  ? `Changement en attente : ${sub.pendingPlanKey}`
+                  : `Change queued: ${sub.pendingPlanKey}`
+                : fr
+                  ? "Aucun changement en attente"
+                  : "No pending change"
           }
         />
         <Metric
-          label={sub.recurringSupported ? "Renews on" : "Renew manually by"}
+          label={
+            sub.recurringSupported
+              ? fr
+                ? "Renouvellement le"
+                : "Renews on"
+              : fr
+                ? "À renouveler avant le"
+                : "Renew manually by"
+          }
           value={formatDay(sub.renewalDueAt ?? sub.currentPeriodEnd)}
           hint={
             sub.recurringSupported
-              ? "The provider charges this automatically"
-              : "This provider cannot auto-charge; a new payment is required"
+              ? fr
+                ? "Le fournisseur débite automatiquement"
+                : "The provider charges this automatically"
+              : fr
+                ? "Ce fournisseur ne débite pas automatiquement ; un nouveau paiement est requis"
+                : "This provider cannot auto-charge; a new payment is required"
           }
         />
         <Metric
-          label="Amount"
+          label={fr ? "Montant" : "Amount"}
           value={sub.amountMinor && sub.currency ? formatMinor(sub.amountMinor, sub.currency) : "—"}
           hint={
-            sub.period ? `per ${sub.period === "monthly" ? "month" : "year"}` : "No paid period"
+            sub.period
+              ? fr
+                ? `par ${sub.period === "monthly" ? "mois" : "an"}`
+                : `per ${sub.period === "monthly" ? "month" : "year"}`
+              : fr
+                ? "Aucune période payée"
+                : "No paid period"
           }
         />
       </div>
@@ -352,17 +415,28 @@ export function Billing() {
           <div className="flex items-start gap-3">
             <TriangleAlert size={17} className="mt-0.5 shrink-0 text-warning" />
             <div>
-              <p className="text-sm font-medium">This workspace is on Free</p>
+              <p className="text-sm font-medium">
+                {fr ? "Cet espace est sur Free" : "This workspace is on Free"}
+              </p>
               <p className="mt-1 text-xs leading-relaxed text-muted">
                 {sub.reason === "period_ended_awaiting_renewal"
-                  ? `The paid period ended on ${formatDate(sub.currentPeriodEnd)} and no verified renewal exists.`
+                  ? fr
+                    ? `La période payée s'est terminée le ${formatDate(sub.currentPeriodEnd)} et aucun renouvellement vérifié n'existe.`
+                    : `The paid period ended on ${formatDate(sub.currentPeriodEnd)} and no verified renewal exists.`
                   : sub.reason === "subscription_cancelled"
-                    ? "The subscription was cancelled."
+                    ? fr
+                      ? "L'abonnement a été annulé."
+                      : "The subscription was cancelled."
                     : sub.reason === "subscription_suspended"
-                      ? "The subscription is suspended."
-                      : "No paid subscription is active."}{" "}
-                Nothing was deleted, and no paid feature is switched on until a provider confirms a
-                payment.
+                      ? fr
+                        ? "L'abonnement est suspendu."
+                        : "The subscription is suspended."
+                      : fr
+                        ? "Aucun abonnement payant n'est actif."
+                        : "No paid subscription is active."}{" "}
+                {fr
+                  ? "Rien n'a été supprimé, et aucune fonction payante n'est activée avant la confirmation d'un paiement par le fournisseur."
+                  : "Nothing was deleted, and no paid feature is switched on until a provider confirms a payment."}
               </p>
             </div>
           </div>
@@ -371,17 +445,21 @@ export function Billing() {
 
       <Card
         className="mt-6"
-        title="Usage this period"
-        description="Metered once per subject: a retried upload or a re-run of the same id counts once."
+        title={fr ? "Usage de cette période" : "Usage this period"}
+        description={
+          fr
+            ? "Compté une fois par sujet : un envoi réessayé ou un nouveau run du même identifiant ne compte qu'une fois."
+            : "Metered once per subject: a retried upload or a re-run of the same id counts once."
+        }
       >
         <div className="overflow-x-auto">
           <table className="app-table">
             <thead>
               <tr>
-                <th>Counter</th>
-                <th className="text-right">Used</th>
-                <th className="text-right">Limit</th>
-                <th>Billing treatment</th>
+                <th>{fr ? "Compteur" : "Counter"}</th>
+                <th className="text-right">{fr ? "Utilisé" : "Used"}</th>
+                <th className="text-right">{fr ? "Limite" : "Limit"}</th>
+                <th>{fr ? "Traitement" : "Billing treatment"}</th>
               </tr>
             </thead>
             <tbody>
@@ -390,7 +468,7 @@ export function Billing() {
                   <td>{counter.label}</td>
                   <td className="text-right tabular-nums">{counter.used}</td>
                   <td className="text-right tabular-nums">
-                    {counter.limit === -1 ? "unlimited" : counter.limit}
+                    {counter.limit === -1 ? (fr ? "illimité" : "unlimited") : counter.limit}
                   </td>
                   <td className="text-xs text-muted">{counter.counted.replaceAll("_", " ")}</td>
                 </tr>
@@ -402,11 +480,15 @@ export function Billing() {
 
       <Card
         className="mt-6"
-        title="Change plan"
+        title={fr ? "Changer d'offre" : "Change plan"}
         description={
           sub.recurringSupported
-            ? "Upgrades apply immediately with a new charge; downgrades queue until the period ends."
-            : "This provider cannot auto-charge, so a plan change is a new prepaid period. Nothing renews by itself."
+            ? fr
+              ? "Les montées s'appliquent immédiatement avec un nouveau paiement ; les descentes attendent la fin de la période."
+              : "Upgrades apply immediately with a new charge; downgrades queue until the period ends."
+            : fr
+              ? "Ce fournisseur ne débite pas automatiquement : changer d'offre crée une nouvelle période prépayée. Rien ne se renouvelle seul."
+              : "This provider cannot auto-charge, so a plan change is a new prepaid period. Nothing renews by itself."
         }
       >
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -422,7 +504,9 @@ export function Billing() {
                   <p className="mt-1 text-xs leading-relaxed text-muted">{plan.description}</p>
                   <p className="mt-3 text-lg font-semibold">
                     {monthly ? formatMinor(monthly.amount.minor, monthly.amount.currency) : "—"}
-                    <span className="ml-1 text-xs font-normal text-muted">/ month</span>
+                    <span className="ml-1 text-xs font-normal text-muted">
+                      {fr ? "/ mois" : "/ month"}
+                    </span>
                   </p>
                   <button
                     type="button"
@@ -431,39 +515,52 @@ export function Billing() {
                     onClick={() => void choosePlan(plan)}
                   >
                     {isCurrent
-                      ? "Current plan"
+                      ? fr
+                        ? "Offre actuelle"
+                        : "Current plan"
                       : isUpgrade
-                        ? `Upgrade to ${plan.name}`
-                        : `Switch to ${plan.name}`}
+                        ? fr
+                          ? `Passer à ${plan.name}`
+                          : `Upgrade to ${plan.name}`
+                        : fr
+                          ? `Choisir ${plan.name}`
+                          : `Switch to ${plan.name}`}
                   </button>
                 </div>
               );
             })}
         </div>
         <p className="mt-4 border-t border-line pt-3 text-xs leading-relaxed text-muted">
-          A plan is never activated by a browser redirect. Access changes only after the
-          provider&apos;s verified transaction status says the payment succeeded.
+          {fr
+            ? "Une offre n'est jamais activée par une redirection du navigateur. L'accès change seulement quand le statut vérifié de la transaction confirme le paiement."
+            : "A plan is never activated by a browser redirect. Access changes only after the provider's verified transaction status says the payment succeeded."}
         </p>
       </Card>
 
       <Card
         className="mt-6"
-        title="Payment history"
-        description="Every attempt, including the ones that failed. A failed attempt is shown, not hidden."
+        title={fr ? "Historique des paiements" : "Payment history"}
+        description={
+          fr
+            ? "Chaque tentative, y compris celles qui ont échoué. Un échec est affiché, pas caché."
+            : "Every attempt, including the ones that failed. A failed attempt is shown, not hidden."
+        }
       >
         {data.payments.length === 0 ? (
-          <p className="px-5 py-6 text-sm text-muted">No payment attempts yet.</p>
+          <p className="px-5 py-6 text-sm text-muted">
+            {fr ? "Aucune tentative de paiement." : "No payment attempts yet."}
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="app-table">
               <thead>
                 <tr>
-                  <th>Created</th>
-                  <th>Plan</th>
-                  <th className="text-right">Amount</th>
-                  <th>State</th>
-                  <th>Credited</th>
-                  <th>Reference</th>
+                  <th>{fr ? "Créé" : "Created"}</th>
+                  <th>{fr ? "Offre" : "Plan"}</th>
+                  <th className="text-right">{fr ? "Montant" : "Amount"}</th>
+                  <th>{fr ? "État" : "State"}</th>
+                  <th>{fr ? "Crédité" : "Credited"}</th>
+                  <th>{fr ? "Référence" : "Reference"}</th>
                 </tr>
               </thead>
               <tbody>
@@ -483,7 +580,9 @@ export function Billing() {
                         <span className="ml-2 text-xs text-muted">{payment.failureReason}</span>
                       ) : null}
                     </td>
-                    <td className="text-xs">{payment.credited ? "yes" : "no"}</td>
+                    <td className="text-xs">
+                      {payment.credited ? (fr ? "oui" : "yes") : fr ? "non" : "no"}
+                    </td>
                     <td className="app-mono text-xs text-muted">
                       {payment.providerReference ?? "—"}
                     </td>
@@ -497,23 +596,29 @@ export function Billing() {
 
       <Card
         className="mt-6"
-        title="Receipts"
-        description="A payment receipt proves a payment. It is not a tax invoice, and VAT/GST treatment is not assessed."
+        title={fr ? "Reçus" : "Receipts"}
+        description={
+          fr
+            ? "Un reçu prouve un paiement. Ce n'est pas une facture fiscale ; le traitement TVA/GST n'est pas évalué."
+            : "A payment receipt proves a payment. It is not a tax invoice, and VAT/GST treatment is not assessed."
+        }
       >
         {data.invoices.length === 0 ? (
           <p className="px-5 py-6 text-sm text-muted">
-            No receipts yet. One is issued when a payment is verified.
+            {fr
+              ? "Aucun reçu. Un reçu est émis lorsqu'un paiement est vérifié."
+              : "No receipts yet. One is issued when a payment is verified."}
           </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="app-table">
               <thead>
                 <tr>
-                  <th>Number</th>
-                  <th>Issued</th>
-                  <th>Service period</th>
+                  <th>{fr ? "Numéro" : "Number"}</th>
+                  <th>{fr ? "Émis" : "Issued"}</th>
+                  <th>{fr ? "Période" : "Service period"}</th>
                   <th className="text-right">Total</th>
-                  <th>Status</th>
+                  <th>{fr ? "État" : "Status"}</th>
                   <th />
                 </tr>
               </thead>
@@ -537,7 +642,7 @@ export function Billing() {
                         className="app-btn"
                         onClick={() => downloadReceipt(invoice, sub.planName)}
                       >
-                        <Download size={13} /> Receipt
+                        <Download size={13} /> {fr ? "Reçu" : "Receipt"}
                       </button>
                     </td>
                   </tr>
@@ -550,28 +655,46 @@ export function Billing() {
 
       <Card
         className="mt-6"
-        title="Payment provider"
-        description="What the configured gateway can and cannot do. Read from the adapter, not from marketing."
+        title={fr ? "Fournisseur de paiement" : "Payment provider"}
+        description={
+          fr
+            ? "Ce que la passerelle configurée peut faire, et ne peut pas faire. Lu depuis l'adaptateur, pas depuis le marketing."
+            : "What the configured gateway can and cannot do. Read from the adapter, not from marketing."
+        }
       >
         <dl className="grid gap-3 px-5 py-4 text-xs sm:grid-cols-2">
           <div>
-            <dt className="text-muted">Provider</dt>
+            <dt className="text-muted">{fr ? "Fournisseur" : "Provider"}</dt>
             <dd className="mt-0.5 font-medium">{data.provider.name}</dd>
           </div>
           <div>
-            <dt className="text-muted">Automatic recurring charges</dt>
+            <dt className="text-muted">
+              {fr ? "Débits récurrents automatiques" : "Automatic recurring charges"}
+            </dt>
             <dd className="mt-0.5 font-medium">
-              {data.provider.automatedRecurring ? "supported" : "not supported"}
+              {data.provider.automatedRecurring
+                ? fr
+                  ? "pris en charge"
+                  : "supported"
+                : fr
+                  ? "non pris en charge"
+                  : "not supported"}
             </dd>
           </div>
           <div>
-            <dt className="text-muted">Refunds via API</dt>
+            <dt className="text-muted">{fr ? "Remboursements via API" : "Refunds via API"}</dt>
             <dd className="mt-0.5 font-medium">
-              {data.provider.refunds ? "supported" : "administrative only"}
+              {data.provider.refunds
+                ? fr
+                  ? "pris en charge"
+                  : "supported"
+                : fr
+                  ? "administratif uniquement"
+                  : "administrative only"}
             </dd>
           </div>
           <div>
-            <dt className="text-muted">Webhook signature</dt>
+            <dt className="text-muted">{fr ? "Signature du webhook" : "Webhook signature"}</dt>
             <dd className="app-mono mt-0.5">{data.provider.webhookSignatureScheme}</dd>
           </div>
         </dl>
@@ -587,8 +710,12 @@ export function Billing() {
       {sub.entitled || sub.state !== "NONE" ? (
         <Card
           className="mt-6"
-          title="Cancel"
-          description="Cancelling keeps the access you already paid for until the period ends."
+          title={fr ? "Annulation" : "Cancel"}
+          description={
+            fr
+              ? "L'annulation conserve l'accès déjà payé jusqu'à la fin de la période."
+              : "Cancelling keeps the access you already paid for until the period ends."
+          }
         >
           <div className="px-5 py-4">
             <button
@@ -599,16 +726,27 @@ export function Billing() {
                 void act(
                   "cancel",
                   () => postJson("/api/v1/billing/cancel", { workspaceId }),
-                  `Cancelled. Access continues until ${formatDay(sub.currentPeriodEnd)}.`
+                  fr
+                    ? `Annulé. L'accès continue jusqu'au ${formatDay(sub.currentPeriodEnd)}.`
+                    : `Cancelled. Access continues until ${formatDay(sub.currentPeriodEnd)}.`
                 )
               }
             >
               <CreditCard size={14} />{" "}
-              {sub.cancelAtPeriodEnd ? "Cancellation already scheduled" : "Cancel subscription"}
+              {sub.cancelAtPeriodEnd
+                ? fr
+                  ? "Annulation déjà programmée"
+                  : "Cancellation already scheduled"
+                : fr
+                  ? "Annuler l'abonnement"
+                  : "Cancel subscription"}
             </button>
             <p className="mt-3 text-xs leading-relaxed text-muted">
-              No further charge is created. The plan drops to Free at{" "}
-              {formatDay(sub.currentPeriodEnd)}, and your data is kept.
+              {fr
+                ? "Aucun nouveau débit n'est créé. L'offre repasse à Free le"
+                : "No further charge is created. The plan drops to Free at"}{" "}
+              {formatDay(sub.currentPeriodEnd)}
+              {fr ? ", et vos données sont conservées." : ", and your data is kept."}
             </p>
           </div>
         </Card>

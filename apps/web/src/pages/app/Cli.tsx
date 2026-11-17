@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { Card, Empty, ErrorState, Loading, StatusBadge } from "../../components/app/ui.js";
 import { CliPreview } from "../../components/marketing/CliPreview.js";
+import { useI18n } from "../../i18n/index.js";
 import { PageHeader } from "../../layouts/AppLayout.js";
 import { type ApiError, apiFetch } from "../../lib/api.js";
 import { relativeTime } from "../../lib/format.js";
@@ -19,24 +20,27 @@ interface Project {
 
 const STEPS = [
   {
-    title: "Install",
-    body: "The package is private in this build. Run it from this repository, or use the published name once it is released.",
+    titleKey: "ws.cli.install",
+    bodyKey: "ws.cli.step.install.body",
     command: "pnpm cli -- init",
   },
   {
-    title: "Configure",
-    body: "Point the modules at localhost or staging, then validate the targets before the first run.",
+    titleKey: "ws.cli.configure",
+    bodyKey: "ws.cli.step.configure.body",
     command: "pnpm cli -- doctor\npnpm cli -- validate",
   },
   {
-    title: "Prove",
-    body: "Run the checks, read the finding, reproduce it. Uploading the result is a separate, explicit step.",
+    titleKey: "ws.cli.prove",
+    bodyKey: "ws.cli.step.prove.body",
     command: "pnpm cli -- test --module world,flow,exit\npnpm cli -- sync",
   },
-];
+] as const;
+
+const CLI_FACTS = ["ws.cli.what.1", "ws.cli.what.2", "ws.cli.what.3", "ws.cli.what.4"] as const;
 
 export function Cli() {
   const { workspaceId } = useSession();
+  const { t } = useI18n();
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [error, setError] = useState<ApiError | Error | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
@@ -69,7 +73,7 @@ export function Cli() {
   };
 
   if (error) return <ErrorState error={error} onRetry={() => void load()} />;
-  if (!projects) return <Loading label="Checking the workspace connection…" />;
+  if (!projects) return <Loading label={t("ws.cli.checking")} />;
 
   const latest = [...projects]
     .filter((project) => project.lastRunAt)
@@ -79,27 +83,25 @@ export function Cli() {
   return (
     <>
       <PageHeader
-        title="Connect the CLI"
-        description="Developer onboarding for this workspace. The browser can copy commands and create a project token; it cannot execute a local shell command."
+        eyebrow={t("ws.cli.eyebrow")}
+        title={t("ws.cli.title")}
+        description={t("ws.cli.description")}
         actions={
           <Link to="/docs" className="app-btn">
-            <Terminal size={14} /> CLI documentation
+            <Terminal size={14} /> {t("ws.cli.docs")}
           </Link>
         }
       />
 
       <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <Card
-          title="Connection status"
-          description="Read from the same project records as the dashboard."
-        >
+        <Card title={t("ws.cli.connection")} description={t("ws.cli.connection.body")}>
           {projects.length === 0 ? (
             <Empty
-              title="No project yet"
-              body="Create a project first. A project gives the CLI a base URL, an environment and the module set to run."
+              title={t("ws.cli.noProject")}
+              body={t("ws.cli.noProject.body")}
               action={
                 <Link to="/app/projects" className="app-btn app-btn-primary">
-                  Create a project <ArrowRight size={14} />
+                  {t("ws.cli.create")} <ArrowRight size={14} />
                 </Link>
               }
             />
@@ -108,12 +110,12 @@ export function Cli() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium">
-                    {latest ? `Last upload from ${latest.name}` : "No run received yet"}
+                    {latest ? t("ws.cli.lastUpload", { project: latest.name }) : t("ws.cli.noRun")}
                   </p>
                   <p className="mt-1 text-xs leading-relaxed text-muted">
                     {latest?.lastRunAt
-                      ? `${relativeTime(latest.lastRunAt)} · the status below is the uploaded run status, not a local test result.`
-                      : "The projects exist, but the CLI has not uploaded a run. Create a scoped token, run the checks, then sync."}
+                      ? t("ws.cli.lastUpload.body", { time: relativeTime(latest.lastRunAt) })
+                      : t("ws.cli.noRun.body")}
                   </p>
                 </div>
                 {latest?.lastRunStatus ? <StatusBadge status={latest.lastRunStatus} /> : null}
@@ -131,37 +133,26 @@ export function Cli() {
               </div>
               <div className="mt-4 rounded-[var(--radius)] border border-line bg-surface-alt px-3 py-3">
                 <div className="flex items-center gap-2 text-xs font-medium">
-                  <KeyRound size={13} className="text-primary" />
-                  Project token
+                  <KeyRound size={13} className="text-primary" /> {t("ws.cli.token")}
                 </div>
-                <p className="mt-1 text-xs leading-relaxed text-muted">
-                  Open a project and create a token scoped to{" "}
-                  <code className="app-mono">runs:write</code> and{" "}
-                  <code className="app-mono">reports:read</code>. It is shown once; store it in CI
-                  secrets.
-                </p>
+                <p className="mt-1 text-xs leading-relaxed text-muted">{t("ws.cli.token.body")}</p>
                 <Link
                   to={latest ? `/app/projects/${latest.id}` : "/app/projects"}
                   className="app-btn mt-3"
                 >
-                  Open project token <ArrowRight size={13} />
+                  {t("ws.cli.token.open")} <ArrowRight size={13} />
                 </Link>
               </div>
             </div>
           )}
         </Card>
 
-        <Card title="What the CLI is" description="The execution model, stated plainly.">
+        <Card title={t("ws.cli.what")} description={t("ws.cli.what.body")}>
           <ul className="space-y-3 px-5 py-4">
-            {[
-              "Runs on your machine or CI — not in the browser or the API.",
-              "One engine, one report schema, three modules.",
-              "The cloud stores results you explicitly sync; no silent upload.",
-              "Every failed finding includes a reproducible command.",
-            ].map((item) => (
-              <li key={item} className="flex gap-2.5 text-xs leading-relaxed text-muted">
+            {CLI_FACTS.map((key) => (
+              <li key={key} className="flex gap-2.5 text-xs leading-relaxed text-muted">
                 <Check size={14} className="mt-0.5 shrink-0 text-success" />
-                {item}
+                {t(key)}
               </li>
             ))}
           </ul>
@@ -170,9 +161,9 @@ export function Cli() {
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         {STEPS.map((step, index) => (
-          <Card key={step.title} title={`0${index + 1} · ${step.title}`}>
+          <Card key={step.titleKey} title={`0${index + 1} · ${t(step.titleKey)}`}>
             <div className="px-5 py-4">
-              <p className="text-xs leading-relaxed text-muted">{step.body}</p>
+              <p className="text-xs leading-relaxed text-muted">{t(step.bodyKey)}</p>
               <div className="mt-3 flex items-start gap-2">
                 <pre className="min-w-0 flex-1 overflow-x-auto rounded-[var(--radius)] bg-surface-alt px-3 py-2 app-mono whitespace-pre-wrap">
                   {step.command}
@@ -181,13 +172,13 @@ export function Cli() {
                   type="button"
                   className="app-btn px-2"
                   onClick={() => void copy(step.command)}
-                  aria-label={`Copy ${step.title} command`}
+                  aria-label={t("ws.cli.copy", { title: t(step.titleKey) })}
                 >
                   <Copy size={13} />
                 </button>
               </div>
               {copied === step.command ? (
-                <p className="mt-1 text-[0.7rem] text-success">Copied.</p>
+                <p className="mt-1 text-[0.7rem] text-success">{t("ws.cli.copied")}</p>
               ) : null}
             </div>
           </Card>
@@ -196,33 +187,31 @@ export function Cli() {
 
       <div className="mt-4">
         <CliPreview />
-        <p className="mt-2 text-[0.7rem] text-muted">
-          The terminal above is a static example generated from a real report shape. It is not a
-          live execution from this browser.
-        </p>
+        <p className="mt-2 text-[0.7rem] text-muted">{t("ws.cli.static")}</p>
       </div>
 
-      <Card title="Installation troubleshooting" className="mt-4">
+      <Card title={t("ws.cli.trouble.title")} className="mt-4">
         <div className="grid gap-3 px-5 py-4 text-xs leading-relaxed text-muted sm:grid-cols-2">
           <p>
-            <span className="font-medium text-ink">Command not found?</span> Use{" "}
-            <code className="app-mono">pnpm cli -- &lt;command&gt;</code> from the repository root;
-            the npm package is not published yet.
+            <span className="font-medium text-ink">{t("ws.cli.trouble.command.title")}</span>{" "}
+            {t("ws.cli.trouble.command.body")}{" "}
+            <code className="app-mono">pnpm cli -- &lt;command&gt;</code>
           </p>
           <p>
-            <span className="font-medium text-ink">401 on sync?</span> The token is scoped to one
-            project and must be supplied as{" "}
+            <span className="font-medium text-ink">{t("ws.cli.trouble.sync.title")}</span>{" "}
+            {t("ws.cli.trouble.sync.body")}{" "}
             <code className="app-mono">PROOFSTACK_PROJECT_TOKEN</code>.
           </p>
           <p>
-            <span className="font-medium text-ink">API unreachable?</span> Set{" "}
-            <code className="app-mono">VITE_API_URL</code> for the dashboard and{" "}
-            <code className="app-mono">PROOFSTACK_API_URL</code> for the CLI.
+            <span className="font-medium text-ink">{t("ws.cli.trouble.api.title")}</span>{" "}
+            {t("ws.cli.trouble.api.body")} <code className="app-mono">VITE_API_URL</code>{" "}
+            {t("ws.cli.trouble.api.body2")} <code className="app-mono">PROOFSTACK_API_URL</code>{" "}
+            {t("ws.cli.trouble.api.body3")}
           </p>
           <p>
-            <span className="font-medium text-ink">No run appears?</span>{" "}
-            <code className="app-mono">test</code> is local; <code className="app-mono">sync</code>{" "}
-            is the explicit upload step.
+            <span className="font-medium text-ink">{t("ws.cli.trouble.upload.title")}</span>{" "}
+            <code className="app-mono">test</code> {t("ws.cli.trouble.upload.body")}{" "}
+            <code className="app-mono">sync</code> {t("ws.cli.trouble.upload.body2")}
           </p>
         </div>
       </Card>

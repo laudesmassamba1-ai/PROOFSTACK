@@ -83,16 +83,66 @@ async function open(page, path) {
   await ctx.close();
 }
 
-// 4. Authenticated dashboard and CLI onboarding.
+// 4. Authenticated workspace, desktop.
 if (cookie) {
   const ctx = await context({ colorScheme: "light" });
   const page = await ctx.newPage();
   await open(page, "/app");
   await page.waitForTimeout(1200);
+  console.log("workspace-url", page.url());
   await page.screenshot({ path: `${output}/dashboard.png` });
+
+  await open(page, "/app/projects");
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: `${output}/projects.png` });
+
+  await open(page, "/app/modules/world");
+  await page.waitForTimeout(900);
+  await page.screenshot({ path: `${output}/module-world.png` });
+
   await open(page, "/app/cli");
   await page.waitForTimeout(700);
   await page.screenshot({ path: `${output}/cli-onboarding.png` });
+
+  await open(page, "/app");
+  await page.waitForTimeout(800);
+  await page.keyboard.press("Control+k");
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: `${output}/command-palette.png` });
+  await page.keyboard.press("Escape");
+
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: `${output}/dashboard-1024.png` });
+  await ctx.close();
+}
+
+// 5. Authenticated workspace, mobile and mobile menu.
+if (cookie) {
+  const ctx = await context({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+    deviceScaleFactor: 2,
+    colorScheme: "light",
+  });
+  const page = await ctx.newPage();
+  await open(page, "/app");
+  await page.waitForTimeout(1000);
+  await page.screenshot({ path: `${output}/dashboard-mobile.png` });
+  await page.locator("button.app-menu-trigger").click();
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: `${output}/mobile-menu.png` });
+  await ctx.close();
+}
+
+// 6. Tablet check for type wrapping and object placement.
+if (cookie) {
+  const ctx = await context({ viewport: { width: 768, height: 1024 }, colorScheme: "light" });
+  const page = await ctx.newPage();
+  await open(page, "/app");
+  await page.waitForTimeout(900);
+  await page.screenshot({ path: `${output}/dashboard-768.png` });
   await ctx.close();
 }
 

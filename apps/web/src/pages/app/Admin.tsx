@@ -1,6 +1,7 @@
 import { RefreshCw, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Card, Empty, ErrorState, Loading, Metric, StatusBadge } from "../../components/app/ui.js";
+import { EnhancedCard } from "../../components/common/EnhancedCard.js";
 import { PageHeader } from "../../layouts/AppLayout.js";
 import { type ApiError, apiFetch } from "../../lib/api.js";
 import { duration, formatDate, formatMinor, relativeTime } from "../../lib/format.js";
@@ -199,7 +200,7 @@ export function Admin() {
         />
       </div>
 
-      <div className="mt-6 grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+      <EnhancedCard className="mt-6 grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <Card
           title="Verified revenue"
           description="Sum of credited payment intents, by currency. Credited means the provider verification marked the payment as paid."
@@ -257,7 +258,7 @@ export function Admin() {
             </div>
           )}
         </Card>
-      </div>
+      </EnhancedCard>
 
       <Card
         className="mt-6"

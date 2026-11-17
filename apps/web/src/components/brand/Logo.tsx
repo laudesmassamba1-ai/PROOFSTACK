@@ -88,7 +88,8 @@ export function Wordmark({
           color: variant === "onLight" ? "#142033" : "#F2F6FA",
         }}
       >
-        PROOFSTACK
+        {/* The mark supplies the first P; printing it again reads “PPROOFSTACK”. */}
+        {showMark ? "ROOFSTACK" : "PROOFSTACK"}
       </span>
     </span>
   );
@@ -97,7 +98,8 @@ export function Wordmark({
 /** Stable keys for repeated letters in the animated wordmark. */
 const WORDMARK_LETTERS = (() => {
   const seen = new Map<string, number>();
-  return "PROOFSTACK".split("").map((char) => {
+  // The geometric P is rendered separately as the mark.
+  return "ROOFSTACK".split("").map((char) => {
     const occurrence = (seen.get(char) ?? 0) + 1;
     seen.set(char, occurrence);
     return { char, key: `${char}-${occurrence}` };

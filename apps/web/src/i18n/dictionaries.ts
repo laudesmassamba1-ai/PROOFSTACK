@@ -150,6 +150,9 @@ export const en = {
   "notfound.title": "Page not found",
   "notfound.body": "That route does not exist in this build.",
   "notfound.cta": "Back to the homepage",
+  "ws.noWorkspace.title": "No workspace selected",
+  "ws.noWorkspace.body":
+    "Pick a workspace in the header, or create one. Nothing is loaded until a workspace is chosen.",
   "ws.status.notTested": "not tested",
   "ws.status.notConfigured": "to configure",
   "ws.status.running": "running",
@@ -323,6 +326,9 @@ export const fr: Messages = {
   "notfound.title": "Page introuvable",
   "notfound.body": "Cette route n'existe pas dans cette version.",
   "notfound.cta": "Retour à l'accueil",
+  "ws.noWorkspace.title": "Aucun espace de travail sélectionné",
+  "ws.noWorkspace.body":
+    "Choisissez un espace de travail dans l'en-tête, ou créez-en un. Rien n'est chargé tant qu'aucun espace n'est choisi.",
   "ws.status.notTested": "non testé",
   "ws.status.notConfigured": "à configurer",
   "ws.status.running": "en cours",

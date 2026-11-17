@@ -1,7 +1,43 @@
 # Reference decoding — Ink & Object
 
-The three reference energies are decoded here into principles and measurements. The
+The reference energies are decoded here into principles and measurements. The
 product does not copy their compositions, objects or copy.
+
+## Images actually inspected
+
+`ref_visuelles/` contains six files, viewed directly before the final QA pass:
+
+- `z1.png` (405×252) — “Limitless Design Solutions”. White page, tiny top nav, an
+  iridescent violet/blue metallic atom-ribbon on the left, and a three-line black
+  uppercase headline on the right. Microcopy sits at the left edge; `*300`, `*200`,
+  `*100` stats and `REACH OUT ↗` sit at the top right. Two service cards peek from the
+  bottom edge. This is the clearest reference for type/object overlap.
+- `z2.png` (405×255) — “Puffed-up abstract 3D illustrations”. Warm off-white field,
+  yellow ribbed torus cropped at top-left, purple velvet loop at bottom-left, silver
+  foil flower at top-right, glass spheres. A centred three-line grotesque headline
+  sits over the objects; nav and pill controls are tiny. This is the material language
+  behind FLOW and EXIT.
+- `z3.png` (402×251) — “Look Out Below”. Cream page inside a thin black rounded frame;
+  giant three-line black display type; an angled piano at top-right; dozens of tiny
+  ink characters with speech bubbles; one black pill and one outlined pill. This is
+  the frame and Tester reference.
+- `da1.png` (1364×750) — black field with a mint/teal dot wave sweeping in from the
+  right; centred spaced wordmark “CAYLENT” with the A built from three green bars;
+  subtitle “Idea to Impact. Faster.” Very high negative space, no cards.
+- `da2.png` (1354×753) — blue-to-magenta-to-orange gradient field with floating white
+  isometric cards (“User-based improvements”, “Compare Parts”, “Knowledge Spaces”,
+  “Smart Publishing”), blue line icons, glossy edges and small 3D objects. This is the
+  previous brand-object direction, not the workspace direction.
+- `exp2.webp` (1339×768) — dark product screenshot: narrow icon rail, project sidebar,
+  large “The only 100% free powerful coding agent” headline with a mint highlight,
+  dotted globe and a prompt composer. It confirms the contrast between a dense dark
+  admin/product shell and the paper workspace; it is not copied.
+
+What the real images add to the textual brief: `z1` uses much more empty paper than a
+normal dashboard; `z2` crops objects aggressively; `z3` makes the frame and characters
+part of the composition; `da1` proves that a dot field can carry an entire hero.
+The workspace intentionally keeps more data below the fold than `z1`, because
+engineers need runs, findings and project facts on the same screen.
 
 ## REF-1 — Limitless Design Solutions
 

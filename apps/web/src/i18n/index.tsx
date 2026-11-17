@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { setFormatLocale } from "../lib/format.js";
 import { type MessageKey as BaseKey, en, fr } from "./dictionaries.js";
 import { type MarketingKey, marketingEn, marketingFr } from "./marketing.js";
 import { type WorkspaceKey, workspaceEn, workspaceFr } from "./workspace.js";
@@ -49,6 +50,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.lang = locale;
+    setFormatLocale(locale);
     try {
       window.localStorage.setItem(STORAGE_KEY, locale);
     } catch {

@@ -53,8 +53,8 @@ const PENDING = [
     body: "Plans and prices are code-backed today. An admin interface for pricing, subscriptions, refunds and webhook history is not built.",
   },
   {
-    title: "Dashboard translation",
-    body: "Marketing pages and account forms are bilingual. The authenticated dashboard is English-only and says so in Settings.",
+    title: "Billing and Settings translation",
+    body: "Marketing pages, account forms, the workspace shell, Overview, Projects, modules and CLI are FR/EN. Billing and Settings UI copy is still being migrated and is not claimed as fully bilingual.",
   },
 ];
 
