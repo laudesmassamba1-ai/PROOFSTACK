@@ -25,6 +25,31 @@ interface RunTotalsShape {
   errors?: number;
 }
 
+/** Wrangler's `d1 migrations apply` records in d1_migrations; the app's own
+ *  migrate() records in schema_migrations. Local test databases only have the
+ *  latter, so the query adapts to whichever tables exist. */
+async function latestMigrationRow(db: Services["db"]): Promise<Row | null> {
+  const tables = await db
+    .prepare(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('d1_migrations','schema_migrations')"
+    )
+    .all<{ name: string }>();
+  const names = tables.map((row) => row.name);
+  const hasD1 = names.includes("d1_migrations");
+  const hasApp = names.includes("schema_migrations");
+  const query =
+    hasD1 && hasApp
+      ? `SELECT id FROM (
+         SELECT name AS id, applied_at FROM d1_migrations
+         UNION ALL
+         SELECT id, applied_at FROM schema_migrations
+       ) ORDER BY applied_at DESC LIMIT 1`
+      : hasD1
+        ? "SELECT name AS id, applied_at FROM d1_migrations ORDER BY applied_at DESC LIMIT 1"
+        : "SELECT id, applied_at FROM schema_migrations ORDER BY applied_at DESC LIMIT 1";
+  return db.prepare(query).first<Row>();
+}
+
 export function adminRoutes(services: Services): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
 
@@ -89,9 +114,7 @@ export function adminRoutes(services: Services): Hono<AppEnv> {
         services.db,
         "SELECT COUNT(*) AS count FROM webhook_events WHERE processing_state = 'FAILED'"
       ),
-      services.db
-        .prepare("SELECT id FROM schema_migrations ORDER BY applied_at DESC LIMIT 1")
-        .first<Row>(),
+      latestMigrationRow(services.db),
       services.db
         .prepare(
           `SELECT currency,

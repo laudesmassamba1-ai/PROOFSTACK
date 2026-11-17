@@ -120,6 +120,15 @@ reports which file was found, which modules it enables, and any environment
 problem (Node version, API reachability, missing tokens) without ever inventing
 a passing result.
 
+## AI connection
+
+`proofcore mcp` serves the analysis tools (project_summary, doctor,
+validate_config, run_tests, last_report) to external AI agents — Claude Code and
+the Gemini CLI register it from `.mcp.json` / `~/.gemini/settings.json`.
+`proofcore ai integrate [--write]` generates those files plus the analysis
+instructions. `proofcore ai status|tools|ask|agent` drives the in-app agent loop
+against any OpenAI-compatible provider. Details: docs/guides/AI_INTEGRATION.md.
+
 ## QA
 
 - Every flow above is exercised by tests: device authorization in
