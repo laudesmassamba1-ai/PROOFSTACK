@@ -32,6 +32,7 @@ import {
   clearStoredSession,
   DEFAULT_API_URL,
   loadStoredSession,
+  loginDevice,
   loginInteractive,
   type Overview,
   resolveApiUrl,
@@ -918,6 +919,11 @@ async function commandProjects(flags: GlobalFlags): Promise<number> {
   return 0;
 }
 
+/** Testable sleep: the device flow's polling interval. */
+function waitMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function commandAuth(
   flags: GlobalFlags,
   command: "login" | "logout",
@@ -935,6 +941,17 @@ async function commandAuth(
   }
 
   const apiUrl = resolveApiUrl(flagValue(args, "--api"));
+  if (args.includes("--device")) {
+    try {
+      await loginDevice({ apiUrl, print: (line) => out(flags, line), sleep: waitMs });
+      out(flags, dim(flags, "Next: run `proofcore` to open the terminal console."));
+      return 0;
+    } catch (error) {
+      err(flags, red(flags, describeError(error).message));
+      return 2;
+    }
+  }
+
   if (stdin.isTTY && !flags.json) {
     try {
       await loginInteractive({ apiUrl });

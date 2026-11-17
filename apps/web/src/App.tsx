@@ -16,6 +16,9 @@ const Changelog = lazy(() =>
 );
 const Security = lazy(() => import("./pages/Security.js").then((m) => ({ default: m.Security })));
 const Auth = lazy(() => import("./pages/Auth.js").then((m) => ({ default: m.Auth })));
+const DeviceApproval = lazy(() =>
+  import("./pages/DeviceApproval.js").then((m) => ({ default: m.DeviceApproval }))
+);
 const NotFound = lazy(() => import("./pages/NotFound.js").then((m) => ({ default: m.NotFound })));
 const AppLayout = lazy(() =>
   import("./layouts/AppLayout.js").then((m) => ({ default: m.AppLayout }))
@@ -73,6 +76,7 @@ export function App() {
           <Route path="changelog" element={<Changelog />} />
           <Route path="security" element={<Security />} />
           <Route path="signin" element={<Auth mode="in" />} />
+          <Route path="device" element={<DeviceApproval />} />
           <Route path="signup" element={<Auth mode="up" />} />
           <Route path="*" element={<NotFound />} />
         </Route>

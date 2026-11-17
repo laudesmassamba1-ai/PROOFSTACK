@@ -10,6 +10,7 @@ import { createPaymentProvider } from "./providers.js";
 import { adminRoutes } from "./routes/admin.js";
 import { authRoutes } from "./routes/auth.js";
 import { billingRoutes, planRoutes } from "./routes/billing.js";
+import { deviceRoutes } from "./routes/device.js";
 import { machineRoutes } from "./routes/machine.js";
 import { webhookRoutes } from "./routes/webhooks.js";
 import { workspaceRoutes } from "./routes/workspace.js";
@@ -118,6 +119,7 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
   });
 
   app.route("/api/auth", authRoutes(services));
+  app.route("/api/auth/device", deviceRoutes(services));
   app.route("/api/v1", planRoutes(services));
   app.route("/api/v1", workspaceRoutes(services));
   app.route("/api/v1", billingRoutes(services));

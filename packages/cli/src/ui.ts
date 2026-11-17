@@ -443,6 +443,143 @@ function readHidden(prompt: string): Promise<string> {
   });
 }
 
+// -------------------------------------------------------- device authorization
+
+export interface DeviceStartResponse {
+  deviceCode: string;
+  userCode: string;
+  verificationUrl: string;
+  expiresIn: number;
+  interval: number;
+}
+
+type DevicePollStatus = "pending" | "approved" | "denied" | "expired" | "invalid";
+
+const DEVICE_POLL_POLLABLE_CODES: Record<number, DevicePollStatus> = {
+  400: "pending",
+  403: "denied",
+};
+
+async function devicePollOnce(
+  apiUrl: string,
+  deviceCode: string
+): Promise<{ status: DevicePollStatus; setCookie?: string; body?: string }> {
+  const response = await fetch(`${apiUrl}/api/auth/device/token`, {
+    method: "POST",
+    headers: { accept: "application/json", "content-type": "application/json" },
+    body: JSON.stringify({ deviceCode }),
+  });
+  if (response.ok) {
+    const headers = response.headers as Headers & { getSetCookie?: () => string[] };
+    const rawCookie = headers.getSetCookie?.()[0] ?? headers.get("set-cookie");
+    return {
+      status: "approved",
+      setCookie: rawCookie?.split(";")[0],
+      body: await response.text(),
+    };
+  }
+  const mapped = DEVICE_POLL_POLLABLE_CODES[response.status];
+  if (mapped) return { status: mapped };
+  if (response.status === 429) return { status: "pending" }; // slow_down: back off, keep waiting
+  return { status: "invalid" };
+}
+
+/**
+ * Device authorization login (RFC 8628-style).
+ *
+ * For machines where no browser is reachable: CI runners, SSH boxes, a teammate's
+ * terminal. The CLI asks the API for a short-lived grant, shows the user code,
+ * and polls until the grant is approved in a browser where the user is already
+ * signed in. Nothing about this flow is simulated: the decision happens in an
+ * authenticated browser session, one approval mints exactly one session, and
+ * the grant expires after ten minutes.
+ */
+export async function loginDevice(input: {
+  apiUrl?: string;
+  clientName?: string;
+  print: (line: string) => void;
+  sleep: (ms: number) => Promise<void>;
+}): Promise<StoredSession> {
+  const apiUrl = resolveApiUrl(input.apiUrl);
+  const startResponse = await fetch(`${apiUrl}/api/auth/device/start`, {
+    method: "POST",
+    headers: { accept: "application/json", "content-type": "application/json" },
+    body: JSON.stringify({ clientName: input.clientName ?? "proofcore CLI" }),
+  });
+  if (!startResponse.ok) {
+    throw new UiApiError(
+      `The API refused to start the device login (HTTP ${startResponse.status}).`,
+      startResponse.status,
+      "device_start_failed"
+    );
+  }
+  const start = (await startResponse.json()) as DeviceStartResponse;
+
+  input.print("");
+  input.print("Open this URL on any device where you are signed in:");
+  input.print(`  ${start.verificationUrl}`);
+  input.print("");
+  input.print("Then enter this code:");
+  input.print(`  ${start.userCode}`);
+  input.print("");
+  input.print(`Waiting for approval (expires in ${Math.round(start.expiresIn / 60)} min)…`);
+
+  const deadline = Date.now() + start.expiresIn * 1000;
+  let interval = Math.max(start.interval, 1) * 1000;
+
+  while (Date.now() < deadline) {
+    await input.sleep(interval);
+    const poll = await devicePollOnce(apiUrl, start.deviceCode);
+
+    if (poll.status === "approved") {
+      if (!poll.setCookie) {
+        throw new UiApiError(
+          "The API approved the device but did not return a session cookie.",
+          502,
+          "missing_session_cookie"
+        );
+      }
+      let email = "";
+      try {
+        const body = JSON.parse(poll.body ?? "") as { user?: { email?: string } };
+        if (body.user?.email) email = body.user.email;
+      } catch {
+        // The cookie is what matters; the email is only a display hint.
+      }
+      const session: StoredSession = {
+        apiUrl,
+        cookie: poll.setCookie,
+        email,
+        savedAt: new Date().toISOString(),
+      };
+      await saveStoredSession(session);
+      input.print("");
+      input.print(email ? `Signed in as ${email}.` : "Signed in.");
+      input.print(`Session stored at ${sessionFilePath()} (mode 0600).`);
+      return session;
+    }
+
+    if (poll.status === "denied") {
+      throw new UiApiError("The request was denied in the browser.", 403, "access_denied");
+    }
+    if (poll.status === "invalid") {
+      throw new UiApiError(
+        "The device grant is no longer valid. Start again.",
+        400,
+        "invalid_grant"
+      );
+    }
+    // pending: keep polling. slow_down (429) nudges the interval up.
+    interval = Math.min(interval * 1.5, 15_000);
+  }
+
+  throw new UiApiError(
+    "The approval window expired. Run `proofcore login --device` again.",
+    400,
+    "expired_token"
+  );
+}
+
 // -------------------------------------------------------------------- snapshot/tui
 
 export async function runUi(options: UiOptions): Promise<number> {

@@ -24,7 +24,7 @@ const lucideAlias = fileURLToPath(
  */
 const apiPort = process.env.PORT ? Number(process.env.PORT) : 8787;
 
-export default defineConfig(({ mode }) => ({
+export default defineConfig(() => ({
   build: {
     rollupOptions: {
       output: {

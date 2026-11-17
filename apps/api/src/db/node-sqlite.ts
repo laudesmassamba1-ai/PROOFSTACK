@@ -61,6 +61,6 @@ const MIGRATIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "..",
 
 /** Migration files, ordered. The filename is the version. */
 export function migrationFiles(): { id: string; sql: string }[] {
-  const names = ["0001_init.sql", "0002_report_per_run.sql"];
+  const names = ["0001_init.sql", "0002_report_per_run.sql", "0003_device_grants.sql"];
   return names.map((name) => ({ id: name, sql: readFileSync(join(MIGRATIONS_DIR, name), "utf8") }));
 }

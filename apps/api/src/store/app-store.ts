@@ -47,6 +47,21 @@ export interface SessionRecord {
   lastSeenAt: string | null;
 }
 
+export interface DeviceGrantRecord {
+  id: string;
+  deviceCodeHash: string;
+  userCode: string;
+  status: "pending" | "approved" | "denied" | "consumed";
+  userId: string | null;
+  createdAt: string;
+  expiresAt: string;
+  decidedAt: string | null;
+  consumedAt: string | null;
+  pollCount: number;
+  clientName: string | null;
+  ip: string | null;
+}
+
 export interface WorkspaceRecord {
   id: string;
   name: string;
@@ -285,6 +300,108 @@ export class AppStore {
       .bind(userId, iso(now))
       .all<Row>();
     return rows.map(mapSession);
+  }
+
+  // ---------------------------------------------------------- device grants
+
+  /** RFC 8628-style grant for `proofcore login --device`. Only the SHA-256 of
+   *  the device code is persisted; the raw code is bearer knowledge. */
+  async createDeviceGrant(input: {
+    deviceCodeHash: string;
+    userCode: string;
+    expiresAt: string;
+    clientName?: string;
+    ip?: string;
+  }): Promise<DeviceGrantRecord> {
+    const grant: DeviceGrantRecord = {
+      id: `dvc_${uuid().replaceAll("-", "").slice(0, 20)}`,
+      deviceCodeHash: input.deviceCodeHash,
+      userCode: input.userCode,
+      status: "pending",
+      userId: null,
+      createdAt: iso(this.clock()),
+      expiresAt: input.expiresAt,
+      decidedAt: null,
+      consumedAt: null,
+      pollCount: 0,
+      clientName: input.clientName ?? null,
+      ip: input.ip ?? null,
+    };
+    await this.db
+      .prepare(
+        `INSERT INTO device_grants (id, device_code_hash, user_code, status, user_id, created_at, expires_at, decided_at, consumed_at, poll_count, client_name, ip)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        grant.id,
+        grant.deviceCodeHash,
+        grant.userCode,
+        grant.status,
+        null,
+        grant.createdAt,
+        grant.expiresAt,
+        null,
+        null,
+        0,
+        grant.clientName,
+        grant.ip
+      )
+      .run();
+    return grant;
+  }
+
+  async findDeviceGrantByUserCode(userCode: string): Promise<DeviceGrantRecord | null> {
+    const row = await this.db
+      .prepare("SELECT * FROM device_grants WHERE user_code = ?")
+      .bind(userCode)
+      .first<Row>();
+    return row ? mapDeviceGrant(row) : null;
+  }
+
+  async findDeviceGrantByDeviceCodeHash(hash: string): Promise<DeviceGrantRecord | null> {
+    const row = await this.db
+      .prepare("SELECT * FROM device_grants WHERE device_code_hash = ?")
+      .bind(hash)
+      .first<Row>();
+    return row ? mapDeviceGrant(row) : null;
+  }
+
+  /** Mark a grant approved (or denied) for a user. Only a pending grant can be
+   *  decided: an approved, denied or consumed grant keeps its first decision. */
+  async decideDeviceGrant(
+    id: string,
+    status: "approved" | "denied",
+    userId: string
+  ): Promise<void> {
+    await this.db
+      .prepare(
+        `UPDATE device_grants SET status = ?, user_id = ?, decided_at = ?
+         WHERE id = ? AND status = 'pending'`
+      )
+      .bind(status, userId, iso(this.clock()), id)
+      .run();
+  }
+
+  async markDevicePolled(id: string): Promise<void> {
+    await this.db
+      .prepare("UPDATE device_grants SET poll_count = poll_count + 1 WHERE id = ?")
+      .bind(id)
+      .run();
+  }
+
+  /** Consume an approved grant so the same approval can never mint two sessions. */
+  async consumeDeviceGrant(id: string): Promise<void> {
+    await this.db
+      .prepare(
+        `UPDATE device_grants SET status = 'consumed', consumed_at = ?
+         WHERE id = ? AND status = 'approved'`
+      )
+      .bind(iso(this.clock()), id)
+      .run();
+  }
+
+  async deleteExpiredDeviceGrants(now = this.clock()): Promise<void> {
+    await this.db.prepare("DELETE FROM device_grants WHERE expires_at <= ?").bind(iso(now)).run();
   }
 
   // ------------------------------------------------------------- workspaces
@@ -870,6 +987,23 @@ function mapSession(row: Row): SessionRecord {
     createdAt: str(row, "created_at"),
     expiresAt: str(row, "expires_at"),
     lastSeenAt: nullableStr(row, "last_seen_at"),
+  };
+}
+
+function mapDeviceGrant(row: Row): DeviceGrantRecord {
+  return {
+    id: str(row, "id"),
+    deviceCodeHash: str(row, "device_code_hash"),
+    userCode: str(row, "user_code"),
+    status: str(row, "status") as DeviceGrantRecord["status"],
+    userId: nullableStr(row, "user_id"),
+    createdAt: str(row, "created_at"),
+    expiresAt: str(row, "expires_at"),
+    decidedAt: nullableStr(row, "decided_at"),
+    consumedAt: nullableStr(row, "consumed_at"),
+    pollCount: typeof row.poll_count === "number" ? row.poll_count : 0,
+    clientName: nullableStr(row, "client_name"),
+    ip: nullableStr(row, "ip"),
   };
 }
 
