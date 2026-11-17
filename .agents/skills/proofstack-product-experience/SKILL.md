@@ -1,9 +1,10 @@
 ---
+
 name: proofstack-product-experience
 description: >-
-  Art direction, UX engineering, design system, motion, contextual copywriting
-  and visual QA for the authenticated PROOFSTACK workspace. Activate for any
-  change to workspace UI, copy, layout, illustration, motion or empty/error states.
+Art direction, UX engineering, design system, motion, contextual copywriting
+and visual QA for the authenticated PROOFSTACK workspace. Activate for any
+change to workspace UI, copy, layout, illustration, motion or empty/error states.
 ---
 
 # PROOFSTACK Product Experience
@@ -52,18 +53,18 @@ tangible object per module embodies the latest data.
 
 ### Frozen tokens
 
-| Token | Value | Use |
-| --- | --- | --- |
-| `--paper` | `#F3F0E8` | Page canvas |
-| `--paper-raised` | `#FAF8F3` | Framed work surface |
-| `--ink` | `#0A0A0B` | Type, primary buttons, rules |
-| `--ink-soft` | `#5B5A55` | Secondary text; minimum 4.5:1 on paper |
-| `--rule` | `rgba(10,10,11,0.12)` | Hairlines |
-| `--mint` | `#5CF2C4` | Highlight / one primary action |
-| `--turquoise` | `#0FD9D0` | Focus and small accents |
-| WORLD material | `#2F5BFF` cobalt-violet | Orbit object |
-| FLOW material | `#5CF2C4` mint chrome | Chain object |
-| EXIT material | `#FFB020` amber velvet | Stack object |
+| Token            | Value                   | Use                                    |
+| ---------------- | ----------------------- | -------------------------------------- |
+| `--paper`        | `#F3F0E8`               | Page canvas                            |
+| `--paper-raised` | `#FAF8F3`               | Framed work surface                    |
+| `--ink`          | `#0A0A0B`               | Type, primary buttons, rules           |
+| `--ink-soft`     | `#5B5A55`               | Secondary text; minimum 4.5:1 on paper |
+| `--rule`         | `rgba(10,10,11,0.12)`   | Hairlines                              |
+| `--mint`         | `#5CF2C4`               | Highlight / one primary action         |
+| `--turquoise`    | `#0FD9D0`               | Focus and small accents                |
+| WORLD material   | `#2F5BFF` cobalt-violet | Orbit object                           |
+| FLOW material    | `#5CF2C4` mint chrome   | Chain object                           |
+| EXIT material    | `#FFB020` amber velvet  | Stack object                           |
 
 Semantic status colours are separate and muted: success green, warning ochre, danger
 oxide red, neutral grey. Always pair a status colour with a word and a glyph.
@@ -114,12 +115,12 @@ destructive confirmations.
 
 The headline is generated from real state:
 
-| State | FR | EN |
-| --- | --- | --- |
-| No project | `AUCUN PROJET.` | `NO PROJECT.` |
-| Project, no run | `AUCUNE EXÉCUTION.` | `NO RUN YET.` |
-| Recent failures | `{n} ÉCHEC(S) À EXAMINER.` | `{n} FAILURE(S) TO REVIEW.` |
-| Runs, no failure | `AUCUNE ANOMALIE.` | `NO ANOMALY.` |
+| State            | FR                         | EN                          |
+| ---------------- | -------------------------- | --------------------------- |
+| No project       | `AUCUN PROJET.`            | `NO PROJECT.`               |
+| Project, no run  | `AUCUNE EXÉCUTION.`        | `NO RUN YET.`               |
+| Recent failures  | `{n} ÉCHEC(S) À EXAMINER.` | `{n} FAILURE(S) TO REVIEW.` |
+| Runs, no failure | `AUCUNE ANOMALIE.`         | `NO ANOMALY.`               |
 
 Support line names the latest project/module/time or the next action. Never say
 "healthy" or "verified" when nothing ran. Below: three asymmetric module objects, a
@@ -181,7 +182,7 @@ FR and EN complete. Do not mix languages in one screen.
 2. Lazy WebGL only if tier 1 fails a documented gate and no 3D library exists; one
    context, DPR ≤ 2, transparent canvas, pause off-screen.
 3. Static poster fallback for reduced motion, no WebGL and print.
-Objects must never block interaction, data rendering or first load.
+   Objects must never block interaction, data rendering or first load.
 
 ## 10. Anti-generic gates
 

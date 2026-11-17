@@ -10,13 +10,14 @@ import {
 } from "react";
 import { type MessageKey as BaseKey, en, fr } from "./dictionaries.js";
 import { type MarketingKey, marketingEn, marketingFr } from "./marketing.js";
+import { type WorkspaceKey, workspaceEn, workspaceFr } from "./workspace.js";
 
-export type MessageKey = BaseKey | MarketingKey;
+export type MessageKey = BaseKey | MarketingKey | WorkspaceKey;
 type Messages = Record<MessageKey, string>;
 
 const DICTIONARIES: Record<UiLocale, Messages> = {
-  en: { ...en, ...marketingEn },
-  fr: { ...fr, ...marketingFr },
+  en: { ...en, ...marketingEn, ...workspaceEn },
+  fr: { ...fr, ...marketingFr, ...workspaceFr },
 };
 
 const STORAGE_KEY = "proofstack.locale";

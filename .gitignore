@@ -33,5 +33,4 @@ npm-debug.log*
 .proofstack/
 reports/
 .vercel
-.env*
 .tesseract/

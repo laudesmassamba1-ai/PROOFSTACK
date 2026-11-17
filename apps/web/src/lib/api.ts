@@ -8,9 +8,14 @@
  * Session authentication is an HttpOnly cookie, so every dashboard call uses
  * `credentials: "include"` and never stores a token in JavaScript.
  */
+/**
+ * In production the web app is served behind the same origin as `/api/*` and
+ * `/health`, so the base is intentionally empty. A localhost fallback in a built
+ * bundle would send production visitors to their own machine.
+ */
 export const API_BASE: string =
   (import.meta.env?.VITE_API_URL as string | undefined)?.replace(/\/+$/, "") ??
-  "http://localhost:8787";
+  (import.meta.env.DEV ? "http://localhost:8787" : "");
 
 export type Probe = { status: "checking" | "reachable" | "unreachable"; detail?: string };
 

@@ -2,16 +2,16 @@
 
 ## Route ownership
 
-| Route | Component | Data source |
-| --- | --- | --- |
-| `/app` | `Overview` | `GET /api/v1/overview?workspaceId=` |
-| `/app/projects` | `Projects` | `GET/POST /api/v1/projects` |
-| `/app/projects/:id` | `ProjectDetail` | project, project runs, project findings, API keys |
-| `/app/modules/:module` | `ModulePage` | workspace runs + findings filtered by module |
-| `/app/cli` | `Cli` | projects |
-| `/app/billing` | `Billing` | billing, plans, checkout, sandbox settle |
-| `/app/settings` | `Settings` | workspace, members, API keys |
-| `/app/admin` | `Admin` | admin API; server re-checks allowlist |
+| Route                  | Component       | Data source                                       |
+| ---------------------- | --------------- | ------------------------------------------------- |
+| `/app`                 | `Overview`      | `GET /api/v1/overview?workspaceId=`               |
+| `/app/projects`        | `Projects`      | `GET/POST /api/v1/projects`                       |
+| `/app/projects/:id`    | `ProjectDetail` | project, project runs, project findings, API keys |
+| `/app/modules/:module` | `ModulePage`    | workspace runs + findings filtered by module      |
+| `/app/cli`             | `Cli`           | projects                                          |
+| `/app/billing`         | `Billing`       | billing, plans, checkout, sandbox settle          |
+| `/app/settings`        | `Settings`      | workspace, members, API keys                      |
+| `/app/admin`           | `Admin`         | admin API; server re-checks allowlist             |
 
 The app shell is `AppLayout`; it owns session states and navigation only. Pages own
 their data fetching and error states.

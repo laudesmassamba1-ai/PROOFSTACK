@@ -20,16 +20,16 @@ Also banned: exclamation marks in status text, emoji as icons, “healthy”, �
 
 ## Status vocabulary
 
-| Internal | FR | EN |
-| --- | --- | --- |
-| not tested | Non testé | Not tested |
-| needs setup | À configurer | Needs setup |
-| running | En cours | Running |
-| passed | Réussi | Passed |
-| failed | Échec | Failed |
-| warning | Avertissement | Warning |
-| partial | Incomplet | Incomplete |
-| unavailable | Indisponible | Unavailable |
+| Internal    | FR            | EN          |
+| ----------- | ------------- | ----------- |
+| not tested  | Non testé     | Not tested  |
+| needs setup | À configurer  | Needs setup |
+| running     | En cours      | Running     |
+| passed      | Réussi        | Passed      |
+| failed      | Échec         | Failed      |
+| warning     | Avertissement | Warning     |
+| partial     | Incomplet     | Incomplete  |
+| unavailable | Indisponible  | Unavailable |
 
 The UI must not translate raw API codes into new claims. `NOTHING_VERIFIED` is shown as
 “nothing verified”; `SKIPPED` is never “passed”.

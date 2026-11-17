@@ -1,7 +1,8 @@
-import { Plus } from "lucide-react";
+import { ArrowUpRight, Plus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
-import { Card, Empty, ErrorState, Field, Loading, StatusBadge } from "../../components/app/ui.js";
+import { Empty, ErrorState, Field, Loading, StatusBadge } from "../../components/app/ui.js";
+import { useI18n } from "../../i18n/index.js";
 import { PageHeader } from "../../layouts/AppLayout.js";
 import { type ApiError, apiFetch } from "../../lib/api.js";
 import { relativeTime } from "../../lib/format.js";
@@ -22,6 +23,7 @@ const MODULES = ["world", "flow", "exit"] as const;
 
 export function Projects() {
   const { workspaceId } = useSession();
+  const { t } = useI18n();
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [error, setError] = useState<ApiError | Error | null>(null);
   const [creating, setCreating] = useState(false);
@@ -80,30 +82,38 @@ export function Projects() {
     }
   };
 
-  if (!workspaceId)
+  if (!workspaceId) {
     return <Empty title="No workspace yet" body="Create a workspace before adding projects." />;
+  }
   if (error) return <ErrorState error={error} onRetry={() => void load()} />;
 
   return (
     <>
       <PageHeader
-        title="Projects"
-        description="A project is one application under test: its base URL, environment and the modules allowed to check it."
+        eyebrow={`${t("ws.overview.projects").toUpperCase()} / ${t("ws.overview.eyebrow")}`}
+        title={t("ws.projects.title")}
+        description={t("ws.projects.description")}
         actions={
           <button
             type="button"
             className="app-btn app-btn-primary"
             onClick={() => setCreating((value) => !value)}
           >
-            <Plus size={15} /> New project
+            <Plus size={15} /> {t("ws.projects.new")}
           </button>
         }
       />
 
       {creating ? (
-        <Card title="New project" className="mb-5">
-          <form className="grid gap-4 px-5 py-5 sm:grid-cols-2" onSubmit={submit}>
-            <Field label="Name" htmlFor="project-name">
+        <section className="app-sheet mb-5">
+          <header className="app-workbench-head">
+            <div>
+              <p className="app-eyebrow">00 / {t("ws.projects.new")}</p>
+              <h2 className="app-workbench-title">{t("ws.projects.new")}</h2>
+            </div>
+          </header>
+          <form className="app-form-sheet" onSubmit={submit}>
+            <Field label={t("ws.projects.name")} htmlFor="project-name">
               <input
                 id="project-name"
                 className="app-input"
@@ -112,11 +122,11 @@ export function Projects() {
                 value={form.name}
                 onChange={(event) => setForm({ ...form, name: event.target.value })}
               />
-            </Field>{" "}
+            </Field>
             <Field
-              label="Base URL"
+              label={t("ws.projects.baseUrl")}
               htmlFor="project-base-url"
-              hint="Local or staging. Production is refused for write-capable module tests."
+              hint={t("ws.projects.baseUrl.hint")}
             >
               <input
                 id="project-base-url"
@@ -127,7 +137,7 @@ export function Projects() {
                 onChange={(event) => setForm({ ...form, baseUrl: event.target.value })}
               />
             </Field>
-            <Field label="Stack (optional)" htmlFor="project-stack">
+            <Field label={t("ws.projects.stack")} htmlFor="project-stack">
               <input
                 id="project-stack"
                 className="app-input"
@@ -137,7 +147,7 @@ export function Projects() {
                 onChange={(event) => setForm({ ...form, stack: event.target.value })}
               />
             </Field>
-            <Field label="Environment" htmlFor="project-environment">
+            <Field label={t("ws.projects.environment")} htmlFor="project-environment">
               <select
                 id="project-environment"
                 className="app-select"
@@ -150,9 +160,9 @@ export function Projects() {
                 <option value="production">production</option>
               </select>
             </Field>
-            <fieldset className="sm:col-span-2">
-              <legend className="app-label">Modules</legend>
-              <div className="flex flex-wrap gap-3">
+            <fieldset className="sm:col-span-2 md:col-span-2">
+              <legend className="app-label">{t("ws.projects.modules")}</legend>
+              <div className="mt-2 flex flex-wrap gap-4">
                 {MODULES.map((module) => (
                   <label key={module} className="flex items-center gap-2 text-sm">
                     <input
@@ -172,11 +182,11 @@ export function Projects() {
               </div>
             </fieldset>
             {formError ? (
-              <div className="sm:col-span-2">
+              <div className="sm:col-span-2 md:col-span-2">
                 <ErrorState error={formError} />
                 {"code" in formError && formError.code === "project_limit_reached" ? (
                   <p className="mt-2 text-xs text-muted">
-                    <Link to="/app/billing" className="text-primary hover:underline">
+                    <Link to="/app/billing" className="app-text-link">
                       Compare plans
                     </Link>{" "}
                     to raise this limit. Existing projects are never deleted when a limit is
@@ -185,73 +195,79 @@ export function Projects() {
                 ) : null}
               </div>
             ) : null}
-            <div className="flex gap-2 sm:col-span-2">
+            <div className="flex flex-wrap gap-2 sm:col-span-2 md:col-span-2">
               <button
                 type="submit"
                 className="app-btn app-btn-primary"
                 disabled={busy || modules.length === 0}
               >
-                {busy ? "Creating…" : "Create project"}
+                {busy ? t("ws.projects.creating") : t("ws.projects.create")}
               </button>
               <button type="button" className="app-btn" onClick={() => setCreating(false)}>
-                Cancel
+                {t("ws.projects.cancel")}
               </button>
             </div>
           </form>
-        </Card>
+        </section>
       ) : null}
 
       {!projects ? (
         <Loading label="Loading projects…" />
       ) : projects.length === 0 ? (
-        <Card>
+        <section className="app-sheet">
           <Empty
-            title="No projects yet"
-            body="Create a project to get a configuration and a project token for the CLI."
+            title={t("ws.projects.empty.title")}
+            body={t("ws.projects.empty.body")}
             action={
               <button
                 type="button"
                 className="app-btn app-btn-primary"
                 onClick={() => setCreating(true)}
               >
-                <Plus size={14} /> New project
+                <Plus size={14} /> {t("ws.projects.new")}
               </button>
             }
           />
-        </Card>
+        </section>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {projects.map((project) => (
-            <Link
-              key={project.id}
-              to={`/app/projects/${project.id}`}
-              className="app-card block p-5 hover:border-primary"
-            >
-              <div className="flex items-start justify-between gap-3">
+        <>
+          <p className="app-eyebrow mb-3">{t("ws.projects.count", { count: projects.length })}</p>
+          <div className="app-project-list">
+            {projects.map((project, index) => (
+              <Link
+                key={project.id}
+                to={`/app/projects/${project.id}`}
+                className="app-project-row"
+                aria-label={`${t("ws.projects.open")}: ${project.name}`}
+              >
+                <span className="app-project-index">{String(index + 1).padStart(2, "0")}</span>
                 <div className="min-w-0">
-                  <h2 className="truncate text-sm font-semibold">{project.name}</h2>
-                  <p className="app-mono mt-1 truncate text-muted">{project.baseUrl}</p>
+                  <h2 className="app-project-name truncate">{project.name}</h2>
+                  <p className="app-project-target">{project.baseUrl}</p>
                 </div>
-                {project.lastRunStatus ? (
-                  <StatusBadge status={project.lastRunStatus} />
-                ) : (
-                  <span className="app-badge">no runs</span>
-                )}
-              </div>
-              <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted">
-                <span className="app-badge">{project.environment}</span>
-                {project.enabledModules.map((module) => (
-                  <span key={module} className="app-badge">
-                    {module.toUpperCase()}
+                <div className="app-project-meta">
+                  <span>{project.environment}</span>
+                  {project.enabledModules.map((module) => (
+                    <span key={module}>{module.toUpperCase()}</span>
+                  ))}
+                  <span>
+                    {project.lastRunAt
+                      ? t("ws.projects.last", { time: relativeTime(project.lastRunAt) })
+                      : t("ws.projects.never")}
                   </span>
-                ))}
-                <span className="ml-auto">
-                  {project.lastRunAt ? `last run ${relativeTime(project.lastRunAt)}` : "never run"}
-                </span>
-              </div>
-            </Link>
-          ))}
-        </div>
+                </div>
+                <div className="app-project-side">
+                  {project.lastRunStatus ? (
+                    <StatusBadge status={project.lastRunStatus} />
+                  ) : (
+                    <span className="app-badge">{t("ws.projects.noRuns")}</span>
+                  )}
+                  <ArrowUpRight size={16} aria-hidden />
+                </div>
+              </Link>
+            ))}
+          </div>
+        </>
       )}
     </>
   );

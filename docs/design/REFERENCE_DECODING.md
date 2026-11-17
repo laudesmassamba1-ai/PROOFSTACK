@@ -48,15 +48,15 @@ characters 24–40px; bubble text 10–12px; primary controls 44px tall.
 
 ## Translation into PROOFSTACK
 
-| Reference principle | Product decision |
-| --- | --- |
-| Giant type | Overview headline is generated from real workspace state |
-| Tangible object | WORLD orbit, FLOW chain, EXIT stack are bound to latest run totals |
-| Paper frame | `/app` lives in a 28px bordered frame on `#F3F0E8` |
-| Ink characters | Testers appear only in empty, loading and 404 states |
-| Tiny microtext | Workspace, project and run metadata use 11px caps |
-| Colour as material | Module colours belong to objects; semantic status uses a separate muted set |
-| Asymmetry | 5/4/3 module columns and objects that bleed past card edges |
+| Reference principle | Product decision                                                            |
+| ------------------- | --------------------------------------------------------------------------- |
+| Giant type          | Overview headline is generated from real workspace state                    |
+| Tangible object     | WORLD orbit, FLOW chain, EXIT stack are bound to latest run totals          |
+| Paper frame         | `/app` lives in a 28px bordered frame on `#F3F0E8`                          |
+| Ink characters      | Testers appear only in empty, loading and 404 states                        |
+| Tiny microtext      | Workspace, project and run metadata use 11px caps                           |
+| Colour as material  | Module colours belong to objects; semantic status uses a separate muted set |
+| Asymmetry           | 5/4/3 module columns and objects that bleed past card edges                 |
 
 ## What is explicitly rejected
 

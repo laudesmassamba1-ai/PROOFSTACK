@@ -5,22 +5,22 @@ arbitrary hex values. The marketing site keeps its dark brand surfaces.
 
 ## Colour
 
-| Token | Light / paper | Dark / inverse | Role |
-| --- | --- | --- | --- |
-| `--paper` | `#F3F0E8` | `#0A0A0B` | Page canvas |
-| `--paper-raised` | `#FAF8F3` | `#141412` | Framed work surface |
-| `--surface-alt` | `#EAE6DC` | `#1D1D1A` | Inputs, quiet fills |
-| `--ink` | `#0A0A0B` | `#F3F0E8` | Primary type |
-| `--ink-soft` | `#5B5A55` | `#B8B3A8` | Secondary type |
-| `--rule` | `rgba(10,10,11,.12)` | `rgba(243,240,232,.14)` | Hairlines |
-| `--mint` | `#5CF2C4` | `#5CF2C4` | Highlight, one action |
-| `--turquoise` | `#0FD9D0` | `#0FD9D0` | Focus ring |
-| `--world` | `#2F5BFF` | `#2F5BFF` | WORLD object |
-| `--flow` | `#5CF2C4` | `#5CF2C4` | FLOW object |
-| `--exit` | `#FFB020` | `#FFB020` | EXIT object |
-| `--success` | `#177A54` | `#63D6A2` | Verified pass |
-| `--warning` | `#8A5A00` | `#E9B45A` | Ran but inconclusive |
-| `--danger` | `#B62C36` | `#F07884` | Product defect |
+| Token            | Light / paper        | Dark / inverse          | Role                  |
+| ---------------- | -------------------- | ----------------------- | --------------------- |
+| `--paper`        | `#F3F0E8`            | `#0A0A0B`               | Page canvas           |
+| `--paper-raised` | `#FAF8F3`            | `#141412`               | Framed work surface   |
+| `--surface-alt`  | `#EAE6DC`            | `#1D1D1A`               | Inputs, quiet fills   |
+| `--ink`          | `#0A0A0B`            | `#F3F0E8`               | Primary type          |
+| `--ink-soft`     | `#5B5A55`            | `#B8B3A8`               | Secondary type        |
+| `--rule`         | `rgba(10,10,11,.12)` | `rgba(243,240,232,.14)` | Hairlines             |
+| `--mint`         | `#5CF2C4`            | `#5CF2C4`               | Highlight, one action |
+| `--turquoise`    | `#0FD9D0`            | `#0FD9D0`               | Focus ring            |
+| `--world`        | `#2F5BFF`            | `#2F5BFF`               | WORLD object          |
+| `--flow`         | `#5CF2C4`            | `#5CF2C4`               | FLOW object           |
+| `--exit`         | `#FFB020`            | `#FFB020`               | EXIT object           |
+| `--success`      | `#177A54`            | `#63D6A2`               | Verified pass         |
+| `--warning`      | `#8A5A00`            | `#E9B45A`               | Ran but inconclusive  |
+| `--danger`       | `#B62C36`            | `#F07884`               | Product defect        |
 
 Status colour is never the only signal. Every badge carries a word; object states are
 also stated in the adjacent sentence.
@@ -39,16 +39,16 @@ also stated in the adjacent sentence.
 
 ## Geometry
 
-| Token | Value |
-| --- | --- |
-| Frame radius | 28px |
-| Card radius | 20px |
-| Control radius | 999px |
-| Hairline | 1px |
-| Page margin desktop | 24px |
-| Page margin mobile | 0 |
-| Content max width | 1440px |
-| Grid | 12 columns, 16px gutter |
+| Token               | Value                   |
+| ------------------- | ----------------------- |
+| Frame radius        | 28px                    |
+| Card radius         | 20px                    |
+| Control radius      | 999px                   |
+| Hairline            | 1px                     |
+| Page margin desktop | 24px                    |
+| Page margin mobile  | 0                       |
+| Content max width   | 1440px                  |
+| Grid                | 12 columns, 16px gutter |
 
 ## Elevation
 

@@ -2,6 +2,7 @@ import { ArrowRight, Globe2, PackageOpen, Route as RouteIcon, Terminal } from "l
 import { Link } from "react-router";
 import { DottedWave } from "../components/brand/DottedWave.js";
 import { HeroLockup } from "../components/brand/Logo.js";
+import { ParticleLogo } from "../components/brand/ParticleLogo.js";
 import { ModuleShowcase } from "../components/marketing/ModuleShowcase.js";
 import { useI18n } from "../i18n/index.js";
 import { Section, SectionHeading } from "../layouts/BrandLayout.js";
@@ -17,21 +18,38 @@ export function Home() {
 
   return (
     <>
-      {/* ---------- brand hero: reference A (minimalist, non-AI) ---------- */}
+      {/* ---------- brand hero: reference A ---------- */}
       <section className="relative min-h-[86vh] overflow-hidden">
-        <DottedWave className="absolute inset-0 size-full" step={15} intensity={1} bias={0.66} />
+        {/*
+          The signature motion: a field of particles drifts as a wave, converges into the
+          three-layer P, holds, then dissolves back. It is the brand's identity, so it is
+          the hero's main visual — but it sits *behind* a scrim and never over the copy.
+          A static SVG mark renders when motion is reduced or Canvas is unavailable.
+        */}
+        <ParticleLogo focus="right" density={1} waveIntensity={1} className="z-0" />
+        <DottedWave
+          className="absolute inset-0 size-full opacity-45"
+          step={17}
+          intensity={0.7}
+          bias={0.6}
+        />
         <div
-          className="pointer-events-none absolute inset-0"
+          className="pointer-events-none absolute inset-0 z-[1]"
           style={{
             background:
-              "radial-gradient(70% 60% at 30% 45%, rgba(5,7,8,0.86), rgba(5,7,8,0.2) 70%)",
+              "radial-gradient(72% 62% at 26% 46%, rgba(5,7,8,0.92), rgba(5,7,8,0.55) 55%, rgba(5,7,8,0.15) 78%)",
           }}
         />
-        <div className="relative mx-auto flex min-h-[86vh] max-w-[1240px] px-5 py-20 sm:py-24 lg:px-8 lg:flex-row items-center gap-8">
-          <div className="max-w-[760px] lg:order-1 order-2">
+        <div className="relative z-[2] mx-auto flex min-h-[86vh] max-w-[1240px] flex-col justify-center gap-12 px-5 py-20 sm:py-24 lg:px-8">
+          <div className="max-w-[760px]">
             <HeroLockup size={54} />
             <p className="eyebrow mt-10 text-white/80">{t("hero.eyebrow")}</p>
-            <h1 className="rise rise-2 mt-4 max-w-[18ch] text-balance text-white text-[2.2rem] leading-[1.06] tracking-tight sm:text-[3.4rem] lg:text-[4rem]">
+            {/*
+              The headline is the image, per the reference decoding: uppercase, ultra-tight
+              leading (0.86–0.92) and negative tracking (−0.05em), sized to dominate the
+              viewport on desktop (88–148px) while still fitting a 320px phone.
+            */}
+            <h1 className="rise rise-2 hero-title mt-4 max-w-[16ch] text-balance text-white">
               {t("hero.title")}
             </h1>
             <p className="rise rise-3 mt-6 max-w-[58ch] text-[1.02rem] leading-relaxed text-white/62">
@@ -54,7 +72,7 @@ export function Home() {
             </div>
           </div>
 
-          <div className="grid gap-3 border-t border-white/10 py-5 sm:grid-cols-3">
+          <div className="grid max-w-[760px] gap-3 border-t border-white/10 py-5 sm:grid-cols-3">
             {MODULE_CARDS.map((module) => {
               const Icon = module.icon;
               return (
@@ -77,7 +95,6 @@ export function Home() {
         </div>
       </section>
 
-      {/* Sections réciproques minimalisées pour éviter vibe IA */}
       <Section id="modules">
         <SectionHeading
           eyebrow={t("modules.eyebrow")}

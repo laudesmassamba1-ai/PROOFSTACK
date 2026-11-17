@@ -1,35 +1,64 @@
+import { lazy, Suspense } from "react";
 import { Route, Routes } from "react-router";
-import { useI18n } from "./i18n/index.js";
-import { AppLayout } from "./layouts/AppLayout.js";
 import { BrandLayout } from "./layouts/BrandLayout.js";
-import { Auth } from "./pages/Auth.js";
-import { Admin } from "./pages/app/Admin.js";
-import { Billing } from "./pages/app/Billing.js";
-import { Cli } from "./pages/app/Cli.js";
-import { ModulePage } from "./pages/app/ModulePage.js";
-import { Overview } from "./pages/app/Overview.js";
-import { ProjectDetail } from "./pages/app/ProjectDetail.js";
-import { Projects } from "./pages/app/Projects.js";
-import { Settings } from "./pages/app/Settings.js";
-import { Changelog } from "./pages/Changelog.js";
-import { Docs } from "./pages/Docs.js";
-import { Home } from "./pages/Home.js";
-import { ModulePage as MarketingModulePage } from "./pages/ModulePage.js";
-import { NotFound } from "./pages/NotFound.js";
-import { Platform } from "./pages/Platform.js";
-import { Pricing } from "./pages/Pricing.js";
-import { Product } from "./pages/Product.js";
-import { Security } from "./pages/Security.js";
+
+/** Route-level splitting keeps marketing, docs, the workspace and admin apart. */
+const Home = lazy(() => import("./pages/Home.js").then((m) => ({ default: m.Home })));
+const Product = lazy(() => import("./pages/Product.js").then((m) => ({ default: m.Product })));
+const MarketingModulePage = lazy(() =>
+  import("./pages/ModulePage.js").then((m) => ({ default: m.ModulePage }))
+);
+const Platform = lazy(() => import("./pages/Platform.js").then((m) => ({ default: m.Platform })));
+const Pricing = lazy(() => import("./pages/Pricing.js").then((m) => ({ default: m.Pricing })));
+const Docs = lazy(() => import("./pages/Docs.js").then((m) => ({ default: m.Docs })));
+const Changelog = lazy(() =>
+  import("./pages/Changelog.js").then((m) => ({ default: m.Changelog }))
+);
+const Security = lazy(() => import("./pages/Security.js").then((m) => ({ default: m.Security })));
+const Auth = lazy(() => import("./pages/Auth.js").then((m) => ({ default: m.Auth })));
+const NotFound = lazy(() => import("./pages/NotFound.js").then((m) => ({ default: m.NotFound })));
+const AppLayout = lazy(() =>
+  import("./layouts/AppLayout.js").then((m) => ({ default: m.AppLayout }))
+);
+const Overview = lazy(() =>
+  import("./pages/app/Overview.js").then((m) => ({ default: m.Overview }))
+);
+const Projects = lazy(() =>
+  import("./pages/app/Projects.js").then((m) => ({ default: m.Projects }))
+);
+const ProjectDetail = lazy(() =>
+  import("./pages/app/ProjectDetail.js").then((m) => ({ default: m.ProjectDetail }))
+);
+const AppModulePage = lazy(() =>
+  import("./pages/app/ModulePage.js").then((m) => ({ default: m.ModulePage }))
+);
+const Cli = lazy(() => import("./pages/app/Cli.js").then((m) => ({ default: m.Cli })));
+const Billing = lazy(() => import("./pages/app/Billing.js").then((m) => ({ default: m.Billing })));
+const Settings = lazy(() =>
+  import("./pages/app/Settings.js").then((m) => ({ default: m.Settings }))
+);
+const Admin = lazy(() => import("./pages/app/Admin.js").then((m) => ({ default: m.Admin })));
+
+function RouteFallback() {
+  return (
+    <div
+      className="grid min-h-screen place-items-center bg-brand-black"
+      role="status"
+      aria-live="polite"
+    >
+      <span className="eyebrow">Loading…</span>
+    </div>
+  );
+}
 
 export function App() {
-  const { t } = useI18n();
   return (
-    <>
+    <Suspense fallback={<RouteFallback />}>
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-white focus:px-3 focus:py-2 focus:text-black"
       >
-        {t("mkt.skip")}
+        Skip to content
       </a>
       <Routes>
         <Route element={<BrandLayout />}>
@@ -53,13 +82,13 @@ export function App() {
           <Route index element={<Overview />} />
           <Route path="projects" element={<Projects />} />
           <Route path="projects/:projectId" element={<ProjectDetail />} />
-          <Route path="modules/:module" element={<ModulePage />} />
+          <Route path="modules/:module" element={<AppModulePage />} />
           <Route path="cli" element={<Cli />} />
           <Route path="billing" element={<Billing />} />
           <Route path="settings" element={<Settings />} />
           <Route path="admin" element={<Admin />} />
         </Route>
       </Routes>
-    </>
+    </Suspense>
   );
 }

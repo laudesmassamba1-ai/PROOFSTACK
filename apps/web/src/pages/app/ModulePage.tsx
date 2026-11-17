@@ -1,40 +1,39 @@
-import { Globe2, PackageOpen, Route as RouteIcon, Terminal } from "lucide-react";
+import { ArrowRight, Globe2, PackageOpen, Route as RouteIcon, Terminal } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
-import { Card, Empty, ErrorState, Loading, Metric, StatusBadge } from "../../components/app/ui.js";
-import { PageHeader } from "../../layouts/AppLayout.js";
+import { ModuleObject } from "../../components/app/ModuleObjects.js";
+import { Empty, ErrorState, Loading, StatusBadge } from "../../components/app/ui.js";
+import { useI18n } from "../../i18n/index.js";
 import { type ApiError, apiFetch } from "../../lib/api.js";
 import { duration, relativeTime } from "../../lib/format.js";
 import { useSession } from "../../lib/session.js";
 
 /**
- * A module view.
+ * A module workbench.
  *
- * It reports what the engine has actually verified for one module across the
- * workspace. A module with no run says so; it is never rendered as green because
- * "nothing failed".
+ * The object is bound to the latest run that contains this module. No locale profile,
+ * transaction stage or export format is invented: the API does not supply those here.
  */
-
 const MODULES = {
   world: {
     name: "WORLD",
     icon: Globe2,
-    summary: "Can users from different countries use the software correctly?",
-    body: "Locale fixtures for identity, phone, address, currency and dates. A finding here means real data was rejected or silently changed.",
+    summary: "ws.module.world.summary",
+    body: "ws.module.world.body",
     command: "proofstack test --module world",
   },
   flow: {
     name: "FLOW",
     icon: RouteIcon,
-    summary: "Can users complete the critical operations?",
-    body: "Journeys, checkout scenarios, webhook ordering and idempotency. Failures are reported with the step that broke, not just a status.",
+    summary: "ws.module.flow.summary",
+    body: "ws.module.flow.body",
     command: "proofstack test --module flow",
   },
   exit: {
     name: "EXIT",
     icon: PackageOpen,
-    summary: "Can users retrieve their information without losing it?",
-    body: "Export formats, schema validity, referential integrity and round-trip fidelity. Nothing here runs against production data by default.",
+    summary: "ws.module.exit.summary",
+    body: "ws.module.exit.body",
     command: "proofstack test --module exit",
   },
 } as const;
@@ -70,12 +69,15 @@ interface Finding {
   detectedAt: string;
 }
 
+const ZERO = { passed: 0, failed: 0, warnings: 0, errors: 0, skipped: 0, total: 0 };
+
 export function ModulePage() {
   const { module: raw } = useParams();
   const module = (
     raw === "world" || raw === "flow" || raw === "exit" ? raw : null
   ) as ModuleId | null;
   const { workspaceId } = useSession();
+  const { t } = useI18n();
   const [runs, setRuns] = useState<ModuleRun[] | null>(null);
   const [findings, setFindings] = useState<Finding[]>([]);
   const [error, setError] = useState<ApiError | Error | null>(null);
@@ -103,174 +105,212 @@ export function ModulePage() {
 
   if (!module) {
     return (
-      <Empty title="Unknown module" body="PROOFSTACK has three modules: WORLD, FLOW and EXIT." />
+      <Empty
+        title="Unknown module"
+        body="PROOFSTACK has three modules: WORLD, FLOW and EXIT."
+        tester="lost"
+      />
     );
   }
+
   const meta = MODULES[module];
   const Icon = meta.icon;
 
   if (error) return <ErrorState error={error} onRetry={() => void load()} />;
   if (!runs) return <Loading label={`Loading ${meta.name} activity…`} />;
 
-  const totals = runs.reduce(
-    (sum, run) => {
-      const moduleTotals = run.totals[module];
-      if (!moduleTotals) return sum;
-      return {
-        passed: sum.passed + moduleTotals.passed,
-        failed: sum.failed + moduleTotals.failed,
-        warnings: sum.warnings + moduleTotals.warnings,
-        errors: sum.errors + moduleTotals.errors,
-        skipped: sum.skipped + moduleTotals.skipped,
-      };
-    },
-    { passed: 0, failed: 0, warnings: 0, errors: 0, skipped: 0 }
-  );
   const latest = runs[0];
+  const latestTotals = latest?.totals[module] ?? ZERO;
+  const hasRun = Boolean(latest);
 
   return (
-    <>
-      <div className={`app-module-strip module-${module} mb-5`}>
-        <span className="app-module-strip-icon">
-          <Icon size={16} />
-        </span>
-        <div className="min-w-0">
-          <p className="font-mono text-[0.68rem] uppercase tracking-[0.16em] text-muted">
-            {meta.name} · module view
+    <div className={`app-page app-module-page module-${module}`}>
+      <section className="app-module-hero">
+        <div className="app-module-hero-copy">
+          <p className="app-eyebrow">
+            {t("ws.module.eyebrow")} / 0{Object.keys(MODULES).indexOf(module) + 1}
           </p>
-          <p className="mt-0.5 text-sm font-medium">{meta.summary}</p>
+          <h1 className="app-display app-module-title">{meta.name}</h1>
+          <p className="app-support">{t(meta.summary)}</p>
+          <p className="app-module-state">
+            {hasRun && latest
+              ? t("ws.module.state.latest", {
+                  module: meta.name,
+                  status: latest.status.toLowerCase(),
+                  time: relativeTime(latest.startedAt),
+                })
+              : t("ws.module.state.empty", { module: meta.name })}
+          </p>
         </div>
-      </div>
-      <PageHeader
-        title={meta.name}
-        description={meta.summary}
-        actions={
-          latest ? (
-            <StatusBadge status={latest.status} />
+        <div className="app-module-object-stage">
+          <ModuleObject
+            module={module}
+            passed={latestTotals.passed}
+            failed={latestTotals.failed}
+            total={latestTotals.total}
+          />
+        </div>
+        <div className="app-module-figures">
+          <div>
+            <span className="app-module-figure">{latestTotals.passed}</span>
+            <span className="app-eyebrow">{t("ws.module.passed")}</span>
+          </div>
+          <div>
+            <span className={`app-module-figure ${latestTotals.failed > 0 ? "is-danger" : ""}`}>
+              {latestTotals.failed}
+            </span>
+            <span className="app-eyebrow">{t("ws.module.failed")}</span>
+          </div>
+          <div>
+            <span className="app-module-figure">{latestTotals.skipped}</span>
+            <span className="app-eyebrow">{t("ws.module.skipped")}</span>
+          </div>
+          <div>
+            <span className="app-module-figure app-module-figure-small">
+              {latestTotals.warnings}
+            </span>
+            <span className="app-eyebrow">{t("ws.module.warnings")}</span>
+          </div>
+        </div>
+      </section>
+
+      <section className="app-module-intro">
+        <div>
+          <p className="app-eyebrow">{t("ws.module.what")}</p>
+          <p className="app-module-body">{t(meta.body)}</p>
+        </div>
+        <div className="app-module-run-state">
+          <Icon size={16} aria-hidden />
+          <span>
+            {hasRun && latest
+              ? t("ws.module.latestSummary", {
+                  passed: latestTotals.passed,
+                  failed: latestTotals.failed,
+                  skipped: latestTotals.skipped,
+                  warnings: latestTotals.warnings,
+                })
+              : t("ws.module.latestNone")}
+          </span>
+          {latest ? <StatusBadge status={latest.status} /> : null}
+        </div>
+      </section>
+
+      <div className="app-module-body-grid">
+        <section className="app-workbench" aria-labelledby="module-runs-title">
+          <header className="app-workbench-head">
+            <div>
+              <p className="app-eyebrow">02 / {t("ws.module.runs")}</p>
+              <h2 id="module-runs-title" className="app-workbench-title">
+                {t("ws.module.runs")}
+              </h2>
+              <p>{t("ws.module.runs.body")}</p>
+            </div>
+            <span className="app-count-mark">{runs.length}</span>
+          </header>
+          {runs.length === 0 ? (
+            <Empty
+              title={`${meta.name} has not run yet`}
+              body={t(meta.body)}
+              tester="working"
+              action={
+                <Link to="/app/projects" className="app-btn">
+                  {t("ws.module.configure")} <ArrowRight size={13} />
+                </Link>
+              }
+            />
           ) : (
-            <span className="app-badge">not verified yet</span>
-          )
-        }
-      />
+            <div className="app-table-wrap">
+              <table className="app-table">
+                <thead>
+                  <tr>
+                    <th>{t("ws.module.project")}</th>
+                    <th>{t("ws.module.status")}</th>
+                    <th>{t("ws.module.started")}</th>
+                    <th>{t("ws.module.duration")}</th>
+                    <th>{t("ws.module.passFail")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {runs.map((run) => {
+                    const totals = run.totals[module] ?? ZERO;
+                    return (
+                      <tr key={run.id}>
+                        <td className="font-medium">{run.projectName}</td>
+                        <td>
+                          <StatusBadge status={run.status} />
+                        </td>
+                        <td className="text-muted">{relativeTime(run.startedAt)}</td>
+                        <td className="text-muted">{duration(run.durationMs)}</td>
+                        <td className="tabular-nums">
+                          {totals.passed} / {totals.failed}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric
-          label="Cases passed"
-          value={totals.passed}
-          hint="Across the most recent runs listed below"
-        />
-        <Metric
-          label="Failures"
-          value={totals.failed}
-          hint="Product defects with a reproducible case id"
-        />
-        <Metric
-          label="Warnings"
-          value={totals.warnings}
-          hint="Ran, but proved less than expected"
-        />
-        <Metric
-          label="Skipped"
-          value={totals.skipped}
-          hint="No target or fixture available: never counted as a pass"
-        />
-      </div>
+        <aside className="app-module-side">
+          <section className="app-command-sheet">
+            <p className="app-eyebrow">03 / {t("ws.module.command")}</p>
+            <h2>{t("ws.module.command")}</h2>
+            <pre>
+              <code>{meta.command}</code>
+            </pre>
+            <p>{t("ws.module.command.body")}</p>
+            <Link to="/app/projects" className="app-btn">
+              <Terminal size={14} /> {t("ws.module.projects")}
+            </Link>
+          </section>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-[1.3fr_1fr]">
-        <Card title="What this module checks" description={meta.body}>
-          <div className="px-5 py-4">
-            {runs.length === 0 ? (
+          <section
+            className="app-workbench app-findings-workbench"
+            aria-labelledby="module-findings-title"
+          >
+            <header className="app-workbench-head">
+              <div>
+                <p className="app-eyebrow">04 / {t("ws.module.findings")}</p>
+                <h2 id="module-findings-title" className="app-workbench-title">
+                  {t("ws.module.findings")}
+                </h2>
+              </div>
+              <span className="app-count-mark">{findings.length}</span>
+            </header>
+            {findings.length === 0 ? (
               <Empty
-                title={`${meta.name} has not run yet`}
-                body="Point this module at your application in proofstack.config.ts, then run it. Until then its cases are skipped, not passed."
-                action={
-                  <Link to="/app/projects" className="app-btn">
-                    Configure a project
-                  </Link>
-                }
+                title={t("ws.module.findings")}
+                body={t("ws.module.findings.empty")}
+                tester={false}
               />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="app-table">
-                  <thead>
-                    <tr>
-                      <th>Project</th>
-                      <th>Status</th>
-                      <th>Started</th>
-                      <th>Duration</th>
-                      <th>Passed / failed</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {runs.map((run) => {
-                      const moduleTotals = run.totals[module]!;
-                      return (
-                        <tr key={run.id}>
-                          <td className="font-medium">{run.projectName}</td>
-                          <td>
-                            <StatusBadge status={run.status} />
-                          </td>
-                          <td className="text-muted">{relativeTime(run.startedAt)}</td>
-                          <td className="text-muted">{duration(run.durationMs)}</td>
-                          <td>
-                            {moduleTotals.passed} / {moduleTotals.failed}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </Card>
-
-        <div className="space-y-4">
-          <Card
-            title="Run it"
-            description="The browser work happens on your machine or in CI, never in the dashboard."
-          >
-            <div className="px-5 py-4">
-              <pre className="overflow-x-auto rounded-[var(--radius)] bg-surface-alt px-3 py-2 app-mono">
-                {meta.command}
-              </pre>
-              <p className="mt-3 text-xs leading-relaxed text-muted">
-                A project token is required to upload the result. Create one from a project page.
-              </p>
-              <Link to="/app/projects" className="app-btn mt-3">
-                <Terminal size={14} /> Projects
-              </Link>
-            </div>
-          </Card>
-
-          <Card title="Open findings" description="Failed checks recorded for this module.">
-            {findings.length === 0 ? (
-              <Empty title="No finding" body="No failed check has been recorded for this module." />
-            ) : (
-              <ul className="divide-y divide-line">
+              <ul className="app-failure-list">
                 {findings.slice(0, 8).map((finding) => (
-                  <li key={finding.id} className="px-5 py-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm font-medium leading-snug">{finding.title}</p>
+                  <li key={finding.id}>
+                    <div className="app-finding-static">
+                      <span className="app-failure-glyph" aria-hidden>
+                        ×
+                      </span>
+                      <span className="min-w-0">
+                        <span className="app-failure-title">{finding.title}</span>
+                        <span className="app-failure-meta">
+                          <span className="app-mono">{finding.code ?? "—"}</span> ·{" "}
+                          {relativeTime(finding.detectedAt)}
+                        </span>
+                      </span>
                       <span className="app-badge app-badge-danger">
                         {finding.severity.toLowerCase()}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs text-muted">
-                      <span className="app-mono">{finding.code ?? "—"}</span> ·{" "}
-                      {relativeTime(finding.detectedAt)}
-                    </p>
                   </li>
                 ))}
               </ul>
             )}
-          </Card>
-        </div>
+          </section>
+        </aside>
       </div>
-
-      <p className="mt-4 flex items-center gap-2 text-xs text-muted">
-        <Icon size={14} /> {meta.name} · {meta.summary}
-      </p>
-    </>
+    </div>
   );
 }

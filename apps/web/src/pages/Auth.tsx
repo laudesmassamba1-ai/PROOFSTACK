@@ -71,7 +71,7 @@ export function Auth({ mode }: { mode: Mode }) {
     }
     if (probe.status !== "reachable") {
       setState("failed");
-      setMessage(t("auth.noBackend").replace("{url}", API_BASE));
+      setMessage(t("auth.noBackend"));
       return;
     }
     setState("sending");
@@ -218,8 +218,14 @@ export function Auth({ mode }: { mode: Mode }) {
           {probe.status === "checking"
             ? t("auth.checking")
             : probe.status === "reachable"
-              ? `${t("auth.reachable")} (${API_BASE}${probe.detail ? ` · ${probe.detail}` : ""})`
-              : t("auth.noBackend").replace("{url}", API_BASE)}
+              ? t("auth.reachable")
+              : t("auth.noBackend")}
+          {import.meta.env.DEV && probe.status === "unreachable" ? (
+            <code className="mt-1 block text-[0.7rem] opacity-65">
+              {API_BASE}
+              {probe.detail ? ` · ${probe.detail}` : ""}
+            </code>
+          ) : null}
           {message ? <strong className="mt-1 block text-white/86">{message}</strong> : null}
         </span>
       </div>

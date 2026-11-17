@@ -1,6 +1,7 @@
-import { CircleAlert, LoaderCircle } from "lucide-react";
+import { CircleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import type { ApiError } from "../../lib/api.js";
+import { TesterScene, type TesterVariant } from "./Testers.js";
 
 /**
  * Small dashboard primitives.
@@ -77,8 +78,9 @@ export function Metric({ label, value, hint }: { label: string; value: ReactNode
 
 export function Loading({ label = "Loading…" }: { label?: string }) {
   return (
-    <div className="flex items-center gap-2 px-5 py-8 text-sm text-muted">
-      <LoaderCircle size={15} className="animate-spin" /> {label}
+    <div className="app-loading-inline">
+      <TesterScene variant="working" />
+      <span className="text-sm text-muted">{label}</span>
     </div>
   );
 }
@@ -105,16 +107,19 @@ export function Empty({
   title,
   body,
   action,
+  tester = "empty",
 }: {
   title: string;
   body: string;
   action?: ReactNode;
+  tester?: TesterVariant | false;
 }) {
   return (
-    <div className="px-5 py-10 text-center">
-      <p className="text-sm font-medium">{title}</p>
-      <p className="mx-auto mt-1 max-w-[52ch] text-xs leading-relaxed text-muted">{body}</p>
-      {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
+    <div className="app-empty">
+      {tester ? <TesterScene variant={tester} /> : null}
+      <p className="app-empty-title">{title}</p>
+      <p className="app-empty-body">{body}</p>
+      {action ? <div className="app-empty-action">{action}</div> : null}
     </div>
   );
 }

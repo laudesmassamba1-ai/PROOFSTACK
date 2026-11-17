@@ -4,11 +4,11 @@ Motion explains state. It is never ambient noise.
 
 ## Timing
 
-| Interaction | Duration |
-| --- | --- |
-| Hover / focus | 120–160ms |
-| Small transition | 160–220ms |
-| Dialog / sheet | 180–260ms |
+| Interaction                   | Duration  |
+| ----------------------------- | --------- |
+| Hover / focus                 | 120–160ms |
+| Small transition              | 160–220ms |
+| Dialog / sheet                | 180–260ms |
 | Large layout or object settle | 240–400ms |
 
 One family: `cubic-bezier(.2,.8,.2,1)`. No bounce on ordinary UI. No parallax.

@@ -1,9 +1,9 @@
-import { ArrowRight, Terminal } from "lucide-react";
+import { ArrowRight, FolderPlus, Terminal } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
-import { RunsChart } from "../../components/app/RunsChart.js";
-import { Card, Empty, ErrorState, Loading, Metric, StatusBadge } from "../../components/app/ui.js";
-import { PageHeader } from "../../layouts/AppLayout.js";
+import { ModuleObject } from "../../components/app/ModuleObjects.js";
+import { Empty, ErrorState, Loading, StatusBadge } from "../../components/app/ui.js";
+import { useI18n } from "../../i18n/index.js";
 import { type ApiError, apiFetch } from "../../lib/api.js";
 import { duration, formatDate, relativeTime } from "../../lib/format.js";
 import { useSession } from "../../lib/session.js";
@@ -56,7 +56,6 @@ interface Overview {
     planName: string;
     entitled: boolean;
     state: string;
-    /** Why the workspace is not on its paid plan, when it is not. */
     reason: string | null;
     recurringSupported: boolean;
     renewalDueAt: string | null;
@@ -64,8 +63,14 @@ interface Overview {
   };
 }
 
+type ModuleId = "world" | "flow" | "exit";
+const MODULE_IDS: ModuleId[] = ["world", "flow", "exit"];
+
+const EMPTY_TOTALS = { passed: 0, failed: 0, warnings: 0, errors: 0, skipped: 0, total: 0 };
+
 export function Overview() {
   const { workspaceId } = useSession();
+  const { t } = useI18n();
   const [data, setData] = useState<Overview | null>(null);
   const [error, setError] = useState<ApiError | Error | null>(null);
 
@@ -83,9 +88,48 @@ export function Overview() {
     void load();
   }, [load]);
 
-  if (!workspaceId) return <Empty title="No workspace yet" body="Create a workspace to begin." />;
+  if (!workspaceId) {
+    return <Empty title="No workspace yet" body="Create a workspace to begin." tester={false} />;
+  }
   if (error) return <ErrorState error={error} onRetry={() => void load()} />;
-  if (!data) return <Loading label="Loading your workspace…" />;
+  if (!data) return <Loading label="Loading the situation…" />;
+
+  const latest = data.recentRuns[0];
+  const failures = data.recentFailures.length;
+  const hasProjects = data.projects.length > 0;
+  const hasRuns = data.recentRuns.length > 0;
+
+  const headline = !hasProjects
+    ? t("ws.overview.noProject")
+    : !hasRuns
+      ? t("ws.overview.noRun")
+      : failures > 0
+        ? t("ws.overview.failures", { count: failures })
+        : t("ws.overview.anomaly");
+
+  const support = !hasProjects
+    ? t("ws.overview.noProject.body")
+    : !latest
+      ? t("ws.overview.noRun.body", { project: data.projects[0]?.name ?? "The project" })
+      : failures > 0
+        ? t("ws.overview.failures.body", {
+            project: latest.projectName,
+            time: relativeTime(latest.startedAt),
+          })
+        : t("ws.overview.anomaly.body", { count: data.recentRuns.length });
+
+  const firstFailure = data.recentFailures[0];
+  const nextAction = !hasProjects
+    ? { label: t("ws.overview.next.create"), to: "/app/projects", primary: true }
+    : !hasRuns
+      ? { label: t("ws.overview.next.install"), to: "/app/cli", primary: true }
+      : failures > 0 && firstFailure
+        ? {
+            label: t("ws.overview.next.review"),
+            to: `/app/modules/${firstFailure.module}`,
+            primary: true,
+          }
+        : { label: t("ws.overview.next.run"), to: "/app/cli", primary: true };
 
   const runsCounter = data.usage.counters.find((counter) => counter.key === "monthly_test_runs");
   const quota = runsCounter?.limit ?? 0;
@@ -93,205 +137,267 @@ export function Overview() {
   const percent = quota > 0 ? Math.min(100, Math.round((used / quota) * 100)) : 0;
 
   return (
-    <>
-      <PageHeader
-        title={`${data.workspace.name}`}
-        description="What PROOFSTACK has verified in this workspace, and what it could not verify. Nothing here is simulated: an empty module means no run has covered it yet."
-        actions={
-          <>
-            <Link to="/app/cli" className="app-btn">
-              <Terminal size={14} /> Connect CLI
-            </Link>
-            <Link to="/app/projects" className="app-btn">
-              Projects
-            </Link>
-            <Link to="/app/billing" className="app-btn app-btn-primary">
-              {data.subscription.entitled ? "Manage plan" : "Upgrade"} <ArrowRight size={14} />
-            </Link>
-          </>
-        }
-      />
-
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric
-          label="Plan"
-          value={data.subscription.planName}
-          hint={planHint(data.subscription)}
-        />
-        <Metric
-          label="Projects"
-          value={data.projects.length}
-          hint="Active projects in this workspace"
-        />
-        <Metric
-          label="Test runs"
-          value={quota === -1 ? used : `${used} / ${quota}`}
-          hint={quota === -1 ? "Unlimited on this plan" : "Metered once per run id this period"}
-        />
-        <Metric
-          label="Open failures"
-          value={data.recentFailures.length}
-          hint="Failed findings detected in recent runs"
-        />
-      </div>
-
-      {!data.subscription.entitled ? (
-        <p className="mt-4 rounded-[var(--radius)] border border-line bg-surface px-4 py-3 text-xs leading-relaxed text-muted">
-          This workspace resolves to Free.{" "}
-          {data.subscription.reason === "period_ended_awaiting_renewal"
-            ? `The paid period ended on ${formatDate(data.subscription.currentPeriodEnd)} and no verified renewal exists.`
-            : "No paid subscription is active for it."}{" "}
-          No data was deleted, and nothing paid is switched on until a provider confirms a payment.
-        </p>
-      ) : null}
-
-      <div className="mt-6 grid gap-4 lg:grid-cols-3">
-        {data.modules.map((module) => (
-          <div
-            key={module.module}
-            className={`app-card app-module-card module-${module.module} p-5`}
-          >
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-wide">{module.module}</h2>
-              <StatusBadge status={module.status} />
+    <div className="app-page app-overview">
+      <section className="app-situation">
+        <div className="app-situation-copy">
+          <p className="app-eyebrow">
+            {t("ws.overview.eyebrow")} / {data.workspace.name}
+          </p>
+          <h1 className="app-display app-situation-headline">{headline}</h1>
+          <p className="app-support">{support}</p>
+        </div>
+        <aside className="app-situation-stamp" aria-label="Real workspace facts">
+          <p className="app-eyebrow">01 / {t("ws.overview.latest")}</p>
+          <div className="app-stamp-facts">
+            <div>
+              <span className="app-stamp-value">{data.projects.length}</span>
+              <span>{t("ws.overview.projects")}</span>
             </div>
-            <dl className="mt-4 grid grid-cols-3 gap-2 text-xs">
-              <div>
-                <dt className="text-muted">Passed</dt>
-                <dd className="mt-0.5 text-sm font-medium">{module.passed}</dd>
-              </div>
-              <div>
-                <dt className="text-muted">Failed</dt>
-                <dd className="mt-0.5 text-sm font-medium">{module.failed}</dd>
-              </div>
-              <div>
-                <dt className="text-muted">Skipped</dt>
-                <dd className="mt-0.5 text-sm font-medium">{module.warnings}</dd>
-              </div>
-            </dl>
-            <p className="mt-4 text-xs text-muted">
-              {module.lastRunAt
-                ? `Last covered ${relativeTime(module.lastRunAt)}`
-                : "No run has covered this module yet."}
-            </p>
+            <div>
+              <span className="app-stamp-value">{data.recentRuns.length}</span>
+              <span>{t("ws.overview.runs.count")}</span>
+            </div>
+            <div>
+              <span className={`app-stamp-value ${failures > 0 ? "is-danger" : ""}`}>
+                {failures}
+              </span>
+              <span>{t("ws.overview.failures.count")}</span>
+            </div>
           </div>
-        ))}
-      </div>
+          <p className="app-stamp-note">
+            {latest
+              ? `${latest.projectName} · ${relativeTime(latest.startedAt)}`
+              : t("ws.overview.never")}
+          </p>
+        </aside>
+      </section>
 
-      <div className="mt-6">
-        <Card
-          title="Execution history"
-          description="Actual uploaded runs, newest on the right. No trend is inferred from missing history."
-        >
-          <RunsChart runs={data.recentRuns} />
-        </Card>
-      </div>
+      <section className="app-section" aria-labelledby="module-objects-title">
+        <div className="app-section-head">
+          <p className="app-eyebrow">02 / {t("ws.overview.modules")}</p>
+          <h2 id="module-objects-title" className="app-section-title">
+            WORLD. FLOW. EXIT.
+          </h2>
+        </div>
 
-      <div className="mt-6 grid gap-4 xl:grid-cols-[1.4fr_1fr]">
-        <Card
-          title="Recent runs"
-          description="Uploaded by the CLI or CI. A report is stored once per run id."
-          actions={
-            <Link to="/app/projects" className="text-xs font-medium text-primary hover:underline">
-              All projects
+        <div className="app-object-grid">
+          {MODULE_IDS.map((module, index) => {
+            const latestModuleRun = data.recentRuns.find((run) => run.totals[module]);
+            const totals = latestModuleRun?.totals[module] ?? EMPTY_TOTALS;
+            const moduleRecord = data.modules.find((item) => item.module === module);
+            const covered = moduleRecord?.lastRunAt ?? latestModuleRun?.startedAt;
+            return (
+              <Link
+                key={module}
+                to={`/app/modules/${module}`}
+                className={`app-object-card module-${module} app-object-card-${index + 1}`}
+              >
+                <div className="app-object-card-head">
+                  <span className="app-object-index">0{index + 1}</span>
+                  {covered ? (
+                    <StatusBadge status={moduleRecord?.status ?? latestModuleRun?.status ?? ""} />
+                  ) : (
+                    <span className="app-badge">{t("ws.status.notTested")}</span>
+                  )}
+                </div>
+                <div className="app-object-stage">
+                  <ModuleObject
+                    module={module}
+                    passed={totals.passed}
+                    failed={totals.failed}
+                    total={totals.total}
+                  />
+                </div>
+                <div className="app-object-card-foot">
+                  <h3 className="app-object-name">{module.toUpperCase()}</h3>
+                  <p className="app-object-state">
+                    {covered
+                      ? t("ws.module.latestSummary", {
+                          passed: totals.passed,
+                          failed: totals.failed,
+                          skipped: totals.skipped,
+                          warnings: totals.warnings,
+                        })
+                      : t("ws.module.latestNone")}
+                  </p>
+                  <span className="app-object-open">
+                    {t("ws.overview.openModule")} <ArrowRight size={13} />
+                  </span>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="app-next-action">
+        <div>
+          <p className="app-eyebrow">03 / {t("ws.overview.next")}</p>
+          <h2 className="app-next-title">{nextAction.label}</h2>
+          <p className="app-next-body">
+            {!hasProjects
+              ? t("ws.overview.noProject.body")
+              : !hasRuns
+                ? t("ws.overview.runs.empty")
+                : failures > 0
+                  ? t("ws.overview.failures.empty")
+                  : t("ws.overview.anomaly.body", { count: data.recentRuns.length })}
+          </p>
+        </div>
+        <div className="app-next-actions">
+          <Link
+            to={nextAction.to}
+            className={nextAction.primary ? "app-btn app-btn-mint" : "app-btn"}
+          >
+            {!hasProjects ? <FolderPlus size={14} /> : <Terminal size={14} />}
+            {nextAction.label} <ArrowRight size={14} />
+          </Link>
+          <Link to={hasProjects ? "/app/projects" : "/app/cli"} className="app-btn app-btn-paper">
+            {hasProjects ? t("ws.overview.allProjects") : t("ws.overview.next.cli")}
+          </Link>
+        </div>
+      </section>
+
+      <div className="app-overview-body">
+        <section className="app-workbench" aria-labelledby="recent-runs-title">
+          <header className="app-workbench-head">
+            <div>
+              <p className="app-eyebrow">04 / {t("ws.overview.runs")}</p>
+              <h2 id="recent-runs-title" className="app-workbench-title">
+                {t("ws.overview.runs")}
+              </h2>
+              <p>{t("ws.overview.runs.body")}</p>
+            </div>
+            <Link to="/app/projects" className="app-text-link">
+              {t("ws.overview.allProjects")} <ArrowRight size={13} />
             </Link>
-          }
-        >
-          {data.recentRuns.length === 0 ? (
+          </header>
+          {!hasRuns ? (
             <Empty
-              title="No run yet"
-              body="Install the CLI, point a module at your app, and run `proofstack test`. Uploads appear here with their real status."
+              title={t("ws.overview.runs")}
+              body={t("ws.overview.runs.empty")}
+              tester="working"
               action={
-                <Link to="/docs" className="app-btn">
-                  <Terminal size={14} /> Read the CLI guide
+                <Link to="/app/cli" className="app-btn">
+                  <Terminal size={14} /> {t("ws.overview.next.install")}
                 </Link>
               }
             />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="app-table">
+            <div className="app-table-wrap">
+              <table className="app-table app-runs-table">
                 <thead>
                   <tr>
-                    <th>Project</th>
-                    <th>Status</th>
-                    <th>Started</th>
-                    <th>Duration</th>
+                    <th>{t("ws.module.project")}</th>
+                    <th>{t("ws.module.status")}</th>
+                    <th>{t("ws.module.started")}</th>
+                    <th>{t("ws.module.duration")}</th>
                     <th>Findings</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.recentRuns.map((run) => (
                     <tr key={run.id}>
-                      <td className="font-medium">{run.projectName}</td>
+                      <td>
+                        <Link to={`/app/projects/${run.projectId}`} className="app-row-link">
+                          {run.projectName}
+                        </Link>
+                      </td>
                       <td>
                         <StatusBadge status={run.status} />
                       </td>
                       <td className="text-muted">{formatDate(run.startedAt)}</td>
                       <td className="text-muted">{duration(run.durationMs)}</td>
-                      <td>{run.findingCount}</td>
+                      <td className="tabular-nums">{run.findingCount}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
-        </Card>
+        </section>
 
-        <div className="space-y-4">
-          <Card title="Usage this period">
-            <div className="px-5 py-4">
-              <div className="flex items-baseline justify-between text-sm">
-                <span>{runsCounter?.label ?? "Test runs"}</span>
-                <span className="font-medium">
-                  {quota === -1 ? `${used}` : `${used} / ${quota}`}
-                </span>
+        <aside className="app-overview-side">
+          <section className="app-workbench app-failures-panel" aria-labelledby="failures-title">
+            <header className="app-workbench-head">
+              <div>
+                <p className="app-eyebrow">05 / {t("ws.overview.failures.title")}</p>
+                <h2 id="failures-title" className="app-workbench-title">
+                  {t("ws.overview.failures.title")}
+                </h2>
               </div>
-              <div className="app-meter mt-2" aria-hidden>
-                <span style={{ width: `${quota === -1 ? 8 : percent}%` }} />
-              </div>
-              <p className="mt-2 text-xs leading-relaxed text-muted">
-                {quota === -1
-                  ? "Unlimited on this plan."
-                  : `${Math.max(0, quota - used)} run(s) left. Retries of the same run id are not billed twice.`}
-              </p>
-            </div>
-          </Card>
-
-          <Card title="Recent failures">
-            {data.recentFailures.length === 0 ? (
+              <span className="app-count-mark">{failures}</span>
+            </header>
+            {failures === 0 ? (
               <Empty
-                title="Nothing failing"
-                body="No failed finding has been recorded in this workspace's recent runs."
+                title={t("ws.overview.failures.title")}
+                body={t("ws.overview.failures.empty")}
               />
             ) : (
-              <ul className="divide-y divide-line">
+              <ul className="app-failure-list">
                 {data.recentFailures.slice(0, 5).map((finding) => (
-                  <li key={finding.id} className="px-5 py-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm font-medium leading-snug">{finding.title}</p>
+                  <li key={finding.id}>
+                    <Link to={`/app/modules/${finding.module}`} className="app-failure-row">
+                      <span className="app-failure-glyph" aria-hidden>
+                        ×
+                      </span>
+                      <span className="min-w-0">
+                        <span className="app-failure-title">{finding.title}</span>
+                        <span className="app-failure-meta">
+                          {finding.module.toUpperCase()} · {relativeTime(finding.detectedAt)}
+                        </span>
+                      </span>
                       <span className="app-badge app-badge-danger">
                         {finding.severity.toLowerCase()}
                       </span>
-                    </div>
-                    <p className="mt-1 text-xs text-muted">
-                      {finding.module.toUpperCase()} · {relativeTime(finding.detectedAt)}
-                    </p>
+                    </Link>
                   </li>
                 ))}
               </ul>
             )}
-          </Card>
-        </div>
-      </div>
-    </>
-  );
-}
+          </section>
 
-function planHint(subscription: Overview["subscription"]): string {
-  if (!subscription.recurringSupported && subscription.entitled) {
-    return subscription.renewalDueAt
-      ? `Renews manually · due ${formatDate(subscription.renewalDueAt)}`
-      : "Prepaid period";
-  }
-  return subscription.entitled ? "Verified subscription" : "Free tier";
+          <section className="app-workbench app-usage-panel" aria-labelledby="usage-title">
+            <header className="app-workbench-head">
+              <div>
+                <p className="app-eyebrow">06 / {t("ws.overview.usage")}</p>
+                <h2 id="usage-title" className="app-workbench-title">
+                  {data.subscription.planName}
+                </h2>
+              </div>
+              <span className="app-badge">
+                {data.subscription.entitled ? t("ws.overview.plan") : t("ws.overview.free")}
+              </span>
+            </header>
+            <div className="app-usage-body">
+              <div className="app-usage-row">
+                <span>{runsCounter?.label ?? t("ws.overview.runs.count")}</span>
+                <strong>{quota === -1 ? `${used}` : `${used} / ${quota}`}</strong>
+              </div>
+              <div className="app-meter" aria-hidden>
+                <span style={{ width: `${quota === -1 ? 8 : percent}%` }} />
+              </div>
+              <p>
+                {quota === -1
+                  ? "Unlimited on this plan."
+                  : `${Math.max(0, quota - used)} run(s) left. Retries of the same run id are not billed twice.`}
+              </p>
+              {!data.subscription.entitled ? (
+                <p className="app-usage-note">
+                  {data.subscription.reason === "period_ended_awaiting_renewal"
+                    ? `The paid period ended on ${formatDate(data.subscription.currentPeriodEnd)}.`
+                    : "No verified paid subscription is active."}{" "}
+                  Nothing was deleted; paid access is not switched on until a provider confirms a
+                  payment.
+                </p>
+              ) : null}
+              <Link to="/app/billing" className="app-text-link">
+                {data.subscription.entitled ? "Manage plan" : "View plans"} <ArrowRight size={13} />
+              </Link>
+            </div>
+          </section>
+        </aside>
+      </div>
+    </div>
+  );
 }

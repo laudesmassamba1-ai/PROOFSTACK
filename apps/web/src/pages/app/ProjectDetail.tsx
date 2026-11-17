@@ -141,8 +141,9 @@ export default config;`;
         <ArrowLeft size={13} /> Projects
       </Link>
       <PageHeader
+        eyebrow={`PROJECT / ${project.environment.toUpperCase()}`}
         title={project.name}
-        description={`${project.baseUrl} · ${project.environment}${project.stack ? ` · ${project.stack}` : ""}`}
+        description={`${project.baseUrl}${project.stack ? ` · ${project.stack}` : ""}`}
         actions={
           <button
             type="button"
