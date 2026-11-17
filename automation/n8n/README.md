@@ -30,9 +30,33 @@ N8N_WEBHOOK_SECRET=<same-secret-as-PROOFSTACK_WEBHOOK_SECRET>
 `x-proofstack-signature: sha256=<hex>`. The workflow rejects stale timestamps
 (>300 seconds), bad signatures and events other than `payment.webhook.processed`.
 
-A Worker cannot reach `localhost`. For a Cloudflare-hosted API, expose n8n through a
-stable HTTPS hostname or Cloudflare Tunnel and use that public URL. Without
-`N8N_WEBHOOK_URL`, the API ignores n8n and payments continue normally.
+A Worker cannot reach `localhost`. The repository includes a webhook-only facade so a
+Cloudflare Quick Tunnel never exposes the n8n editor:
+
+```bash
+# 1. Start the loopback-only facade (n8n stays on 127.0.0.1:5678).
+node automation/n8n/webhook-proxy.mjs
+
+# 2. In another shell, expose only the facade.
+cloudflared tunnel --url http://127.0.0.1:5681 --no-autoupdate
+```
+
+The tunnel prints a temporary `https://<name>.trycloudflare.com` URL. Use
+`<url>/webhook/proofstack-payments` as `N8N_WEBHOOK_URL`. A Quick Tunnel URL changes
+when the tunnel restarts; for a durable production hostname, use a named tunnel with
+a domain or a hosted n8n instance. Without `N8N_WEBHOOK_URL`, the API ignores n8n and
+payments continue normally.
+
+## Slack notification
+
+The **Notify Slack** node runs after signature verification and posts a short payment
+summary. Set `SLACK_WEBHOOK_URL` on the n8n container to an Incoming Webhook URL:
+
+```bash
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...```
+
+Without it the workflow still responds `200` and reports `notification: "skipped"`;
+the payment is never affected by Slack availability.
 
 ## Add notification nodes
 

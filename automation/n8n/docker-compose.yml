@@ -13,6 +13,8 @@ services:
       N8N_DIAGNOSTICS_ENABLED: "false"
       GENERIC_TIMEZONE: Africa/Porto-Novo
       PROOFSTACK_WEBHOOK_SECRET: dev-only-change-me
+      # Optional Slack Incoming Webhook; leave empty to skip notifications.
+      SLACK_WEBHOOK_URL: ""
     volumes:
       - n8n_data:/home/node/.n8n
       - ./workflows:/workflows:ro

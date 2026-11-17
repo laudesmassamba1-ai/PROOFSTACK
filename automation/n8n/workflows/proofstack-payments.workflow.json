@@ -30,6 +30,16 @@
     },
     {
       "parameters": {
+        "jsCode": "const event = items[0].json.event;\nconst slackUrl = process.env.SLACK_WEBHOOK_URL || '';\nlet notification = 'skipped';\nif (slackUrl) {\n  const text = [`✅ PROOFSTACK payment verified`, `Provider: ${event.provider}`, `Result: ${event.result || 'verified'}`, `Intent: ${event.intentId || 'n/a'}`, `Provider event: ${event.providerEventId || 'n/a'}`, `Occurred: ${event.occurredAt}`].join('\\n');\n  const response = await fetch(slackUrl, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }) });\n  notification = response.ok ? 'sent' : `failed:${response.status}`;\n}\nreturn [{ json: { ...items[0].json, notification } }];"
+      },
+      "id": "notify-slack",
+      "name": "Notify Slack",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 0]
+    },
+    {
+      "parameters": {
         "respondWith": "json",
         "responseBody": "={{ $json }}",
         "options": {}
@@ -38,7 +48,7 @@
       "name": "Respond",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [480, 0]
+      "position": [720, 0]
     }
   ],
   "connections": {
@@ -46,6 +56,9 @@
       "main": [[{ "node": "Verify signature", "type": "main", "index": 0 }]]
     },
     "Verify signature": {
+      "main": [[{ "node": "Notify Slack", "type": "main", "index": 0 }]]
+    },
+    "Notify Slack": {
       "main": [[{ "node": "Respond", "type": "main", "index": 0 }]]
     }
   }

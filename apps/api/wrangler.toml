@@ -20,6 +20,8 @@ enabled = true
 # Secrets are never placed in this file. Set them with:
 #   wrangler secret put SASPAY_API_KEY
 #   wrangler secret put SASPAY_WEBHOOK_SECRET
+#   wrangler secret put N8N_WEBHOOK_URL
+#   wrangler secret put N8N_WEBHOOK_SECRET
 
 [vars]
 NODE_ENV = "production"
