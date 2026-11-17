@@ -1,7 +1,7 @@
 import { ArrowRight, Check, Copy, ExternalLink, KeyRound, Terminal } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
-import { Card, Empty, ErrorState, Loading, StatusBadge } from "../../components/app/ui.js";
+import { Card, Empty, ErrorState, Loading, StatusBadge } from "../../components/app/ui.js";\nimport { EnhancedCard } from "../../components/common/EnhancedCard.js";
 import { CliPreview } from "../../components/marketing/CliPreview.js";
 import { useI18n } from "../../i18n/index.js";
 import { PageHeader } from "../../layouts/AppLayout.js";
