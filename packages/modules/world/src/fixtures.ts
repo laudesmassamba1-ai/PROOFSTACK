@@ -1,10 +1,12 @@
 import type { LocaleProfileData } from "@proofstack/contracts";
 import {
   currencyMeta,
+  dstTransitions,
   Money,
   numberSeparators,
   parseLocalizedDecimal,
   resolveWallClock,
+  zoneOffsetMs,
 } from "@proofstack/core";
 import type { CountryCode } from "libphonenumber-js";
 import { parsePhoneNumberFromString } from "libphonenumber-js/max";
@@ -451,25 +453,29 @@ function dstGapSample(
   zone: string
 ): { value: string; instant: string; note: string } | undefined {
   const year = 2026;
-  for (let month = 1; month <= 12; month++) {
-    for (let day = 1; day <= 28; day++) {
-      for (const hour of [1, 2, 3]) {
-        const wall = { year, month, day, hour, minute: 30, second: 0 };
-        const resolution = resolveWallClock(zone, wall);
-        if (resolution.kind === "nonexistent") {
-          const padded = (n: number): string => String(n).padStart(2, "0");
-          const value =
-            profile.id === "en-US"
-              ? `${padded(month)}/${padded(day)}/${year} ${padded(hour)}:30`
-              : `${padded(day)}/${padded(month)}/${year} ${padded(hour)}:30`;
-          return {
-            value,
-            instant: new Date(resolution.nearestAfter).toISOString(),
-            note: `${value} local time is inside the ${zone} spring-forward gap`,
-          };
-        }
-      }
-    }
+  // Find the actual transitions once, instead of probing every day/hour with a full
+  // offset sweep. The old loop made a starter `test` spend ~50s in fixture generation.
+  for (const transition of dstTransitions(zone, year, year)) {
+    const before = zoneOffsetMs(zone, transition - 1);
+    const after = zoneOffsetMs(zone, transition);
+    if (after <= before) continue; // fall-back overlap, not the spring gap
+
+    const gapStart = transition + before;
+    const gapEnd = transition + after;
+    const midpoint = gapStart + Math.min(30 * 60_000, Math.floor((gapEnd - gapStart) / 2));
+    const wall = new Date(midpoint);
+    const padded = (n: number): string => String(n).padStart(2, "0");
+    const month = wall.getUTCMonth() + 1;
+    const day = wall.getUTCDate();
+    const value =
+      profile.id === "en-US"
+        ? `${padded(month)}/${padded(day)}/${year} ${padded(wall.getUTCHours())}:${padded(wall.getUTCMinutes())}`
+        : `${padded(day)}/${padded(month)}/${year} ${padded(wall.getUTCHours())}:${padded(wall.getUTCMinutes())}`;
+    return {
+      value,
+      instant: new Date(transition).toISOString(),
+      note: `${value} local time is inside the ${zone} spring-forward gap`,
+    };
   }
   return undefined;
 }

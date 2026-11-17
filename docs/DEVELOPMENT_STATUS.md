@@ -35,7 +35,7 @@ uses the Ink & Object direction; this file records what is true and what remains
 ## Verification
 
 - `pnpm typecheck`: passes across the workspace.
-- `pnpm test`: 220 tests pass.
+- `pnpm test`: 221 tests pass.
 - `pnpm --filter @proofstack/web build`: passes; route-level chunks replace the previous
   single 554 kB bundle.
 - Visual QA: 42 route/viewport combinations from 1920×1080 to 375×812, zero horizontal
@@ -49,6 +49,8 @@ uses the Ink & Object direction; this file records what is true and what remains
   workspace — shell, Overview, Projects, modules, CLI, Billing and Settings — is FR/EN.
   The internal console is explicitly outside the language switch.
 - No email provider: verification, password reset and invitations are absent, not faked.
+- The CLI is distributable as a self-contained global tarball (`pnpm cli:install`), but
+  `@proofstack/cli` is not published on the npm registry yet.
 - SasPay live path is untested without credentials; sandbox payments are tested.
 - Browser journeys for WORLD/FLOW remain HTTP/fixture based; no Playwright customer
   journey driver.

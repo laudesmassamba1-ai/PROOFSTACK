@@ -22,7 +22,7 @@ not implemented yet — see the status file.
 Implemented and tested: the shared engine and all three modules, the CLI with JSON/
 JUnit/HTML reports, the SaaS API (auth, workspaces, projects, run ingestion, API keys,
 billing, webhooks), the authenticated workspace and the terminal console. `pnpm test`
-runs 220 tests; `pnpm typecheck` and `pnpm build` pass. Biome still reports pre-existing
+runs 221 tests; `pnpm typecheck` and `pnpm build` pass. Biome still reports pre-existing
 diagnostics, so `pnpm lint` is not claimed as clean.
 
 The creator's read-only operations console lives at `/app/admin`: users, workspaces,
@@ -73,18 +73,40 @@ pnpm proofstack -- report text
 pnpm proofstack -- sync
 ```
 
-`@proofstack/cli` is private to this workspace and is **not published on npm**.
-`pnpm proofstack` runs `packages/cli/dist/index.js` from this checkout; it is the
-supported command today. Do not use `pnpm cli` from an unrelated application
-repository — that would resolve a different package. For another local project, pass
-its directory to the CLI:
+## Install the CLI globally
+
+The CLI is still private in the workspace, but the repository builds a self-contained
+tarball with **no runtime npm dependencies**:
 
 ```bash
-pnpm proofstack -- --cwd /path/to/your/app init
-pnpm proofstack -- --cwd /path/to/your/app doctor
+pnpm cli:package
+npm install -g ./artifacts/proofstack-cli-0.1.0.tgz
+proofstack --version
 ```
 
-When the package is published, the same commands become `proofstack <command>`.
+Or build, install and check the global binary in one command:
+
+```bash
+pnpm cli:install
+```
+
+Then run it against any application directory:
+
+```bash
+proofstack --cwd /path/to/your/app init
+proofstack --cwd /path/to/your/app doctor
+proofstack --cwd /path/to/your/app test --module world,flow,exit
+```
+
+The package is not yet on the npm registry. Once npm authentication and ownership of
+the `@proofstack` scope are configured, the generated release is publishable:
+
+```bash
+npm publish ./packages/cli/release --access public
+```
+
+`pnpm proofstack` remains the in-repo command. `pnpm cli` from an unrelated application
+still resolves nothing; use the generated global binary instead.
 
 ## Terminal console
 
@@ -154,6 +176,8 @@ control, labelled as such.
 | `pnpm web:dev`      | Vite dev server on `:5173`        |
 | `pnpm cli -- <cmd>` | run the built CLI                 |
 | `pnpm proofstack`   | full-screen terminal console      |
+| `pnpm cli:package`  | build the standalone global tarball |
+| `pnpm cli:install`  | build and install `proofstack` globally |
 
 Copy [`.env.example`](.env.example) to `.env.local` for local development. API
 environment variables are documented in

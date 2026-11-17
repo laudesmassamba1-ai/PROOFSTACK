@@ -23,19 +23,19 @@ const STEPS = [
     titleKey: "ws.cli.install",
     bodyKey: "ws.cli.step.install.body",
     command:
-      "git clone https://github.com/laudesmassamba1-ai/PROOFSTACK.git\ncd PROOFSTACK && pnpm install && pnpm build\npnpm proofstack -- --cwd /path/to/your/app init",
+      "git clone https://github.com/laudesmassamba1-ai/PROOFSTACK.git\ncd PROOFSTACK && pnpm install\npnpm cli:install\nproofstack --cwd /path/to/your/app init",
   },
   {
     titleKey: "ws.cli.configure",
     bodyKey: "ws.cli.step.configure.body",
     command:
-      "pnpm proofstack -- --cwd /path/to/your/app doctor\npnpm proofstack -- --cwd /path/to/your/app validate",
+      "proofstack --cwd /path/to/your/app doctor\nproofstack --cwd /path/to/your/app validate",
   },
   {
     titleKey: "ws.cli.prove",
     bodyKey: "ws.cli.step.prove.body",
     command:
-      "pnpm proofstack -- --cwd /path/to/your/app test --module world,flow,exit\npnpm proofstack -- --cwd /path/to/your/app sync",
+      "proofstack --cwd /path/to/your/app test --module world,flow,exit\nproofstack --cwd /path/to/your/app sync",
   },
 ] as const;
 

@@ -180,7 +180,7 @@ export const workspaceEn = {
   "ws.cli.prove": "Prove",
   "ws.cli.checking": "Checking the workspace connection…",
   "ws.cli.step.install.body":
-    "The npm package is private in this build. Clone this repository, install and build it, then run the CLI from that checkout with --cwd pointing at your application.",
+    "The npm registry package is not published yet. Clone this repository and run `pnpm cli:install` to build and install the dependency-free `proofstack` binary globally.",
   "ws.cli.step.configure.body":
     "Point the modules at localhost or staging, then validate the targets before the first run.",
   "ws.cli.step.prove.body":
@@ -198,7 +198,7 @@ export const workspaceEn = {
   "ws.cli.trouble.title": "Installation troubleshooting",
   "ws.cli.trouble.command.title": "Command not found?",
   "ws.cli.trouble.command.body":
-    "Use this form from the repository root; the npm package is not published yet.",
+    "Run `pnpm cli:install` from the checkout, then ensure npm's global bin directory is on PATH.",
   "ws.cli.trouble.sync.title": "401 on sync?",
   "ws.cli.trouble.sync.body": "The token is scoped to one project and must be supplied as",
   "ws.cli.trouble.api.title": "API unreachable?",
@@ -395,7 +395,7 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
   "ws.cli.prove": "Prouver",
   "ws.cli.checking": "Vérification de la connexion à l'espace…",
   "ws.cli.step.install.body":
-    "Le paquet npm est privé dans cette version. Clonez ce dépôt, installez et construisez-le, puis lancez la CLI depuis ce checkout avec --cwd pointant vers votre application.",
+    "Le paquet npm n'est pas encore publié. Clonez ce dépôt et lancez `pnpm cli:install` pour construire et installer globalement le binaire autonome `proofstack`.",
   "ws.cli.step.configure.body":
     "Pointez les modules vers localhost ou la préproduction, puis validez les cibles avant la première exécution.",
   "ws.cli.step.prove.body":
@@ -414,7 +414,7 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
   "ws.cli.trouble.title": "Dépannage de l'installation",
   "ws.cli.trouble.command.title": "Commande introuvable ?",
   "ws.cli.trouble.command.body":
-    "Utilisez cette forme depuis la racine du dépôt ; le paquet npm n'est pas encore publié.",
+    "Lancez `pnpm cli:install` depuis le checkout, puis vérifiez que le dossier bin global de npm est dans le PATH.",
   "ws.cli.trouble.sync.title": "401 à la synchronisation ?",
   "ws.cli.trouble.sync.body": "Le token est limité à un projet et doit être fourni via",
   "ws.cli.trouble.api.title": "API injoignable ?",

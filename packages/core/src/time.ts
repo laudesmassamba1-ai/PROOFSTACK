@@ -159,7 +159,10 @@ export function zoneOffsetMs(zone: string, instant: number): number {
 
 export function assertZone(zone: string): void {
   try {
-    new Intl.DateTimeFormat("en-US", { timeZone: zone });
+    // Reuse the formatter cache: zoneOffsetMs calls this for every offset probe, and
+    // constructing a fresh Intl formatter each time made WORLD fixture generation
+    // take tens of seconds.
+    zoneFormatter(zone);
   } catch {
     throw new ProofstackError({
       message: `Unknown IANA time zone: ${JSON.stringify(zone)}`,
