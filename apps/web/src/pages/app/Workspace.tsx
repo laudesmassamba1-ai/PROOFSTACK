@@ -42,6 +42,23 @@ function roleLabel(role: string, fr: boolean): string {
   return labels ? labels[fr ? "fr" : "en"] : role;
 }
 
+/** The API returns English messages; known codes get a French rendering. */
+function errorText(error: unknown, fr: boolean): string {
+  const code = (error as ApiError | undefined)?.code;
+  if (fr && code) {
+    const frByCode: Record<string, string> = {
+      user_not_found: "Aucun compte PROOFCORE n'utilise cet email.",
+      already_member: "Cette personne fait déjà partie de l'espace.",
+      last_owner: "Un espace garde toujours au moins un propriétaire.",
+      workspace_limit_reached: "Limite d'espaces atteinte pour votre plan.",
+      forbidden: "Action réservée au propriétaire ou aux administrateurs.",
+    };
+    const frMessage = frByCode[code];
+    if (frMessage) return frMessage;
+  }
+  return (error as Error | undefined)?.message ?? String(error);
+}
+
 export function WorkspacePage(): React.ReactElement {
   const { locale } = useI18n();
   const fr = locale === "fr";
@@ -168,6 +185,8 @@ export function WorkspacePage(): React.ReactElement {
         `/api/v1/workspaces/${session.workspaceId}/members`,
         { method: "POST", body: { email, role: inviteRole } }
       );
+      if (!body.member)
+        throw new Error(fr ? "Réponse d'invitation inattendue." : "Unexpected invite response.");
       setMembers((items) => [...(items ?? []), body.member]);
       setInviteEmail("");
       setNotice(
@@ -601,7 +620,7 @@ export function WorkspacePage(): React.ReactElement {
       {error ? (
         <div className="mt-4">
           <ErrorState
-            error={error}
+            error={{ ...(error as ApiError), message: errorText(error, fr) } as ApiError}
             onRetry={() => {
               setError(null);
               void load();
