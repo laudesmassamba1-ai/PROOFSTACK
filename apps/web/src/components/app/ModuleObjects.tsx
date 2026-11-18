@@ -440,11 +440,13 @@ function AuditObject({
         style={{ "--arc-len": `${arcLen}px` } as CSSProperties}
       />
       <g className="audit-needle" style={{ "--audit-angle": `${angle}deg` } as CSSProperties}>
+        {/* The needle is drawn pointing straight up; the CSS rotation carries
+         * the score — the transform animation never fights the geometry. */}
         <line
           x1="100"
           y1="110"
-          x2={100 + 44 * Math.sin((angle * Math.PI) / 180)}
-          y2={110 - 44 * Math.cos((angle * Math.PI) / 180)}
+          x2="100"
+          y2="66"
           stroke="var(--object-glyph)"
           strokeWidth="3"
           strokeLinecap="round"

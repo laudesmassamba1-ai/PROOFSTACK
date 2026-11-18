@@ -5362,7 +5362,6 @@ p {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .module-object * {
-    animation: none !important;
-  }
+  /* Every object animation is gated by .is-running, which the motion hook
+   * already withholds when reduced motion is on — nothing to force here. */
 }
