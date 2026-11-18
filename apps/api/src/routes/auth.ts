@@ -55,6 +55,12 @@ export function authRoutes(services: Services): Hono<AppEnv> {
   const signUpLimit = Number(process.env.SIGNUP_RATE_LIMIT ?? 20);
   const signUpWindowMs = Number(process.env.SIGNUP_RATE_WINDOW_MS ?? 60 * 60_000);
   const signInLimiter = new RateLimiter(10, 5 * 60_000);
+  // Durable lockout policy. Read at route-construction time, like the sign-up limit, so
+  // a test can lower it without touching the code. Per-address is deliberately looser
+  // than per-account: a shared office NAT must not be a denial-of-service lever.
+  const maxEmailFailures = Number(process.env.SIGN_IN_MAX_FAILURES ?? 8);
+  const maxAddressFailures = Number(process.env.SIGN_IN_MAX_ADDRESS_FAILURES ?? 40);
+  const lockoutWindowMs = Number(process.env.SIGN_IN_LOCKOUT_MS ?? 15 * 60_000);
   const signUpLimiter =
     services.config.environment === "test" || signUpLimit <= 0
       ? null
@@ -122,7 +128,8 @@ export function authRoutes(services: Services): Hono<AppEnv> {
     const address = clientAddress({ get: (name) => c.req.header(name) });
     const userAgent = c.req.header("user-agent");
     const body = await readBody(c, signInSchema);
-    const limited = signInLimiter.check(`${address}|${normalizeEmail(body.email)}`);
+    const email = normalizeEmail(body.email);
+    const limited = signInLimiter.check(`${address}|${email}`);
     if (!limited.allowed) {
       c.header("Retry-After", String(limited.retryAfterSeconds));
       throw new HttpError(
@@ -132,12 +139,41 @@ export function authRoutes(services: Services): Hono<AppEnv> {
       );
     }
 
-    const user = await services.store.findUserByNormalizedEmail(normalizeEmail(body.email));
+    // The in-process limiter above forgets everything when the isolate recycles. These
+    // two scopes remember, so a password-guessing run cannot reset its own budget by
+    // waiting for a cold start or by spreading across colos.
+    const windowStart = new Date(services.clock().getTime() - lockoutWindowMs);
+    const [emailFailures, addressFailures] = await Promise.all([
+      services.store.countAuthAttempts(`signin:email:${email}`, windowStart),
+      services.store.countAuthAttempts(`signin:ip:${address}`, windowStart),
+    ]);
+    if (
+      maxEmailFailures > 0 &&
+      (emailFailures >= maxEmailFailures || addressFailures >= maxAddressFailures)
+    ) {
+      const minutes = Math.ceil(lockoutWindowMs / 60_000);
+      c.header("Retry-After", String(minutes * 60));
+      throw new HttpError(
+        429,
+        "account_locked",
+        `Too many failed attempts. This account is paused for ${minutes} minutes.`,
+        { retryAfterSeconds: minutes * 60 }
+      );
+    }
+
+    const user = await services.store.findUserByNormalizedEmail(email);
     // One message for "no such user" and "wrong password": no account enumeration.
     const valid = user ? await verifyPassword(body.password, user.passwordHash) : false;
     if (!user || !valid) {
+      // Both scopes are recorded: an attacker rotating addresses still meets the email
+      // budget, and one guessing across many accounts still meets the address budget.
+      await Promise.all([
+        services.store.recordAuthAttempt(`signin:email:${email}`),
+        services.store.recordAuthAttempt(`signin:ip:${address}`),
+      ]);
       throw new HttpError(401, "invalid_credentials", "Email or password is incorrect.");
     }
+    await services.store.clearAuthAttempts(`signin:email:${email}`);
 
     await services.store.deleteExpiredSessions(user.id, services.clock());
     const { token, tokenHash } = await createSessionToken();

@@ -70,6 +70,7 @@ export function migrationFiles(): { id: string; sql: string }[] {
     "0006_account_lifecycle.sql",
     "0007_provider_kind.sql",
     "0008_browser_sessions.sql",
+    "0009_auth_attempts.sql",
   ];
   return names.map((name) => ({ id: name, sql: readFileSync(join(MIGRATIONS_DIR, name), "utf8") }));
 }

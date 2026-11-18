@@ -61,6 +61,12 @@ function newToken(): string {
 export function accountRoutes(services: Services): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
   const forgotLimiter = new RateLimiter(5, 15 * 60_000);
+  // Same durable backstop as sign-in: the isolate may recycle between two bursts, and a
+  // reset request costs an e-mail, so the two counters that matter are per address and
+  // per target account (a mail bomb aimed at one inbox).
+  const maxForgotPerAddress = Number(process.env.FORGOT_MAX_PER_ADDRESS ?? 10);
+  const maxForgotPerEmail = Number(process.env.FORGOT_MAX_PER_EMAIL ?? 4);
+  const forgotWindowMs = Number(process.env.FORGOT_WINDOW_MS ?? 60 * 60_000);
   const supportLimiter = new RateLimiter(5, 60 * 60_000);
   const webOrigin = services.config.webOrigin;
 
@@ -81,7 +87,26 @@ export function accountRoutes(services: Services): Hono<AppEnv> {
       );
     }
 
-    const user = await services.store.findUserByNormalizedEmail(normalizeEmail(body.email));
+    const email = normalizeEmail(body.email);
+    const windowStart = new Date(services.clock().getTime() - forgotWindowMs);
+    const [addressHits, emailHits] = await Promise.all([
+      services.store.countAuthAttempts(`forgot:ip:${address}`, windowStart),
+      services.store.countAuthAttempts(`forgot:email:${email}`, windowStart),
+    ]);
+    if (addressHits >= maxForgotPerAddress || emailHits >= maxForgotPerEmail) {
+      c.header("Retry-After", String(Math.ceil(forgotWindowMs / 1000)));
+      throw new HttpError(
+        429,
+        "too_many_attempts",
+        "Trop de demandes. Réessaie dans quelques minutes."
+      );
+    }
+    await Promise.all([
+      services.store.recordAuthAttempt(`forgot:ip:${address}`),
+      services.store.recordAuthAttempt(`forgot:email:${email}`),
+    ]);
+
+    const user = await services.store.findUserByNormalizedEmail(email);
 
     if (user) {
       const token = newToken();

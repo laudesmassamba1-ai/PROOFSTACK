@@ -521,6 +521,41 @@ export class AppStore {
     await this.db.prepare("DELETE FROM sessions WHERE id = ?").bind(id).run();
   }
 
+  /**
+   * Durable brute-force memory.
+   *
+   * The in-memory limiter in the route is per isolate, so it resets on every cold
+   * start. These three helpers back it with rows that all isolates see, and they are
+   * only written on a failed attempt — a successful sign-in costs one read.
+   *
+   * `since` is passed in by the caller so the lockout window is a route policy, not a
+   * storage detail.
+   */
+  async recordAuthAttempt(scope: string, now = this.clock()): Promise<void> {
+    await this.db
+      .prepare("INSERT INTO auth_attempts (id, scope, at) VALUES (?, ?, ?)")
+      .bind(uuid(), scope, iso(now))
+      .run();
+  }
+
+  /** Attempts for one scope inside the window, pruning anything older than it. */
+  async countAuthAttempts(scope: string, since: Date): Promise<number> {
+    await this.db
+      .prepare("DELETE FROM auth_attempts WHERE scope = ? AND at < ?")
+      .bind(scope, iso(since))
+      .run();
+    const row = await this.db
+      .prepare("SELECT COUNT(*) AS count FROM auth_attempts WHERE scope = ? AND at >= ?")
+      .bind(scope, iso(since))
+      .first<Row>();
+    return row ? num(row, "count") : 0;
+  }
+
+  /** A correct password clears the counter: the person proved who they are. */
+  async clearAuthAttempts(scope: string): Promise<void> {
+    await this.db.prepare("DELETE FROM auth_attempts WHERE scope = ?").bind(scope).run();
+  }
+
   async deleteExpiredSessions(userId: string, now = this.clock()): Promise<void> {
     await this.db
       .prepare("DELETE FROM sessions WHERE user_id = ? AND expires_at <= ?")
