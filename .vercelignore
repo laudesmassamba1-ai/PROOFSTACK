@@ -1,0 +1,47 @@
+# What Vercel does NOT need to receive.
+#
+# Without this file the CLI uploads the build output of every package (hundreds of
+# hashed asset files, several hundred MB of tsbuildinfo and dist trees), at roughly two
+# seconds per file: the upload alone overran a five-minute deploy window. Vercel builds
+# from source with `pnpm build`, so generated files are dead weight in transit.
+
+# Dependencies and build output
+node_modules/
+**/node_modules/
+**/dist/
+**/build/
+**/*.tsbuildinfo
+**/.vite/
+**/.turbo/
+apps/web/.vercel/
+
+# Local runtime data: a dev SQLite database is not a deployment input
+**/.proofcore/
+**/*.sqlite
+**/*.sqlite3
+**/*.db
+**/*.db-journal
+
+# Test output
+coverage/
+**/coverage/
+playwright-report/
+test-results/
+**/*.log
+
+# Editors and OS noise
+.DS_Store
+**/.DS_Store
+.idea/
+.vscode/
+**/.swc/
+
+# Release binaries and packaged archives (CLI builds these locally; Vercel never needs
+# them, and a single tarball is often slower to upload than the whole source tree)
+artifacts/
+**/artifacts/
+**/release/
+**/*.tgz
+**/*.tar.gz
+**/*.zip
+**/*.sha256
