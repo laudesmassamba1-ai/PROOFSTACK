@@ -54,18 +54,41 @@ async function bootstrap(env: Record<string, string | undefined> = ENV): Promise
 
 interface UpstreamState {
   requests: { body: string }[];
+  /** Every call with its path and headers, so wire formats can be asserted. */
+  calls: { method: string; url: string; headers: Record<string, string>; body: string }[];
   respond: (attempt: number, body: Record<string, unknown>) => Response | Promise<Response>;
 }
 
 function startUpstream(state: UpstreamState): Promise<string> {
   return new Promise((resolve) => {
     const server = createServer((req, res) => {
+      // The connect flow reads the provider catalogue before it stores a model, so the
+      // fake upstream behaves like a provider: a real model list on GET /models.
+      state.calls.push({
+        method: req.method ?? "GET",
+        url: req.url ?? "",
+        headers: Object.fromEntries(
+          Object.entries(req.headers).map(([key, value]) => [key, String(value ?? "")])
+        ),
+        body: "",
+      });
+      if (req.method === "GET" && (req.url ?? "").endsWith("/models")) {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(
+          JSON.stringify({
+            data: [{ id: "test-model" }, { id: "test-model-mini" }, { id: "whisper-large-v3" }],
+          })
+        );
+        return;
+      }
       let raw = "";
       req.on("data", (chunk: Buffer) => {
         raw += String(chunk);
       });
       req.on("end", () => {
         state.requests.push({ body: raw });
+        const last = state.calls.at(-1);
+        if (last) last.body = raw;
         Promise.resolve(
           state.respond(state.requests.length, JSON.parse(raw) as Record<string, unknown>)
         ).then((response) => {
@@ -86,6 +109,7 @@ let harness: Harness;
 let upstreamBase: string;
 const upstreamState: UpstreamState = {
   requests: [],
+  calls: [],
   respond: () => ({ status: 500, body: {} }),
 };
 
@@ -95,6 +119,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   upstreamState.requests = [];
+  upstreamState.calls = [];
   harness = await bootstrap();
 });
 
@@ -106,6 +131,7 @@ describe("ai profile", () => {
       method: "PUT",
       cookie,
       body: JSON.stringify({
+        providerId: "custom",
         baseUrl: upstreamBase,
         model: "test-model",
         apiKey: "sk-secret-value-123",
@@ -131,13 +157,76 @@ describe("ai profile", () => {
     expect(JSON.stringify(await get.json())).not.toContain("sk-secret-value-123");
   });
 
+  it("chooses the model itself when the user only supplies a provider and a key", async () => {
+    const { request, signUp } = harness;
+    const { cookie } = await signUp("ai-auto-model@example.com");
+    const put = await request("/api/v1/ai/profile", {
+      method: "PUT",
+      cookie,
+      body: JSON.stringify({
+        providerId: "custom",
+        baseUrl: upstreamBase,
+        apiKey: "sk-auto-key-1234",
+      }),
+    });
+    expect(put.status).toBe(200);
+    const body = (await put.json()) as {
+      model: string;
+      modelWasChosen: boolean;
+      chatModels: string[];
+      providerKind: string;
+    };
+    // Picked from the fake catalogue, and it is not the non-chat entry.
+    expect(body.model).toBe("test-model");
+    expect(body.modelWasChosen).toBe(true);
+    expect(body.chatModels).not.toContain("whisper-large-v3");
+    expect(body.providerKind).toBe("openai");
+  });
+
+  it("replaces a retired model id instead of storing a conversation that cannot work", async () => {
+    const { request, signUp } = harness;
+    const { cookie } = await signUp("ai-retired@example.com");
+    const put = await request("/api/v1/ai/profile", {
+      method: "PUT",
+      cookie,
+      body: JSON.stringify({
+        providerId: "custom",
+        baseUrl: upstreamBase,
+        model: "llama-3.3-70b-versatile",
+        apiKey: "sk-retired-key-1234",
+      }),
+    });
+    expect(put.status).toBe(200);
+    const body = (await put.json()) as { model: string; modelWasChosen: boolean };
+    expect(body.model).toBe("test-model");
+    expect(body.modelWasChosen).toBe(true);
+  });
+
+  it("refuses an unknown provider id rather than guessing where to send the key", async () => {
+    const { request, signUp } = harness;
+    const { cookie } = await signUp("ai-bad-provider@example.com");
+    const put = await request("/api/v1/ai/profile", {
+      method: "PUT",
+      cookie,
+      body: JSON.stringify({ providerId: "grop", apiKey: "sk-typo-key-1234" }),
+    });
+    expect(put.status).toBe(400);
+    const body = (await put.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("unknown_provider");
+  });
+
   it("refuses key storage without AI_KEYS_SECRET instead of storing plaintext", async () => {
     const weak = await bootstrap({ ...ENV, AI_KEYS_SECRET: undefined });
     const { cookie } = await weak.signUp("ai-nosecret@example.com");
     const put = await weak.request("/api/v1/ai/profile", {
       method: "PUT",
       cookie,
-      body: JSON.stringify({ baseUrl: upstreamBase, model: "m", apiKey: "sk-secret-value-123" }),
+      body: JSON.stringify({
+        providerId: "custom",
+        baseUrl: upstreamBase,
+        model: "m",
+        apiKey: "sk-secret-value-123",
+      }),
     });
     expect(put.status).toBe(503);
     expect(
@@ -149,6 +238,65 @@ describe("ai profile", () => {
         ).user.id
       )
     ).toBeNull();
+  });
+});
+
+describe("anthropic wire format", () => {
+  it("posts to /messages with x-api-key, a top-level system prompt and input_schema tools", async () => {
+    const { request, signUp } = harness;
+    const { cookie, workspaceId } = await signUp("ai-anthropic@example.com");
+    upstreamState.respond = () => ({
+      status: 200,
+      body: { content: [{ type: "text", text: "Bonjour." }] },
+    });
+
+    const put = await request("/api/v1/ai/profile", {
+      method: "PUT",
+      cookie,
+      body: JSON.stringify({
+        providerId: "custom",
+        baseUrl: upstreamBase,
+        model: "test-model",
+        apiKey: "sk-ant-api03-test",
+      }),
+    });
+    expect(put.status).toBe(200);
+
+    // Force the anthropic family on the stored profile: this is what the "Anthropic
+    // (Claude)" provider stores, and it is the branch this test exists to prove.
+    const session = (await request("/api/auth/session", { cookie }).then((r) => r.json())) as {
+      user: { id: string };
+    };
+    await harness.services.db
+      .prepare("UPDATE ai_profiles SET provider_kind = 'anthropic' WHERE user_id = ?")
+      .bind(session.user.id)
+      .run();
+
+    upstreamState.calls = [];
+    const chat = await request("/api/v1/ai/chat", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({ workspaceId, message: "Bonjour", effort: "quick" }),
+    });
+    expect(chat.status).toBe(200);
+    expect(((await chat.json()) as { message: string }).message).toBe("Bonjour.");
+
+    const call = upstreamState.calls.find((entry) => entry.method === "POST");
+    expect(call?.url).toBe("/v1/messages");
+    expect(call?.headers["x-api-key"]).toBe("sk-ant-api03-test");
+    expect(call?.headers["anthropic-version"]).toBe("2023-06-01");
+    const payload = JSON.parse(call?.body ?? "{}") as {
+      system?: string;
+      max_tokens?: number;
+      tools?: { name: string; input_schema?: unknown }[];
+      messages: { role: string; content: unknown }[];
+    };
+    // The system prompt travels at the top level, never as a message.
+    expect(payload.system).toContain("PROOFCORE assistant");
+    expect(payload.messages.some((message) => message.role === "system")).toBe(false);
+    expect(payload.tools?.[0]?.name).toBe("workspace_overview");
+    expect(payload.tools?.[0]).toHaveProperty("input_schema");
+    expect(payload.max_tokens).toBe(500);
   });
 });
 
@@ -172,6 +320,7 @@ describe("ai chat", () => {
       method: "PUT",
       cookie,
       body: JSON.stringify({
+        providerId: "custom",
         baseUrl: upstreamBase,
         model: "test-model",
         apiKey: "sk-chat-key-456",
@@ -259,6 +408,7 @@ describe("ai chat", () => {
       method: "PUT",
       cookie,
       body: JSON.stringify({
+        providerId: "custom",
         baseUrl: upstreamBase,
         model: "test-model",
         apiKey: "sk-bad-key-789",

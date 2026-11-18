@@ -39,7 +39,7 @@ uses the Ink & Object direction; this file records what is true and what remains
 ## Verification
 
 - `pnpm typecheck`: passes across the workspace.
-- `pnpm test`: 253 tests pass (20 files).
+- `pnpm test`: 257 tests pass (20 files).
 - `pnpm test:e2e`: 26 tests pass (desktop + mobile), including the HttpOnly session
   surviving a reload and no horizontal overflow on any dashboard page.
 - `pnpm --filter @proofcore/web build`: passes; route-level chunks replace the previous

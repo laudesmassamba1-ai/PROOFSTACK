@@ -77,6 +77,8 @@ export interface AiProfileRecord {
   userId: string;
   providerBaseUrl: string;
   providerModel: string;
+  providerKind: string;
+  providerId: string;
   apiKeyEncrypted: string;
   keyFingerprint: string;
   updatedAt: string;
@@ -234,6 +236,181 @@ export class AppStore {
   async findUserById(id: string): Promise<UserRecord | null> {
     const row = await this.db.prepare("SELECT * FROM users WHERE id = ?").bind(id).first<Row>();
     return row ? mapUser(row) : null;
+  }
+
+  // ---------------------------------------------------- account lifecycle
+
+  async createAuthToken(input: {
+    id: string;
+    userId: string;
+    kind: "password_reset" | "email_verify";
+    tokenHash: string;
+    expiresAt: string;
+    requestedIp?: string | null;
+  }): Promise<void> {
+    await this.db
+      .prepare(
+        `INSERT INTO auth_tokens (id, user_id, kind, token_hash, created_at, expires_at, requested_ip)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        input.id,
+        input.userId,
+        input.kind,
+        input.tokenHash,
+        iso(this.clock()),
+        input.expiresAt,
+        input.requestedIp ?? null
+      )
+      .run();
+  }
+
+  /**
+   * Consumes a token atomically.
+   *
+   * `UPDATE ... WHERE consumed_at IS NULL` is the whole point: two concurrent clicks on
+   * the same link must not both succeed, and a consumed token must never be reusable.
+   */
+  async consumeAuthToken(
+    tokenHash: string,
+    kind: "password_reset" | "email_verify"
+  ): Promise<{ userId: string } | null> {
+    const row = await this.db
+      .prepare(
+        `SELECT id, user_id, expires_at, consumed_at FROM auth_tokens
+         WHERE token_hash = ? AND kind = ?`
+      )
+      .bind(tokenHash, kind)
+      .first<Row>();
+    if (!row) return null;
+    if (nullableStr(row, "consumed_at")) return null;
+    if (str(row, "expires_at") <= iso(this.clock())) return null;
+    const result = await this.db
+      .prepare("UPDATE auth_tokens SET consumed_at = ? WHERE id = ? AND consumed_at IS NULL")
+      .bind(iso(this.clock()), str(row, "id"))
+      .run();
+    if (result.changes !== 1) return null;
+    return { userId: str(row, "user_id") };
+  }
+
+  async invalidateAuthTokens(
+    userId: string,
+    kind: "password_reset" | "email_verify"
+  ): Promise<void> {
+    await this.db
+      .prepare(
+        "UPDATE auth_tokens SET consumed_at = ? WHERE user_id = ? AND kind = ? AND consumed_at IS NULL"
+      )
+      .bind(iso(this.clock()), userId, kind)
+      .run();
+  }
+
+  async updateUserPassword(userId: string, passwordHash: string): Promise<void> {
+    await this.db
+      .prepare("UPDATE users SET password_hash = ? WHERE id = ?")
+      .bind(passwordHash, userId)
+      .run();
+    // A password change invalidates every existing session: that is the point of
+    // changing it. The user signs in again on each device.
+    await this.db.prepare("DELETE FROM sessions WHERE user_id = ?").bind(userId).run();
+  }
+
+  async markEmailVerified(userId: string): Promise<void> {
+    await this.db
+      .prepare("UPDATE users SET email_verified_at = ? WHERE id = ? AND email_verified_at IS NULL")
+      .bind(iso(this.clock()), userId)
+      .run();
+  }
+
+  async enqueueEmail(input: {
+    id: string;
+    userId?: string | null;
+    to: string;
+    subject: string;
+    text: string;
+    html?: string | null;
+    kind: string;
+    status: "queued" | "sent" | "failed" | "unconfigured";
+    provider?: string | null;
+    providerId?: string | null;
+    error?: string | null;
+  }): Promise<void> {
+    await this.db
+      .prepare(
+        `INSERT INTO email_outbox (id, user_id, to_address, subject, body_text, body_html,
+                                   kind, status, provider, provider_id, error, created_at, sent_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        input.id,
+        input.userId ?? null,
+        input.to,
+        input.subject,
+        input.text,
+        input.html ?? null,
+        input.kind,
+        input.status,
+        input.provider ?? null,
+        input.providerId ?? null,
+        input.error ?? null,
+        iso(this.clock()),
+        input.status === "sent" ? iso(this.clock()) : null
+      )
+      .run();
+  }
+
+  async listEmailOutbox(limit = 50): Promise<
+    {
+      id: string;
+      to: string;
+      subject: string;
+      kind: string;
+      status: string;
+      error: string | null;
+      createdAt: string;
+    }[]
+  > {
+    const rows = await this.db
+      .prepare(
+        `SELECT id, to_address, subject, kind, status, error, created_at FROM email_outbox
+         ORDER BY created_at DESC LIMIT ?`
+      )
+      .bind(limit)
+      .all<Row>();
+    return rows.map((row) => ({
+      id: str(row, "id"),
+      to: str(row, "to_address"),
+      subject: str(row, "subject"),
+      kind: str(row, "kind"),
+      status: str(row, "status"),
+      error: nullableStr(row, "error"),
+      createdAt: str(row, "created_at"),
+    }));
+  }
+
+  async createSupportMessage(input: {
+    id: string;
+    userId?: string | null;
+    fromAddress: string;
+    workspaceId?: string | null;
+    subject: string;
+    body: string;
+  }): Promise<void> {
+    await this.db
+      .prepare(
+        `INSERT INTO support_messages (id, user_id, from_address, workspace_id, subject, body, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        input.id,
+        input.userId ?? null,
+        input.fromAddress,
+        input.workspaceId ?? null,
+        input.subject,
+        input.body,
+        iso(this.clock())
+      )
+      .run();
   }
 
   // --------------------------------------------------------------- sessions
@@ -520,6 +697,8 @@ export class AppStore {
     userId: string;
     providerBaseUrl: string;
     providerModel: string;
+    providerKind: string;
+    providerId: string;
     apiKeyEncrypted: string;
     keyFingerprint: string;
   }): Promise<AiProfileRecord> {
@@ -545,6 +724,8 @@ export class AppStore {
       userId: input.userId,
       providerBaseUrl: input.providerBaseUrl,
       providerModel: input.providerModel,
+      providerKind: input.providerKind,
+      providerId: input.providerId,
       apiKeyEncrypted: input.apiKeyEncrypted,
       keyFingerprint: input.keyFingerprint,
       updatedAt: now,
@@ -561,6 +742,8 @@ export class AppStore {
       userId: str(row, "user_id"),
       providerBaseUrl: str(row, "provider_base_url"),
       providerModel: str(row, "provider_model"),
+      providerKind: str(row, "provider_kind") || "openai",
+      providerId: str(row, "provider_id") || "custom",
       apiKeyEncrypted: str(row, "api_key_encrypted"),
       keyFingerprint: str(row, "key_fingerprint"),
       updatedAt: str(row, "updated_at"),

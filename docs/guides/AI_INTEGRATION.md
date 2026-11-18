@@ -115,3 +115,29 @@ production URL live (`docker exec proofcore-n8n n8n update:workflow --id=proofco
 - Publish anything without the human's approval when `autonomy: "ask"`.
 - Fake results: a tool that cannot run answers with an error, never invented
   output.
+
+## Connexion d'un fournisseur (depuis 0.2.0)
+
+Le modèle n'est **jamais** demandé à l'utilisateur. Le parcours est :
+
+1. choisir un fournisseur (liste servie par `GET /api/v1/ai/providers`) ;
+2. coller une clé API ;
+3. `PUT /api/v1/ai/profile` → le serveur appelle `GET {base}/models` avec la clé,
+   filtre les familles non conversationnelles (whisper, tts, embeddings, guardrails),
+   choisit un modèle et l'enregistre.
+
+Conséquences de conception :
+
+- **Aucun identifiant de modèle n'est codé en dur.** Un preset qui embarque un modèle
+  retiré par le fournisseur casse toutes les conversations avec un 404 amont — c'est
+  exactement ce qui est arrivé avec `llama-3.3-70b-versatile` chez Groq.
+- **Le modèle enregistré est toujours dans le catalogue de la clé**, puisque la même
+  lecture sert de validation à chaque sauvegarde. Un modèle absent est remplacé et la
+  réponse porte `modelWasChosen: true`.
+- **Deux formats de câblage** : `openai` (`/chat/completions`, `Authorization: Bearer`)
+  et `anthropic` (`/messages`, `x-api-key` + `anthropic-version`, blocs de contenu,
+  `input_schema`). Claude fonctionne donc nativement, sans passer par un proxy
+  compatible OpenAI.
+- **Erreurs utiles** : une clé refusée remonte `ai_key_rejected` avec le statut et le
+  message du fournisseur ; un modèle retiré remonte `ai_model_not_found` ; une coupure
+  de passerelle est expliquée comme telle (et non plus « HTTP 502 »).

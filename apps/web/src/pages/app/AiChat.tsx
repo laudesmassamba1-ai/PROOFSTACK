@@ -44,6 +44,9 @@ interface ChatMessage {
 
 interface ProfileState {
   configured: boolean;
+  providerId?: string;
+  providerKind?: string;
+  providerLabel?: string;
   baseUrl?: string;
   model?: string;
   keyFingerprint?: string;
@@ -87,79 +90,23 @@ const TOOL_ICONS: Record<string, typeof Bot> = {
 };
 
 /** One-click provider presets: pick one, paste the key, done. All OpenAI-compatible. */
-interface ProviderPreset {
+
+/** Short notes only. The provider list itself is read from /api/v1/ai/providers. */
+const PROVIDER_HINTS: Record<string, string> = {
+  groq: "très rapide, gratuit",
+  openrouter: "tous les modèles",
+  cerebras: "le plus rapide",
+  ollama: "100 % local",
+  anthropic: "Claude",
+  google: "Gemini",
+};
+
+interface ProviderOption {
   id: string;
   label: string;
-  baseUrl: string;
-  models: string[];
-  note?: string;
+  kind: string;
+  keyOptional?: boolean;
 }
-
-const PROVIDER_PRESETS: ProviderPreset[] = [
-  {
-    id: "openai",
-    label: "OpenAI",
-    baseUrl: "https://api.openai.com/v1",
-    models: ["gpt-4o-mini", "gpt-4o", "gpt-4.1"],
-  },
-  {
-    id: "groq",
-    label: "Groq",
-    baseUrl: "https://api.groq.com/openai/v1",
-    models: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "qwen-2.5-32b"],
-    note: "très rapide, généreux gratuit",
-  },
-  {
-    id: "openrouter",
-    label: "OpenRouter",
-    baseUrl: "https://openrouter.ai/api/v1",
-    models: [
-      "openai/gpt-4o-mini",
-      "anthropic/claude-sonnet-4",
-      "meta-llama/llama-3.3-70b-instruct",
-    ],
-    note: "tous les modèles, une clé",
-  },
-  {
-    id: "gemini",
-    label: "Google Gemini",
-    baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
-    models: ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-pro"],
-  },
-  {
-    id: "mistral",
-    label: "Mistral",
-    baseUrl: "https://api.mistral.ai/v1",
-    models: ["mistral-large-latest", "mistral-small-latest"],
-  },
-  {
-    id: "deepseek",
-    label: "DeepSeek",
-    baseUrl: "https://api.deepseek.com/v1",
-    models: ["deepseek-chat", "deepseek-reasoner"],
-  },
-  {
-    id: "together",
-    label: "Together",
-    baseUrl: "https://api.together.xyz/v1",
-    models: ["meta-llama/Llama-3.3-70B-Instruct-Turbo", "Qwen/Qwen2.5-72B-Instruct-Turbo"],
-  },
-  {
-    id: "cerebras",
-    label: "Cerebras",
-    baseUrl: "https://api.cerebras.ai/v1",
-    models: ["llama-3.3-70b", "llama3.1-8b"],
-    note: "inférence la plus rapide",
-  },
-  { id: "xai", label: "xAI", baseUrl: "https://api.x.ai/v1", models: ["grok-3", "grok-3-mini"] },
-  {
-    id: "ollama",
-    label: "Ollama",
-    baseUrl: "http://localhost:11434/v1",
-    models: ["llama3.2", "qwen2.5", "mistral"],
-    note: "100 % local, aucune clé",
-  },
-];
 
 /** MCP connection recipes: PROOFCORE tools inside the user's coding agent. */
 const MCP_RECIPES = [
@@ -234,6 +181,63 @@ async function readApiError(response: Response, fallback: string): Promise<strin
   return `${fallback} (HTTP ${response.status})`;
 }
 
+/**
+ * Explains a failed chat call in the user's terms.
+ *
+ * A 502 from the edge carries no JSON at all, while a provider refusal carries the
+ * provider's own words. Both used to surface as "the request failed (HTTP 502)".
+ */
+function describeFailure(
+  status: number,
+  data: { error?: { code?: string; message?: string; details?: Record<string, unknown> } },
+  raw: string,
+  fr: boolean
+): string {
+  const code = data.error?.code ?? "";
+  const message = data.error?.message;
+  if (
+    code === "ai_model_not_found" ||
+    (/model/i.test(message ?? "") && /not.*(exist|access|offer)/i.test(message ?? ""))
+  ) {
+    return fr
+      ? `${message ?? "Ce modèle n'existe pas sur cette clé."} Ouvre les réglages du modèle et choisis-en un dans la liste.`
+      : `${message ?? "This model does not exist on this key."} Open the model settings and pick one from the list.`;
+  }
+  if (code === "ai_invalid_key") {
+    return fr
+      ? "Le fournisseur a refusé la clé enregistrée. Remplace-la dans les réglages."
+      : "The provider rejected the saved key. Replace it in the settings.";
+  }
+  if (code === "ai_not_configured") {
+    return fr
+      ? "Aucun modèle connecté. Ouvre les réglages."
+      : "No model connected. Open the settings.";
+  }
+  if (code === "ai_rate_limited") {
+    return fr
+      ? "Trop de demandes cette heure-ci. Réessaie plus tard."
+      : "Too many requests this hour. Try again later.";
+  }
+  if (code === "ai_turn_budget") {
+    return fr
+      ? "La question demandait trop d'étapes. Précise-la, ou baisse le niveau d'effort."
+      : "The question needed too many steps. Narrow it, or lower the effort level.";
+  }
+  if (code === "payload_too_large" || status === 413) {
+    return fr
+      ? "Message trop long pour une seule demande."
+      : "Message too long for a single request.";
+  }
+  if (status === 502 || status === 504) {
+    return fr
+      ? "La passerelle a coupé la requête avant la réponse (délai dépassé). Réessaie : si ça se répète, baisse le niveau d'effort — Ultra enchaîne beaucoup d'appels d'outils."
+      : "The gateway cut the request before the answer (timeout). Retry; if it repeats, lower the effort level — Ultra chains many tool calls.";
+  }
+  if (message) return message;
+  if (raw && raw.length < 200 && !raw.trimStart().startsWith("<")) return raw;
+  return fr ? `La demande a échoué (HTTP ${status}).` : `The request failed (HTTP ${status}).`;
+}
+
 function uid(): string {
   return `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -295,7 +299,29 @@ export function AiChatPage(): React.ReactElement {
   const [activePreset, setActivePreset] = useState<string>("openai");
   const [modelDraft, setModelDraft] = useState("gpt-4o-mini");
   const [keyDraft, setKeyDraft] = useState("");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [providers, setProviders] = useState<ProviderOption[]>([
+    { id: "openai", label: "OpenAI", kind: "openai" },
+    { id: "anthropic", label: "Anthropic (Claude)", kind: "anthropic" },
+  ]);
+  const [chatModels, setChatModels] = useState<string[]>([]);
   const [profileError, setProfileError] = useState<string | null>(null);
+  /** The provider list is server-owned: adding Claude must not need a web release. */
+  const loadProviders = useCallback(async () => {
+    try {
+      const response = await fetch("/api/v1/ai/providers", { credentials: "include" });
+      if (!response.ok) return;
+      const data = (await response.json()) as { items?: ProviderOption[] };
+      if (data.items && data.items.length > 0) setProviders(data.items);
+    } catch {
+      // The built-in pair stays usable if the registry call fails.
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadProviders();
+  }, [loadProviders]);
+
   const [testResult, setTestResult] = useState<{
     ok: boolean;
     message: string;
@@ -330,8 +356,9 @@ export function AiChatPage(): React.ReactElement {
         if (data.configured) {
           setBaseUrlDraft(data.baseUrl ?? "");
           setModelDraft(data.model ?? "");
-          const preset = PROVIDER_PRESETS.find((entry) => entry.baseUrl === data.baseUrl);
-          setActivePreset(preset?.id ?? "custom");
+          // The stored provider id is authoritative; only a legacy row without one falls
+          // back to "custom".
+          setActivePreset(data.providerId ?? "custom");
         }
       })
       .catch(() => setProfile({ configured: false }));
@@ -382,6 +409,8 @@ export function AiChatPage(): React.ReactElement {
   );
 
   const testConnection = useCallback(async () => {
+    // `activePreset` and `baseUrlDraft` decide where the key is sent: both must be in
+    // the dependency list or a stale provider would be tested.
     setTesting(true);
     setTestResult(null);
     setProfileError(null);
@@ -391,8 +420,9 @@ export function AiChatPage(): React.ReactElement {
         credentials: "include",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          baseUrl: baseUrlDraft,
-          model: modelDraft,
+          providerId: activePreset,
+          ...(activePreset === "custom" ? { baseUrl: baseUrlDraft } : {}),
+          ...(modelDraft ? { model: modelDraft } : {}),
           ...(keyDraft ? { apiKey: keyDraft } : {}),
         }),
       });
@@ -405,13 +435,24 @@ export function AiChatPage(): React.ReactElement {
         message: string;
         latencyMs?: number;
         models?: string[];
+        chatModels?: string[];
         modelAvailable?: boolean;
+        suggestedModel?: string;
       };
+      // A model that is not on the key cannot work: switch to the suggested one
+      // instead of letting the user discover it later in a failed chat.
+      if (data.ok && data.modelAvailable === false) {
+        const replacement = data.suggestedModel ?? data.chatModels?.[0];
+        if (replacement) {
+          setModelDraft(replacement);
+          setProfileError(null);
+        }
+      }
       setTestResult({
         ok: data.ok,
         message: data.message,
         ...(data.latencyMs !== undefined ? { latencyMs: data.latencyMs } : {}),
-        ...(data.models ? { models: data.models } : {}),
+        ...((data.chatModels ?? data.models) ? { models: data.chatModels ?? data.models } : {}),
       });
     } catch (error) {
       setTestResult({
@@ -421,9 +462,15 @@ export function AiChatPage(): React.ReactElement {
     } finally {
       setTesting(false);
     }
-  }, [baseUrlDraft, modelDraft, keyDraft]);
+  }, [activePreset, baseUrlDraft, modelDraft, keyDraft]);
 
-  const saveProfile = useCallback(async () => {
+  /**
+   * Connects a provider: provider + key in, working model out.
+   *
+   * The user never types a model id. If they do (advanced picker), it is still validated
+   * against the provider catalogue by the server before it is stored.
+   */
+  const connectProvider = useCallback(async () => {
     setProfileSaving(true);
     setProfileError(null);
     try {
@@ -432,25 +479,47 @@ export function AiChatPage(): React.ReactElement {
         credentials: "include",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          baseUrl: baseUrlDraft,
-          model: modelDraft,
+          providerId: activePreset,
+          ...(activePreset === "custom" ? { baseUrl: baseUrlDraft } : {}),
+          ...(modelDraft ? { model: modelDraft } : {}),
           ...(keyDraft ? { apiKey: keyDraft } : {}),
         }),
       });
-      if (!response.ok) {
+      const raw = await response.text();
+      type ConnectResponse = ProfileState & {
+        configured: true;
+        chatModels?: string[];
+        modelWasChosen?: boolean;
+      };
+      const parsed: unknown = (() => {
+        try {
+          return JSON.parse(raw);
+        } catch {
+          return null;
+        }
+      })();
+      if (!response.ok || !parsed) {
         setProfileError(
-          await readApiError(response, fr ? "Enregistrement refusé" : "Save refused")
+          describeFailure(
+            response.status,
+            (parsed ?? {}) as Parameters<typeof describeFailure>[1],
+            raw,
+            fr
+          )
         );
         return;
       }
-      const data = (await response.json()) as ProfileState & { configured: true };
+      const data = parsed as ConnectResponse;
       setProfile(data);
+      if (data.chatModels) setChatModels(data.chatModels);
       setKeyDraft("");
+      setModelDraft("");
+      setTestResult(null);
       setSettingsOpen(false);
     } finally {
       setProfileSaving(false);
     }
-  }, [baseUrlDraft, modelDraft, keyDraft, fr]);
+  }, [activePreset, baseUrlDraft, modelDraft, keyDraft, fr]);
 
   const send = useCallback(async () => {
     const text = draft.trim();
@@ -480,19 +549,21 @@ export function AiChatPage(): React.ReactElement {
           effort,
         }),
       });
-      const data = (await response.json().catch(() => ({}))) as {
+      const raw = await response.text();
+      let data: {
         conversationId?: string;
         title?: string;
         message?: string;
         trace?: { tool: string; summary: string }[];
-        message_error?: string;
-        error?: string;
-      };
+        error?: { code?: string; message?: string; details?: Record<string, unknown> };
+      } = {};
+      try {
+        data = JSON.parse(raw) as typeof data;
+      } catch {
+        data = {};
+      }
       if (!response.ok) {
-        const message = await readApiError(
-          response,
-          fr ? "La demande a échoué" : "The request failed"
-        );
+        const message = describeFailure(response.status, data, raw, fr);
         setMessages((items) =>
           items.map((item) =>
             item.id === pendingId ? { ...item, content: "", error: message } : item
@@ -808,22 +879,27 @@ export function AiChatPage(): React.ReactElement {
                 : "Your key is encrypted (AES-256-GCM) server-side and never returned to the browser. Replace or delete it anytime."}
             </p>
             <div className="mt-4 space-y-3">
-              {/* provider presets: one click fills URL + model */}
+              {/* Step 1 — which provider. The model is never asked for: the server reads
+                  the provider catalogue and picks one from it. */}
               <div>
-                <p className="text-xs font-medium">{fr ? "Fournisseur" : "Provider"}</p>
+                <p className="text-xs font-medium">
+                  1. {fr ? "Choisis le fournisseur" : "Choose the provider"}
+                </p>
                 <div className="mt-1.5 grid grid-cols-2 gap-1.5">
-                  {PROVIDER_PRESETS.map((preset) => {
-                    const active = baseUrlDraft === preset.baseUrl;
+                  {providers.map((preset) => {
+                    const active = activePreset === preset.id;
+                    const note = PROVIDER_HINTS[preset.id];
                     return (
                       <button
                         key={preset.id}
                         type="button"
                         onClick={() => {
-                          setBaseUrlDraft(preset.baseUrl);
-                          setModelDraft(preset.models[0] ?? "");
                           setActivePreset(preset.id);
+                          setModelDraft("");
+                          setTestResult(null);
+                          setProfileError(null);
                         }}
-                        title={preset.note ?? preset.baseUrl}
+                        title={note ?? preset.label}
                         className={`flex items-center justify-between rounded-lg border px-2.5 py-2 text-left text-xs transition ${
                           active
                             ? "border-primary/70 bg-primary/10 text-primary"
@@ -831,71 +907,115 @@ export function AiChatPage(): React.ReactElement {
                         }`}
                       >
                         <span className="font-medium">{preset.label}</span>
-                        {preset.note && (
+                        {note && (
                           <span className="ml-1 truncate text-[9.5px] text-muted-foreground">
-                            {preset.note}
+                            {note}
                           </span>
                         )}
                       </button>
                     );
                   })}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setActivePreset("custom")}
-                  className={`mt-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition ${
-                    activePreset === "custom"
-                      ? "border-primary/70 bg-primary/10 text-primary"
-                      : "border-border/60 bg-surface-2 text-foreground/80 hover:border-primary/40"
-                  }`}
-                >
-                  {fr ? "URL personnalisée…" : "Custom URL…"}
-                </button>
               </div>
+
               {activePreset === "custom" && (
                 <label className="block text-xs font-medium">
-                  {fr ? "URL de base (compatible OpenAI)" : "Base URL (OpenAI-compatible)"}
+                  {fr ? "URL de base" : "Base URL"}
                   <input
                     value={baseUrlDraft}
                     onChange={(event) => setBaseUrlDraft(event.target.value)}
                     className="mt-1 w-full rounded-lg border border-border/70 bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary/60"
-                    placeholder="https://api.openai.com/v1"
+                    placeholder="https://api.example.com/v1"
                   />
                 </label>
               )}
+
+              {/* Step 2 — the key. That is all we need. */}
               <label className="block text-xs font-medium">
-                {fr ? "Modèle" : "Model"}
-                <input
-                  value={modelDraft}
-                  onChange={(event) => setModelDraft(event.target.value)}
-                  list="proofcore-model-list"
-                  className="mt-1 w-full rounded-lg border border-border/70 bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary/60"
-                  placeholder="gpt-4o-mini"
-                />
-                <datalist id="proofcore-model-list">
-                  {PROVIDER_PRESETS.find((preset) => preset.baseUrl === baseUrlDraft)?.models.map(
-                    (model) => (
-                      <option key={model} value={model} />
-                    )
-                  )}
-                </datalist>
-              </label>
-              <label className="block text-xs font-medium">
-                {fr ? "Clé API" : "API key"}
+                2. {fr ? "Colle ta clé API" : "Paste your API key"}
                 <input
                   type="password"
                   value={keyDraft}
                   onChange={(event) => setKeyDraft(event.target.value)}
-                  className="mt-1 w-full rounded-lg border border-border/70 bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary/60"
+                  className="mt-1 w-full rounded-lg border border-border/70 bg-surface-2 px-3 py-2 font-mono text-sm outline-none focus:border-primary/60"
                   placeholder={
                     profile?.configured
                       ? fr
                         ? "Laisser vide pour conserver la clé actuelle"
                         : "Leave empty to keep the current key"
-                      : "sk-…"
+                      : activePreset === "ollama"
+                        ? "ollama"
+                        : "sk-…"
                   }
+                  autoComplete="off"
+                  spellCheck={false}
                 />
+                <span className="mt-1 block text-[10.5px] font-normal leading-relaxed text-muted-foreground">
+                  {fr
+                    ? "Créée chez le fournisseur, jamais stockée en clair ici. PROOFCORE lit la liste des modèles de la clé et choisit le meilleur modèle de conversation — tu n'as rien à connaître."
+                    : "Created at the provider, never stored in clear here. PROOFCORE reads the key's model list and picks the best chat model — nothing to know on your side."}
+                </span>
               </label>
+
+              {/* Connected state: what was chosen for the user, and how to change it. */}
+              {profile?.configured && (
+                <div className="mt-3 rounded-xl border border-border/60 bg-surface-2/60 px-3 py-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium text-foreground">
+                      {profile.providerLabel ?? profile.providerId ?? "—"}
+                      <span className="ml-1.5 font-mono text-[10.5px] font-normal text-muted-foreground">
+                        {profile.model}
+                      </span>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setAdvancedOpen((open) => !open)}
+                      className="shrink-0 text-[10.5px] text-primary hover:underline"
+                    >
+                      {advancedOpen
+                        ? fr
+                          ? "Masquer"
+                          : "Hide"
+                        : fr
+                          ? "Changer de modèle"
+                          : "Change model"}
+                    </button>
+                  </div>
+                  {advancedOpen && (
+                    <div className="mt-2 space-y-2">
+                      <select
+                        value={profile.model}
+                        onChange={(event) => setModelDraft(event.target.value)}
+                        className="w-full rounded-lg border border-border/70 bg-surface-1 px-2 py-1.5 font-mono text-[11px] outline-none focus:border-primary/60"
+                      >
+                        {[
+                          profile.model,
+                          ...(chatModels ?? []).filter((m) => m !== profile.model),
+                        ].map((model) => (
+                          <option key={model} value={model}>
+                            {model}
+                          </option>
+                        ))}
+                      </select>
+                      {modelDraft && (
+                        <button
+                          type="button"
+                          onClick={() => void connectProvider()}
+                          disabled={profileSaving}
+                          className="rounded-lg bg-primary px-3 py-1.5 text-[11px] font-semibold text-primary-foreground disabled:opacity-50"
+                        >
+                          {fr ? "Appliquer" : "Apply"}
+                        </button>
+                      )}
+                      <p className="text-[10px] leading-relaxed text-muted-foreground">
+                        {fr
+                          ? "Liste lue depuis ta clé. Un modèle absent de cette liste ne fonctionnera pas."
+                          : "List read from your key. A model absent from it will not work."}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             {profileError && (
               <p className="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs leading-relaxed text-destructive">
@@ -954,21 +1074,25 @@ export function AiChatPage(): React.ReactElement {
                   disabled={testing || (!keyDraft && !profile?.configured)}
                   className="rounded-xl border border-border/70 px-3 py-2 text-xs font-medium transition hover:border-primary/50 disabled:opacity-40"
                 >
-                  {testing ? (fr ? "Test en cours…" : "Testing…") : fr ? "Tester" : "Test"}
+                  {testing ? (fr ? "Test…" : "Testing…") : fr ? "Tester la clé" : "Test the key"}
                 </button>
                 <button
                   type="button"
-                  onClick={() => void saveProfile()}
-                  disabled={profileSaving}
+                  onClick={() => void connectProvider()}
+                  disabled={
+                    profileSaving ||
+                    (!keyDraft && !profile?.configured) ||
+                    (activePreset === "custom" && !baseUrlDraft.trim())
+                  }
                   className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition hover:brightness-110 disabled:opacity-50"
                 >
                   {profileSaving
                     ? fr
-                      ? "Enregistrement…"
-                      : "Saving…"
+                      ? "Connexion…"
+                      : "Connecting…"
                     : fr
-                      ? "Enregistrer"
-                      : "Save"}
+                      ? "Connecter"
+                      : "Connect"}
                 </button>
               </div>
             </div>

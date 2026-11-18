@@ -2,7 +2,9 @@ import type { PaymentProvider } from "@proofcore/adapter-payments";
 import { CheckoutService, UsageMeter, WebhookProcessor } from "@proofcore/billing";
 import type { PaymentAutomationEvent } from "../automation.js";
 import type { Database } from "../db/types.js";
-import type { AppConfig } from "../env.js";
+import type { EmailSender } from "../email.js";
+import { createEmailSender } from "../email.js";
+import type { AppConfig, Env } from "../env.js";
 import {
   type ApiKeyRecord,
   AppStore,
@@ -28,6 +30,7 @@ export interface Services {
   checkout: CheckoutService;
   webhooks: WebhookProcessor;
   meter: UsageMeter;
+  email: EmailSender;
   clock: () => Date;
 }
 
@@ -35,12 +38,17 @@ export function createServices(input: {
   db: Database;
   config: AppConfig;
   provider: PaymentProvider;
+  env?: Env;
   clock?: () => Date;
 }): Services {
   const clock = input.clock ?? (() => new Date());
   const store = new AppStore(input.db, clock);
   const billing = new SqlBillingStore(input.db, clock);
   const checkout = new CheckoutService(billing, input.provider, clock);
+  const email = createEmailSender(store, {
+    ...(input.env?.RESEND_API_KEY ? { RESEND_API_KEY: input.env.RESEND_API_KEY } : {}),
+    ...(input.env?.MAIL_FROM ? { MAIL_FROM: input.env.MAIL_FROM } : {}),
+  });
   const meter = new UsageMeter(billing, {
     now: () => clock().getTime(),
     iso: () => clock().toISOString(),
@@ -55,6 +63,7 @@ export function createServices(input: {
     checkout,
     webhooks,
     meter,
+    email,
     clock,
   };
 }

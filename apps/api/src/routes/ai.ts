@@ -2,6 +2,12 @@ import { ProofCoreError, stableStringify } from "@proofcore/core";
 import { Hono } from "hono";
 import { z } from "zod";
 import { decryptApiKey, encryptApiKey, hasEncryptionSecret, keyFingerprint } from "../ai-crypto.js";
+import {
+  fetchCatalogue,
+  findProvider,
+  PROVIDERS,
+  type ProviderDefinition,
+} from "../ai-providers.js";
 import { clientAddress, HttpError, RateLimiter } from "../http/errors.js";
 import { readBody, requireWorkspace } from "../http/guards.js";
 import type { AppEnv, Services } from "../http/services.js";
@@ -74,35 +80,264 @@ const chatRequestSchema = z
   })
   .strict();
 
-const profileSchema = z
+/**
+ * Connecting is provider-first: the user names the provider and pastes a key.
+ *
+ * `model` is optional on purpose. When it is omitted the server reads the provider's
+ * catalogue and picks a chat model itself, so a retired model id can never be saved.
+ */
+const connectSchema = z
   .object({
-    baseUrl: z.string().url().max(300),
-    model: z.string().min(1).max(120),
-    apiKey: z.string().min(8).max(300).optional(),
+    providerId: z.string().min(1).max(40),
+    apiKey: z.string().min(4).max(400).optional(),
+    baseUrl: z.string().url().max(300).optional(),
+    model: z.string().min(1).max(160).optional(),
   })
   .strict();
 
-const profileTestSchema = z
-  .object({
-    baseUrl: z.string().url().max(300),
-    model: z.string().min(1).max(120),
-    apiKey: z.string().min(8).max(300).optional(),
-  })
-  .strict();
+const profileTestSchema = connectSchema;
 
-/** Turns a provider status into something a customer can act on. */
-function explainProviderError(status: number, body: string): string {
-  const detail = body.replace(/\s+/g, " ").slice(0, 200);
-  if (status === 401 || status === 403) {
-    return `The provider rejected this key (HTTP ${status}). Check that the key is complete, active, and has the right scope. ${detail}`;
+/**
+ * Turns a `providerId` into a wire definition.
+ *
+ * Unknown ids are refused rather than treated as "custom", because a typo in the
+ * provider name must not silently send a key somewhere else.
+ */
+function resolveProvider(
+  providerId: string,
+  baseUrl: string | undefined,
+  existing: { providerId: string; providerBaseUrl: string; providerKind: string } | null
+): ProviderDefinition {
+  const provider = findProvider(providerId);
+  if (!provider) {
+    throw new HttpError(400, "unknown_provider", `Unknown provider "${providerId}".`);
   }
-  if (status === 404) {
-    return `HTTP 404: the base URL is wrong. It must end before /chat/completions, e.g. https://api.groq.com/openai/v1. ${detail}`;
+  const resolvedBase = baseUrl?.trim() || provider.baseUrl || (existing?.providerBaseUrl ?? "");
+  if (provider.id === "custom" || !provider.baseUrl) {
+    if (!/^https?:\/\//.test(resolvedBase)) {
+      throw new HttpError(
+        400,
+        "base_url_required",
+        "A base URL is required for a custom provider (for example https://api.example.com/v1)."
+      );
+    }
   }
-  if (status === 429) {
-    return `HTTP 429: the provider is rate-limiting this key. ${detail}`;
+  return provider.baseUrl === resolvedBase ? provider : { ...provider, baseUrl: resolvedBase };
+}
+
+/**
+ * One turn of conversation on the provider's wire format.
+ *
+ * OpenAI-compatible providers answer with `choices[0].message.tool_calls`; Anthropic
+ * answers with `content` blocks (`text`, `tool_use`). Both are normalised to the same
+ * shape here so the loop below has a single logic, and the internal history stays in
+ * the OpenAI shape (which is what conversations are persisted in).
+ */
+interface ProviderTurn {
+  text: string;
+  toolCalls: UpstreamToolCall[];
+  /** Exactly what to append to the internal history as the assistant message. */
+  historyEntry: Record<string, unknown>;
+}
+
+function toAnthropicMessages(
+  messages: { role: string; content: string; tool_call_id?: string; tool_calls?: unknown }[]
+): unknown[] {
+  const out: Record<string, unknown>[] = [];
+  let pending: Record<string, unknown>[] = [];
+  const flush = () => {
+    if (pending.length > 0) {
+      out.push({ role: "user", content: pending });
+      pending = [];
+    }
+  };
+  for (const message of messages) {
+    if (message.role === "system") continue;
+    if (message.role === "tool") {
+      pending.push({
+        type: "tool_result",
+        tool_use_id: message.tool_call_id,
+        content: message.content,
+      });
+      continue;
+    }
+    flush();
+    if (message.role === "assistant") {
+      const blocks: Record<string, unknown>[] = [];
+      if (message.content) blocks.push({ type: "text", text: message.content });
+      for (const call of (message.tool_calls ?? []) as {
+        id: string;
+        function?: { name?: string; arguments?: string };
+      }[]) {
+        let input: unknown = {};
+        try {
+          input = JSON.parse(call.function?.arguments || "{}");
+        } catch {
+          input = {};
+        }
+        blocks.push({ type: "tool_use", id: call.id, name: call.function?.name, input });
+      }
+      out.push({
+        role: "assistant",
+        content: blocks.length > 0 ? blocks : [{ type: "text", text: "" }],
+      });
+      continue;
+    }
+    out.push({ role: "user", content: [{ type: "text", text: message.content }] });
   }
-  return `The provider answered HTTP ${status}. ${detail}`;
+  flush();
+  return out;
+}
+
+/** Calls the provider once. Throws HttpError with an actionable code on failure. */
+async function callUpstream(input: {
+  kind: string;
+  baseUrl: string;
+  model: string;
+  apiKey: string;
+  system: string;
+  messages: { role: string; content: string; tool_call_id?: string; tool_calls?: unknown }[];
+  maxTokens: number;
+  timeoutMs: number;
+}): Promise<ProviderTurn> {
+  const root = input.baseUrl.replace(/\/+$/, "");
+  const isAnthropic = input.kind === "anthropic";
+  const url = isAnthropic ? `${root}/messages` : `${root}/chat/completions`;
+  const headers: Record<string, string> = isAnthropic
+    ? {
+        "content-type": "application/json",
+        "x-api-key": input.apiKey,
+        "anthropic-version": "2023-06-01",
+      }
+    : { "content-type": "application/json", authorization: `Bearer ${input.apiKey}` };
+
+  const payload = isAnthropic
+    ? {
+        model: input.model,
+        max_tokens: input.maxTokens,
+        temperature: 0.2,
+        system: input.system,
+        messages: toAnthropicMessages(input.messages),
+        tools: TOOLS.map((tool) => ({
+          name: tool.name,
+          description: tool.description,
+          input_schema: tool.parameters,
+        })),
+      }
+    : {
+        model: input.model,
+        messages: input.messages,
+        tools: TOOLS.map((tool) => ({
+          type: "function",
+          function: { name: tool.name, description: tool.description, parameters: tool.parameters },
+        })),
+        max_tokens: input.maxTokens,
+        temperature: 0.2,
+      };
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(input.timeoutMs),
+  }).catch((error: unknown) => {
+    throw new HttpError(
+      502,
+      "ai_unreachable",
+      `Le fournisseur IA est injoignable : ${error instanceof Error ? error.message : "erreur réseau"}`
+    );
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    if (
+      response.status === 404 ||
+      /model_not_found|does not exist|not have access|not_found_error/i.test(text)
+    ) {
+      throw new HttpError(
+        400,
+        "ai_model_not_found",
+        `Le fournisseur ne propose pas « ${input.model} » sur cette clé. Reconnecte le fournisseur pour laisser PROOFCORE choisir un modèle disponible.`,
+        { detail: text.slice(0, 300), model: input.model }
+      );
+    }
+    if (response.status === 401 || response.status === 403) {
+      throw new HttpError(
+        401,
+        "ai_invalid_key",
+        "Le fournisseur a refusé la clé enregistrée. Remplace-la dans les réglages du modèle.",
+        { detail: text.slice(0, 200) }
+      );
+    }
+    if (response.status === 429) {
+      throw new HttpError(
+        429,
+        "ai_rate_limited",
+        "Le fournisseur limite le débit de cette clé. Réessaie dans un instant.",
+        { detail: text.slice(0, 200) }
+      );
+    }
+    throw new HttpError(
+      502,
+      "ai_provider_error",
+      `Le fournisseur a répondu HTTP ${response.status}.`,
+      { detail: text.slice(0, 300) }
+    );
+  }
+
+  if (isAnthropic) {
+    const body = (await response.json()) as {
+      content?: { type?: string; text?: string; id?: string; name?: string; input?: unknown }[];
+    };
+    const blocks = body.content ?? [];
+    const text = blocks
+      .filter((block) => block.type === "text")
+      .map((block) => block.text ?? "")
+      .join("");
+    const toolCalls: UpstreamToolCall[] = blocks
+      .filter((block) => block.type === "tool_use" && block.name)
+      .map((block) => ({
+        id: block.id ?? `call_${stableId()}`,
+        name: block.name ?? "",
+        arguments: JSON.stringify(block.input ?? {}),
+      }));
+    return {
+      text,
+      toolCalls,
+      historyEntry: {
+        role: "assistant",
+        content: text,
+        ...(toolCalls.length > 0
+          ? {
+              tool_calls: toolCalls.map((call) => ({
+                id: call.id,
+                type: "function",
+                function: { name: call.name, arguments: call.arguments },
+              })),
+            }
+          : {}),
+      },
+    };
+  }
+
+  const body = (await response.json()) as UpstreamResponse;
+  const choice = body.choices?.[0]?.message;
+  const toolCalls: UpstreamToolCall[] = (choice?.tool_calls ?? [])
+    .filter((call) => call.function?.name)
+    .map((call) => ({
+      id: call.id,
+      name: call.function?.name ?? "",
+      arguments: call.function?.arguments ?? "{}",
+    }));
+  return {
+    text: choice?.content ?? "",
+    toolCalls,
+    historyEntry: {
+      role: "assistant",
+      content: choice?.content ?? "",
+      ...(choice?.tool_calls ? { tool_calls: choice.tool_calls } : {}),
+    },
+  };
 }
 
 interface UpstreamToolCall {
@@ -257,6 +492,9 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
     if (!profile) return c.json({ configured: false as const });
     return c.json({
       configured: true as const,
+      providerId: profile.providerId,
+      providerKind: profile.providerKind,
+      providerLabel: findProvider(profile.providerId)?.label ?? "Personnalisé",
       baseUrl: profile.providerBaseUrl,
       model: profile.providerModel,
       keyFingerprint: profile.keyFingerprint,
@@ -264,9 +502,22 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
     });
   });
 
+  /** The provider list the UI renders: labels only, no model ids. */
+  app.get("/providers", (c) =>
+    c.json({
+      items: PROVIDERS.map((provider) => ({
+        id: provider.id,
+        label: provider.label,
+        kind: provider.kind,
+        docsUrl: provider.docsUrl ?? null,
+        keyOptional: provider.keyOptional === true,
+      })),
+    })
+  );
+
   app.put("/profile", async (c) => {
     const user = c.get("user");
-    const body = await readBody(c, profileSchema);
+    const body = await readBody(c, connectSchema);
     if (!hasEncryptionSecret(services.config)) {
       throw new HttpError(
         503,
@@ -275,6 +526,7 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
       );
     }
     const existing = await services.store.getAiProfile(user.id);
+    const provider = resolveProvider(body.providerId, body.baseUrl, existing);
     // Rotating only the model must not rewrite the fingerprint of a key that did not
     // change: the fingerprint is how the UI proves which key is loaded.
     const fingerprint = body.apiKey
@@ -284,17 +536,64 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
       ? await encryptApiKey(services.config, body.apiKey)
       : (existing?.apiKeyEncrypted ?? "");
     if (!encrypted) throw new HttpError(400, "api_key_required", "An API key is required.");
+    const apiKey = body.apiKey ?? (await decryptApiKey(services.config, encrypted));
+    const baseUrl = provider.baseUrl.replace(/\/+$/, "");
+
+    // Read the provider's catalogue. This is the only authority on model ids, and it is
+    // consulted on every save so a retired id can never be stored.
+    const catalogue = await fetchCatalogue(provider, baseUrl, apiKey);
+    if (!catalogue.ok) {
+      throw new HttpError(400, "ai_key_rejected", catalogue.message, {
+        status: catalogue.status,
+        providerId: provider.id,
+      });
+    }
+
+    // No model supplied: pick one from the catalogue. The user said "connect Groq";
+    // choosing `openai/gpt-oss-120b` is our job, not theirs.
+    const requested = body.model?.trim() || existing?.providerModel || "";
+    let model = requested;
+    if (model && catalogue.models.length > 0 && !catalogue.models.includes(model)) {
+      const replacement = catalogue.suggested ?? catalogue.chatModels[0];
+      if (!replacement) {
+        throw new HttpError(
+          400,
+          "ai_model_not_found",
+          `"${model}" is not available on this key, and the catalogue lists no chat model.`
+        );
+      }
+      model = replacement;
+    }
+    if (!model) {
+      model = catalogue.suggested ?? catalogue.chatModels[0] ?? "";
+    }
+    if (!model) {
+      throw new HttpError(
+        400,
+        "ai_no_chat_model",
+        "This key has no chat-capable model. Use a key with chat access, or choose another provider."
+      );
+    }
+
     const record = await services.store.saveAiProfile({
       userId: user.id,
-      providerBaseUrl: body.baseUrl.replace(/\/+$/, ""),
-      providerModel: body.model,
+      providerBaseUrl: baseUrl,
+      providerModel: model,
+      providerKind: provider.kind,
+      providerId: provider.id,
       apiKeyEncrypted: encrypted,
       keyFingerprint: fingerprint,
     });
     return c.json({
       configured: true as const,
+      providerId: record.providerId,
+      providerKind: record.providerKind,
+      providerLabel: provider.label,
       baseUrl: record.providerBaseUrl,
       model: record.providerModel,
+      // Say what was decided on the user's behalf, so the choice is never a surprise.
+      modelWasChosen: requested !== model || !requested,
+      chatModels: catalogue.chatModels.slice(0, 40),
       keyFingerprint: record.keyFingerprint,
       updatedAt: record.updatedAt,
     });
@@ -317,73 +616,36 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
   app.post("/profile/test", async (c) => {
     const user = c.get("user");
     const body = await readBody(c, profileTestSchema);
+    const existing = await services.store.getAiProfile(user.id);
+    const provider = resolveProvider(body.providerId, body.baseUrl, existing);
+
     let apiKey = body.apiKey ?? "";
     if (!apiKey) {
-      const stored = await services.store.getAiProfile(user.id);
-      if (!stored) {
+      if (!existing) {
         throw new HttpError(400, "no_key", "Save a key first, or paste one to test.");
       }
       if (!hasEncryptionSecret(services.config)) {
         throw new HttpError(503, "key_storage_unavailable", "The stored key cannot be read.");
       }
-      apiKey = await decryptApiKey(services.config, stored.apiKeyEncrypted);
+      apiKey = await decryptApiKey(services.config, existing.apiKeyEncrypted);
     }
 
-    const baseUrl = body.baseUrl.replace(/\/+$/, "");
-    const started = Date.now();
-    let response: Response;
-    try {
-      response = await fetch(`${baseUrl}/models`, {
-        headers: { authorization: `Bearer ${apiKey}` },
-        signal: AbortSignal.timeout(15_000),
-      });
-    } catch (error) {
-      return c.json({
-        ok: false,
-        status: 0,
-        latencyMs: Date.now() - started,
-        message:
-          error instanceof Error && error.name === "TimeoutError"
-            ? "The provider did not answer within 15 seconds."
-            : `Network error: ${error instanceof Error ? error.message : "unreachable"}`,
-      });
-    }
-
-    const latencyMs = Date.now() - started;
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      return c.json({
-        ok: false,
-        status: response.status,
-        latencyMs,
-        message: explainProviderError(response.status, text),
-      });
-    }
-
-    let models: string[] = [];
-    try {
-      const payload = (await response.json()) as { data?: { id?: string }[] };
-      models = (payload.data ?? [])
-        .map((entry) => entry.id)
-        .filter((id): id is string => typeof id === "string")
-        .slice(0, 40);
-    } catch {
-      models = [];
-    }
-    const modelAvailable = models.length === 0 || models.includes(body.model);
+    const catalogue = await fetchCatalogue(provider, provider.baseUrl, apiKey);
     return c.json({
-      ok: true,
-      status: response.status,
-      latencyMs,
-      models,
-      modelAvailable,
-      message: modelAvailable
-        ? `Connected. ${models.length} model(s) available.`
-        : `Connected, but "${body.model}" is not in this account's model list.`,
+      ok: catalogue.ok,
+      status: catalogue.status,
+      latencyMs: catalogue.latencyMs,
+      providerId: provider.id,
+      providerLabel: provider.label,
+      models: catalogue.models.slice(0, 80),
+      chatModels: catalogue.chatModels.slice(0, 40),
+      ...(catalogue.suggested ? { suggestedModel: catalogue.suggested } : {}),
+      modelAvailable: body.model
+        ? catalogue.chatModels.includes(body.model) || catalogue.models.includes(body.model)
+        : true,
+      message: catalogue.message,
     });
   });
-
-  // ------------------------------------------------------- conversations
 
   app.get("/conversations", async (c) => {
     const user = c.get("user");
@@ -480,67 +742,28 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
 
     const trace: { tool: string; summary: string }[] = [];
     let finalContent = "";
-    const upstream = profile.providerBaseUrl.replace(/\/+$/, "");
+    const deadline = Date.now() + 25_000;
     for (let turn = 0; turn < tuning.maxTurns; turn += 1) {
-      const response = await fetch(`${upstream}/chat/completions`, {
-        method: "POST",
-        headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({
-          model: profile.providerModel,
-          messages,
-          tools: TOOLS.map((tool) => ({
-            type: "function",
-            function: {
-              name: tool.name,
-              description: tool.description,
-              parameters: tool.parameters,
-            },
-          })),
-          max_tokens: tuning.maxTokens,
-          temperature: 0.2,
-        }),
-        signal: AbortSignal.timeout(60_000),
-      }).catch((error: unknown) => {
-        throw new HttpError(
-          502,
-          "ai_unreachable",
-          `The AI provider could not be reached: ${error instanceof Error ? error.message : "network error"}`
-        );
+      const remaining = deadline - Date.now();
+      if (remaining < 3_000) break;
+      const result = await callUpstream({
+        kind: profile.providerKind,
+        baseUrl: profile.providerBaseUrl,
+        model: profile.providerModel,
+        apiKey,
+        system: systemPrompt(workspace.name, effort),
+        messages,
+        maxTokens: tuning.maxTokens,
+        timeoutMs: Math.min(remaining, 25_000),
       });
 
-      if (!response.ok) {
-        const text = await response.text();
-        throw new HttpError(
-          response.status === 401 ? 401 : 502,
-          response.status === 401 ? "ai_invalid_key" : "ai_provider_error",
-          response.status === 401
-            ? "The AI provider rejected the saved API key."
-            : `The AI provider answered HTTP ${response.status}.`,
-          { detail: text.slice(0, 300) }
-        );
-      }
-
-      const payload = (await response.json()) as UpstreamResponse;
-      const choice = payload.choices?.[0]?.message;
-      const toolCalls: UpstreamToolCall[] = (choice?.tool_calls ?? [])
-        .filter((call) => call.function?.name)
-        .map((call) => ({
-          id: call.id,
-          name: call.function?.name ?? "",
-          arguments: call.function?.arguments ?? "{}",
-        }));
-
-      if (toolCalls.length === 0) {
-        finalContent = choice?.content ?? "";
+      if (result.toolCalls.length === 0) {
+        finalContent = result.text;
         break;
       }
 
-      messages.push({
-        role: "assistant",
-        content: choice?.content ?? "",
-        tool_calls: choice?.tool_calls,
-      });
-      for (const call of toolCalls) {
+      messages.push(result.historyEntry as never);
+      for (const call of result.toolCalls) {
         const outcome = await executeTool(
           services,
           workspace.id,
@@ -558,10 +781,14 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
     }
 
     if (!finalContent) {
+      // Distinguish "took too long" from "looped on tools": they need different fixes.
+      const timedOut = Date.now() >= deadline;
       throw new HttpError(
-        502,
-        "ai_turn_budget",
-        `The model kept calling tools for more than ${tuning.maxTurns} turns. Narrow the question.`
+        timedOut ? 504 : 502,
+        timedOut ? "ai_timeout" : "ai_turn_budget",
+        timedOut
+          ? `Le modèle n'a pas conclu en 25 secondes (${trace.length} outil(s) appelé(s)). Baisse le niveau d'effort ou précise la question.`
+          : `Le modèle a enchaîné plus de ${tuning.maxTurns} tours d'outils. Précise la question.`
       );
     }
 
