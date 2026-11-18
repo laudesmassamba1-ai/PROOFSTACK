@@ -245,7 +245,6 @@ score 61/100  ·  4 fail · 2 warn · 5 pass
   },
 };
 
-
 const CONTENT_FR: Record<ModuleName, ModuleContent> = {
   world: {
     name: "world",

@@ -86,7 +86,10 @@ const EFFORTS: EffortLevel[] = [
   {
     id: "deep",
     label: { fr: "Approfondi", en: "Deep" },
-    hint: { fr: "Croise runs, findings et audits", en: "Cross-references runs, findings and audits" },
+    hint: {
+      fr: "Croise runs, findings et audits",
+      en: "Cross-references runs, findings and audits",
+    },
     burn: "4×",
   },
   {
@@ -393,7 +396,8 @@ function EffortPicker({
             >
               <span className="min-w-0 flex-1">
                 <span className="chat-effort-name">
-                  {level.label[fr ? "fr" : "en"]} <span className="chat-effort-burn">· {level.burn}</span>
+                  {level.label[fr ? "fr" : "en"]}{" "}
+                  <span className="chat-effort-burn">· {level.burn}</span>
                 </span>
                 <span className="chat-effort-hint">{level.hint[fr ? "fr" : "en"]}</span>
               </span>
@@ -1340,7 +1344,9 @@ export function AiChatPage(): React.ReactElement {
                         className={`chat-provider ${active ? "is-active" : ""}`}
                       >
                         <span className="truncate">{preset.label}</span>
-                        {note && <span className="chat-provider-note">{note[fr ? "fr" : "en"]}</span>}
+                        {note && (
+                          <span className="chat-provider-note">{note[fr ? "fr" : "en"]}</span>
+                        )}
                       </button>
                     );
                   })}
