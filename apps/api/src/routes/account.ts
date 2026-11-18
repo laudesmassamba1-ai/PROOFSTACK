@@ -3,6 +3,7 @@ import { uuid } from "@proofcore/core";
 import { Hono } from "hono";
 import { z } from "zod";
 import {
+  clearSessionCookie,
   createSessionToken,
   hashPassword,
   hashToken,
@@ -10,10 +11,11 @@ import {
   SESSION_COOKIE,
   serializeSessionCookie,
   sessionExpiry,
+  verifyPassword,
 } from "../auth.js";
 import { renderEmail, resetUrl, verifyUrl } from "../email.js";
 import { clientAddress, HttpError, RateLimiter } from "../http/errors.js";
-import { readBody } from "../http/guards.js";
+import { readBody, requireUser } from "../http/guards.js";
 import type { AppEnv, Services } from "../http/services.js";
 
 /**
@@ -39,6 +41,19 @@ const resetSchema = z
   })
   .strict();
 const verifySchema = z.object({ token: z.string().min(20).max(200) }).strict();
+const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1).max(200),
+    newPassword: z.string().min(10, "Use at least 10 characters").max(200),
+  })
+  .strict();
+const deleteAccountSchema = z
+  .object({
+    password: z.string().min(1).max(200),
+    /** Typed by hand: a destructive action must not be one stray click away. */
+    confirm: z.literal("DELETE"),
+  })
+  .strict();
 const supportSchema = z
   .object({
     email: z.string().email().max(254),
@@ -295,6 +310,117 @@ export function accountRoutes(services: Services): Hono<AppEnv> {
         ? "Message enregistré. Une réponse arrive par e-mail."
         : "Message enregistré avec sa référence. Aucun e-mail n'est configuré sur ce déploiement : la réponse sera humaine, depuis la console d'administration.",
     });
+  });
+
+  // ------------------------------------------------------------- sessions
+
+  /**
+   * The sessions a person can see and revoke.
+   *
+   * A password cannot protect what the owner cannot inspect: "sign out everywhere" is
+   * only meaningful with a list of where "everywhere" is. The token hash is never
+   * returned — knowing a session exists must not help impersonate it.
+   */
+  app.get("/sessions", async (c) => {
+    const user = await requireUser(c, services);
+    const current = c.get("session");
+    const sessions = await services.store.listSessions(user.id, services.clock());
+    return c.json({
+      items: sessions.map((session) => ({
+        id: session.id,
+        createdAt: session.createdAt,
+        expiresAt: session.expiresAt,
+        lastSeenAt: session.lastSeenAt,
+        userAgent: session.userAgent ?? null,
+        ip: session.ip ?? null,
+        current: session.id === current.id,
+      })),
+    });
+  });
+
+  app.delete("/sessions/:sessionId", async (c) => {
+    const user = await requireUser(c, services);
+    const session = await services.store.sessionById(c.req.param("sessionId"));
+    // Someone else's session is "not found", never "forbidden": no id enumeration.
+    if (!session || session.userId !== user.id) {
+      throw new HttpError(404, "session_not_found", "This session does not exist.");
+    }
+    await services.store.deleteSession(session.id);
+    return c.json({ ok: true });
+  });
+
+  // ------------------------------------------------------- password change
+
+  /**
+   * Change the password with the current one as proof, then revoke every *other*
+   * session. That second half is the point: a person changing a password usually
+   * believes someone else may be signed in, and leaving those sessions alive would
+   * make the change cosmetic.
+   */
+  app.post("/password", async (c) => {
+    const user = await requireUser(c, services);
+    const body = await readBody(c, changePasswordSchema);
+    if (!(await verifyPassword(body.currentPassword, user.passwordHash))) {
+      throw new HttpError(403, "invalid_password", "The current password is incorrect.");
+    }
+    if (body.currentPassword === body.newPassword) {
+      throw new HttpError(
+        400,
+        "password_unchanged",
+        "The new password must differ from the current one."
+      );
+    }
+    const current = c.get("session");
+    const revoked = await services.store.updateUserPassword(
+      user.id,
+      await hashPassword(body.newPassword),
+      {
+        keepSessionId: current.id,
+      }
+    );
+    return c.json({ ok: true, revokedSessions: revoked });
+  });
+
+  // -------------------------------------------------------- account deletion
+
+  /**
+   * Delete the account, as the privacy page promises.
+   *
+   * Two guards keep this from surprising anyone: the password is re-checked, and the
+   * word DELETE has to be typed. A workspace the person owns with other members is
+   * refused, because deleting it would delete their colleagues' work — the person is
+   * told to transfer ownership or remove the members first.
+   */
+  // Canonical path is `/api/account` (no trailing slash): Hono mounts this router
+  // under that prefix, so "/" is the account itself.
+  app.delete("/", async (c) => {
+    const user = await requireUser(c, services);
+    const body = await readBody(c, deleteAccountSchema);
+    if (!(await verifyPassword(body.password, user.passwordHash))) {
+      throw new HttpError(403, "invalid_password", "The password is incorrect.");
+    }
+
+    const workspaces = await services.store.listWorkspaces(user.id);
+    const owned = workspaces.filter((workspace) => workspace.role === "owner");
+    for (const workspace of owned) {
+      const members = await services.store.listMembers(workspace.id);
+      const others = members.filter((member) => member.userId !== user.id);
+      if (others.length > 0) {
+        throw new HttpError(
+          409,
+          "workspace_not_empty",
+          `You still own "${workspace.name}" with ${others.length} other member(s). Transfer ownership or remove them first.`,
+          { workspaceId: workspace.id, workspaceName: workspace.name, members: others.length }
+        );
+      }
+    }
+    // Every owned workspace is now single-member, so deleting it removes only this
+    // person's own data. Memberships elsewhere are dropped by deleteUserAccount.
+    for (const workspace of owned) await services.store.deleteWorkspace(workspace.id);
+    await services.store.deleteUserAccount(user.id);
+
+    c.header("Set-Cookie", clearSessionCookie(services.config.secureCookies));
+    return c.json({ ok: true });
   });
 
   /** Operational visibility for the operator: what was never delivered, and why. */

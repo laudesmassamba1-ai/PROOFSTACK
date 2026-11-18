@@ -278,7 +278,7 @@ export function WorkspacePage(): React.ReactElement {
   const list = session.workspaces;
 
   return (
-    <main className="mx-auto w-full max-w-[980px] px-5 py-8 lg:px-8">
+    <div className="mx-auto w-full max-w-[980px] px-5 py-8 lg:px-8">
       <PageHeader
         title={fr ? "Espaces de travail" : "Workspaces"}
         eyebrow="02"
@@ -628,7 +628,7 @@ export function WorkspacePage(): React.ReactElement {
           />
         </div>
       ) : null}
-    </main>
+    </div>
   );
 }
 

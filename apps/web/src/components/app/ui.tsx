@@ -118,7 +118,7 @@ export function Loading({ label = "Loading…" }: { label?: string }) {
 export function ErrorState({ error, onRetry }: { error: ApiError | Error; onRetry?: () => void }) {
   const isApi = "code" in error;
   return (
-    <div className="app-card flex items-start gap-3 border-danger/40 px-5 py-4">
+    <div role="alert" className="app-card flex items-start gap-3 border-danger/40 px-5 py-4">
       <CircleAlert size={17} className="mt-0.5 shrink-0 text-danger" />
       <div className="min-w-0">
         <p className="text-sm font-medium">{error.message}</p>

@@ -95,9 +95,14 @@ const ZERO = { passed: 0, failed: 0, warnings: 0, errors: 0, skipped: 0, total: 
 
 export function ModulePage() {
   const { module: raw } = useParams();
+  const requested = (raw ?? "").toLowerCase();
   const module = (
-    raw === "world" || raw === "flow" || raw === "exit" || raw === "fail" || raw === "clean"
-      ? raw
+    requested === "world" ||
+    requested === "flow" ||
+    requested === "exit" ||
+    requested === "fail" ||
+    requested === "clean"
+      ? requested
       : null
   ) as ModuleId | null;
   const { workspaceId } = useSession();

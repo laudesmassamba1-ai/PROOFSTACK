@@ -45,6 +45,9 @@ export interface SessionRecord {
   createdAt: string;
   expiresAt: string;
   lastSeenAt: string | null;
+  /** Context the browser can show next to a session ("Chrome · 82.64.x.x"). */
+  userAgent?: string | null;
+  ip?: string | null;
 }
 
 export interface DeviceGrantRecord {
@@ -305,14 +308,37 @@ export class AppStore {
       .run();
   }
 
-  async updateUserPassword(userId: string, passwordHash: string): Promise<void> {
+  /**
+   * Change a password and revoke sessions.
+   *
+   * The two callers want different things, so the policy is a parameter rather than a
+   * hidden default:
+   *  - a reset link (nobody is signed in) revokes every session;
+   *  - a change made from inside the app keeps the session that made it, otherwise the
+   *    person is thrown out of the page they just used.
+   * Returns how many sessions were revoked, so the route can tell the truth about it.
+   */
+  async updateUserPassword(
+    userId: string,
+    passwordHash: string,
+    options: { keepSessionId?: string } = {}
+  ): Promise<number> {
     await this.db
       .prepare("UPDATE users SET password_hash = ? WHERE id = ?")
       .bind(passwordHash, userId)
       .run();
-    // A password change invalidates every existing session: that is the point of
-    // changing it. The user signs in again on each device.
-    await this.db.prepare("DELETE FROM sessions WHERE user_id = ?").bind(userId).run();
+    if (options.keepSessionId) {
+      const result = await this.db
+        .prepare("DELETE FROM sessions WHERE user_id = ? AND id <> ?")
+        .bind(userId, options.keepSessionId)
+        .run();
+      return result.changes;
+    }
+    const result = await this.db
+      .prepare("DELETE FROM sessions WHERE user_id = ?")
+      .bind(userId)
+      .run();
+    return result.changes;
   }
 
   async markEmailVerified(userId: string): Promise<void> {
@@ -554,6 +580,60 @@ export class AppStore {
   /** A correct password clears the counter: the person proved who they are. */
   async clearAuthAttempts(scope: string): Promise<void> {
     await this.db.prepare("DELETE FROM auth_attempts WHERE scope = ?").bind(scope).run();
+  }
+
+  /** Revoke every session but the one in hand: what a password change must do. */
+  async deleteSessionsExcept(userId: string, keepSessionId: string): Promise<number> {
+    const result = await this.db
+      .prepare("DELETE FROM sessions WHERE user_id = ? AND id <> ?")
+      .bind(userId, keepSessionId)
+      .run();
+    return result.changes;
+  }
+
+  async sessionById(id: string): Promise<SessionRecord | null> {
+    const row = await this.db.prepare("SELECT * FROM sessions WHERE id = ?").bind(id).first<Row>();
+    if (!row) return null;
+    return {
+      id: str(row, "id"),
+      userId: str(row, "user_id"),
+      tokenHash: str(row, "token_hash"),
+      createdAt: str(row, "created_at"),
+      expiresAt: str(row, "expires_at"),
+      lastSeenAt: nullableStr(row, "last_seen_at"),
+      ...(nullableStr(row, "user_agent") ? { userAgent: nullableStr(row, "user_agent") } : {}),
+      ...(nullableStr(row, "ip") ? { ip: nullableStr(row, "ip") } : {}),
+    };
+  }
+
+  /**
+   * Delete a person's account and everything that only exists because of it.
+   *
+   * Workspace rows are the caller's responsibility: a workspace has its own lifetime
+   * and may have other members, so the route decides which ones to delete first. This
+   * walk removes what a departure unambiguously owns.
+   */
+  async deleteUserAccount(userId: string): Promise<void> {
+    const userScoped = [
+      "sessions",
+      "auth_tokens",
+      "device_grants",
+      "ai_profiles",
+      "ai_conversations",
+      "browser_sessions",
+      "email_outbox",
+      "workspace_members",
+    ];
+    for (const table of userScoped) {
+      await this.db.prepare(`DELETE FROM ${table} WHERE user_id = ?`).bind(userId).run();
+    }
+    // Support messages keep their reference for the operator's queue, but they lose the
+    // identity link: the message is a support artefact, the person is gone.
+    await this.db
+      .prepare("UPDATE support_messages SET user_id = NULL WHERE user_id = ?")
+      .bind(userId)
+      .run();
+    await this.db.prepare("DELETE FROM users WHERE id = ?").bind(userId).run();
   }
 
   async deleteExpiredSessions(userId: string, now = this.clock()): Promise<void> {
@@ -1117,17 +1197,30 @@ export class AppStore {
     // The db port has no batch; sequential deletes are correct (a failure stops
     // the walk and the workspace row survives — deletion stays all-or-nothing
     // from the caller's point of view because it is retried, not partial-by-silence).
+    // Every table here must actually carry workspace_id. `webhook_events` used to be in
+    // this list and does not: the first delete threw "no such column", which made every
+    // workspace deletion a 500. Those rows are provider-global anyway — removing them
+    // would also break replay protection for events we have already processed.
     const tables = [
       "findings",
       "reports",
       "test_runs",
       "api_keys",
-      "webhook_events",
+      "invoices",
+      "payment_intents",
+      "subscriptions",
       "usage_events",
       "audit_logs",
       "idempotency_keys",
+      "workspace_webhooks",
       "projects",
       "workspace_members",
+      // Workspace-scoped content that is not part of the billing walk: leaving it
+      // behind would keep conversations and support messages alive after the
+      // workspace is gone, which is exactly what "delete" must not do.
+      "ai_conversations",
+      "browser_sessions",
+      "support_messages",
     ];
     for (const table of tables) {
       await this.db.prepare(`DELETE FROM ${table} WHERE workspace_id = ?`).bind(workspaceId).run();
@@ -1744,6 +1837,8 @@ function mapSession(row: Row): SessionRecord {
     createdAt: str(row, "created_at"),
     expiresAt: str(row, "expires_at"),
     lastSeenAt: nullableStr(row, "last_seen_at"),
+    userAgent: nullableStr(row, "user_agent"),
+    ip: nullableStr(row, "ip"),
   };
 }
 

@@ -501,6 +501,7 @@ function Composer({
         }}
         rows={Math.min(7, Math.max(1, draft.split("\n").length))}
         placeholder={fr ? "Comment puis-je vous aider aujourd'hui ?" : "How can I help you today?"}
+        aria-label={fr ? "Message à envoyer à l'assistant" : "Message to send to the assistant"}
         className="chat-composer-input"
       />
       <div className="chat-composer-bar">
@@ -527,6 +528,7 @@ function Composer({
             ref={inputRef}
             type="file"
             multiple
+            aria-label={fr ? "Joindre un document" : "Attach a document"}
             className="sr-only"
             accept={
               ".txt,.md,.markdown,.csv,.tsv,.json,.log,.yml,.yaml,.toml,.ini,.xml,.html,.htm,.svg,.css,.scss,.js,.jsx,.ts,.tsx,.py,.rb,.go,.rs,.java,.c,.h,.cpp,.sh,.sql,.env,.gitignore,.pdf"

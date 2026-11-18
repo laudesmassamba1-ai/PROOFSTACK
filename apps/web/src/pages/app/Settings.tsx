@@ -36,6 +36,34 @@ interface WebhookEntry {
   lastError: string | null;
 }
 
+/** "Chrome · Linux" is enough context to recognise a device; the full UA is noise. */
+function describeUserAgent(userAgent: string | null, fr: boolean): string {
+  if (!userAgent) return fr ? "Appareil inconnu" : "Unknown device";
+  const browser = /Edg\//.test(userAgent)
+    ? "Edge"
+    : /Chrome\//.test(userAgent)
+      ? "Chrome"
+      : /Safari\//.test(userAgent)
+        ? "Safari"
+        : /Firefox\//.test(userAgent)
+          ? "Firefox"
+          : fr
+            ? "Navigateur"
+            : "Browser";
+  const os = /Windows/.test(userAgent)
+    ? "Windows"
+    : /Mac OS X/.test(userAgent)
+      ? "macOS"
+      : /Android/.test(userAgent)
+        ? "Android"
+        : /iPhone|iPad/.test(userAgent)
+          ? "iOS"
+          : /Linux/.test(userAgent)
+            ? "Linux"
+            : "";
+  return os ? `${browser} · ${os}` : browser;
+}
+
 export function Settings() {
   const { theme, setTheme } = useTheme();
   const { locale, setLocale, t } = useI18n();
@@ -54,6 +82,116 @@ export function Settings() {
   const [error, setError] = useState<ApiError | Error | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [sessions, setSessions] = useState<
+    | {
+        id: string;
+        createdAt: string;
+        lastSeenAt: string | null;
+        userAgent: string | null;
+        ip: string | null;
+        current: boolean;
+      }[]
+    | null
+  >(null);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deletingAccount, setDeletingAccount] = useState(false);
+
+  /**
+   * Account self-service. Every call here is destructive or security-relevant, so each
+   * one reports what actually happened ("3 sessions closed") instead of a generic
+   * "saved" that would hide a no-op.
+   */
+  const loadSessions = useCallback(async () => {
+    try {
+      const body = await apiFetch<{
+        items: {
+          id: string;
+          createdAt: string;
+          lastSeenAt: string | null;
+          userAgent: string | null;
+          ip: string | null;
+          current: boolean;
+        }[];
+      }>("/api/account/sessions");
+      setSessions(body.items);
+    } catch (caught) {
+      setError(caught as ApiError);
+    }
+  }, []);
+
+  const changePassword = async () => {
+    if (!currentPassword || newPassword.length < 10 || changingPassword) return;
+    if (newPassword !== confirmPassword) {
+      setError(
+        new Error(
+          fr
+            ? "Les deux nouveaux mots de passe ne correspondent pas."
+            : "The two new passwords do not match."
+        )
+      );
+      return;
+    }
+    setChangingPassword(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const body = await apiFetch<{ revokedSessions: number }>("/api/account/password", {
+        method: "POST",
+        body: { currentPassword, newPassword },
+      });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setNotice(
+        body.revokedSessions > 0
+          ? fr
+            ? `Mot de passe modifié. ${body.revokedSessions} autre(s) session(s) fermée(s) : cette session reste ouverte.`
+            : `Password changed. ${body.revokedSessions} other session(s) closed; this one stays open.`
+          : fr
+            ? "Mot de passe modifié. Aucune autre session n'était ouverte."
+            : "Password changed. No other session was open."
+      );
+      await loadSessions();
+    } catch (caught) {
+      setError(caught as ApiError);
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  const revokeSession = async (id: string) => {
+    setError(null);
+    try {
+      await apiFetch(`/api/account/sessions/${id}`, { method: "DELETE" });
+      setSessions((items) => (items ?? []).filter((item) => item.id !== id));
+      setNotice(fr ? "Session fermée." : "Session closed.");
+    } catch (caught) {
+      setError(caught as ApiError);
+    }
+  };
+
+  const deleteAccount = async () => {
+    if (deleteConfirm !== "DELETE" || !deletePassword || deletingAccount) return;
+    setDeletingAccount(true);
+    setError(null);
+    try {
+      await apiFetch("/api/account", {
+        method: "DELETE",
+        body: { password: deletePassword, confirm: "DELETE" },
+      });
+      await session.signOut();
+      window.location.assign("/");
+    } catch (caught) {
+      setError(caught as ApiError);
+    } finally {
+      setDeletingAccount(false);
+    }
+  };
 
   const load = useCallback(async () => {
     if (!session.workspaceId) return;
@@ -88,7 +226,11 @@ export function Settings() {
     }
   }, [session.workspaceId]);
 
+  // `loadSessions` is stable (useCallback over the workspace), and adding it here would
+  // refetch on every render the id changes — which is the same bug, one level up.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional, see above.
   useEffect(() => {
+    void loadSessions();
     void load();
   }, [load]);
 
@@ -265,8 +407,8 @@ export function Settings() {
           <Cannot
             reason={
               fr
-                ? "Inviter un coéquipier exige un fournisseur d'e-mail, qui n'est pas configuré. L'API ne crée pas d'invitations qui ne pourraient jamais être livrées."
-                : "Inviting a teammate requires an email delivery provider, which is not configured. The API does not create invitations that could never be delivered."
+                ? "L'invitation se fait depuis la page Espace, et elle ajoute un compte PROOFCORE existant : aucun e-mail n'est envoyé. L'adresse doit donc déjà s'être inscrite."
+                : "Invitations happen on the Workspace page, and they add an existing PROOFCORE account: no email is sent, so the address must already have signed up."
             }
           />
         </Card>
@@ -341,6 +483,175 @@ export function Settings() {
           />
         </Card>
       </div>
+
+      <Card
+        className="mt-4"
+        title={fr ? "Sécurité" : "Security"}
+        description={
+          fr
+            ? "Mot de passe et sessions ouvertes. Changer le mot de passe ferme les autres appareils."
+            : "Password and open sessions. Changing the password closes the other devices."
+        }
+        enhanced
+      >
+        <div className="grid gap-4 px-5 py-4">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="grid gap-1 text-xs text-muted">
+              {fr ? "Mot de passe actuel" : "Current password"}
+              <input
+                type="password"
+                autoComplete="current-password"
+                className="app-input"
+                value={currentPassword}
+                onChange={(event) => setCurrentPassword(event.target.value)}
+              />
+            </label>
+            <span aria-hidden />
+            <label className="grid gap-1 text-xs text-muted">
+              {fr
+                ? "Nouveau mot de passe (10 caractères min.)"
+                : "New password (10 characters min.)"}
+              <input
+                type="password"
+                autoComplete="new-password"
+                className="app-input"
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+              />
+            </label>
+            <label className="grid gap-1 text-xs text-muted">
+              {fr ? "Confirmer le nouveau mot de passe" : "Confirm the new password"}
+              <input
+                type="password"
+                autoComplete="new-password"
+                className="app-input"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+              />
+            </label>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              className="app-btn app-btn-primary"
+              onClick={() => void changePassword()}
+              disabled={
+                changingPassword ||
+                !currentPassword ||
+                newPassword.length < 10 ||
+                newPassword !== confirmPassword
+              }
+            >
+              <KeyRound size={13} aria-hidden />{" "}
+              {fr ? "Changer le mot de passe" : "Change password"}
+            </button>
+            {newPassword.length > 0 && newPassword.length < 10 ? (
+              <span className="text-xs text-muted">
+                {fr ? "Encore " : ""}
+                {10 - newPassword.length}
+                {fr ? " caractères." : " more characters."}
+              </span>
+            ) : null}
+          </div>
+
+          <div className="border-t border-line pt-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+              {fr ? "Sessions ouvertes" : "Open sessions"}
+            </p>
+            {sessions === null ? (
+              <div className="py-3">
+                <Loading />
+              </div>
+            ) : (
+              <ul className="mt-2 grid gap-2">
+                {sessions.map((entry) => (
+                  <li
+                    key={entry.id}
+                    className="flex flex-wrap items-center gap-3 rounded-[var(--radius)] border border-line px-3 py-2"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-medium">
+                        {describeUserAgent(entry.userAgent, fr)}
+                        {entry.current ? (
+                          <span className="app-badge app-badge-success ml-2">
+                            {fr ? "cette session" : "this session"}
+                          </span>
+                        ) : null}
+                      </p>
+                      <p className="truncate text-xs text-muted">
+                        {entry.lastSeenAt
+                          ? `${fr ? "vue" : "seen"} ${relativeTime(entry.lastSeenAt)}`
+                          : `${fr ? "ouverte" : "opened"} ${relativeTime(entry.createdAt)}`}
+                        {entry.ip ? ` · ${entry.ip}` : ""}
+                      </p>
+                    </div>
+                    {entry.current ? null : (
+                      <button
+                        type="button"
+                        className="app-btn"
+                        onClick={() => void revokeSession(entry.id)}
+                      >
+                        {fr ? "Fermer" : "Close"}
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </Card>
+
+      <Card
+        className="mt-4"
+        title={fr ? "Zone dangereuse" : "Danger zone"}
+        description={
+          fr
+            ? "Supprimer le compte efface votre profil, vos sessions et les espaces dont vous êtes le seul membre."
+            : "Deleting the account erases your profile, your sessions, and the workspaces where you are the only member."
+        }
+      >
+        <div className="grid gap-2 px-5 py-4">
+          <p className="text-xs text-muted">
+            {fr
+              ? "Un espace que vous partagez avec d'autres personnes bloque la suppression : transférez-le ou retirez ses membres d'abord."
+              : "A workspace you share with others blocks deletion: transfer it or remove its members first."}
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="grid gap-1 text-xs text-muted">
+              {fr ? "Votre mot de passe" : "Your password"}
+              <input
+                type="password"
+                autoComplete="current-password"
+                className="app-input"
+                value={deletePassword}
+                onChange={(event) => setDeletePassword(event.target.value)}
+              />
+            </label>
+            <label className="grid gap-1 text-xs text-muted">
+              {fr ? "Tapez DELETE pour confirmer" : "Type DELETE to confirm"}
+              <input
+                type="text"
+                className="app-input"
+                value={deleteConfirm}
+                onChange={(event) => setDeleteConfirm(event.target.value)}
+                placeholder="DELETE"
+              />
+            </label>
+          </div>
+          <div>
+            <button
+              type="button"
+              className="app-btn app-btn-danger"
+              onClick={() => void deleteAccount()}
+              disabled={deleteConfirm !== "DELETE" || !deletePassword || deletingAccount}
+            >
+              <Trash2 size={13} aria-hidden />{" "}
+              {fr ? "Supprimer définitivement mon compte" : "Permanently delete my account"}
+            </button>
+          </div>
+        </div>
+      </Card>
 
       <Card
         className="mt-4"

@@ -192,7 +192,16 @@ export function BrowserPanel({
         </button>
       </header>
 
-      {error && <div className="pc-browser-error">{error}</div>}
+      {error && (
+        <div className="pc-browser-error">
+          <span>{error}</span>
+          {/* A quota refusal is temporary: without a way to try again the panel looks
+              broken and the only option is to reload the whole page. */}
+          <button type="button" onClick={() => void start(address)}>
+            {fr ? "Réessayer" : "Try again"}
+          </button>
+        </div>
+      )}
 
       <div className="pc-browser-viewport">
         {state?.screenshot ? (

@@ -218,6 +218,10 @@ export function authRoutes(services: Services): Hono<AppEnv> {
       return c.json({
         user: publicUser(found.user),
         workspaces,
+        // Same field sign-up and sign-in return. The server's notion of "active" is the
+        // first membership; a client may store its own choice, but the key is always
+        // present so a client never has to infer it.
+        workspaceId: workspaces[0]?.id ?? null,
         session: { expiresAt: found.session.expiresAt },
         emailVerification: "not_configured" as const,
         // The browser uses this to decide whether to show the operations console.
