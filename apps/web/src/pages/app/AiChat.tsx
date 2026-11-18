@@ -609,14 +609,18 @@ export function AiChatPage(): React.ReactElement {
   // While the assistant works (trace chips, views, then the answer), keep the
   // thread pinned to the newest content — but only when the reader is already
   // near the bottom, so scrolling up to re-read never gets yanked back.
-  const lastMessage = messages[messages.length - 1];
+  const lastFollowKeyRef = useRef("");
   useEffect(() => {
     const scroller = scrollRef.current;
-    if (!scroller) return;
+    if (!scroller || messages.length === 0) return;
+    const last = messages[messages.length - 1];
+    const key = `${last?.id}:${last?.content?.length}:${last?.trace?.length}`;
+    if (lastFollowKeyRef.current === key) return;
+    lastFollowKeyRef.current = key;
     const distance = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
     if (distance > 260) return;
     scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
-  }, [lastMessage?.id, lastMessage?.content, lastMessage?.trace, messages.length]);
+  }, [messages]);
 
   const loadConversation = useCallback(async (id: string) => {
     setActiveId(id);
