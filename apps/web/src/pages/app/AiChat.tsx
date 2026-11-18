@@ -15,12 +15,12 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AiMark } from "../../components/brand/AiMark.js";
 import {
   ChatMarkdown,
   MessageActions,
   printConversation,
 } from "../../components/app/ChatMarkdown.js";
+import { AiMark } from "../../components/brand/AiMark.js";
 import { useI18n } from "../../i18n/index.js";
 import { useSession } from "../../lib/session.js";
 
@@ -224,7 +224,6 @@ function describeFailure(
 function uid(): string {
   return `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
-
 
 /* ---------- pieces of the composer ---------- */
 

@@ -36,3 +36,6 @@ npm-debug.log*
 reports/
 .vercel
 .tesseract/
+
+# local agent sessions and semantic index
+.proofcore/

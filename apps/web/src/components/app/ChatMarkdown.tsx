@@ -22,14 +22,19 @@ function Inline({ text }: { text: string }): React.ReactNode[] {
   // One regex walk for `code`, **bold**, *italic* and [text](url).
   const pattern = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*\s][^*]*\*)|(\[[^\]]+\]\([^)\s]+\))/g;
   let last = 0;
-  let match: RegExpExecArray | null;
   let key = 0;
-  while ((match = pattern.exec(text)) !== null) {
+  // A `for` loop keeps the assignment out of the condition, which the linter rejects and
+  // which hides the fact that `exec` both tests and advances.
+  for (let match = pattern.exec(text); match !== null; match = pattern.exec(text)) {
     if (match.index > last) nodes.push(text.slice(last, match.index));
     const token = match[0];
     const k = `i${key++}`;
     if (token.startsWith("`")) {
-      nodes.push(<code key={k} className="chat-inline-code">{token.slice(1, -1)}</code>);
+      nodes.push(
+        <code key={k} className="chat-inline-code">
+          {token.slice(1, -1)}
+        </code>
+      );
     } else if (token.startsWith("**")) {
       nodes.push(<strong key={k}>{token.slice(2, -2)}</strong>);
     } else if (token.startsWith("*")) {
@@ -142,16 +147,16 @@ function renderBlocks(source: string): React.ReactNode[] {
           <table className="chat-table">
             <thead>
               <tr>
-                {head.map((cell, i) => (
-                  <th key={`h${i}`}>{Inline({ text: cell })}</th>
+                {head.map((cell) => (
+                  <th key={`h-${cell}`}>{Inline({ text: cell })}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, r) => (
-                <tr key={`r${r}`}>
-                  {row.map((cell, c) => (
-                    <td key={`c${c}`}>{Inline({ text: cell })}</td>
+              {rows.map((row) => (
+                <tr key={`r-${row.join("|")}`}>
+                  {row.map((cell) => (
+                    <td key={`c-${cell}`}>{Inline({ text: cell })}</td>
                   ))}
                 </tr>
               ))}
@@ -186,8 +191,8 @@ function renderBlocks(source: string): React.ReactNode[] {
       }
       out.push(
         <ul key={nextKey()}>
-          {items.map((item, i) => (
-            <li key={`l${i}`}>{Inline({ text: item })}</li>
+          {items.map((item) => (
+            <li key={`l-${item}`}>{Inline({ text: item })}</li>
           ))}
         </ul>
       );
@@ -203,8 +208,8 @@ function renderBlocks(source: string): React.ReactNode[] {
       }
       out.push(
         <ol key={nextKey()}>
-          {items.map((item, i) => (
-            <li key={`l${i}`}>{Inline({ text: item })}</li>
+          {items.map((item) => (
+            <li key={`l-${item}`}>{Inline({ text: item })}</li>
           ))}
         </ol>
       );
@@ -247,13 +252,7 @@ export function ChatMarkdown({ text }: { text: string }): React.ReactElement {
 
 /* ---------- message-level actions ---------- */
 
-export function MessageActions({
-  text,
-  fr,
-}: {
-  text: string;
-  fr: boolean;
-}): React.ReactElement {
+export function MessageActions({ text, fr }: { text: string; fr: boolean }): React.ReactElement {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {

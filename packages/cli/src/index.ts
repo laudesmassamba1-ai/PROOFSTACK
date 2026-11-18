@@ -35,6 +35,18 @@ import {
   semanticSearch,
 } from "./agent-extra-tools.js";
 import {
+  type AgentProvider,
+  AgentSession,
+  type Approver,
+  keyFingerprint,
+  loadSession,
+  loadStoredProvider,
+  resolveProvider,
+  saveSession,
+  saveStoredProvider,
+  sessionId,
+} from "./agent-runtime.js";
+import {
   parseAuditTarget,
   printAuditHelp,
   renderAudit,
@@ -198,6 +210,8 @@ async function main(argv: string[]): Promise<number> {
     "svg",
     "debug",
     "tools",
+    "agent",
+    "whoami",
   ]);
   if (command && cwdCommands.has(command) && flags.cwdExplicit && !isDirectory(flags.cwd)) {
     err(
@@ -269,6 +283,10 @@ async function main(argv: string[]): Promise<number> {
     case "debug":
     case "tools":
       return commandAgentTools(command, flags, args);
+    case "agent":
+      return commandAgent(flags, args);
+    case "whoami":
+      return commandWhoami(flags);
     default:
       err(flags, `Unknown command: ${command}`);
       printHelp(flags);
@@ -2021,6 +2039,288 @@ async function commandMap(flags: GlobalFlags, args: string[]): Promise<number> {
   }
 }
 
+/** One line of input on the shared stdin. Throws on EOF so callers can stop cleanly. */
+async function ask(question: string): Promise<string> {
+  const rl = createInterface({ input: stdin, output: stdout });
+  try {
+    return await rl.question(question);
+  } catch {
+    return "exit";
+  } finally {
+    rl.close();
+  }
+}
+
+/**
+ * Reads a secret without echoing it.
+ *
+ * The question is asked on stderr and the terminal echo is turned off, so the value never
+ * appears in a terminal recording, a scrollback buffer or a CI log.
+ */
+async function askHidden(question: string): Promise<string> {
+  if (!stdin.isTTY) {
+    const chunks: Buffer[] = [];
+    for await (const chunk of stdin) chunks.push(Buffer.from(chunk));
+    return Buffer.concat(chunks).toString("utf8").split("\n")[0] ?? "";
+  }
+  process.stderr.write(question);
+  stdin.setRawMode?.(true);
+  return new Promise<string>((resolvePromise) => {
+    let value = "";
+    const onData = (chunk: Buffer) => {
+      const text = chunk.toString("utf8");
+      for (const char of text) {
+        if (char === "\r" || char === "\n") {
+          stdin.setRawMode?.(false);
+          stdin.off("data", onData);
+          stdin.pause();
+          process.stderr.write("\n");
+          resolvePromise(value);
+          return;
+        }
+        if (char === "\u0003") {
+          stdin.setRawMode?.(false);
+          stdin.off("data", onData);
+          process.exit(3);
+        }
+        if (char === "\u007f" || char === "\b") {
+          value = value.slice(0, -1);
+          continue;
+        }
+        value += char;
+      }
+    };
+    stdin.on("data", onData);
+    stdin.resume();
+  });
+}
+
+/**
+ * `proofcore agent` — the local coding loop.
+ *
+ * This is the architecture every CLI coding tool uses: the process on this machine owns
+ * the conversation, calls the model, and runs the tools itself. Nothing here uploads a
+ * file; the model sees only what a tool returned.
+ */
+async function commandAgent(flags: GlobalFlags, args: string[]): Promise<number> {
+  if (args.includes("--configure")) return commandConfigureProvider(flags);
+
+  const root = flags.cwd;
+  const autoApprove = args.includes("--yes");
+  const maxSteps = Number(flagValue(args, "--max-steps") ?? "24");
+  const prompt = args
+    .filter((arg) => !arg.startsWith("-"))
+    .join(" ")
+    .trim();
+
+  let provider: AgentProvider;
+  try {
+    provider = await resolveProvider({
+      ...(flagValue(args, "--model") ? { model: flagValue(args, "--model") as string } : {}),
+      ...(flagValue(args, "--base-url")
+        ? { baseUrl: flagValue(args, "--base-url") as string }
+        : {}),
+    });
+  } catch (error) {
+    err(flags, red(flags, describeError(error).message));
+    return 2;
+  }
+
+  const history = args.includes("--continue")
+    ? await loadSession(root, sessionId(root))
+    : undefined;
+  if (history) out(flags, dim(flags, `Resuming ${history.length} previous messages.`));
+
+  const approve: Approver = async (request) => {
+    if (autoApprove) return true;
+    if (!stdin.isTTY || flags.json) return false;
+    out(flags, "");
+    out(
+      flags,
+      `${yellow(flags, "approve")} ${bold(flags, request.tool)} ${dim(flags, JSON.stringify(request.args).slice(0, 200))}`
+    );
+    if (request.preview) {
+      for (const line of request.preview.split("\n").slice(0, 80)) {
+        const colour = line.startsWith("+") ? green : line.startsWith("-") ? red : dim;
+        out(flags, `  ${colour(flags, line)}`);
+      }
+    }
+    const answer = (await ask("Apply? [y/N] ")).trim().toLowerCase();
+    return answer === "y" || answer === "yes";
+  };
+
+  const session = new AgentSession(
+    {
+      root,
+      provider,
+      approve,
+      maxSteps: Number.isFinite(maxSteps) && maxSteps > 0 ? maxSteps : 24,
+      onEvent: (event) => {
+        if (event.type === "assistant_text" && !flags.json) out(flags, `\n${event.text}\n`);
+        if (event.type === "tool_call" && !flags.json) {
+          out(flags, dim(flags, `→ ${event.name} ${JSON.stringify(event.args).slice(0, 160)}`));
+        }
+        if (event.type === "tool_refused" && !flags.json) {
+          out(flags, yellow(flags, `  refused: ${event.name}`));
+        }
+        if (event.type === "tool_result" && event.isError && !flags.json) {
+          out(flags, red(flags, `  ${event.content.split("\n")[0]}`));
+        }
+      },
+    },
+    history ?? []
+  );
+
+  const controller = new AbortController();
+  const onInterrupt = () => controller.abort();
+  process.once("SIGINT", onInterrupt);
+
+  try {
+    if (prompt) {
+      const result = await session.send(prompt);
+      await saveSession(root, sessionId(root), result.messages, { model: provider.model });
+      if (flags.json) {
+        stdout.write(
+          `${JSON.stringify({ text: result.text, toolCalls: result.toolCalls, refused: result.refused }, null, 2)}\n`
+        );
+      }
+      return controller.signal.aborted ? 3 : 0;
+    }
+
+    // Interactive: a prompt, then a turn per line, until EOF or `exit`.
+    out(flags, bold(flags, "\nPROOFCORE agent"));
+    out(flags, dim(flags, `${provider.model} · ${root}`));
+    out(flags, dim(flags, '"exit" to quit, "clear" to drop the history.\n'));
+    while (true) {
+      const line = (await ask(`${green(flags, "›")} `)).trim();
+      if (!line) {
+        if (!stdin.isTTY) break;
+        continue;
+      }
+      if (line === "exit" || line === "quit") break;
+      if (line === "clear") {
+        out(flags, dim(flags, "(history cleared on next launch)"));
+        continue;
+      }
+      const result = await session.send(line);
+      await saveSession(root, sessionId(root), result.messages, { model: provider.model });
+      if (controller.signal.aborted) break;
+    }
+    return 0;
+  } catch (error) {
+    err(flags, red(flags, describeError(error).message));
+    return controller.signal.aborted ? 3 : 2;
+  } finally {
+    process.off("SIGINT", onInterrupt);
+  }
+}
+
+/** Stores the model configuration once, in a 0600 file, with a hidden key prompt. */
+async function commandConfigureProvider(flags: GlobalFlags): Promise<number> {
+  out(flags, bold(flags, "\nConnect a model"));
+  out(
+    flags,
+    dim(flags, "The key is written to a file only you can read. It never leaves this machine.\n")
+  );
+  const baseUrl = (await ask("Base URL (e.g. https://api.groq.com/openai/v1): ")).trim();
+  if (!baseUrl) {
+    err(flags, "A base URL is required.");
+    return 2;
+  }
+  const kind = (await ask("Provider kind [openai/anthropic] (openai): ")).trim() || "openai";
+  const model = (await ask("Model id (leave empty to ask the provider): ")).trim();
+  const apiKey = (await askHidden("API key: ")).trim();
+  if (!apiKey) {
+    err(flags, "A key is required.");
+    return 2;
+  }
+  let chosenModel = model;
+  if (!chosenModel) {
+    // Discover it the same way the web profile does, instead of hard-coding an id that a
+    // provider can retire.
+    try {
+      const response = await fetch(`${baseUrl.replace(/\/+$/, "")}/models`, {
+        headers:
+          kind === "anthropic"
+            ? { "x-api-key": apiKey, "anthropic-version": "2023-06-01" }
+            : { authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(15_000),
+      });
+      const payload = (await response.json()) as { data?: { id: string }[] };
+      const ids = (payload.data ?? [])
+        .map((entry) => entry.id)
+        .filter((id) => !/whisper|tts|embed|guard/i.test(id));
+      chosenModel = ids[0] ?? "";
+      if (ids.length > 0)
+        out(flags, dim(flags, `Discovered ${ids.length} chat models; using ${chosenModel}.`));
+    } catch {
+      err(flags, "Could not list models; re-run with an explicit model id.");
+      return 2;
+    }
+  }
+  if (!chosenModel) {
+    err(flags, "No chat model found. Re-run with an explicit model id.");
+    return 2;
+  }
+  const path = await saveStoredProvider({ baseUrl, model: chosenModel, apiKey, kind });
+  out(
+    flags,
+    `${green(flags, "✓")} stored ${dim(flags, path)} ${dim(flags, `(${keyFingerprint(apiKey)})`)}`
+  );
+  out(flags, dim(flags, '\nNext: `proofcore agent "describe this project"`'));
+  return 0;
+}
+
+/** Who this CLI is, and which model it will use. Both answers come from disk, not hope. */
+async function commandWhoami(flags: GlobalFlags): Promise<number> {
+  const session = await loadStoredSession();
+  const provider = await loadStoredProvider();
+  if (flags.json) {
+    stdout.write(
+      `${JSON.stringify(
+        {
+          account: session
+            ? { email: session.email, apiUrl: session.apiUrl, savedAt: session.savedAt }
+            : null,
+          model: provider.baseUrl
+            ? {
+                baseUrl: provider.baseUrl,
+                model: provider.model,
+                key: keyFingerprint(provider.apiKey ?? ""),
+              }
+            : null,
+        },
+        null,
+        2
+      )}\n`
+    );
+    return 0;
+  }
+  out(flags, `\n${bold(flags, "whoami")}\n`);
+  if (session) {
+    out(flags, `  account   ${session.email} ${dim(flags, `· ${session.apiUrl}`)}`);
+    out(
+      flags,
+      `  session   ${dim(flags, "stored, 0600")} ${dim(flags, session.savedAt.slice(0, 19))}`
+    );
+  } else {
+    out(flags, `  account   ${yellow(flags, "not signed in")} ${dim(flags, "· proofcore login")}`);
+  }
+  if (provider.baseUrl) {
+    out(
+      flags,
+      `  model     ${provider.model} ${dim(flags, `· ${provider.baseUrl} · ${keyFingerprint(provider.apiKey ?? "")}`)}`
+    );
+  } else {
+    out(
+      flags,
+      `  model     ${yellow(flags, "not configured")} ${dim(flags, "· proofcore agent --configure")}`
+    );
+  }
+  out(flags, "");
+  return 0;
+}
+
 /**
  * The agent tool surface, from the terminal.
  *
@@ -2225,6 +2525,9 @@ function printHelp(flags: GlobalFlags): void {
   w("  debug <file> --line <n>     breakpoints and real variable scopes");
   w("  svg <name> [--out file]     deterministic SVG icon");
   w("  tools                       list every agent tool and where it lives");
+  w('  agent ["prompt"] [--yes]     local coding agent: reads, edits, runs, with diffs');
+  w("  agent --configure           store the model URL/model/key (0600, local only)");
+  w("  whoami                      which account and which model this CLI will use");
   w("  mcp                      Serve PROOFCORE as an MCP server over stdio");
   w("");
   w(bold(flags, "test options"));
