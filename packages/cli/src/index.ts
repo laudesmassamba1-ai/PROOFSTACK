@@ -66,7 +66,7 @@ import {
  *     written to a report or a config file.
  */
 
-const CLI_VERSION = "0.1.0";
+const CLI_VERSION = "0.2.0";
 
 interface GlobalFlags {
   cwd: string;
