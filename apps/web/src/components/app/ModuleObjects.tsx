@@ -191,7 +191,7 @@ export function WorldObject({ passed, failed, total }: ObjectProps) {
 
 export function FlowObject({ passed, failed, total }: ObjectProps) {
   const uid = useUid();
-  const { ref } = useObjectMotion<SVGSVGElement>();
+  const { ref, running } = useObjectMotion<SVGSVGElement>();
   const count = Math.min(Math.max(passed + failed, 0), 7);
   const passedShown = Math.min(passed, count);
   const hasData = total > 0;
@@ -213,7 +213,7 @@ export function FlowObject({ passed, failed, total }: ObjectProps) {
     <svg
       ref={ref}
       viewBox="0 0 280 220"
-      className={`module-object module-object-flow ${hasData ? "has-data" : ""}`}
+      className={`module-object module-object-flow ${hasData ? "has-data" : ""} ${running ? "is-running" : ""}`}
       role="img"
       aria-label={
         hasData
@@ -298,7 +298,7 @@ export function FlowObject({ passed, failed, total }: ObjectProps) {
 
 export function ExitObject({ passed, failed, total }: ObjectProps) {
   const uid = useUid();
-  const { ref } = useObjectMotion<SVGSVGElement>();
+  const { ref, running } = useObjectMotion<SVGSVGElement>();
   const count = Math.min(Math.max(passed + failed, 0), 5);
   const failedShown = Math.min(failed, count);
   const hasData = total > 0;
@@ -312,7 +312,7 @@ export function ExitObject({ passed, failed, total }: ObjectProps) {
     <svg
       ref={ref}
       viewBox="0 0 280 220"
-      className={`module-object module-object-exit ${hasData ? "has-data" : ""}`}
+      className={`module-object module-object-exit ${hasData ? "has-data" : ""} ${running ? "is-running" : ""}`}
       role="img"
       aria-label={
         hasData
