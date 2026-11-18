@@ -6,6 +6,7 @@ import {
   Globe,
   Loader2,
   Lock,
+  Monitor,
   PanelLeft,
   Paperclip,
   Plug,
@@ -18,6 +19,7 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { BrowserPanel } from "../../components/app/BrowserPanel.js";
 import {
   ChatMarkdown,
   MessageActions,
@@ -125,7 +127,15 @@ interface AgentTraceStep {
 }
 
 /** The in-app browser: what the assistant actually opened, not a description of it. */
-function BrowserView({ view, fr }: { view: NonNullable<AgentTraceStep["view"]>; fr: boolean }) {
+function BrowserView({
+  view,
+  fr,
+  onOpen,
+}: {
+  view: NonNullable<AgentTraceStep["view"]>;
+  fr: boolean;
+  onOpen?: (url: string) => void;
+}) {
   const [open, setOpen] = useState(true);
   return (
     <figure className="chat-browser">
@@ -152,6 +162,11 @@ function BrowserView({ view, fr }: { view: NonNullable<AgentTraceStep["view"]>; 
             onClick={() => setOpen((value) => !value)}
           >
             {open ? (fr ? "masquer" : "hide") : fr ? "afficher" : "show"}
+          </button>
+        )}
+        {onOpen && (
+          <button type="button" className="chat-browser-open" onClick={() => onOpen(view.url)}>
+            {fr ? "ouvrir le navigateur" : "open the browser"}
           </button>
         )}
       </figcaption>
@@ -534,6 +549,10 @@ export function AiChatPage(): React.ReactElement {
   const [attachNotice, setAttachNotice] = useState<{ title: string; detail: string } | null>(null);
   const [effort, setEffort] = useState<EffortLevel["id"]>("balanced");
   const [busy, setBusy] = useState(false);
+  // The browser opens beside the chat, not inside the transcript: a page you can click is a
+  // panel, not a message.
+  const [browserOpen, setBrowserOpen] = useState(false);
+  const [browserUrl, setBrowserUrl] = useState<string | undefined>(undefined);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [profile, setProfile] = useState<ProfileState | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -606,9 +625,13 @@ export function AiChatPage(): React.ReactElement {
     node?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, []);
 
-  // While the assistant works (trace chips, views, then the answer), keep the
-  // thread pinned to the newest content — but only when the reader is already
-  // near the bottom, so scrolling up to re-read never gets yanked back.
+  // Two scroll modes. "pinned" is the default: the thread follows new content
+  // while the reader is near the bottom. When the user sends a message the pin
+  // is forced ON until the answer lands — reading position never wins over a
+  // question that was just asked. Scrolling up by hand releases the pin and
+  // shows the jump-back button instead.
+  const pinnedRef = useRef(true);
+  const [showJump, setShowJump] = useState(false);
   const lastFollowKeyRef = useRef("");
   useEffect(() => {
     const scroller = scrollRef.current;
@@ -618,9 +641,31 @@ export function AiChatPage(): React.ReactElement {
     if (lastFollowKeyRef.current === key) return;
     lastFollowKeyRef.current = key;
     const distance = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
+    if (pinnedRef.current) {
+      scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
+      return;
+    }
     if (distance > 260) return;
     scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
   }, [messages]);
+
+  // Release the pin as soon as the reader scrolls up on purpose; surface the
+  // jump button once the newest answer is out of sight.
+  const onThreadScroll = useCallback(() => {
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+    const distance = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
+    if (distance > 90) pinnedRef.current = false;
+    if (distance < 40) pinnedRef.current = true;
+    setShowJump(distance > 420);
+  }, []);
+
+  const jumpToLatest = useCallback(() => {
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+    pinnedRef.current = true;
+    scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
+  }, []);
 
   const loadConversation = useCallback(async (id: string) => {
     setActiveId(id);
@@ -798,6 +843,13 @@ export function AiChatPage(): React.ReactElement {
       userMessage,
       { id: pendingId, role: "assistant", content: "" },
     ]);
+    // Asking a question is the strongest reading intent there is: the thread
+    // pins to the bottom and the answer scrolls into view when it lands.
+    pinnedRef.current = true;
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    });
+    setShowJump(false);
     setBusy(true);
     try {
       const response = await fetch("/api/v1/ai/chat", {
@@ -1004,7 +1056,7 @@ export function AiChatPage(): React.ReactElement {
       </aside>
 
       {/* ------------------------------------------------- main column */}
-      <div className="chat-main">
+      <div className={`chat-main${browserOpen ? " has-browser" : ""}`}>
         <header className="chat-topbar">
           {!sidebarOpen && (
             <button
@@ -1021,6 +1073,14 @@ export function AiChatPage(): React.ReactElement {
             {fr ? "Assistant PROOFCORE" : "PROOFCORE Assistant"}
           </div>
           {activeWorkspace && <span className="chat-workspace-chip">{activeWorkspace.name}</span>}
+          <button
+            type="button"
+            className={`chat-action-btn ${browserOpen ? "is-on" : ""}`}
+            onClick={() => setBrowserOpen((open) => !open)}
+            aria-pressed={browserOpen}
+          >
+            <Monitor size={13} /> {fr ? "Navigateur" : "Browser"}
+          </button>
           <button
             type="button"
             className="chat-action-btn chat-topbar-export"
@@ -1040,131 +1100,161 @@ export function AiChatPage(): React.ReactElement {
           </button>
         </header>
 
-        {/* empty state: centered greeting + composer, like the reference */}
-        {!hasMessages && (
-          <div className="chat-greeting">
-            <AiMark size={56} className="chat-greeting-mark" decorative />
-            <h1 className="chat-greeting-title">{greeting}</h1>
-            <p className="chat-greeting-support">
-              {fr
-                ? "WORLD · FLOW · EXIT — vos données, vos audits, aucune invention."
-                : "WORLD · FLOW · EXIT — your data, your audits, no invention."}
-            </p>
-            <div className="chat-composer-zone is-center w-full">
-              <Composer
-                draft={draft}
-                setDraft={setDraft}
-                onSend={() => void send()}
-                busy={busy}
-                effort={effort}
-                onEffort={setEffort}
-                fr={fr}
-                attachments={attachments}
-                onAttach={(files) => void handleAttach(files)}
-                onRemoveAttachment={(index) =>
-                  setAttachments((items) => items.filter((_, i) => i !== index))
-                }
-                onDismissNotice={() => setAttachNotice(null)}
-                extracting={extracting}
-                notice={attachNotice}
-              />
-              <p className="chat-disclaimer">
-                {fr
-                  ? "L'assistant lit vos vraies données d'espace de travail. Vérifiez les informations importantes."
-                  : "The assistant reads your real workspace data. Verify important information."}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* conversation */}
-        {hasMessages && (
-          <>
-            <div ref={scrollRef} className="chat-scroll">
-              <div className="chat-thread">
-                {messages.map((message) =>
-                  message.role === "user" ? (
-                    <div key={message.id} className="chat-msg chat-msg-user">
-                      <div className="chat-msg-user-bubble">{message.content}</div>
-                    </div>
-                  ) : (
-                    <div key={message.id} className="chat-msg chat-msg-ai">
-                      <div className="chat-msg-avatar">
-                        <AiMark size={15} />
-                      </div>
-                      <div className="chat-msg-body">
-                        {message.trace && message.trace.length > 0 && (
-                          <div className="chat-trace">
-                            {message.trace.map((step) => {
-                              const Icon = TOOL_ICONS[step.tool] ?? BadgeCheck;
-                              return (
-                                <span
-                                  key={`${step.tool}:${step.summary}`}
-                                  className="chat-trace-chip"
-                                >
-                                  <Icon size={10} /> {step.tool} · {step.summary}
-                                </span>
-                              );
-                            })}
-                          </div>
-                        )}
-                        {message.trace
-                          ?.filter((step) => step.view?.kind === "browser")
-                          .map((step) => (
-                            <BrowserView
-                              key={`view:${step.view?.url}:${step.summary}`}
-                              view={step.view as NonNullable<AgentTraceStep["view"]>}
-                              fr={fr}
-                            />
-                          ))}
-                        {message.error ? (
-                          <div className="chat-error">{message.error}</div>
-                        ) : message.content ? (
-                          <>
-                            <ChatMarkdown text={message.content} />
-                            <MessageActions text={message.content} fr={fr} />
-                          </>
-                        ) : busy ? (
-                          <div className="chat-thinking" aria-live="polite">
-                            <span />
-                            <span />
-                            <span />
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                  )
-                )}
-                <div ref={endSentinel} />
+        <div className="chat-split">
+          <div className="chat-column">
+            {/* empty state: centered greeting + composer, like the reference */}
+            {!hasMessages && (
+              <div className="chat-greeting">
+                <AiMark size={56} className="chat-greeting-mark" decorative />
+                <h1 className="chat-greeting-title">{greeting}</h1>
+                <p className="chat-greeting-support">
+                  {fr
+                    ? "WORLD · FLOW · EXIT — vos données, vos audits, aucune invention."
+                    : "WORLD · FLOW · EXIT — your data, your audits, no invention."}
+                </p>
+                <div className="chat-composer-zone is-center w-full">
+                  <Composer
+                    draft={draft}
+                    setDraft={setDraft}
+                    onSend={() => void send()}
+                    busy={busy}
+                    effort={effort}
+                    onEffort={setEffort}
+                    fr={fr}
+                    attachments={attachments}
+                    onAttach={(files) => void handleAttach(files)}
+                    onRemoveAttachment={(index) =>
+                      setAttachments((items) => items.filter((_, i) => i !== index))
+                    }
+                    onDismissNotice={() => setAttachNotice(null)}
+                    extracting={extracting}
+                    notice={attachNotice}
+                  />
+                  <p className="chat-disclaimer">
+                    {fr
+                      ? "L'assistant lit vos vraies données d'espace de travail. Vérifiez les informations importantes."
+                      : "The assistant reads your real workspace data. Verify important information."}
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
 
-            <div className="chat-composer-zone is-docked">
-              <Composer
-                draft={draft}
-                setDraft={setDraft}
-                onSend={() => void send()}
-                busy={busy}
-                effort={effort}
-                onEffort={setEffort}
-                fr={fr}
-                attachments={attachments}
-                onAttach={(files) => void handleAttach(files)}
-                onRemoveAttachment={(index) =>
-                  setAttachments((items) => items.filter((_, i) => i !== index))
-                }
-                onDismissNotice={() => setAttachNotice(null)}
-                extracting={extracting}
-                notice={attachNotice}
-              />
-              <p className="chat-disclaimer">
-                {fr
-                  ? "L'assistant lit vos vraies données d'espace de travail. Vérifiez les informations importantes."
-                  : "The assistant reads your real workspace data. Verify important information."}
-              </p>
-            </div>
-          </>
-        )}
+            {/* conversation */}
+            {hasMessages && (
+              <>
+                <div ref={scrollRef} className="chat-scroll">
+                  <div className="chat-thread">
+                    {messages.map((message) =>
+                      message.role === "user" ? (
+                        <div key={message.id} className="chat-msg chat-msg-user">
+                          <div className="chat-msg-user-bubble">{message.content}</div>
+                        </div>
+                      ) : (
+                        <div key={message.id} className="chat-msg chat-msg-ai">
+                          <div className="chat-msg-avatar">
+                            <AiMark size={15} />
+                          </div>
+                          <div className="chat-msg-body">
+                            {message.trace && message.trace.length > 0 && (
+                              <div className="chat-trace">
+                                {message.trace.map((step) => {
+                                  const Icon = TOOL_ICONS[step.tool] ?? BadgeCheck;
+                                  return (
+                                    <span
+                                      key={`${step.tool}:${step.summary}`}
+                                      className="chat-trace-chip"
+                                    >
+                                      <Icon size={10} /> {step.tool} · {step.summary}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            )}
+                            {message.trace
+                              ?.filter((step) => step.view?.kind === "browser")
+                              .map((step) => (
+                                <BrowserView
+                                  key={`view:${step.view?.url}:${step.summary}`}
+                                  view={step.view as NonNullable<AgentTraceStep["view"]>}
+                                  fr={fr}
+                                  onOpen={(url) => {
+                                    setBrowserUrl(url);
+                                    setBrowserOpen(true);
+                                  }}
+                                />
+                              ))}
+                            {message.error ? (
+                              <div className="chat-error">{message.error}</div>
+                            ) : message.content ? (
+                              <>
+                                <ChatMarkdown text={message.content} />
+                                <MessageActions text={message.content} fr={fr} />
+                              </>
+                            ) : busy ? (
+                              <div className="chat-thinking" aria-live="polite">
+                                <span />
+                                <span />
+                                <span />
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      )
+                    )}
+                    <div ref={endSentinel} />
+                  </div>
+                </div>
+
+                {showJump ? (
+                  <div className="chat-jump-zone">
+                    <button
+                      type="button"
+                      className="chat-jump"
+                      onClick={jumpToLatest}
+                      aria-label={fr ? "Revenir au dernier message" : "Jump to latest message"}
+                    >
+                      <ChevronDown size={14} aria-hidden />
+                      {fr ? "Dernier message" : "Latest message"}
+                    </button>
+                  </div>
+                ) : null}
+
+                <div className="chat-composer-zone is-docked">
+                  <Composer
+                    draft={draft}
+                    setDraft={setDraft}
+                    onSend={() => void send()}
+                    busy={busy}
+                    effort={effort}
+                    onEffort={setEffort}
+                    fr={fr}
+                    attachments={attachments}
+                    onAttach={(files) => void handleAttach(files)}
+                    onRemoveAttachment={(index) =>
+                      setAttachments((items) => items.filter((_, i) => i !== index))
+                    }
+                    onDismissNotice={() => setAttachNotice(null)}
+                    extracting={extracting}
+                    notice={attachNotice}
+                  />
+                  <p className="chat-disclaimer">
+                    {fr
+                      ? "L'assistant lit vos vraies données d'espace de travail. Vérifiez les informations importantes."
+                      : "The assistant reads your real workspace data. Verify important information."}
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+          {browserOpen && activeWorkspaceId && (
+            <BrowserPanel
+              workspaceId={activeWorkspaceId}
+              {...(browserUrl ? { initialUrl: browserUrl } : {})}
+              fr={fr}
+              onClose={() => setBrowserOpen(false)}
+            />
+          )}
+        </div>
       </div>
 
       {/* ---------------------------------------------- settings modal */}

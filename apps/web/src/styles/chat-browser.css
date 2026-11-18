@@ -61,3 +61,182 @@
     color: var(--muted-foreground);
   }
 }
+
+/* ---------- the browser panel, docked beside the chat ---------- */
+@layer components {
+  .chat-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+    height: 100%;
+  }
+  .chat-main.has-browser .chat-split {
+    grid-template-columns: minmax(0, 1fr) minmax(420px, 46%);
+  }
+  .chat-column {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .pc-browser {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    border-left: 1px solid var(--border);
+    background: var(--surface-1);
+  }
+  .pc-browser-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .pc-browser-icon {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--surface-2);
+    color: var(--muted-foreground);
+    cursor: pointer;
+  }
+  .pc-browser-icon:hover:not(:disabled) {
+    color: var(--foreground);
+  }
+  .pc-browser-icon:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+  .pc-browser-address {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0 8px;
+    background: var(--surface-2);
+    min-width: 0;
+  }
+  .pc-browser-address input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: var(--foreground);
+    font: inherit;
+    font-size: 12px;
+    padding: 6px 0;
+    outline: none;
+  }
+  .pc-browser-go {
+    border: 0;
+    background: transparent;
+    color: var(--muted-foreground);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+  }
+  .pc-browser-spinner {
+    width: 10px;
+    height: 10px;
+    border: 1.5px solid var(--border);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: pc-browser-spin 0.7s linear infinite;
+  }
+  @keyframes pc-browser-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  .pc-browser-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 2px 7px;
+    white-space: nowrap;
+  }
+  .pc-browser-error {
+    padding: 8px 10px;
+    font-size: 12px;
+    color: #f87171;
+    border-bottom: 1px solid var(--border);
+    background: color-mix(in oklab, #f87171 8%, transparent);
+  }
+  .pc-browser-viewport {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    background: #0e1116;
+    display: grid;
+    place-items: start center;
+  }
+  .pc-browser-viewport img {
+    display: block;
+    width: 100%;
+    height: auto;
+    cursor: crosshair;
+    background: #fff;
+    transition: opacity 0.12s ease;
+  }
+  .pc-browser-viewport img.is-loading {
+    opacity: 0.6;
+  }
+  .pc-browser-empty {
+    padding: 32px 16px;
+    font-size: 12px;
+    color: var(--muted-foreground);
+  }
+  .pc-browser-foot {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--muted-foreground);
+  }
+  .pc-browser-title {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pc-browser-console {
+    color: #fbbf24;
+  }
+  .chat-browser-open {
+    background: none;
+    border: 0;
+    color: var(--primary);
+    font-size: 11px;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .chat-action-btn.is-on {
+    border-color: color-mix(in oklab, var(--primary) 55%, transparent);
+    color: var(--primary);
+  }
+  @media (width <= 1100px) {
+    .chat-main.has-browser .chat-split {
+      grid-template-rows: minmax(0, 1fr) minmax(300px, 45%);
+    }
+    .pc-browser {
+      border-left: 0;
+      border-top: 1px solid var(--border);
+    }
+  }
+}

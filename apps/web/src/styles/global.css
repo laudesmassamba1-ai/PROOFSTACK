@@ -5575,3 +5575,41 @@ p {
   /* Every object animation is gated by .is-running, which the motion hook
    * already withholds when reduced motion is on — nothing to force here. */
 }
+
+/* ---------- chat: jump to latest ---------- */
+
+.chat-jump-zone {
+  position: relative;
+  z-index: 3;
+  height: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.chat-jump {
+  position: absolute;
+  top: -40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--surface-raised, var(--surface));
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  padding: 7px 13px;
+  cursor: pointer;
+  box-shadow: 0 8px 24px -10px rgb(0 0 0 / 35%);
+  transition:
+    color var(--dur-1) var(--ease-standard),
+    border-color var(--dur-1) var(--ease-standard),
+    transform var(--dur-1) var(--ease-standard);
+}
+
+.chat-jump:hover {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--rule));
+  transform: translateY(-1px);
+}

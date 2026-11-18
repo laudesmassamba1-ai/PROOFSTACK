@@ -12,6 +12,7 @@ import { adminRoutes } from "./routes/admin.js";
 import { aiRoutes } from "./routes/ai.js";
 import { authRoutes } from "./routes/auth.js";
 import { billingRoutes, planRoutes } from "./routes/billing.js";
+import { browserRoutes } from "./routes/browser.js";
 import { deviceRoutes } from "./routes/device.js";
 import { machineRoutes } from "./routes/machine.js";
 import { webhookRoutes } from "./routes/webhooks.js";
@@ -134,6 +135,7 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
   app.route("/api/v1", planRoutes(services));
   app.route("/api/v1", workspaceRoutes(services));
   app.route("/api/v1/ai", aiRoutes(services));
+  app.route("/api/v1/browser", browserRoutes(services));
   app.route("/api/v1", billingRoutes(services));
   app.route("/api/v1/admin", adminRoutes(services));
   app.route("/v1", machineRoutes(services));

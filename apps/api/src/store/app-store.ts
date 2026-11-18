@@ -642,6 +642,51 @@ export class AppStore {
 
   // ---------------------------------------------------------- ai experience
 
+  async createBrowserSession(input: {
+    id: string;
+    userId: string;
+    workspaceId: string;
+    targetSessionId: string;
+    url: string;
+  }): Promise<void> {
+    const now = iso(this.clock());
+    await this.db
+      .prepare(
+        `INSERT INTO browser_sessions (id, user_id, workspace_id, target_session_id, url, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(input.id, input.userId, input.workspaceId, input.targetSessionId, input.url, now, now)
+      .run();
+  }
+
+  async getBrowserSession(
+    userId: string,
+    id: string
+  ): Promise<{ id: string; targetSessionId: string; url: string } | null> {
+    const row = await this.db
+      .prepare(
+        "SELECT id, target_session_id, url FROM browser_sessions WHERE id = ? AND user_id = ?"
+      )
+      .bind(id, userId)
+      .first<{ id: string; target_session_id: string; url: string }>();
+    if (!row) return null;
+    return { id: row.id, targetSessionId: row.target_session_id, url: row.url };
+  }
+
+  async touchBrowserSession(userId: string, id: string, url: string): Promise<void> {
+    await this.db
+      .prepare("UPDATE browser_sessions SET url = ?, updated_at = ? WHERE id = ? AND user_id = ?")
+      .bind(url, iso(this.clock()), id, userId)
+      .run();
+  }
+
+  async deleteBrowserSession(userId: string, id: string): Promise<void> {
+    await this.db
+      .prepare("DELETE FROM browser_sessions WHERE id = ? AND user_id = ?")
+      .bind(id, userId)
+      .run();
+  }
+
   async saveAiConversation(input: {
     id: string;
     userId: string;
