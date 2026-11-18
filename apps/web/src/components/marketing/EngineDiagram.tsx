@@ -3,7 +3,7 @@ import { useI18n } from "../../i18n/index.js";
 
 /**
  * A structural diagram, not a screenshot. It names the real layers the product
- * uses: a local/CI runner, one scheduler, three module providers and the shared
+ * uses: a local/CI runner, one scheduler, the five module providers and the shared
  * report formats. No counts or success rates are implied.
  */
 export function EngineDiagram() {
@@ -56,11 +56,13 @@ export function EngineDiagram() {
 
         <div className="ml-6 h-5 border-l border-dashed border-white/15" />
 
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid gap-2 sm:grid-cols-5">
           {[
             { label: "WORLD", note: "locales", className: "module-world" },
             { label: "FLOW", note: "journeys", className: "module-flow" },
             { label: "EXIT", note: "round trips", className: "module-exit" },
+            { label: "FAIL", note: "exposure", className: "module-fail" },
+            { label: "CLEAN", note: "score /100", className: "module-clean" },
           ].map((module) => (
             <div key={module.label} className={`module-card ${module.className} px-3 py-3`}>
               <p className="text-[0.72rem] font-semibold tracking-[0.12em]">{module.label}</p>

@@ -131,7 +131,7 @@ export function WorldObject({ passed, failed, total }: ObjectProps) {
           <g className="world-satellites">
             {items.map((item) => (
               <g key={item.key}>
-                <circle cx={item.x} cy={item.y} r="7" fill="#ffffff" opacity="0.16" />
+                <circle cx={item.x} cy={item.y} r="7" fill="var(--object-halo)" opacity="0.16" />
                 <circle
                   cx={item.x}
                   cy={item.y}
@@ -156,7 +156,7 @@ export function WorldObject({ passed, failed, total }: ObjectProps) {
         opacity={hasData ? 0.24 : 0.1}
         transform="rotate(-28 124 88)"
       />
-      <circle cx="140" cy="108" r="44" fill="none" stroke="#ffffff" strokeOpacity="0.2" />
+      <circle cx="140" cy="108" r="44" fill="none" stroke="var(--object-ring)" />
       <path
         d="M110 128c17 13 43 16 63 5"
         fill="none"
@@ -398,7 +398,7 @@ function AuditObject({
       <path
         d="M40 110 A60 60 0 0 1 160 110"
         fill="none"
-        stroke="#ffffff22"
+        stroke="var(--object-track)"
         strokeWidth="10"
         strokeLinecap="round"
       />
@@ -415,12 +415,12 @@ function AuditObject({
         y1="110"
         x2={100 + 44 * Math.sin((angle * Math.PI) / 180)}
         y2={110 - 44 * Math.cos((angle * Math.PI) / 180)}
-        stroke="#e8f5ef"
+        stroke="var(--object-glyph)"
         strokeWidth="3"
         strokeLinecap="round"
       />
-      <circle cx="100" cy="110" r="5" fill="#e8f5ef" />
-      <text x="100" y="70" textAnchor="middle" fill="#e8f5ef" fontSize="26" fontWeight="700">
+      <circle cx="100" cy="110" r="5" fill="var(--object-glyph)" />
+      <text x="100" y="70" textAnchor="middle" fill="var(--object-glyph)" fontSize="26" fontWeight="700">
         {total > 0 ? `${Math.round(rate * 100)}` : "—"}
       </text>
     </svg>

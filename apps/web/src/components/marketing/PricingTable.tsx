@@ -1,7 +1,7 @@
 import { PLANS, SUPPORTED_CURRENCIES, yearlySavingPercent } from "@proofcore/billing";
 import { type EntitlementKey, planSchema } from "@proofcore/contracts";
 import { Money } from "@proofcore/core";
-import { Check, Minus, ShieldCheck, Sparkles, Zap } from "lucide-react";
+import { BadgeCheck, Check, Minus, ShieldCheck, Zap } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { Link } from "react-router";
@@ -99,7 +99,7 @@ export function PricingTable({ currentPlanKey }: { currentPlanKey?: string }) {
             >
               {plan.key === "studio" ? (
                 <span className="absolute -top-3 left-6 flex items-center gap-1 rounded-full bg-brand-mint px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-[#05231b]">
-                  <Sparkles size={11} /> {t("mkt.pricing.featured")}
+                  <BadgeCheck size={11} /> {t("mkt.pricing.featured")}
                 </span>
               ) : null}
 

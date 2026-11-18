@@ -1,4 +1,12 @@
-import { ArrowRight, Globe2, PackageOpen, Route as RouteIcon, Terminal } from "lucide-react";
+import {
+  ArrowRight,
+  BadgeCheck,
+  Globe2,
+  PackageOpen,
+  Route as RouteIcon,
+  ShieldAlert,
+  Terminal,
+} from "lucide-react";
 import { Link } from "react-router";
 import { HeroLockup } from "../components/brand/Logo.js";
 import { ParticleLogo } from "../components/brand/ParticleLogo.js";
@@ -12,6 +20,8 @@ const MODULE_CARDS = [
   { id: "world", icon: Globe2, className: "module-world" },
   { id: "flow", icon: RouteIcon, className: "module-flow" },
   { id: "exit", icon: PackageOpen, className: "module-exit" },
+  { id: "fail", icon: ShieldAlert, className: "module-fail" },
+  { id: "clean", icon: BadgeCheck, className: "module-clean" },
 ] as const;
 
 export function Home() {
@@ -73,7 +83,7 @@ export function Home() {
             </div>
           </div>
 
-          <div className="grid max-w-[760px] gap-3 border-t border-white/10 py-5 sm:grid-cols-3">
+          <div className="grid max-w-[820px] gap-3 border-t border-white/10 py-5 sm:grid-cols-3 lg:grid-cols-5">
             {MODULE_CARDS.map((module) => {
               const Icon = module.icon;
               return (

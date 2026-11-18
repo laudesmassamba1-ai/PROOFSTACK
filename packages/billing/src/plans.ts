@@ -41,7 +41,7 @@ const PLAN_SEEDS: PlanSeed[] = [
     key: "free",
     name: "Free",
     rank: 0,
-    description: "One project, the three modules at basic depth, standard reports.",
+    description: "One project, the five modules at basic depth, standard reports.",
     trialDays: 0,
     graceDays: 0,
     renewalReminderDays: 0,
@@ -50,7 +50,9 @@ const PLAN_SEEDS: PlanSeed[] = [
     active: true,
     prices: [],
     entitlements: { ...FREE_ENTITLEMENTS },
-    modules: ["world", "flow", "exit"],
+    // FAIL and CLEAN audits are included on every plan; the audit meter is
+    // monthly_test_runs, like the engine modules.
+    modules: ["world", "flow", "exit", "fail", "clean"],
   },
   {
     id: "plan_developer",
@@ -89,7 +91,9 @@ const PLAN_SEEDS: PlanSeed[] = [
       client_sharing: false,
       priority_support: false,
     },
-    modules: ["world", "flow", "exit"],
+    // FAIL and CLEAN audits are included on every plan; the audit meter is
+    // monthly_test_runs, like the engine modules.
+    modules: ["world", "flow", "exit", "fail", "clean"],
   },
   {
     id: "plan_studio",
@@ -127,7 +131,9 @@ const PLAN_SEEDS: PlanSeed[] = [
       client_sharing: true,
       priority_support: false,
     },
-    modules: ["world", "flow", "exit"],
+    // FAIL and CLEAN audits are included on every plan; the audit meter is
+    // monthly_test_runs, like the engine modules.
+    modules: ["world", "flow", "exit", "fail", "clean"],
   },
   {
     id: "plan_agency",
@@ -165,7 +171,9 @@ const PLAN_SEEDS: PlanSeed[] = [
       client_sharing: true,
       priority_support: true,
     },
-    modules: ["world", "flow", "exit"],
+    // FAIL and CLEAN audits are included on every plan; the audit meter is
+    // monthly_test_runs, like the engine modules.
+    modules: ["world", "flow", "exit", "fail", "clean"],
   },
 ];
 

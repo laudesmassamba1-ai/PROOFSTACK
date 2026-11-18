@@ -10,6 +10,8 @@ const LINKS = [
   { to: "/world", key: "modules.world.name" as const },
   { to: "/flow", key: "modules.flow.name" as const },
   { to: "/exit", key: "modules.exit.name" as const },
+  { to: "/fail", key: "modules.fail.name" as const },
+  { to: "/clean", key: "modules.clean.name" as const },
   { to: "/platform", key: "nav.platform" as const },
   { to: "/pricing", key: "nav.pricing" as const },
   { to: "/docs", key: "nav.docs" as const },

@@ -1781,6 +1781,41 @@ p {
   background: var(--mint);
 }
 
+/* ---------- tokens for the data-bound module illustrations ----------
+ * The objects were drawn against the dark shell: white halos, near-white gauge
+ * glyphs. On the paper background they vanished — the FAIL/CLEAN gauges read as
+ * empty cards. These vars flip with [data-theme]. */
+:root {
+  --object-ring: rgba(255, 255, 255, 0.2);
+  --object-glyph: #e8f5ef;
+  --object-track: rgba(255, 255, 255, 0.14);
+  --object-halo: #ffffff;
+}
+
+[data-theme="light"] {
+  --object-ring: rgba(10, 10, 11, 0.3);
+  --object-glyph: #0a0a0b;
+  --object-track: rgba(10, 10, 11, 0.16);
+  --object-halo: #1b2f77;
+}
+
+/* Light theme: the object cards get a stronger material tint and a firmer
+ * border so each module's identity reads on paper, not only on ink. */
+[data-theme="light"] .app-object-card {
+  border-color: color-mix(in srgb, var(--material) 32%, var(--rule));
+  background:
+    radial-gradient(
+      110% 76% at 82% 12%,
+      color-mix(in srgb, var(--material) 17%, transparent),
+      transparent 58%
+    ),
+    var(--paper-raised);
+}
+
+[data-theme="light"] .app-object-card:hover {
+  border-color: color-mix(in srgb, var(--material) 60%, var(--rule));
+}
+
 /* ---------- page headers, empty and loading states ---------- */
 
 .app-page-head {
@@ -3478,10 +3513,13 @@ p {
   }
 }
 
-/* Entrance: applies to cards and panels; children can stagger via --pk-delay */
+/* Entrance: applies to cards and panels; children can stagger via --pk-delay.
+ * No standalone `opacity: 0` here: an element that carries another animation
+ * class (pk-plan-featured overrides the `animation` shorthand entirely) would
+ * otherwise stay invisible forever — the Studio card vanished from pricing
+ * for exactly that reason. `both` fill applies the keyframe's own start state. */
 .pk-enter {
-  opacity: 0;
-  animation: pk-fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: pk-fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: var(--pk-delay, 0ms);
 }
 

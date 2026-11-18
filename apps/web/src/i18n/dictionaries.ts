@@ -17,7 +17,7 @@ export const en = {
   "hero.eyebrow": "Integrated software quality suite",
   "hero.title": "Make Software Work Everywhere.",
   "hero.lede":
-    "One unified platform to validate global compatibility, transaction reliability and data portability.",
+    "One unified platform to validate global compatibility, transaction reliability, data portability — and to audit the security and the cleanliness of what you have deployed.",
   "hero.cta.primary": "Start for free",
   "hero.cta.explore": "See how it works",
   "hero.cta.docs": "Read the docs",
@@ -33,7 +33,7 @@ export const en = {
   "home.engine.3": "Every finding carries the exact reproduction command.",
   "home.engine.link": "See the architecture",
   "home.modules.eyebrow": "Module identities",
-  "home.modules.title": "One foundation, three distinct lenses",
+  "home.modules.title": "One foundation, five distinct lenses",
   "home.modules.lede":
     "The layout stays consistent. The colour, illustration and evidence change with the question being answered.",
   "home.cli.eyebrow": "Developer experience",
@@ -62,10 +62,12 @@ export const en = {
   "question.world": "Can users from different countries use the software correctly?",
   "question.flow": "Can users successfully complete the critical operations?",
   "question.exit": "Can users retrieve their information without losing it?",
-  "modules.eyebrow": "Three questions, one engine",
-  "modules.title": "WORLD. FLOW. EXIT.",
+  "question.fail": "Where does the deployed application leak, expose or mislead?",
+  "question.clean": "Is the interface measured, scored and clean — provably?",
+  "modules.eyebrow": "Five questions, one engine",
+  "modules.title": "WORLD. FLOW. EXIT. FAIL. CLEAN.",
   "modules.lede":
-    "Three modules that share one execution engine, one report architecture, one CLI, one workspace and one billing system — and each still works on its own.",
+    "Five modules that share one execution engine, one report architecture, one CLI, one workspace and one billing system — three run fixture and transaction cases, two audit a live URL — and each still works on its own.",
   "modules.world.name": "WORLD",
   "modules.world.tag": "Global compatibility",
   "modules.world.body":
@@ -78,6 +80,14 @@ export const en = {
   "modules.exit.tag": "Data portability",
   "modules.exit.body":
     "Export integrity: schema, relationships, checksums and a round trip from synthetic data to export and back, with field-level diffs.",
+  "modules.fail.name": "FAIL",
+  "modules.fail.tag": "Security & defect audit",
+  "modules.fail.body":
+    "Real HTTP checks against a deployed URL: security headers, cookie flags, mixed content, server leaks, verbose errors. A score, an ordered issue list, and the exact header you are missing.",
+  "modules.clean.name": "CLEAN",
+  "modules.clean.tag": "UI quality · score /100",
+  "modules.clean.body":
+    "The interface measured, not guessed: viewport, language, semantic structure, heading order, alt coverage, form labels, page weight. Every check shows what was observed and why, then one honest 0–100 score.",
   "modules.open": "Open module",
   "proof.eyebrow": "Why it is different",
   "proof.title": "A compatibility report you can reproduce",
@@ -211,7 +221,7 @@ export const fr: Messages = {
   "hero.eyebrow": "Suite intégrée de qualité logicielle",
   "hero.title": "Faites fonctionner vos logiciels partout.",
   "hero.lede":
-    "Une plateforme unifiée pour valider la compatibilité mondiale, la fiabilité des transactions et la portabilité des données.",
+    "Une plateforme unifiée pour valider la compatibilité mondiale, la fiabilité des transactions, la portabilité des données — et pour auditer la sécurité et la propreté de ce que vous avez déployé.",
   "hero.cta.primary": "Commencer gratuitement",
   "hero.cta.explore": "Voir comment ça marche",
   "hero.cta.docs": "Lire la documentation",
@@ -228,7 +238,7 @@ export const fr: Messages = {
   "home.engine.3": "Chaque constat porte la commande exacte qui le reproduit.",
   "home.engine.link": "Voir l'architecture",
   "home.modules.eyebrow": "Identités des modules",
-  "home.modules.title": "Une fondation, trois regards distincts",
+  "home.modules.title": "Une fondation, cinq regards distincts",
   "home.modules.lede":
     "La mise en page reste cohérente. La couleur, l'illustration et la preuve changent selon la question traitée.",
   "home.cli.eyebrow": "Expérience développeur",
@@ -260,10 +270,12 @@ export const fr: Messages = {
     "Des utilisateurs de pays différents peuvent-ils utiliser le logiciel correctement ?",
   "question.flow": "Les utilisateurs peuvent-ils terminer les opérations critiques ?",
   "question.exit": "Les utilisateurs peuvent-ils récupérer leurs informations sans perte ?",
-  "modules.eyebrow": "Trois questions, un moteur",
-  "modules.title": "WORLD. FLOW. EXIT.",
+  "question.fail": "Où l'application déployée fuit-elle, s'expose-t-elle, induit-elle en erreur ?",
+  "question.clean": "L'interface est-elle mesurée, notée et propre — de façon prouvable ?",
+  "modules.eyebrow": "Cinq questions, un moteur",
+  "modules.title": "WORLD. FLOW. EXIT. FAIL. CLEAN.",
   "modules.lede":
-    "Trois modules qui partagent un moteur d'exécution, une architecture de rapport, un CLI, un espace de travail et une facturation — et chacun reste utilisable seul.",
+    "Cinq modules qui partagent un moteur d'exécution, une architecture de rapport, un CLI, un espace de travail et une facturation — trois exécutent des cas et des parcours, deux auditent une URL en ligne — et chacun reste utilisable seul.",
   "modules.world.name": "WORLD",
   "modules.world.tag": "Compatibilité mondiale",
   "modules.world.body":
@@ -276,6 +288,14 @@ export const fr: Messages = {
   "modules.exit.tag": "Portabilité des données",
   "modules.exit.body":
     "Intégrité des exports : schéma, relations, empreintes SHA-256 et aller-retour des données synthétiques avec écarts champ par champ.",
+  "modules.fail.name": "FAIL",
+  "modules.fail.tag": "Audit sécurité & défauts",
+  "modules.fail.body":
+    "Contrôles HTTP réels contre une URL déployée : en-têtes de sécurité, cookies, contenu mixte, bannières serveur, erreurs bavardes. Une note, une liste ordonnée et l'en-tête exact qui vous manque.",
+  "modules.clean.name": "CLEAN",
+  "modules.clean.tag": "Qualité UI · note /100",
+  "modules.clean.body":
+    "L'interface mesurée, pas devinée : viewport, langue, structure sémantique, hiérarchie des titres, alt des images, libellés de formulaires, poids. Chaque contrôle montre ce qui a été observé, puis une note honnête sur 100.",
   "modules.open": "Ouvrir le module",
   "proof.eyebrow": "Ce qui change",
   "proof.title": "Un rapport de compatibilité reproductible",

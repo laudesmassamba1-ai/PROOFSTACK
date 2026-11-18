@@ -84,6 +84,8 @@ export function App() {
           <Route path="world" element={<MarketingModulePage name="world" />} />
           <Route path="flow" element={<MarketingModulePage name="flow" />} />
           <Route path="exit" element={<MarketingModulePage name="exit" />} />
+          <Route path="fail" element={<MarketingModulePage name="fail" />} />
+          <Route path="clean" element={<MarketingModulePage name="clean" />} />
           <Route path="platform" element={<Platform />} />
           <Route path="pricing" element={<Pricing />} />
           <Route path="docs" element={<Docs />} />

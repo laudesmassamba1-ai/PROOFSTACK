@@ -10,8 +10,8 @@ import { Section, SectionHeading } from "../layouts/BrandLayout.js";
  */
 const NOW = [
   {
-    title: "Execution engine and three modules",
-    body: "Scheduling, parallelism, timeouts, cancellation, retry policy, fingerprints and evidence refs. WORLD (8 locale profiles), FLOW (checkout and webhook scenarios) and EXIT (schema, integrity, round trip) run from one TestRun contract.",
+    title: "Execution engine and five modules",
+    body: "Scheduling, parallelism, timeouts, cancellation, retry policy, fingerprints and evidence refs. WORLD (8 locale profiles), FLOW (checkout and webhook scenarios) and EXIT (schema, integrity, round trip) run from one TestRun contract; FAIL (security scan) and CLEAN (UI quality score /100) audit a deployed URL over real HTTP.",
   },
   {
     title: "Money, time and Unicode core",
@@ -19,7 +19,7 @@ const NOW = [
   },
   {
     title: "CLI and reports",
-    body: "init, doctor, validate, test, report, projects, login/logout, sync and ai. JSON, JUnit XML, HTML and text output; exit codes are a contract (0 pass, 1 defect, 2 harness error, 3 cancelled).",
+    body: "init, doctor, validate, test, report, projects, login/logout, sync, ai and audit (fail | clean on a live URL). JSON, JUnit XML, HTML and text output; exit codes are a contract (0 pass, 1 defect, 2 harness error, 3 cancelled).",
   },
   {
     title: "SaaS API and database",
@@ -27,7 +27,7 @@ const NOW = [
   },
   {
     title: "Dashboard and billing",
-    body: "Authenticated overview, projects, module views, settings and a billing page that reads verified payment state. The sandbox provider exercises the full lifecycle without moving money.",
+    body: "Authenticated overview, projects, module views, an AI assistant reading real workspace data, settings and a billing page that reads verified payment state across the Free, Developer, Studio and Agency plans. The sandbox provider exercises the full lifecycle without moving money.",
   },
   {
     title: "Provider research",

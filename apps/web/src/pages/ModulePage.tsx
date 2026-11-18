@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { useI18n } from "../i18n/index.js";
 import { Section, SectionHeading } from "../layouts/BrandLayout.js";
 
-export type ModuleName = "world" | "flow" | "exit";
+export type ModuleName = "world" | "flow" | "exit" | "fail" | "clean";
 
 interface ModuleContent {
   name: ModuleName;
@@ -153,6 +153,96 @@ flow/checkout/declined  FAILED   subscription activated on PENDING`,
   order_402  customer_id: "c_9" -> null (orphan dropped by LEFT JOIN)`,
     command: "proofcore test --module exit --formats json,csv,zip",
   },
+  fail: {
+    name: "fail",
+    tag: "Security & defect audit",
+    headline: "Find the holes before someone else does",
+    lede: "FAIL audits a deployed URL over real HTTP — security headers, cookie flags, mixed content, server leaks, verbose errors. Every check records what was actually observed, then a score and an ordered issue list. No invention: a header that is absent is reported absent.",
+    checks: [
+      {
+        label: "Security headers",
+        detail:
+          "Content-Security-Policy, Strict-Transport-Security, X-Frame-Options / frame-ancestors, Referrer-Policy, Permissions-Policy. Each absent header is a finding with the reason it matters.",
+      },
+      {
+        label: "Cookies",
+        detail:
+          "Secure and HttpOnly flags on every Set-Cookie. A session cookie without them is script-stealable or downgradeable.",
+      },
+      {
+        label: "Transport",
+        detail:
+          "HTTPS enforcement and mixed-content detection: http:// subresources referenced from an https page break TLS guarantees.",
+      },
+      {
+        label: "Leaks",
+        detail:
+          "Server and X-Powered-By banners, stack traces and framework exception dumps in the response body — the fingerprints attackers enumerate first.",
+      },
+    ],
+    implemented: [
+      "Real HTTP fetch against the target, headers and body observed",
+      "Header, cookie, mixed-content and error-disclosure checks with PASS / WARN / FAIL",
+      "Score and ordered findings, each with what was observed and why it matters",
+      "Tenant guard: the URL must belong to a project of the workspace",
+    ],
+    pending: [
+      "Deeper checks: authentication flows, rate limiting, TLS configuration grading",
+      "JavaScript bundle analysis for dangerous patterns",
+    ],
+    sample: `fail/csp           FAILED   absent   a Content-Security-Policy limits XSS impact
+fail/hsts          FAILED   absent   HSTS prevents protocol downgrade
+fail/cookie_secure FAILED   missing Secure   session cookies need Secure
+fail/server_banner WARN     nginx/1.24.0     version banners help attackers
+score 61/100  ·  4 fail · 2 warn · 5 pass
+  reproduce proofcore audit fail https://app.example.com`,
+    command: "proofcore audit fail https://app.example.com",
+  },
+  clean: {
+    name: "clean",
+    tag: "UI quality · score /100",
+    headline: "A score you can argue with, because you can see the checks",
+    lede: "CLEAN measures a page the way a careful reviewer would: viewport, language, semantic structure, heading order, alt coverage, form labels, page weight. Nothing is subjective — each check shows what was observed and why it matters, and the 0–100 score is just the sum.",
+    checks: [
+      {
+        label: "Document basics",
+        detail:
+          "Viewport meta, html lang attribute, title length, meta description. Without them mobile rendering, translation, bookmarks and search results degrade.",
+      },
+      {
+        label: "Accessibility",
+        detail:
+          "Alt-text coverage on every image, accessible labels on every form, heading levels that never skip. The three checks screen readers fail on first.",
+      },
+      {
+        label: "Structure",
+        detail:
+          "Semantic landmarks (main, header, nav, footer, article) and the count of inline styles — the two signals of a page built on purpose or patched in a hurry.",
+      },
+      {
+        label: "Weight & delivery",
+        detail:
+          "HTML size against a 150 KB budget, script count, and caching hints. Heavy pages are slow pages, and slow pages lose users.",
+      },
+    ],
+    implemented: [
+      "Measured DOM checks over real HTTP — no screenshots, no guessing",
+      "Heading-order and alt-coverage maths with PASS / WARN / FAIL detail",
+      "One 0–100 score that sums the checks honestly",
+      "Tenant guard: the URL must belong to a project of the workspace",
+    ],
+    pending: [
+      "Visual regression snapshots between releases",
+      "Performance budget beyond page weight (LCP, CLS via real rendering)",
+    ],
+    sample: `clean/a11y/img_alt     PASSED   14/14 images with alt
+  clean/a11y/form_labels FAILED   0/2 forms labelled   inputs need accessible names
+  clean/doc/html_lang    PASSED   present
+  clean/weight/html      WARN     188 KB of 150 KB budget
+  score 84/100  ·  1 fail · 1 warn · 8 pass
+    reproduce proofcore audit clean https://app.example.com`,
+    command: "proofcore audit clean https://app.example.com",
+  },
 };
 
 export function ModulePage({ name }: { name: ModuleName }) {
@@ -223,7 +313,7 @@ export function ModulePage({ name }: { name: ModuleName }) {
               ))}
             </ul>
             <div className="mt-7 flex flex-wrap gap-3">
-              {(["world", "flow", "exit"] as ModuleName[])
+              {(["world", "flow", "exit", "fail", "clean"] as ModuleName[])
                 .filter((other) => other !== name)
                 .map((other) => (
                   <Link key={other} to={`/${other}`} className="btn btn-ghost">

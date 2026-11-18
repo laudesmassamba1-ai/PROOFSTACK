@@ -1,11 +1,12 @@
 import {
   ArrowUpRight,
+  BadgeCheck,
   Boxes,
   FileBarChart2,
   Globe2,
   Plug,
   Route,
-  ShieldCheck,
+  ShieldAlert,
   Timer,
   Unplug,
 } from "lucide-react";
@@ -76,7 +77,7 @@ export function ModuleShowcase() {
             style={{ transform: depth(0.6) }}
             to="/flow"
             openLabel={t("modules.open")}
-            raised
+            chip={t("mkt.engine.core")}
           />
           <Tile
             title={t("modules.exit.name")}
@@ -89,7 +90,26 @@ export function ModuleShowcase() {
           />
         </div>
 
-        <div className="grid gap-5 md:grid-cols-[1.25fr_1fr]">
+        {/* The two audits live on the second row: same tiles, real HTTP targets. */}
+        <div className="grid gap-5 md:grid-cols-[1fr_1fr_1.4fr]">
+          <Tile
+            title={t("modules.fail.name")}
+            subtitle={t("modules.fail.tag")}
+            body={t("question.fail")}
+            icon={<ShieldAlert size={26} className="tile-ink" />}
+            style={{ transform: depth(1) }}
+            to="/fail"
+            openLabel={t("modules.open")}
+          />
+          <Tile
+            title={t("modules.clean.name")}
+            subtitle={t("modules.clean.tag")}
+            body={t("question.clean")}
+            icon={<BadgeCheck size={26} className="tile-ink" />}
+            style={{ transform: depth(1.6) }}
+            to="/clean"
+            openLabel={t("modules.open")}
+          />
           <div className="tile p-5" style={{ transform: depth(0.35) }}>
             <div className="flex items-start gap-4">
               <span className="tile-chip flex size-11 shrink-0 items-center justify-center">
@@ -112,33 +132,33 @@ export function ModuleShowcase() {
               </div>
             </div>
           </div>
+        </div>
 
-          <div className="grid gap-5 sm:grid-cols-2">
-            <MiniTile
-              icon={<FileBarChart2 size={18} className="tile-ink" />}
-              label={t("mkt.tile.reports")}
-              note={t("mkt.tile.reports.note")}
-              style={{ transform: depth(1.8) }}
-            />
-            <MiniTile
-              icon={<ShieldCheck size={18} className="tile-ink" />}
-              label={t("mkt.tile.validation")}
-              note={t("mkt.tile.validation.note")}
-              style={{ transform: depth(2.2) }}
-            />
-            <MiniTile
-              icon={<Plug size={18} className="tile-ink" />}
-              label={t("mkt.tile.integrations")}
-              note={t("mkt.tile.integrations.note")}
-              style={{ transform: depth(1.4) }}
-            />
-            <MiniTile
-              icon={<Timer size={18} className="tile-ink" />}
-              label={t("mkt.tile.automation")}
-              note={t("mkt.tile.automation.note")}
-              style={{ transform: depth(2) }}
-            />
-          </div>
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <MiniTile
+            icon={<FileBarChart2 size={18} className="tile-ink" />}
+            label={t("mkt.tile.reports")}
+            note={t("mkt.tile.reports.note")}
+            style={{ transform: depth(1.8) }}
+          />
+          <MiniTile
+            icon={<BadgeCheck size={18} className="tile-ink" />}
+            label={t("mkt.tile.validation")}
+            note={t("mkt.tile.validation.note")}
+            style={{ transform: depth(2.2) }}
+          />
+          <MiniTile
+            icon={<Plug size={18} className="tile-ink" />}
+            label={t("mkt.tile.integrations")}
+            note={t("mkt.tile.integrations.note")}
+            style={{ transform: depth(1.4) }}
+          />
+          <MiniTile
+            icon={<Timer size={18} className="tile-ink" />}
+            label={t("mkt.tile.automation")}
+            note={t("mkt.tile.automation.note")}
+            style={{ transform: depth(2) }}
+          />
         </div>
       </div>
     </div>
@@ -152,7 +172,7 @@ function Tile({
   icon,
   to,
   openLabel,
-  raised,
+  chip,
   style,
 }: {
   title: string;
@@ -161,17 +181,16 @@ function Tile({
   icon: React.ReactNode;
   to: string;
   openLabel: string;
-  raised?: boolean;
+  chip?: string;
   style?: React.CSSProperties;
 }) {
-  const { t } = useI18n();
   return (
     <div className="tile p-5" style={style}>
       <div className="flex items-center justify-between">
         <span className="tile-chip flex size-11 items-center justify-center">{icon}</span>
-        {raised ? (
+        {chip ? (
           <span className="rounded-full bg-[#eef1f8] px-2.5 py-1 font-mono text-[0.66rem] text-[#1b2f77]">
-            {t("mkt.engine.core")}
+            {chip}
           </span>
         ) : null}
       </div>

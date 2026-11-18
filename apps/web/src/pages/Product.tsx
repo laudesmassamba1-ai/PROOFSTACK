@@ -34,8 +34,8 @@ export function Product() {
       <Section>
         <SectionHeading
           eyebrow={t("modules.eyebrow")}
-          title="An integrated suite, not three tools in a tab bar"
-          lede="PROOFCORE validates three independent properties of a product — reach, reliability and reversibility — with shared machinery underneath and a module you can adopt alone."
+          title="An integrated suite, not five tools in a tab bar"
+          lede="PROOFCORE validates five independent properties of a product — reach, reliability, reversibility, safety and cleanliness — with shared machinery underneath and a module you can adopt alone."
         />
         <div className="mt-10">
           <ModuleShowcase />
@@ -62,6 +62,12 @@ export function Product() {
           </Link>
           <Link to="/exit" className="btn btn-ghost">
             EXIT
+          </Link>
+          <Link to="/fail" className="btn btn-ghost">
+            FAIL
+          </Link>
+          <Link to="/clean" className="btn btn-ghost">
+            CLEAN
           </Link>
           <Link to="/platform" className="btn btn-primary">
             {t("nav.platform")}

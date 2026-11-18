@@ -21,6 +21,8 @@ export function Footer() {
             { to: "/world", label: "WORLD" },
             { to: "/flow", label: "FLOW" },
             { to: "/exit", label: "EXIT" },
+            { to: "/fail", label: "FAIL" },
+            { to: "/clean", label: "CLEAN" },
             { to: "/pricing", label: t("nav.pricing") },
           ]}
         />
