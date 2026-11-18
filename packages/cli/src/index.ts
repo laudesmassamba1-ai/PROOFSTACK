@@ -34,6 +34,7 @@ import {
   runCleanAudit,
   runFailAudit,
 } from "./audit.js";
+import { mapArchitecture } from "./code-tools.js";
 import { mcpToolDescriptors, ProofcoreMcpServer, serveMcpStdio } from "./mcp-server.js";
 import {
   apiGet,
@@ -75,6 +76,10 @@ interface GlobalFlags {
   quiet: boolean;
   verbose: boolean;
   color: boolean;
+  /** `map`: emit only the Mermaid block, for a README or a docs pipeline. */
+  mermaid: boolean;
+  /** `map`: cap how many source files are parsed. */
+  maxFiles: number | undefined;
 }
 
 function parseGlobalFlags(argv: string[]): { flags: GlobalFlags; rest: string[] } {
@@ -85,6 +90,8 @@ function parseGlobalFlags(argv: string[]): { flags: GlobalFlags; rest: string[] 
     quiet: false,
     verbose: false,
     color: stdout.isTTY && !process.env.NO_COLOR,
+    mermaid: false,
+    maxFiles: undefined,
   };
   const rest: string[] = [];
 
@@ -94,6 +101,20 @@ function parseGlobalFlags(argv: string[]): { flags: GlobalFlags; rest: string[] 
       case "--json":
         flags.json = true;
         break;
+      case "--mermaid":
+        flags.mermaid = true;
+        break;
+      case "--max-files": {
+        const raw = argv[i + 1];
+        const parsed = Number(raw);
+        if (!raw || !Number.isInteger(parsed) || parsed <= 0) {
+          err(flags, "--max-files expects a positive integer");
+          process.exit(2);
+        }
+        flags.maxFiles = parsed;
+        i += 1;
+        break;
+      }
       case "--quiet":
       case "-q":
         flags.quiet = true;
@@ -163,6 +184,7 @@ async function main(argv: string[]): Promise<number> {
     "ai",
     "mcp",
     "audit",
+    "map",
   ]);
   if (command && cwdCommands.has(command) && flags.cwdExplicit && !isDirectory(flags.cwd)) {
     err(
@@ -225,6 +247,8 @@ async function main(argv: string[]): Promise<number> {
       return commandMcp(flags, args);
     case "audit":
       return commandAudit(flags, args);
+    case "map":
+      return commandMap(flags, args);
     default:
       err(flags, `Unknown command: ${command}`);
       printHelp(flags);
@@ -1929,6 +1953,54 @@ async function commandAudit(flags: GlobalFlags, args: string[]): Promise<number>
   }
 }
 
+/**
+ * `proofcore map [dir]` — the project's architecture as a Mermaid diagram.
+ *
+ * The graph is parsed from real import statements, so it is the dependency structure the
+ * build actually has. Useful to a human in a README, and to an assistant that must decide
+ * where a change belongs before it edits anything.
+ */
+async function commandMap(flags: GlobalFlags, args: string[]): Promise<number> {
+  const target = args.find((arg) => !arg.startsWith("-"));
+  const cwd = target ? resolve(flags.cwd, target) : flags.cwd;
+  if (!isDirectory(cwd)) {
+    err(flags, `Not a directory: ${cwd}`);
+    return 2;
+  }
+  try {
+    const map = await mapArchitecture({ root: cwd }, { maxFiles: flags.maxFiles ?? 300 });
+    if (flags.json) {
+      stdout.write(`${JSON.stringify(map, null, 2)}\n`);
+      return 0;
+    }
+    if (flags.mermaid || !process.stdout.isTTY) {
+      stdout.write(`${map.mermaid}\n`);
+      return 0;
+    }
+    const w = (text: string): void => {
+      stdout.write(`${text}\n`);
+    };
+    w("");
+    w(bold(flags, `ARCHITECTURE · ${map.files} source files`));
+    w("");
+    w(dim(flags, "Most used external packages:"));
+    for (const entry of map.external.slice(0, 10)) {
+      w(`  ${entry.name.padEnd(34)} ${dim(flags, `${entry.usedBy} file(s)`)}`);
+    }
+    const localEdges = map.mermaid.split("\n").filter((line) => line.includes("-->")).length;
+    w("");
+    w(dim(flags, `${localEdges} internal dependency edge(s). Mermaid diagram:\n`));
+    w(map.mermaid);
+    w("");
+    w(dim(flags, "Copy the block above into any Mermaid renderer, or use --mermaid / --json."));
+    w("");
+    return 0;
+  } catch (error) {
+    err(flags, error instanceof Error ? error.message : String(error));
+    return 2;
+  }
+}
+
 function printHelp(flags: GlobalFlags): void {
   const w = (text: string): void => {
     stdout.write(`${text}\n`);
@@ -1951,6 +2023,7 @@ function printHelp(flags: GlobalFlags): void {
   w("  sync                     Upload the last run to the API");
   w("  ai <status|tools|ask|agent>  MCP servers, AI providers and external agents");
   w("  audit fail|clean <url>       FAIL: security scan · CLEAN: UI quality score");
+  w("  map [dir]                   architecture as a Mermaid dependency diagram");
   w("  mcp                      Serve PROOFCORE as an MCP server over stdio");
   w("");
   w(bold(flags, "test options"));

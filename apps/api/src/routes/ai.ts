@@ -445,6 +445,24 @@ const TOOLS: { name: string; description: string; parameters: Record<string, unk
     },
   },
   {
+    name: "read_repo",
+    description:
+      "Read a public GitHub or GitLab repository from its URL without cloning: metadata, file tree, and the content of a chosen file. Public repositories only; private ones need a token the operator must configure.",
+    parameters: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "https://github.com/owner/repo or a GitLab URL" },
+        path: { type: "string", description: "File path to read. Omit to get the tree." },
+        ref: {
+          type: "string",
+          description: "Branch, tag or commit. Defaults to the default branch.",
+        },
+      },
+      required: ["url"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "probe_url",
     description:
       "Infrastructure probe of one URL: status, response time, redirects, content type. Use for availability questions.",
@@ -958,6 +976,8 @@ async function executeTool(
       }
       case "fetch_web":
         return fetchWeb(args, maxFetchChars);
+      case "read_repo":
+        return readRepo(args);
       case "probe_url":
         return probeUrl(args);
       case "fail_scan":
@@ -1071,6 +1091,163 @@ async function fetchWeb(args: Record<string, unknown>, maxFetchChars: number) {
       2
     ),
     summary: `HTTP ${response.status}, ${ms} ms`,
+  };
+}
+
+/**
+ * Reads a public repository through the provider's API.
+ *
+ * No clone, no credentials: the public API is enough to list a tree and read a file, and
+ * a private repository answers 404 rather than leaking its existence. Everything is
+ * capped — an agent that pulls a whole repository into the context window is useless.
+ *
+ * Private repositories are a deliberate gap: it needs a token, and a token is an
+ * operator decision, not something a chat message may decide.
+ */
+export async function readRepo(
+  args: Record<string, unknown>
+): Promise<{ content: string; summary: string }> {
+  const raw = typeof args.url === "string" ? args.url.trim() : "";
+  if (!raw)
+    return { content: stableStringify({ error: "url is required" }), summary: "missing url" };
+  const parsed = assertPublicUrl(raw);
+  const host = parsed.hostname.toLowerCase();
+  const segments = parsed.pathname
+    .replace(/^\/+|\/+$/g, "")
+    .split("/")
+    .filter(Boolean);
+  const ref = typeof args.ref === "string" ? args.ref : undefined;
+  const isGitHub = host === "github.com" || host === "www.github.com";
+  const isGitLab = host === "gitlab.com" || host === "www.gitlab.com";
+
+  if (!isGitHub && !isGitLab) {
+    return {
+      content: stableStringify({
+        error: "unsupported host",
+        supported: ["github.com", "gitlab.com"],
+        note: "A self-hosted GitLab needs its API base URL configured by the operator.",
+      }),
+      summary: "unsupported host",
+    };
+  }
+  if (segments.length < 2) {
+    return { content: stableStringify({ error: "URL must name owner/repo" }), summary: "bad url" };
+  }
+  const owner = segments[0] ?? "";
+  const repo = (segments[1] ?? "").replace(/\.git$/, "");
+  const provider = isGitHub ? "github" : "gitlab";
+  const apiBase = isGitHub ? "https://api.github.com" : "https://gitlab.com/api/v4";
+  const headers = { accept: "application/json", "user-agent": "PROOFCORE-Assistant" };
+  const projectPath = encodeURIComponent(`${owner}/${repo}`);
+
+  const fetchJson = async (url: string): Promise<{ status: number; body: unknown }> => {
+    const response = await fetch(url, { headers, signal: AbortSignal.timeout(15_000) });
+    const body = await response.json().catch(() => ({}));
+    return { status: response.status, body };
+  };
+
+  const projectUrl = isGitHub
+    ? `${apiBase}/repos/${owner}/${repo}`
+    : `${apiBase}/projects/${projectPath}`;
+  const project = await fetchJson(projectUrl);
+  if (project.status === 404) {
+    return {
+      content: stableStringify({
+        error: "repository not found, or private",
+        note: "Private repositories need an access token configured by the operator.",
+      }),
+      summary: "not found",
+    };
+  }
+  const info = project.body as {
+    full_name?: string;
+    description?: string | null;
+    default_branch?: string;
+    language?: string | null;
+    stargazers_count?: number;
+    star_count?: number;
+    path_with_namespace?: string;
+  };
+  const defaultRef = ref ?? info.default_branch ?? "HEAD";
+  const requestedPath = typeof args.path === "string" ? args.path.replace(/^\/+/, "") : "";
+
+  if (requestedPath) {
+    const encodedPath = requestedPath.split("/").map(encodeURIComponent).join("/");
+    if (isGitHub) {
+      const file = await fetchJson(
+        `${apiBase}/repos/${owner}/${repo}/contents/${encodedPath}?ref=${encodeURIComponent(defaultRef)}`
+      );
+      if (file.status !== 200) {
+        return {
+          content: stableStringify({ error: `cannot read ${requestedPath}`, status: file.status }),
+          summary: "unreadable file",
+        };
+      }
+      const payload = file.body as { content?: string; encoding?: string; size?: number };
+      const decoded =
+        payload.encoding === "base64" && payload.content
+          ? Buffer.from(payload.content, "base64").toString("utf8")
+          : "";
+      const capped = decoded.slice(0, 20_000);
+      return {
+        content: stableStringify({
+          repo: info.full_name ?? `${owner}/${repo}`,
+          path: requestedPath,
+          ref: defaultRef,
+          bytes: payload.size ?? decoded.length,
+          truncated: decoded.length > capped.length,
+          content: capped,
+        }),
+        summary: `${requestedPath} (${payload.size ?? decoded.length} B)`,
+      };
+    }
+    const response = await fetch(
+      `${apiBase}/projects/${projectPath}/repository/files/${encodeURIComponent(requestedPath)}/raw?ref=${encodeURIComponent(defaultRef)}`,
+      { headers, signal: AbortSignal.timeout(15_000) }
+    );
+    if (!response.ok) {
+      return {
+        content: stableStringify({
+          error: `cannot read ${requestedPath}`,
+          status: response.status,
+        }),
+        summary: "unreadable file",
+      };
+    }
+    const text = (await response.text()).slice(0, 20_000);
+    return {
+      content: stableStringify({
+        repo: `${owner}/${repo}`,
+        path: requestedPath,
+        ref: defaultRef,
+        content: text,
+      }),
+      summary: `${requestedPath} (${text.length} B)`,
+    };
+  }
+
+  const treeUrl = isGitHub
+    ? `${apiBase}/repos/${owner}/${repo}/git/trees/${encodeURIComponent(defaultRef)}?recursive=1`
+    : `${apiBase}/projects/${projectPath}/repository/tree?recursive=true&per_page=100&ref=${encodeURIComponent(defaultRef)}`;
+  const tree = await fetchJson(treeUrl);
+  const paths = Array.isArray(tree.body)
+    ? (tree.body as { path?: string }[]).map((entry) => entry.path ?? "").filter(Boolean)
+    : ((tree.body as { tree?: { path?: string }[] }).tree ?? [])
+        .map((entry) => entry.path ?? "")
+        .filter(Boolean);
+  const limited = paths.slice(0, 300);
+  return {
+    content: stableStringify({
+      repo: info.full_name ?? info.path_with_namespace ?? `${owner}/${repo}`,
+      description: info.description ?? null,
+      defaultRef,
+      language: info.language ?? null,
+      stars: info.stargazers_count ?? info.star_count ?? null,
+      files: limited.length,
+      truncated: paths.length > limited.length,
+      paths: limited,
+    }),
+    summary: `${provider} ${owner}/${repo} · ${limited.length} path(s)`,
   };
 }
 

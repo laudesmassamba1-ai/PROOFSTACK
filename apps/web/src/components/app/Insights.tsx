@@ -14,10 +14,10 @@ export interface RunPerDay {
 }
 
 export function RunsTrend({
-  runs,
+  runs = [],
   locale,
 }: {
-  runs: RunPerDay[];
+  runs?: RunPerDay[];
   locale: string;
 }): React.ReactElement {
   const width = 640;
@@ -112,19 +112,21 @@ export function RunsTrend({
 }
 
 const SEVERITY_ORDER = ["critical", "high", "medium", "low", "info"] as const;
+/* Severity maps onto the token palette: the same red that badges danger, the
+ * same amber that badges warning — never its own off-palette hues. */
 const SEVERITY_COLORS: Record<string, string> = {
-  critical: "#e11d48",
-  high: "#f43f5e",
-  medium: "#f59e0b",
-  low: "#38bdf8",
-  info: "#94a3b8",
+  critical: "var(--danger)",
+  high: "var(--danger)",
+  medium: "var(--warning)",
+  low: "var(--brand-cyan)",
+  info: "var(--text-secondary)",
 };
 
 export function SeverityBreakdown({
-  counts,
+  counts = [],
   locale,
 }: {
-  counts: { severity: string; count: number }[];
+  counts?: { severity: string; count: number }[];
   locale: string;
 }): React.ReactElement {
   const normalized = useMemo(() => {
@@ -169,9 +171,9 @@ export function SeverityBreakdown({
 }
 
 export function ModulePassRates({
-  modules,
+  modules = [],
 }: {
-  modules: { module: string; passed: number; failed: number; total: number }[];
+  modules?: { module: string; passed: number; failed: number; total: number }[];
 }): React.ReactElement {
   return (
     <div className="space-y-3">

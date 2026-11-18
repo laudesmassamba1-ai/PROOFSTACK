@@ -27,9 +27,9 @@ const RAYS = [
   { angle: 315, length: 0.55 },
 ];
 
-const RAY_WIDTH = 3.4;
-const INNER = 13;
-const OUTER = 22;
+const RAY_WIDTH = 5.2;
+const INNER = 10;
+const OUTER = 21;
 
 function rayPath(angleDeg: number, length: number): string {
   const rad = ((angleDeg - 90) * Math.PI) / 180;

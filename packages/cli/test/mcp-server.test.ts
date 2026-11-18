@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -76,17 +77,56 @@ describe("proofcore MCP server", () => {
     expect(Array.isArray(good.result?.tools)).toBe(true);
   });
 
+  it("serves the code tools over the protocol, not just in the descriptor list", async () => {
+    const listed = await call(server(), 1, "tools/call", {
+      name: "list_files",
+      arguments: { depth: 1, limit: 5 },
+    });
+    const listPayload = listed.result?.content?.[0]?.text ?? "";
+    expect(listed.result?.isError).not.toBe(true);
+    expect(listPayload).toContain("entries");
+
+    // write_file without apply must describe a change and change nothing.
+    const diff = await call(server(), 2, "tools/call", {
+      name: "write_file",
+      arguments: { path: ".proofcore-mcp-dry-run.txt", content: "x" },
+    });
+    const diffPayload = JSON.parse(diff.result?.content?.[0]?.text ?? "{}") as {
+      applied: boolean;
+      diff: string;
+      created: boolean;
+    };
+    expect(diffPayload.applied).toBe(false);
+    expect(diffPayload.created).toBe(true);
+    expect(diffPayload.diff).toContain("+++ b/.proofcore-mcp-dry-run.txt");
+    expect(existsSync(join(dir, ".proofcore-mcp-dry-run.txt"))).toBe(false);
+  });
+
   it("lists exactly the advertised tools with schemas", async () => {
     const response = await call(server(), 1, "tools/list");
     const toolsRaw = response.result?.tools;
     expect(Array.isArray(toolsRaw)).toBe(true);
     const tools = toolsRaw as { name: string; inputSchema: object }[];
     expect(tools.map((t) => t.name)).toEqual([
+      // PROOFCORE's own analysis surface
       "project_summary",
       "doctor",
       "validate_config",
       "run_tests",
       "last_report",
+      // codebase, runtime and git: what lets the assistant work on code instead of
+      // speculating about it
+      "list_files",
+      "read_file",
+      "search_code",
+      "map_architecture",
+      "write_file",
+      "apply_patch",
+      "run_command",
+      "git_status",
+      "git_diff",
+      "git_log",
+      "git_commit",
     ]);
     for (const tool of tools) expect(Object.keys(tool.inputSchema).length).toBeGreaterThan(0);
   });

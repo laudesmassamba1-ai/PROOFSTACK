@@ -14,7 +14,7 @@ import {
   X,
 } from "lucide-react";
 import type React from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AiMark } from "../../components/brand/AiMark.js";
 import { useI18n } from "../../i18n/index.js";
 import { useSession } from "../../lib/session.js";
@@ -222,27 +222,40 @@ function uid(): string {
 
 function Markdownish({ text }: { text: string }): React.ReactElement {
   const blocks = text.split(/\n{2,}/);
+  // Inline `**bold**` → <strong>. Keys come from the text itself plus an
+  // occurrence counter — content-addressed, not position-addressed.
+  const inline = (source: string): React.ReactNode[] => {
+    const nodes: React.ReactNode[] = [];
+    let boldIndex = 0;
+    for (const part of source.split(/(\*\*[^*]+\*\*)/g)) {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        boldIndex += 1;
+        nodes.push(<strong key={`b${boldIndex}`}>{part.slice(2, -2)}</strong>);
+      } else if (part) {
+        nodes.push(part);
+      }
+    }
+    return nodes;
+  };
   return (
     <div className="chat-prose space-y-2">
       {blocks.map((block, index) => {
         const key = `b${index}-${block.slice(0, 12)}`;
         if (block.startsWith("### ") || block.startsWith("## ") || block.startsWith("# ")) {
-          return (
-            <h4 key={key}>{block.replace(/^#+\s*/, "")}</h4>
-          );
+          return <h4 key={key}>{block.replace(/^#+\s*/, "")}</h4>;
         }
         if (/^[-*]\s/m.test(block)) {
           return (
             <ul key={key} className="space-y-1">
               {block.split("\n").map((line) => (
-                <li key={`${key}-${line.slice(0, 12)}`}>{line.replace(/^[-*]\s*/, "")}</li>
+                <li key={`${key}-${line.slice(0, 12)}`}>{inline(line.replace(/^[-*]\s*/, ""))}</li>
               ))}
             </ul>
           );
         }
         return (
           <p key={key} className="whitespace-pre-wrap">
-            {block}
+            {inline(block)}
           </p>
         );
       })}
@@ -352,9 +365,7 @@ function Composer({
           }
         }}
         rows={Math.min(4, Math.max(1, draft.split("\n").length))}
-        placeholder={
-          fr ? "Comment puis-je vous aider aujourd'hui ?" : "How can I help you today?"
-        }
+        placeholder={fr ? "Comment puis-je vous aider aujourd'hui ?" : "How can I help you today?"}
         className="chat-composer-input"
       />
       <div className="chat-composer-bar">
@@ -813,7 +824,7 @@ export function AiChatPage(): React.ReactElement {
         {/* empty state: centered greeting + composer, like the reference */}
         {!hasMessages && (
           <div className="chat-greeting">
-            <AiMark size={44} className="chat-greeting-mark" decorative />
+            <AiMark size={56} className="chat-greeting-mark" decorative />
             <h1 className="chat-greeting-title">{greeting}</h1>
             <p className="chat-greeting-support">
               {fr
@@ -943,7 +954,9 @@ export function AiChatPage(): React.ReactElement {
               {/* Step 1 — which provider. The model is never asked for: the server reads
                   the provider catalogue and picks one from it. */}
               <div>
-                <p className="app-label">1. {fr ? "Choisis le fournisseur" : "Choose the provider"}</p>
+                <p className="app-label">
+                  1. {fr ? "Choisis le fournisseur" : "Choose the provider"}
+                </p>
                 <div className="chat-provider-grid">
                   {providers.map((preset) => {
                     const active = activePreset === preset.id;

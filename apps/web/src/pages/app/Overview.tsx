@@ -163,7 +163,7 @@ export function Overview() {
 
   return (
     <div className="app-page app-overview">
-      <EnhancedCard className="app-situation pk-enter" enable3d={undefined}>
+      <EnhancedCard className="pk-enter" enable3d={undefined}>
         <section className="app-situation">
           <div className="app-situation-copy">
             <p className="app-eyebrow">

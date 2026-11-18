@@ -5,6 +5,20 @@ import { type LoadedConfig, loadConfig } from "@proofcore/config";
 import type { ModuleId, ReportFormat, TestRun } from "@proofcore/contracts";
 import { Logger, ProofCoreError, stableStringify } from "@proofcore/core";
 import { ENGINE_VERSION, runEngine } from "@proofcore/engine";
+import {
+  applyPatch,
+  gitCommit,
+  gitDiff,
+  gitLog,
+  gitStatus,
+  listFiles,
+  mapArchitecture,
+  readFileSlice,
+  runCommand,
+  searchCode,
+  type ToolContext,
+  writeFileWithDiff,
+} from "./code-tools.js";
 import { assembleProviders, blockingSafetyWarnings } from "./providers.js";
 
 /**
@@ -136,6 +150,167 @@ export function mcpToolDescriptors(): McpToolDescriptor[] {
       },
       annotations: { readOnlyHint: true },
     },
+    // ------------------------------------------------------------ codebase
+    {
+      name: "list_files",
+      description:
+        "Project tree (directories first, node_modules/build output excluded). Use before guessing where anything lives. Read-only.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Subdirectory, relative to the workspace root." },
+          depth: { type: "integer", minimum: 1, maximum: 8 },
+          limit: { type: "integer", minimum: 1, maximum: 2000 },
+        },
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: true },
+    },
+    {
+      name: "read_file",
+      description:
+        "Read a file with line numbers (paginated). Refuses binary files and paths outside the workspace. Read-only.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          path: { type: "string" },
+          startLine: { type: "integer", minimum: 1 },
+          endLine: { type: "integer", minimum: 1 },
+        },
+        required: ["path"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: true },
+    },
+    {
+      name: "search_code",
+      description:
+        "Search the workspace for a literal string or a regular expression, returning file, line and text. This is real file search, not a similarity guess. Read-only.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          query: { type: "string" },
+          regex: { type: "boolean", description: "Treat the query as a regular expression." },
+          caseSensitive: { type: "boolean" },
+          glob: { type: "string", description: "Only files ending with this suffix, e.g. .ts" },
+          maxResults: { type: "integer", minimum: 1, maximum: 500 },
+        },
+        required: ["query"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: true },
+    },
+    {
+      name: "map_architecture",
+      description:
+        "Build the import graph of the project and render it as a Mermaid diagram, plus the most used external packages. Read-only.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          path: { type: "string" },
+          maxFiles: { type: "integer", minimum: 1, maximum: 1000 },
+        },
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: true },
+    },
+
+    // --------------------------------------------------------------- edits
+    {
+      name: "write_file",
+      description:
+        "Write a file. Without apply:true it writes NOTHING and returns a unified diff to review. Call again with apply:true to commit the change.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          path: { type: "string" },
+          content: { type: "string" },
+          apply: { type: "boolean", description: "Actually write. Default false (diff only)." },
+        },
+        required: ["path", "content"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true },
+    },
+    {
+      name: "apply_patch",
+      description:
+        "Apply a unified diff. Refused entirely when a hunk context does not match the file — it never guesses. Without apply:true it only validates.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          patch: { type: "string", description: "Unified diff (---/+++/@@)." },
+          apply: { type: "boolean", description: "Actually write. Default false (validate only)." },
+        },
+        required: ["patch"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true },
+    },
+
+    // ------------------------------------------------------------- runtime
+    {
+      name: "run_command",
+      description:
+        "Run one allowlisted command (node, pnpm, npm, python, pytest, cargo, docker, tsc, vitest, git, grep…) without a shell, with a timeout and capped output. Use it to compile, test, and read the real error.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          command: { type: "string" },
+          args: { type: "array", items: { type: "string" } },
+          cwd: { type: "string" },
+          timeoutMs: { type: "integer", minimum: 1000, maximum: 600000 },
+        },
+        required: ["command"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+    },
+
+    // ----------------------------------------------------------------- git
+    {
+      name: "git_status",
+      description: "Branch and working-tree state (git status --short --branch). Read-only.",
+      inputSchema: { type: "object", properties: {}, additionalProperties: false },
+      annotations: { readOnlyHint: true },
+    },
+    {
+      name: "git_diff",
+      description: "Working-tree or staged diff, optionally for one path. Read-only.",
+      inputSchema: {
+        type: "object",
+        properties: { staged: { type: "boolean" }, path: { type: "string" } },
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: true },
+    },
+    {
+      name: "git_log",
+      description: "Recent commits, one line each. Read-only.",
+      inputSchema: {
+        type: "object",
+        properties: { limit: { type: "integer", minimum: 1, maximum: 50 } },
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: true },
+    },
+    {
+      name: "git_commit",
+      description:
+        "Create a branch and commit an explicit list of files. Staging everything is refused. Without apply:true it returns the command it would run.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          message: { type: "string" },
+          paths: { type: "array", items: { type: "string" }, minItems: 1 },
+          branch: { type: "string" },
+          apply: { type: "boolean" },
+        },
+        required: ["message", "paths"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true },
+    },
   ];
 }
 
@@ -161,6 +336,67 @@ export async function handleMcpToolCall(
       return runTests(args, context.cwd);
     case "last_report":
       return lastReport(args, context.cwd);
+    case "list_files":
+      return listFiles(toolContext(context.cwd), {
+        ...(typeof args.path === "string" ? { path: args.path } : {}),
+        ...(typeof args.depth === "number" ? { depth: args.depth } : {}),
+        ...(typeof args.limit === "number" ? { limit: args.limit } : {}),
+      });
+    case "read_file":
+      return readFileSlice(toolContext(context.cwd), {
+        path: String(args.path ?? ""),
+        ...(typeof args.startLine === "number" ? { startLine: args.startLine } : {}),
+        ...(typeof args.endLine === "number" ? { endLine: args.endLine } : {}),
+      });
+    case "search_code":
+      return searchCode(toolContext(context.cwd), {
+        query: String(args.query ?? ""),
+        ...(args.regex === true ? { regex: true } : {}),
+        ...(args.caseSensitive === true ? { caseSensitive: true } : {}),
+        ...(typeof args.glob === "string" ? { glob: args.glob } : {}),
+        ...(typeof args.maxResults === "number" ? { maxResults: args.maxResults } : {}),
+      });
+    case "map_architecture":
+      return mapArchitecture(toolContext(context.cwd), {
+        ...(typeof args.path === "string" ? { path: args.path } : {}),
+        ...(typeof args.maxFiles === "number" ? { maxFiles: args.maxFiles } : {}),
+      });
+    case "write_file":
+      return writeFileWithDiff(toolContext(context.cwd), {
+        path: String(args.path ?? ""),
+        content: String(args.content ?? ""),
+        ...(args.apply === true ? { apply: true } : {}),
+      });
+    case "apply_patch":
+      return applyPatch(toolContext(context.cwd), {
+        patch: String(args.patch ?? ""),
+        ...(args.apply === true ? { apply: true } : {}),
+      });
+    case "run_command":
+      return runCommand(toolContext(context.cwd), {
+        command: String(args.command ?? ""),
+        ...(Array.isArray(args.args) ? { args: args.args.map(String) } : {}),
+        ...(typeof args.cwd === "string" ? { cwd: args.cwd } : {}),
+        ...(typeof args.timeoutMs === "number" ? { timeoutMs: args.timeoutMs } : {}),
+      });
+    case "git_status":
+      return gitStatus(toolContext(context.cwd));
+    case "git_diff":
+      return gitDiff(toolContext(context.cwd), {
+        ...(args.staged === true ? { staged: true } : {}),
+        ...(typeof args.path === "string" ? { path: args.path } : {}),
+      });
+    case "git_log":
+      return gitLog(toolContext(context.cwd), {
+        ...(typeof args.limit === "number" ? { limit: args.limit } : {}),
+      });
+    case "git_commit":
+      return gitCommit(toolContext(context.cwd), {
+        message: String(args.message ?? ""),
+        paths: Array.isArray(args.paths) ? args.paths.map(String) : [],
+        ...(typeof args.branch === "string" ? { branch: args.branch } : {}),
+        ...(args.apply === true ? { apply: true } : {}),
+      });
     default:
       throw new ProofCoreError({
         message: `Unknown tool: ${name}`,
@@ -169,6 +405,11 @@ export async function handleMcpToolCall(
         details: { name },
       });
   }
+}
+
+/** One context for every code tool: the workspace root is the process cwd. */
+function toolContext(cwd: string): ToolContext {
+  return { root: cwd };
 }
 
 async function loadConfigFor(cwd: string): Promise<LoadedConfig> {
