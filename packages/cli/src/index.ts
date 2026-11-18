@@ -28,6 +28,13 @@ import { createFlowProvider, defaultFlowTarget } from "@proofcore/module-flow";
 import * as worldProfiles from "@proofcore/module-world";
 import { createWorldProvider, HttpProductUnderTest } from "@proofcore/module-world";
 import {
+  buildSemanticIndex,
+  debugScript,
+  generateSvg,
+  inspectPage,
+  semanticSearch,
+} from "./agent-extra-tools.js";
+import {
   parseAuditTarget,
   printAuditHelp,
   renderAudit,
@@ -185,6 +192,12 @@ async function main(argv: string[]): Promise<number> {
     "mcp",
     "audit",
     "map",
+    "index",
+    "search",
+    "devtools",
+    "svg",
+    "debug",
+    "tools",
   ]);
   if (command && cwdCommands.has(command) && flags.cwdExplicit && !isDirectory(flags.cwd)) {
     err(
@@ -249,6 +262,13 @@ async function main(argv: string[]): Promise<number> {
       return commandAudit(flags, args);
     case "map":
       return commandMap(flags, args);
+    case "index":
+    case "search":
+    case "devtools":
+    case "svg":
+    case "debug":
+    case "tools":
+      return commandAgentTools(command, flags, args);
     default:
       err(flags, `Unknown command: ${command}`);
       printHelp(flags);
@@ -2001,6 +2021,181 @@ async function commandMap(flags: GlobalFlags, args: string[]): Promise<number> {
   }
 }
 
+/**
+ * The agent tool surface, from the terminal.
+ *
+ * Same implementations as the MCP tools, so a developer who does not use an AI client
+ * still gets the semantic index, the browser inspection, the SVG generator and the
+ * debugger. One code path, two entry points — never a second, divergent implementation.
+ */
+async function commandAgentTools(
+  command: string,
+  flags: GlobalFlags,
+  args: string[]
+): Promise<number> {
+  const value = (): string | undefined => args.find((arg) => !arg.startsWith("-"));
+  const root = flags.cwd;
+  try {
+    if (command === "tools") {
+      const rows: [string, string, string][] = [
+        ["list_files / read_file / search_code", "codebase", "MCP"],
+        ["map_architecture", "dependency graph (Mermaid)", "MCP · proofcore map"],
+        ["write_file / apply_patch", "edits with mandatory diff", "MCP"],
+        ["run_command", "allowlisted commands, no shell", "MCP"],
+        ["git_status / diff / log / commit", "version control", "MCP"],
+        [
+          "build_semantic_index / semantic_search",
+          "concept search",
+          "MCP · proofcore index|search",
+        ],
+        ["complete_code", "inline completion (model or index)", "MCP"],
+        ["inspect_page", "console, network, DOM, a11y, screenshot", "MCP · proofcore devtools"],
+        ["analyze_image", "vision on a screenshot/mockup", "MCP"],
+        ["generate_svg", "deterministic icons and placeholders", "MCP · proofcore svg"],
+        ["debug_script", "breakpoints and real scopes", "MCP · proofcore debug"],
+      ];
+      if (flags.json) {
+        stdout.write(
+          `${JSON.stringify(
+            rows.map(([name, role, where]) => ({ name, role, where })),
+            null,
+            2
+          )}\n`
+        );
+        return 0;
+      }
+      stdout.write(`\n${bold(flags, "AGENT TOOLS")}\n\n`);
+      for (const [name, role, where] of rows) {
+        stdout.write(`  ${name.padEnd(42)} ${dim(flags, role.padEnd(34))} ${where}\n`);
+      }
+      stdout.write(
+        `\n${dim(flags, "Models need PROOFCORE_AI_BASE_URL / PROOFCORE_AI_MODEL / PROOFCORE_AI_KEY.")}\n\n`
+      );
+      return 0;
+    }
+
+    if (command === "index") {
+      const built = await buildSemanticIndex({ root });
+      if (flags.json) {
+        stdout.write(`${JSON.stringify(built, null, 2)}\n`);
+      } else {
+        stdout.write(
+          `${green(flags, "✓")} indexed ${built.files} files · ${built.chunks} chunks → ${built.path}\n`
+        );
+      }
+      return 0;
+    }
+
+    if (command === "search") {
+      const query = args.filter((arg) => !arg.startsWith("-")).join(" ");
+      if (!query) {
+        err(flags, 'Give a query, e.g. proofcore search "double charge retry"');
+        return 2;
+      }
+      const result = await semanticSearch({ root }, { query, limit: 8 });
+      if (flags.json) {
+        stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+        return 0;
+      }
+      if (result.hits.length === 0) {
+        stdout.write(`${yellow(flags, "no match")} ${dim(flags, result.note ?? "")}\n`);
+        return 0;
+      }
+      stdout.write(`\n${bold(flags, `SEARCH · ${query}`)}\n\n`);
+      for (const hit of result.hits) {
+        stdout.write(`  ${hit.score.toFixed(3)}  ${hit.path}:${hit.startLine}-${hit.endLine}\n`);
+      }
+      stdout.write("\n");
+      return 0;
+    }
+
+    if (command === "devtools") {
+      const url = value();
+      if (!url) {
+        err(flags, "Give a URL, e.g. proofcore devtools http://localhost:5173");
+        return 2;
+      }
+      const report = await inspectPage({ url }, { root });
+      if (flags.json) {
+        stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+      } else {
+        stdout.write(`\n${bold(flags, `DEVTOOLS · ${report.finalUrl}`)}\n`);
+        stdout.write(dim(flags, `HTTP ${report.status ?? "—"} · "${report.title}"\n`));
+        if (report.errors.length > 0) {
+          stdout.write(`\n${red(flags, "page errors")}\n`);
+          for (const error of report.errors) stdout.write(`  × ${error.message}\n`);
+        }
+        const failed = report.network.filter((entry) => entry.status >= 400);
+        if (failed.length > 0) {
+          stdout.write(`\n${yellow(flags, "failed requests")}\n`);
+          for (const entry of failed.slice(0, 10)) {
+            stdout.write(`  ${entry.status} ${entry.method} ${entry.url}\n`);
+          }
+        }
+        if (report.accessibility.violationsLike.length > 0) {
+          stdout.write(`\n${yellow(flags, "accessibility")}\n`);
+          for (const finding of report.accessibility.violationsLike.slice(0, 10)) {
+            stdout.write(`  ! ${finding}\n`);
+          }
+        }
+        const logs = report.console.filter(
+          (entry) => entry.type === "error" || entry.type === "warning"
+        );
+        if (logs.length > 0) {
+          stdout.write(`\n${dim(flags, "console")}\n`);
+          for (const entry of logs.slice(0, 10)) stdout.write(`  ${entry.type}: ${entry.text}\n`);
+        }
+        stdout.write("\n");
+      }
+      return report.errors.length > 0 ? 1 : 0;
+    }
+
+    if (command === "svg") {
+      const name = value() ?? "check";
+      const outPath = flagValue(args, "--out");
+      const result = generateSvg({ shape: "icon", name, ...(outPath ? {} : {}) });
+      if (outPath) {
+        await writeFile(resolve(flags.cwd, outPath), result.svg, "utf8");
+        stdout.write(`${green(flags, "✓")} ${outPath} (${result.bytes} B)\n`);
+      } else {
+        stdout.write(result.svg);
+      }
+      return 0;
+    }
+
+    if (command === "debug") {
+      const file = value();
+      const line = Number(flagValue(args, "--line") ?? "0");
+      if (!file || !Number.isInteger(line) || line <= 0) {
+        err(flags, "Usage: proofcore debug <file> --line <n>");
+        return 2;
+      }
+      const session = await debugScript({ root }, { file, breakpointLine: line });
+      if (flags.json) {
+        stdout.write(`${JSON.stringify(session, null, 2)}\n`);
+      } else {
+        stdout.write(
+          `\n${bold(flags, `DEBUG · ${file}:${line}`)}\n${dim(flags, `cdp=${session.usedCdp} · stopped=${session.stopped}${session.note ? ` · ${session.note}` : ""}\n`)}`
+        );
+        for (const scope of session.scopes ?? []) {
+          stdout.write(`\n  ${scope.name}\n`);
+          for (const variable of scope.variables.slice(0, 15)) {
+            stdout.write(`    ${variable.name} = ${variable.value.slice(0, 80)}\n`);
+          }
+        }
+        if (session.stdout) stdout.write(`\n${dim(flags, "stdout")}\n${session.stdout}`);
+        stdout.write("\n");
+      }
+      return session.stopped ? 0 : 1;
+    }
+
+    return 2;
+  } catch (error) {
+    err(flags, error instanceof Error ? error.message : String(error));
+    return 2;
+  }
+}
+
 function printHelp(flags: GlobalFlags): void {
   const w = (text: string): void => {
     stdout.write(`${text}\n`);
@@ -2024,6 +2219,12 @@ function printHelp(flags: GlobalFlags): void {
   w("  ai <status|tools|ask|agent>  MCP servers, AI providers and external agents");
   w("  audit fail|clean <url>       FAIL: security scan · CLEAN: UI quality score");
   w("  map [dir]                   architecture as a Mermaid dependency diagram");
+  w("  index                       build the local semantic index");
+  w('  search "<query>"            concept search over the index');
+  w("  devtools <url>              console, network, DOM, a11y from a real browser");
+  w("  debug <file> --line <n>     breakpoints and real variable scopes");
+  w("  svg <name> [--out file]     deterministic SVG icon");
+  w("  tools                       list every agent tool and where it lives");
   w("  mcp                      Serve PROOFCORE as an MCP server over stdio");
   w("");
   w(bold(flags, "test options"));

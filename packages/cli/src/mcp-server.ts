@@ -1,10 +1,19 @@
-import { readFile, stat } from "node:fs/promises";
+import { readFile, stat, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { renderReport } from "@proofcore/adapter-reporting";
 import { type LoadedConfig, loadConfig } from "@proofcore/config";
 import type { ModuleId, ReportFormat, TestRun } from "@proofcore/contracts";
 import { Logger, ProofCoreError, stableStringify } from "@proofcore/core";
 import { ENGINE_VERSION, runEngine } from "@proofcore/engine";
+import {
+  analyzeImage,
+  buildSemanticIndex,
+  completeCode,
+  debugScript,
+  generateSvg,
+  inspectPage,
+  semanticSearch,
+} from "./agent-extra-tools.js";
 import {
   applyPatch,
   gitCommit,
@@ -267,6 +276,119 @@ export function mcpToolDescriptors(): McpToolDescriptor[] {
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
     },
 
+    // ------------------------------------------------- code intelligence
+    {
+      name: "build_semantic_index",
+      description:
+        "Build the local semantic index of the project (chunked TF-IDF). Required before semantic_search. Deterministic, no key, no network.",
+      inputSchema: { type: "object", properties: {}, additionalProperties: false },
+      annotations: { readOnlyHint: false },
+    },
+    {
+      name: "semantic_search",
+      description:
+        "Ranked search over the local index: finds the code that talks about a concept even when the words differ from the identifier. Lexical ranking, reproducible, verifiable.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          query: { type: "string" },
+          limit: { type: "integer", minimum: 1, maximum: 50 },
+        },
+        required: ["query"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: true },
+    },
+    {
+      name: "complete_code",
+      description:
+        "Complete code at a cursor position. Uses the configured provider when a key is present, otherwise real project symbols from the index.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          path: { type: "string" },
+          line: { type: "integer", minimum: 1 },
+          column: { type: "integer", minimum: 1 },
+          maxCompletions: { type: "integer", minimum: 1, maximum: 5 },
+        },
+        required: ["path", "line"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+
+    // ------------------------------------------------------- browser surface
+    {
+      name: "inspect_page",
+      description:
+        "Open a page in a real Chromium and return what actually happened: console messages, page errors, network statuses, DOM counts, accessibility findings, optional full-page screenshot.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          url: { type: "string" },
+          screenshotPath: { type: "string" },
+          viewport: {
+            type: "object",
+            properties: { width: { type: "integer" }, height: { type: "integer" } },
+            additionalProperties: false,
+          },
+        },
+        required: ["url"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false, openWorldHint: true },
+    },
+    {
+      name: "analyze_image",
+      description:
+        "Send a screenshot or mockup to a vision-capable model and get a description plus visible defects. Refuses text-only models.",
+      inputSchema: {
+        type: "object",
+        properties: { path: { type: "string" }, prompt: { type: "string" } },
+        required: ["path"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    {
+      name: "generate_svg",
+      description:
+        "Generate a deterministic SVG icon or placeholder. Same input, same bytes — reviewable in a diff, unlike model-generated markup.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          shape: { type: "string", enum: ["icon", "placeholder", "spinner", "wave"] },
+          name: { type: "string" },
+          size: { type: "integer", minimum: 8, maximum: 2048 },
+          color: { type: "string" },
+          background: { type: "string" },
+          label: { type: "string" },
+          outPath: { type: "string", description: "Write the SVG to this file as well." },
+        },
+        required: ["shape"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false },
+    },
+    {
+      name: "debug_script",
+      description:
+        "Run a Node script under the inspector, stop at a breakpoint and return the real scopes. Reports usedCdp:false when it could not attach.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          file: { type: "string" },
+          breakpointLine: { type: "integer", minimum: 1 },
+          args: { type: "array", items: { type: "string" } },
+          expression: { type: "string" },
+          timeoutMs: { type: "integer", minimum: 1000, maximum: 120000 },
+        },
+        required: ["file", "breakpointLine"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false },
+    },
+
     // ----------------------------------------------------------------- git
     {
       name: "git_status",
@@ -379,6 +501,57 @@ export async function handleMcpToolCall(
         ...(typeof args.cwd === "string" ? { cwd: args.cwd } : {}),
         ...(typeof args.timeoutMs === "number" ? { timeoutMs: args.timeoutMs } : {}),
       });
+    case "build_semantic_index":
+      return buildSemanticIndex(toolContext(context.cwd));
+    case "semantic_search":
+      return semanticSearch(toolContext(context.cwd), {
+        query: String(args.query ?? ""),
+        ...(typeof args.limit === "number" ? { limit: args.limit } : {}),
+      });
+    case "complete_code":
+      return completeCode(toolContext(context.cwd), {
+        path: String(args.path ?? ""),
+        line: Number(args.line ?? 1),
+        ...(typeof args.column === "number" ? { column: args.column } : {}),
+        ...(typeof args.maxCompletions === "number" ? { maxCompletions: args.maxCompletions } : {}),
+      });
+    case "inspect_page":
+      return inspectPage({
+        url: String(args.url ?? ""),
+        ...(typeof args.screenshotPath === "string" ? { screenshotPath: args.screenshotPath } : {}),
+        ...(args.viewport && typeof args.viewport === "object"
+          ? { viewport: args.viewport as { width: number; height: number } }
+          : {}),
+      });
+    case "analyze_image":
+      return analyzeImage(toolContext(context.cwd), {
+        path: String(args.path ?? ""),
+        ...(typeof args.prompt === "string" ? { prompt: args.prompt } : {}),
+        provider: await providerFromEnv(),
+      });
+    case "generate_svg": {
+      const result = generateSvg({
+        shape: (args.shape as "icon" | "placeholder" | "spinner" | "wave") ?? "icon",
+        ...(typeof args.name === "string" ? { name: args.name } : {}),
+        ...(typeof args.size === "number" ? { size: args.size } : {}),
+        ...(typeof args.color === "string" ? { color: args.color } : {}),
+        ...(typeof args.background === "string" ? { background: args.background } : {}),
+        ...(typeof args.label === "string" ? { label: args.label } : {}),
+      });
+      if (typeof args.outPath === "string") {
+        await writeFile(resolve(context.cwd, args.outPath), result.svg, "utf8");
+        return { ...result, path: args.outPath };
+      }
+      return result;
+    }
+    case "debug_script":
+      return debugScript(toolContext(context.cwd), {
+        file: String(args.file ?? ""),
+        breakpointLine: Number(args.breakpointLine ?? 1),
+        ...(Array.isArray(args.args) ? { args: args.args.map(String) } : {}),
+        ...(typeof args.expression === "string" ? { expression: args.expression } : {}),
+        ...(typeof args.timeoutMs === "number" ? { timeoutMs: args.timeoutMs } : {}),
+      });
     case "git_status":
       return gitStatus(toolContext(context.cwd));
     case "git_diff":
@@ -405,6 +578,37 @@ export async function handleMcpToolCall(
         details: { name },
       });
   }
+}
+
+/**
+ * Provider credentials for the tools that need a model.
+ *
+ * Read from the environment, never from a tool argument: a model must not be able to
+ * supply its own key or redirect a request to another endpoint.
+ */
+async function providerFromEnv(): Promise<{
+  baseUrl: string;
+  model: string;
+  apiKey: string;
+  kind?: string;
+}> {
+  const baseUrl = process.env.PROOFCORE_AI_BASE_URL;
+  const model = process.env.PROOFCORE_AI_MODEL;
+  const apiKey = process.env.PROOFCORE_AI_KEY;
+  if (!baseUrl || !model || !apiKey) {
+    throw new ProofCoreError({
+      message:
+        "This tool needs a model: set PROOFCORE_AI_BASE_URL, PROOFCORE_AI_MODEL and PROOFCORE_AI_KEY.",
+      category: "CONFIGURATION",
+      code: "ai_not_configured",
+    });
+  }
+  return {
+    baseUrl,
+    model,
+    apiKey,
+    ...(process.env.PROOFCORE_AI_KIND ? { kind: process.env.PROOFCORE_AI_KIND } : {}),
+  };
 }
 
 /** One context for every code tool: the workspace root is the process cwd. */

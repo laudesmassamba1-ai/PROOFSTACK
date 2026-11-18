@@ -420,7 +420,14 @@ function AuditObject({
         strokeLinecap="round"
       />
       <circle cx="100" cy="110" r="5" fill="var(--object-glyph)" />
-      <text x="100" y="70" textAnchor="middle" fill="var(--object-glyph)" fontSize="26" fontWeight="700">
+      <text
+        x="100"
+        y="70"
+        textAnchor="middle"
+        fill="var(--object-glyph)"
+        fontSize="26"
+        fontWeight="700"
+      >
         {total > 0 ? `${Math.round(rate * 100)}` : "—"}
       </text>
     </svg>

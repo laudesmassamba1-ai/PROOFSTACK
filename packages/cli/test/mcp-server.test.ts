@@ -123,6 +123,15 @@ describe("proofcore MCP server", () => {
       "write_file",
       "apply_patch",
       "run_command",
+      // code intelligence, browser surface, assets and debugging
+      "build_semantic_index",
+      "semantic_search",
+      "complete_code",
+      "inspect_page",
+      "analyze_image",
+      "generate_svg",
+      "debug_script",
+      // git
       "git_status",
       "git_diff",
       "git_log",
