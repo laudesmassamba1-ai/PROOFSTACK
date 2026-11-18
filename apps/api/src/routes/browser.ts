@@ -75,6 +75,7 @@ interface PageLike {
   goBack: (options?: Record<string, unknown>) => Promise<unknown>;
   reload: (options?: Record<string, unknown>) => Promise<unknown>;
   setViewport: (viewport: { width: number; height: number }) => Promise<void>;
+  evaluate?: (expression: string) => Promise<unknown>;
   waitForNetworkIdle?: (options?: { timeout?: number }) => Promise<void>;
   on: (event: string, handler: (...args: unknown[]) => void) => void;
 }

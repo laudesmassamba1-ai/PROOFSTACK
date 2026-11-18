@@ -188,11 +188,11 @@
   }
   .pc-browser-viewport img {
     display: block;
+    /* Width-driven, natural height: the element box and the drawn picture are the same
+       rectangle, which is what makes the click mapping exact. Letterboxing (object-fit)
+       would break that and add white bands anyway. */
     width: 100%;
     height: auto;
-    max-height: 100%;
-    object-fit: contain;
-    object-position: center top;
     cursor: crosshair;
     background: #fff;
     transition: opacity 0.12s ease;
