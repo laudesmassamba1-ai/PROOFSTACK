@@ -16,6 +16,11 @@ import {
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AiMark } from "../../components/brand/AiMark.js";
+import {
+  ChatMarkdown,
+  MessageActions,
+  printConversation,
+} from "../../components/app/ChatMarkdown.js";
 import { useI18n } from "../../i18n/index.js";
 import { useSession } from "../../lib/session.js";
 
@@ -220,48 +225,6 @@ function uid(): string {
   return `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function Markdownish({ text }: { text: string }): React.ReactElement {
-  const blocks = text.split(/\n{2,}/);
-  // Inline `**bold**` → <strong>. Keys come from the text itself plus an
-  // occurrence counter — content-addressed, not position-addressed.
-  const inline = (source: string): React.ReactNode[] => {
-    const nodes: React.ReactNode[] = [];
-    let boldIndex = 0;
-    for (const part of source.split(/(\*\*[^*]+\*\*)/g)) {
-      if (part.startsWith("**") && part.endsWith("**")) {
-        boldIndex += 1;
-        nodes.push(<strong key={`b${boldIndex}`}>{part.slice(2, -2)}</strong>);
-      } else if (part) {
-        nodes.push(part);
-      }
-    }
-    return nodes;
-  };
-  return (
-    <div className="chat-prose space-y-2">
-      {blocks.map((block, index) => {
-        const key = `b${index}-${block.slice(0, 12)}`;
-        if (block.startsWith("### ") || block.startsWith("## ") || block.startsWith("# ")) {
-          return <h4 key={key}>{block.replace(/^#+\s*/, "")}</h4>;
-        }
-        if (/^[-*]\s/m.test(block)) {
-          return (
-            <ul key={key} className="space-y-1">
-              {block.split("\n").map((line) => (
-                <li key={`${key}-${line.slice(0, 12)}`}>{inline(line.replace(/^[-*]\s*/, ""))}</li>
-              ))}
-            </ul>
-          );
-        }
-        return (
-          <p key={key} className="whitespace-pre-wrap">
-            {inline(block)}
-          </p>
-        );
-      })}
-    </div>
-  );
-}
 
 /* ---------- pieces of the composer ---------- */
 
@@ -819,6 +782,23 @@ export function AiChatPage(): React.ReactElement {
             {fr ? "Assistant PROOFCORE" : "PROOFCORE Assistant"}
           </div>
           {activeWorkspace && <span className="chat-workspace-chip">{activeWorkspace.name}</span>}
+          <button
+            type="button"
+            className="chat-action-btn chat-topbar-export"
+            onClick={() =>
+              printConversation(
+                messages.map((message) => ({ role: message.role, content: message.content })),
+                activeWorkspace
+                  ? `${fr ? "Conversation" : "Conversation"} · ${activeWorkspace.name}`
+                  : fr
+                    ? "Conversation PROOFCORE"
+                    : "PROOFCORE conversation"
+              )
+            }
+            disabled={messages.length === 0}
+          >
+            {fr ? "Imprimer / PDF" : "Print / PDF"}
+          </button>
         </header>
 
         {/* empty state: centered greeting + composer, like the reference */}
@@ -884,7 +864,10 @@ export function AiChatPage(): React.ReactElement {
                         {message.error ? (
                           <div className="chat-error">{message.error}</div>
                         ) : message.content ? (
-                          <Markdownish text={message.content} />
+                          <>
+                            <ChatMarkdown text={message.content} />
+                            <MessageActions text={message.content} fr={fr} />
+                          </>
                         ) : busy ? (
                           <div className="chat-thinking" aria-live="polite">
                             <span />

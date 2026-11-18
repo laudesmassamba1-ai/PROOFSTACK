@@ -206,7 +206,7 @@ export function Overview() {
         <div className="app-section-head">
           <p className="app-eyebrow">02 / {t("ws.overview.modules")}</p>
           <h2 id="module-objects-title" className="app-section-title">
-            WORLD. FLOW. EXIT.
+            {MODULE_IDS.map((module) => module.toUpperCase()).join(". ")}.
           </h2>
         </div>
 
