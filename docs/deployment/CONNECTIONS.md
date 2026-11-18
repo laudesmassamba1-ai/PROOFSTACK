@@ -17,11 +17,11 @@ Sans cela : pas de réinitialisation de mot de passe livrée, pas de vérificati
 d'adresse. Le mécanisme fonctionne (jeton, expiration, usage unique, journal), mais
 aucun message ne part.
 
-| Variable | Obligatoire | Rôle |
-|---|---|---|
-| `RESEND_API_KEY` | pour livrer | Clé API Resend (`re_…`). |
-| `MAIL_FROM` | recommandé | Expéditeur vérifié, ex. `PROOFCORE <no-reply@tondomaine.com>`. |
-| `SUPPORT_EMAIL` | recommandé | Adresse affichée pour l'assistance et destinataire des notifications. |
+| Variable         | Obligatoire | Rôle                                                                  |
+| ---------------- | ----------- | --------------------------------------------------------------------- |
+| `RESEND_API_KEY` | pour livrer | Clé API Resend (`re_…`).                                              |
+| `MAIL_FROM`      | recommandé  | Expéditeur vérifié, ex. `PROOFCORE <no-reply@tondomaine.com>`.        |
+| `SUPPORT_EMAIL`  | recommandé  | Adresse affichée pour l'assistance et destinataire des notifications. |
 
 Mise en place (5 minutes) :
 
@@ -55,13 +55,13 @@ de conservation, cookie `ps_session`).
 
 Cinq valeurs restent à renseigner, affichées comme emplacements dans les pages :
 
-| Emplacement | Valeur attendue |
-|---|---|
-| `LEGAL_ENTITY_NAME` | raison sociale exacte |
+| Emplacement          | Valeur attendue                                          |
+| -------------------- | -------------------------------------------------------- |
+| `LEGAL_ENTITY_NAME`  | raison sociale exacte                                    |
 | `LEGAL_REGISTRATION` | forme juridique + numéro d'immatriculation (RCCM/SIREN…) |
-| `LEGAL_ADDRESS` | adresse du siège |
-| `LEGAL_JURISDICTION` | juridiction compétente |
-| `LEGAL_DPO_CONTACT` | contact pour les demandes de données |
+| `LEGAL_ADDRESS`      | adresse du siège                                         |
+| `LEGAL_JURISDICTION` | juridiction compétente                                   |
+| `LEGAL_DPO_CONTACT`  | contact pour les demandes de données                     |
 
 Fichier à modifier : `apps/web/src/pages/Legal.tsx` (constante `PLACEHOLDERS` + les
 `<em>[…]</em>` correspondants). Aucune de ces valeurs n'est déductible du code : les
@@ -71,9 +71,9 @@ inventer serait publier une information juridique fausse.
 
 ## 3. Paiements réels — SasPay
 
-| Variable | Obligatoire | Rôle |
-|---|---|---|
-| `SASPAY_API_KEY` | pour encaisser | `sk_test_…` (bac à sable) ou `sk_live_…`. |
+| Variable                | Obligatoire    | Rôle                                                                       |
+| ----------------------- | -------------- | -------------------------------------------------------------------------- |
+| `SASPAY_API_KEY`        | pour encaisser | `sk_test_…` (bac à sable) ou `sk_live_…`.                                  |
 | `SASPAY_WEBHOOK_SECRET` | pour encaisser | Secret affiché une fois à la création du webhook dans le dashboard SasPay. |
 
 Sans clé : fournisseur `sandbox`, affiché comme tel, aucun débit réel. Les tests
@@ -87,8 +87,8 @@ remboursements sont administratifs, et les périodes payées sont prépayées.
 
 ## 4. Modèles d'IA — clé de chiffrement
 
-| Variable | Obligatoire | Rôle |
-|---|---|---|
+| Variable         | Obligatoire                  | Rôle                                                                                                         |
+| ---------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | `AI_KEYS_SECRET` | oui, pour stocker une clé IA | Clé maître ≥ 32 caractères ; les clés fournisseurs sont chiffrées AES-256-GCM sous une clé dérivée par HKDF. |
 
 Déjà en place sur le Worker. Sans elle, le stockage de clé est **refusé** (503) plutôt que
@@ -109,8 +109,8 @@ build, un test de démarrage du CLI, et la suite e2e sur chaque push. Les secret
 
 ## 6. Rendu headless — audits CLEAN exacts
 
-| Variable | Obligatoire | Rôle |
-|---|---|---|
+| Variable               | Obligatoire        | Rôle                                                     |
+| ---------------------- | ------------------ | -------------------------------------------------------- |
 | `PROOFCORE_RENDER_URL` | pour noter les SPA | Endpoint qui renvoie `{ "html": "…" }` après rendu réel. |
 
 Sans ce service, un audit CLEAN sur une application cliente (React, Vue, Svelte) mesure le
@@ -126,14 +126,14 @@ de développeur.
 
 ## Récapitulatif
 
-| Fonction | Sans identifiant | Avec identifiant |
-|---|---|---|
-| Connexion, espaces, runs, rapports | fonctionne | — |
-| Réinitialisation de mot de passe | jeton créé, message en file, interface honnête | e-mail livré |
-| Vérification d'adresse | idem | e-mail livré |
-| Assistance | message enregistré avec référence | notification à l'opérateur |
-| Pages légales | publiées, 5 emplacements visibles | prêtes à publier |
-| Paiement | mode sandbox explicite | encaissement réel |
-| Assistant IA | refuse proprement (503) | fonctionne |
-| Audits FAIL | fonctionne (HTTP) | — |
-| Audits CLEAN sur SPA | note HTML, aucune lettre | note de l'interface rendue |
+| Fonction                           | Sans identifiant                               | Avec identifiant           |
+| ---------------------------------- | ---------------------------------------------- | -------------------------- |
+| Connexion, espaces, runs, rapports | fonctionne                                     | —                          |
+| Réinitialisation de mot de passe   | jeton créé, message en file, interface honnête | e-mail livré               |
+| Vérification d'adresse             | idem                                           | e-mail livré               |
+| Assistance                         | message enregistré avec référence              | notification à l'opérateur |
+| Pages légales                      | publiées, 5 emplacements visibles              | prêtes à publier           |
+| Paiement                           | mode sandbox explicite                         | encaissement réel          |
+| Assistant IA                       | refuse proprement (503)                        | fonctionne                 |
+| Audits FAIL                        | fonctionne (HTTP)                              | —                          |
+| Audits CLEAN sur SPA               | note HTML, aucune lettre                       | note de l'interface rendue |
