@@ -1,0 +1,96 @@
+name: CI
+
+# The audit found that nothing was run automatically: the e2e suite had been broken and
+# drifted for exactly that reason. This workflow is the cheapest defect prevention in
+# the project — it costs nothing and runs on every push.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: lint · typecheck · test · build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      # The CLI is published from this repository: an artefact that does not start is a
+      # broken release, and `--version` is the cheapest way to prove it starts.
+      - name: CLI smoke test
+        run: |
+          node packages/cli/dist/index.js --version
+          node packages/cli/dist/index.js --help > /dev/null
+          node packages/cli/dist/index.js audit --help > /dev/null
+
+      - name: Audit the code itself for red flags
+        run: |
+          # A token must never be echoed or passed positionally; the CLI refuses it,
+          # and this guard catches a regression before it ships.
+          ! grep -rn "process.stdout.write(.*NPM_TOKEN" packages/cli/src
+          echo "no token echo found"
+
+  e2e:
+    name: e2e (desktop + mobile)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run e2e
+        run: pnpm test:e2e
+
+      - name: Upload traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7

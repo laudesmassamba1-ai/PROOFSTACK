@@ -28,6 +28,16 @@ export interface AppConfig {
   n8nWebhookSecret: string | undefined;
   /** Master key for encrypting stored AI provider keys (AES-256-GCM, base64 or hex, >= 32 bytes). */
   aiKeysSecret: string | undefined;
+  /**
+   * Outbound e-mail. Without RESEND_API_KEY every message is journalled in
+   * `email_outbox` with status `unconfigured` instead of being silently dropped, and
+   * the API tells the truth about it. This is the one connection point a deployment
+   * operator must fill in for password recovery to actually reach a human.
+   */
+  resendApiKey: string | undefined;
+  mailFrom: string | undefined;
+  /** Address shown to customers for support, and recipient of support notifications. */
+  supportEmail: string;
 }
 
 export type Env = Record<string, string | undefined>;
@@ -54,6 +64,9 @@ export function readConfig(env: Env): AppConfig {
     n8nWebhookUrl: env.N8N_WEBHOOK_URL,
     n8nWebhookSecret: env.N8N_WEBHOOK_SECRET,
     aiKeysSecret: env.AI_KEYS_SECRET,
+    resendApiKey: env.RESEND_API_KEY,
+    mailFrom: env.MAIL_FROM,
+    supportEmail: env.SUPPORT_EMAIL ?? "support@proofcore.dev",
   };
 }
 

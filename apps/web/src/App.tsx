@@ -15,6 +15,19 @@ const Changelog = lazy(() =>
   import("./pages/Changelog.js").then((m) => ({ default: m.Changelog }))
 );
 const Security = lazy(() => import("./pages/Security.js").then((m) => ({ default: m.Security })));
+const ForgotPassword = lazy(() =>
+  import("./pages/Account.js").then((m) => ({ default: m.ForgotPassword }))
+);
+const ResetPassword = lazy(() =>
+  import("./pages/Account.js").then((m) => ({ default: m.ResetPassword }))
+);
+const VerifyEmail = lazy(() =>
+  import("./pages/Account.js").then((m) => ({ default: m.VerifyEmail }))
+);
+const Support = lazy(() => import("./pages/Account.js").then((m) => ({ default: m.Support })));
+const Terms = lazy(() => import("./pages/Legal.js").then((m) => ({ default: m.Terms })));
+const Privacy = lazy(() => import("./pages/Legal.js").then((m) => ({ default: m.Privacy })));
+const Cookies = lazy(() => import("./pages/Legal.js").then((m) => ({ default: m.Cookies })));
 const Auth = lazy(() => import("./pages/Auth.js").then((m) => ({ default: m.Auth })));
 const DeviceApproval = lazy(() =>
   import("./pages/DeviceApproval.js").then((m) => ({ default: m.DeviceApproval }))
@@ -77,6 +90,13 @@ export function App() {
           <Route path="changelog" element={<Changelog />} />
           <Route path="security" element={<Security />} />
           <Route path="signin" element={<Auth mode="in" />} />
+          <Route path="forgot-password" element={<ForgotPassword />} />
+          <Route path="reset-password" element={<ResetPassword />} />
+          <Route path="verify-email" element={<VerifyEmail />} />
+          <Route path="support" element={<Support />} />
+          <Route path="legal/terms" element={<Terms />} />
+          <Route path="legal/privacy" element={<Privacy />} />
+          <Route path="legal/cookies" element={<Cookies />} />
           <Route path="device" element={<DeviceApproval />} />
           <Route path="signup" element={<Auth mode="up" />} />
           <Route path="*" element={<NotFound />} />

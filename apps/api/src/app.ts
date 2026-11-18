@@ -7,6 +7,7 @@ import { type Env, readConfig } from "./env.js";
 import { HttpError, toErrorResponse } from "./http/errors.js";
 import { type AppEnv, createServices, type Services } from "./http/services.js";
 import { createPaymentProvider } from "./providers.js";
+import { accountRoutes } from "./routes/account.js";
 import { adminRoutes } from "./routes/admin.js";
 import { aiRoutes } from "./routes/ai.js";
 import { authRoutes } from "./routes/auth.js";
@@ -128,6 +129,7 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
   });
 
   app.route("/api/auth", authRoutes(services));
+  app.route("/api/account", accountRoutes(services));
   app.route("/api/auth/device", deviceRoutes(services));
   app.route("/api/v1", planRoutes(services));
   app.route("/api/v1", workspaceRoutes(services));

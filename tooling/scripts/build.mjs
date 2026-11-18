@@ -96,17 +96,17 @@ function run(dir, args) {
   });
 }
 
-/** Runs a package's own `build` script (vite, for the web app). */
-function runScript(dir) {
+/** Runs one of a package's own scripts (vite build / tsc typecheck). */
+function runScript(dir, script) {
   return new Promise((res, rej) => {
-    const child = spawn("pnpm", ["run", "build"], {
+    const child = spawn("pnpm", ["run", script], {
       cwd: dir,
       stdio: "inherit",
       env: process.env,
       shell: process.platform === "win32",
     });
     child.on("exit", (code) =>
-      code === 0 ? res() : rej(new Error(`build script failed in ${dir} (exit ${code})`))
+      code === 0 ? res() : rej(new Error(`${script} failed in ${dir} (exit ${code})`))
     );
   });
 }
@@ -136,10 +136,12 @@ for (const [i, level] of levels.entries()) {
     })
   );
 }
-if (!noEmit && deferred.length > 0) {
-  console.log(`\n── apps (own build script): ${deferred.map((entry) => entry.name).join(", ")}`);
+if (deferred.length > 0) {
+  console.log(
+    `\n── apps (own ${noEmit ? "typecheck" : "build"} script): ${deferred.map((entry) => entry.name).join(", ")}`
+  );
   for (const entry of deferred) {
-    await runScript(entry.dir);
+    await runScript(entry.dir, noEmit ? "typecheck" : "build");
     console.log(`   ok  ${entry.name}`);
   }
 }

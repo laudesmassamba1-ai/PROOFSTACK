@@ -4,7 +4,7 @@ import type { PaymentAutomationEvent } from "../automation.js";
 import type { Database } from "../db/types.js";
 import type { EmailSender } from "../email.js";
 import { createEmailSender } from "../email.js";
-import type { AppConfig, Env } from "../env.js";
+import type { AppConfig } from "../env.js";
 import {
   type ApiKeyRecord,
   AppStore,
@@ -38,7 +38,6 @@ export function createServices(input: {
   db: Database;
   config: AppConfig;
   provider: PaymentProvider;
-  env?: Env;
   clock?: () => Date;
 }): Services {
   const clock = input.clock ?? (() => new Date());
@@ -46,8 +45,8 @@ export function createServices(input: {
   const billing = new SqlBillingStore(input.db, clock);
   const checkout = new CheckoutService(billing, input.provider, clock);
   const email = createEmailSender(store, {
-    ...(input.env?.RESEND_API_KEY ? { RESEND_API_KEY: input.env.RESEND_API_KEY } : {}),
-    ...(input.env?.MAIL_FROM ? { MAIL_FROM: input.env.MAIL_FROM } : {}),
+    ...(input.config.resendApiKey ? { RESEND_API_KEY: input.config.resendApiKey } : {}),
+    ...(input.config.mailFrom ? { MAIL_FROM: input.config.mailFrom } : {}),
   });
   const meter = new UsageMeter(billing, {
     now: () => clock().getTime(),

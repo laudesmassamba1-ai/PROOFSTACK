@@ -36,8 +36,10 @@ export function Footer() {
         <FooterColumn
           title={t("footer.company")}
           items={[
-            { to: "/security", label: t("mkt.footer.trust") },
-            { to: "/docs", label: t("mkt.footer.cli") },
+            { to: "/support", label: t("footer.support") },
+            { to: "/legal/terms", label: t("footer.terms") },
+            { to: "/legal/privacy", label: t("footer.privacy") },
+            { to: "/legal/cookies", label: t("footer.cookies") },
             { to: "/signin", label: t("nav.signin") },
           ]}
         />

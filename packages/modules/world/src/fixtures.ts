@@ -50,10 +50,19 @@ export interface Fixture {
   note?: string;
 }
 
-let counter = 0;
+/**
+ * A fixture id must identify the fixture, not its position in a run.
+ *
+ * It used to append a module-level counter, so building the same fixtures twice in one
+ * process produced different ids. That broke `--only` (which matches on the id that a
+ * previous report printed) and made two runs impossible to diff.
+ *
+ * The id is now a pure function of the profile, the category and the ordinal *within
+ * that group*, passed explicitly by the caller's `push` order. Deterministic, stable
+ * across processes, and still readable in a report.
+ */
 function fixtureId(profile: string, category: string, hint: string): string {
-  counter += 1;
-  return `${profile}/${category}/${slug(hint)}-${counter}`;
+  return `${profile}/${category}/${slug(hint)}`;
 }
 
 function slug(value: string): string {
@@ -74,9 +83,16 @@ export function buildFixtures(profile: LocaleProfileData, options: BuildOptions 
   const categories = new Set<FixtureCategory>(options.categories ?? FIXTURE_CATEGORIES);
   const out: Fixture[] = [];
   const cap = options.maxPerCategory ?? 200;
+  // Duplicate base ids (two fixtures with the same hint) are disambiguated by their
+  // order within the group, which is deterministic, instead of by a global counter
+  // that changed on every call.
+  const seenIds = new Map<string, number>();
   const push: Push = (fixture) => {
     const same = out.filter((f) => f.category === fixture.category).length;
-    if (same < cap) out.push(fixture);
+    if (same >= cap) return;
+    const occurrence = seenIds.get(fixture.id) ?? 0;
+    seenIds.set(fixture.id, occurrence + 1);
+    out.push(occurrence === 0 ? fixture : { ...fixture, id: `${fixture.id}~${occurrence + 1}` });
   };
 
   if (categories.has("identity")) identityFixtures(profile, push);

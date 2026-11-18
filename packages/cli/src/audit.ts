@@ -34,6 +34,17 @@ export interface AuditCheck {
   why: string;
 }
 
+/**
+ * What the score actually measures.
+ *
+ * `server_html` — the document the server returned. A client-rendered app ships an empty
+ * shell, so accessibility and structure checks legitimately cannot see the interface:
+ * the score describes the HTML, not the product.
+ * `rendered_dom` — a real browser rendered the page and the checks ran on the resulting
+ * DOM. This is the only basis on which "the interface scores 92/100" is a true sentence.
+ */
+export type MeasurementBasis = "server_html" | "rendered_dom";
+
 export interface AuditResult {
   kind: AuditKind;
   url: string;
@@ -43,6 +54,16 @@ export interface AuditResult {
   score: number;
   grade?: string;
   checks: AuditCheck[];
+  basis: MeasurementBasis;
+  /**
+   * True when the page is a client-rendered shell: the score then describes the HTML,
+   * and the report says so instead of pretending to judge the interface.
+   */
+  clientRendered?: boolean;
+  /** Checks that could not be evaluated on this basis, and why. */
+  unmeasured?: { id: string; reason: string }[];
+  /** True when a grade is deliberately not issued (client-rendered shell). */
+  gradeWithheld?: boolean;
 }
 
 const USER_AGENT = "PROOFCORE-Audit/0.2 (+real checks; respects robots intent)";
@@ -188,13 +209,70 @@ export async function runFailAudit(url: string): Promise<AuditResult> {
     finalUrl: response.url,
     status: response.status,
     elapsedMs: ms,
+    // FAIL checks HTTP behaviour (headers, transport, disclosure), which the served
+    // response *is*. Rendering adds nothing here, so the basis is explicit, not absent.
+    basis: "server_html",
     score,
     checks,
   };
 }
 
+/**
+ * Heuristics that identify a client-rendered shell.
+ *
+ * Two independent signals: a mount point that is empty in the served HTML, and a
+ * script bundle in the document head/body with almost no text content. Either one
+ * alone can be a false positive (a mostly-empty landing page), so the shell test
+ * requires a near-empty body *and* a script.
+ */
+function looksClientRendered(html: string): boolean {
+  const body = /<body\b[^>]*>([\s\S]*)<\/body>/i.exec(html)?.[1] ?? "";
+  const withoutScripts = body
+    .replace(/<script\b[\s\S]*?<\/script>/gi, "")
+    .replace(/<style\b[\s\S]*?<\/style>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const hasScript = /<script\b[^>]*\bsrc=/i.test(html);
+  const mountPoint = /<div\s+id=["'](root|app|__next|__nuxt)["']\s*>\s*<\/div>/i.test(html);
+  return hasScript && (mountPoint || withoutScripts.length < 40);
+}
+
+/**
+ * Optional headless renderer.
+ *
+ * Rendering needs a browser, which a plain fetch cannot provide. Rather than shipping a
+ * fake DOM or silently scoring the shell, the audit asks a renderer when one is
+ * configured (`PROOFCORE_RENDER_URL`), and otherwise reports the basis honestly.
+ */
+async function renderWithService(url: string): Promise<string | undefined> {
+  const endpoint = process.env.PROOFCORE_RENDER_URL;
+  if (!endpoint) return undefined;
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!response.ok) return undefined;
+    const payload = (await response.json()) as { html?: string };
+    return typeof payload.html === "string" && payload.html.length > 0 ? payload.html : undefined;
+  } catch {
+    // A configured renderer that fails must not silently downgrade the basis: the
+    // caller reports `server_html`, which is visible in the output.
+    return undefined;
+  }
+}
+
 export async function runCleanAudit(url: string): Promise<AuditResult> {
-  const { response, text: html, ms } = await fetchTarget(url);
+  const { response, text: servedHtml, ms } = await fetchTarget(url);
+  const clientRendered = looksClientRendered(servedHtml);
+  const rendered = clientRendered ? await renderWithService(response.url) : undefined;
+  const html = rendered ?? servedHtml;
+  const basis: MeasurementBasis = rendered ? "rendered_dom" : "server_html";
+  const unmeasured: { id: string; reason: string }[] = [];
   const checks: AuditCheck[] = [];
   const viewport = /<meta[^>]+name=["']viewport["']/i.test(html);
   const lang = /<html[^>]+lang=["'][a-z-]{2,8}["']/i.test(html);
@@ -260,13 +338,24 @@ export async function runCleanAudit(url: string): Promise<AuditResult> {
     "Heading hierarchy guides navigation.",
     true
   );
-  push(
-    checks,
-    "semantic_landmarks",
-    semantics,
-    semantics ? "present" : "absent",
-    "Landmark elements structure the page."
-  );
+  if (clientRendered && basis === "server_html") {
+    // The document is a mount point: judging its landmarks would judge the build
+    // output, not the interface.
+    unmeasured.push(
+      { id: "semantic_landmarks", reason: "client-rendered shell" },
+      { id: "heading_order", reason: "client-rendered shell" },
+      { id: "img_alt", reason: "client-rendered shell" },
+      { id: "form_labels", reason: "client-rendered shell" }
+    );
+  } else {
+    push(
+      checks,
+      "semantic_landmarks",
+      semantics,
+      semantics ? "present" : "absent",
+      "Landmark elements structure the page."
+    );
+  }
   push(
     checks,
     "inline_styles",
@@ -292,9 +381,14 @@ export async function runCleanAudit(url: string): Promise<AuditResult> {
   );
   push(checks, "response_time", ms <= 1500, `${ms} ms`, "Slow HTML delays everything else.");
 
-  const failed = checks.filter((check) => check.status === "FAIL").length;
-  const warned = checks.filter((check) => check.status === "WARN").length;
-  const score = Math.round((100 * (checks.length - failed - 0.5 * warned)) / checks.length);
+  const unmeasuredIds = new Set(unmeasured.map((entry) => entry.id));
+  const measured = checks.filter((check) => !unmeasuredIds.has(check.id));
+  const failed = measured.filter((check) => check.status === "FAIL").length;
+  const warned = measured.filter((check) => check.status === "WARN").length;
+  const score = Math.round((100 * (measured.length - failed - 0.5 * warned)) / measured.length);
+  // No letter grade on a shell: "A" would be a judgement about the interface that was
+  // never seen. The number still describes the HTML, and the report says which.
+  const gradeWithheld = basis === "server_html" && clientRendered;
   return {
     kind: "clean",
     url,
@@ -302,8 +396,16 @@ export async function runCleanAudit(url: string): Promise<AuditResult> {
     status: response.status,
     elapsedMs: ms,
     score,
-    grade: score >= 90 ? "A" : score >= 80 ? "B" : score >= 65 ? "C" : score >= 50 ? "D" : "E",
-    checks,
+    ...(gradeWithheld
+      ? { gradeWithheld: true }
+      : {
+          grade:
+            score >= 90 ? "A" : score >= 80 ? "B" : score >= 65 ? "C" : score >= 50 ? "D" : "E",
+        }),
+    checks: measured,
+    basis,
+    ...(clientRendered ? { clientRendered } : {}),
+    ...(unmeasured.length > 0 ? { unmeasured } : {}),
   };
 }
 
@@ -316,9 +418,22 @@ export function renderAudit(result: AuditResult, flags: AuditFlags): void {
   w(
     dim(
       flags,
-      `HTTP ${result.status} · ${result.elapsedMs} ms · score ${result.score}/100${result.grade ? ` (${result.grade})` : ""}`
+      `HTTP ${result.status} · ${result.elapsedMs} ms · score ${result.score}/100${
+        result.grade ? ` (${result.grade})` : result.gradeWithheld ? " · no grade" : ""
+      }`
     )
   );
+  if (result.basis === "rendered_dom") {
+    w(dim(flags, "basis: rendered DOM (a real browser rendered the page)"));
+  } else if (result.clientRendered) {
+    w(
+      yellow(
+        flags,
+        "basis: served HTML only — this page is client-rendered, so the score describes\n" +
+          "the shell, not the interface. Set PROOFCORE_RENDER_URL to score the rendered page."
+      )
+    );
+  }
   w("");
   for (const check of result.checks) {
     const glyph =

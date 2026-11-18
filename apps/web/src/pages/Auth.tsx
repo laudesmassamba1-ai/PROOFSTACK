@@ -165,6 +165,17 @@ export function Auth({ mode }: { mode: Mode }) {
           />
         </Field>
 
+        {mode === "in" && (
+          <p className="-mt-1 text-right text-[0.8rem]">
+            <Link
+              to="/forgot-password"
+              className="text-white/56 underline-offset-2 hover:text-white hover:underline"
+            >
+              {t("auth.forgot")}
+            </Link>
+          </p>
+        )}
+
         <button
           type="submit"
           className="btn btn-primary w-full justify-center"
