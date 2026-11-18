@@ -17,7 +17,11 @@ import { useSession } from "../lib/session.js";
 export function DeviceApproval() {
   const { t } = useI18n();
   const session = useSession();
-  const [code, setCode] = useState("");
+  // Pre-filled from the URL the CLI opens, so the code does not have to be retyped.
+  const [code, setCode] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return (new URLSearchParams(window.location.search).get("code") ?? "").toUpperCase();
+  });
   const [state, setState] = useState<"idle" | "sending" | "done" | "failed">("idle");
   const [message, setMessage] = useState("");
 

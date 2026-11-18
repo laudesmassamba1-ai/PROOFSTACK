@@ -51,7 +51,9 @@ export interface AppConfig {
    *
    * 40 was too tight to be useful: a single afternoon of real work, or a demo, hit the
    * wall and the user saw "trop de demandes" with no way forward. The default also has to
-   * absorb retries, because a failed turn still counted.
+   * absorb retries, because a failed turn still counted. A signed-in human talking to their
+   * own assistant should never meet this limit; the cap exists to stop a loop, so it is set
+   * where only a runaway client can reach it.
    */
   aiRateLimitPerHour: number;
   cfBrowserToken: string | undefined;
@@ -92,7 +94,7 @@ export function readConfig(env: Env): AppConfig {
     mailFrom: env.MAIL_FROM,
     supportEmail: env.SUPPORT_EMAIL ?? "support@proofcore.dev",
     cfAccountId: env.CF_ACCOUNT_ID?.trim() || undefined,
-    aiRateLimitPerHour: positiveInt(env.AI_RATE_LIMIT_PER_HOUR, 600),
+    aiRateLimitPerHour: positiveInt(env.AI_RATE_LIMIT_PER_HOUR, 5000),
     cfBrowserToken: env.CF_BROWSER_TOKEN?.trim() || undefined,
   };
 }

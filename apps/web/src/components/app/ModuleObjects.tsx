@@ -347,14 +347,34 @@ export function ExitObject({ passed, failed, total }: ObjectProps) {
       />
       {!hasData ? (
         <g className="exit-tray">
-          <path d="M58 168l82-38 82 38-82 38z" fill="none" stroke="#8d8980" strokeDasharray="4 7" />
+          {/* Waiting for the first run: the tray draws itself in, then a ghost
+           * slab keeps rising out of it — data ready to leave. */}
           <path
+            className="exit-tray-line exit-tray-top"
+            d="M58 168l82-38 82 38-82 38z"
+            pathLength={100}
+            fill="none"
+            stroke="#8d8980"
+            strokeDasharray="4 7"
+          />
+          <path
+            className="exit-tray-line exit-tray-side"
             d="M58 168v13l82 38 82-38v-13"
+            pathLength={100}
             fill="none"
             stroke="#8d8980"
             strokeDasharray="4 7"
             opacity="0.65"
           />
+          <g className="exit-ghost">
+            <path
+              d="M58 158l82-38 82 38-82 38z"
+              fill={`url(#${uid}-amber)`}
+              opacity="0.3"
+              stroke="#ffc84e"
+              strokeOpacity="0.55"
+            />
+          </g>
         </g>
       ) : (
         <g className="exit-stack">

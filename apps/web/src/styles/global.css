@@ -5272,8 +5272,53 @@ p {
   animation: obj-exit-shadow 900ms var(--ease-standard) 460ms both;
 }
 
-.module-object-exit.is-running .exit-tray {
-  animation: obj-fade-in 700ms var(--ease-standard) both;
+/* Empty tray: the outline crawls in (marching dashes settle), then a ghost
+ * slab keeps rising out of the tray — the export is armed, waiting for data. */
+.module-object-exit.is-running .exit-tray-line {
+  animation: exit-march 1.6s linear both;
+}
+
+.module-object-exit.is-running .exit-tray-side {
+  animation-delay: 260ms;
+}
+
+@keyframes exit-march {
+  from {
+    stroke-dashoffset: 100;
+  }
+}
+
+.module-object-exit.is-running .exit-ghost {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: exit-ghost-rise 3.4s var(--ease-standard) 1.1s infinite;
+}
+
+@keyframes exit-ghost-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(26px) scale(0.94);
+  }
+
+  22% {
+    opacity: 0.55;
+  }
+
+  62% {
+    opacity: 0.35;
+    transform: translateY(-26px) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-40px) scale(1.02);
+  }
+}
+
+/* Hover: the ghost leaves faster — an impatient export. */
+.app-object-card:hover .module-object-exit.is-running .exit-ghost,
+.module-object-exit.is-running:hover .exit-ghost {
+  animation-duration: 1.7s;
 }
 
 @keyframes obj-exit-drop {

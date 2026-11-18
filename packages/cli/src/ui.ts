@@ -19,7 +19,14 @@ import { createInterface } from "node:readline/promises";
  * still happen locally through `proofcore test` / `proofcore sync`.
  */
 
-export const DEFAULT_API_URL = "https://proofcore-iota.vercel.app";
+/**
+ * Where the API lives.
+ *
+ * This pointed at a Vercel web deployment that no longer exists, so every command that
+ * talks to the API failed — and `login` opened a page ending in DEPLOYMENT_NOT_FOUND. The
+ * API is the Worker; the site is a different origin and must never be used as the API.
+ */
+export const DEFAULT_API_URL = "https://proofcore-api.laudesmassamba1.workers.dev";
 export const SCREENS = ["overview", "projects", "runs", "billing", "admin", "help"] as const;
 export type Screen = (typeof SCREENS)[number];
 
@@ -515,15 +522,29 @@ export async function loginDevice(input: {
       "device_start_failed"
     );
   }
-  const start = (await startResponse.json()) as DeviceStartResponse;
+  const rawStart = await startResponse.text();
+  let start: DeviceStartResponse;
+  try {
+    start = JSON.parse(rawStart) as DeviceStartResponse;
+  } catch {
+    throw new UiApiError(
+      `${apiUrl} did not answer like the PROOFCORE API (expected JSON from /api/auth/device/start). Check PROOFCORE_API_URL — the API is usually https://proofcore-api.laudesmassamba1.workers.dev.`,
+      startResponse.status,
+      "not_the_api"
+    );
+  }
+
+  // The code travels in the URL so the page opens with it already filled: retyping
+  // `9FGB-RX23` from one screen to another is where this flow loses people.
+  const approvalUrl = `${start.verificationUrl}${start.verificationUrl.includes("?") ? "&" : "?"}code=${encodeURIComponent(start.userCode)}`;
 
   input.print("");
   input.print("Open this URL on any device where you are signed in:");
-  input.print(`  ${start.verificationUrl}`);
+  input.print(`  ${approvalUrl}`);
   // Open the page first: the person is looking at their browser, not scrolling back to
   // find a URL they have to copy by hand.
   try {
-    input.openBrowser?.(start.verificationUrl);
+    input.openBrowser?.(approvalUrl);
   } catch {
     // A machine without an opener is not an error; the URL is printed below either way.
   }
