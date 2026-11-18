@@ -4,9 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import { Card, ErrorState, Loading } from "../../components/app/ui.js";
 import { useI18n } from "../../i18n/index.js";
 import { PageHeader } from "../../layouts/AppLayout.js";
-import { type ApiError, apiFetch, ApiError as ApiErrorClass } from "../../lib/api.js";
+import { type ApiError, ApiError as ApiErrorClass, apiFetch } from "../../lib/api.js";
 import { formatDay } from "../../lib/format.js";
-import { useSession, type SessionWorkspace } from "../../lib/session.js";
+import { type SessionWorkspace, useSession } from "../../lib/session.js";
 
 /**
  * The workspace section: every space the account belongs to, with switching,
@@ -82,7 +82,12 @@ export function WorkspacePage(): React.ReactElement {
         createdAt: string;
         members: Member[];
       }>(`/api/v1/workspaces/${session.workspaceId}`);
-      setDetail({ name: body.name, slug: body.slug, myRole: body.myRole, createdAt: body.createdAt });
+      setDetail({
+        name: body.name,
+        slug: body.slug,
+        myRole: body.myRole,
+        createdAt: body.createdAt,
+      });
       setMembers(body.members);
     } catch (caught) {
       setError(caught as ApiError);
@@ -110,7 +115,9 @@ export function WorkspacePage(): React.ReactElement {
       setName("");
       await session.refresh();
       session.setWorkspaceId(created.workspace.id);
-      setNotice(fr ? `Espace « ${trimmed} » créé et activé.` : `Workspace “${trimmed}” created and active.`);
+      setNotice(
+        fr ? `Espace « ${trimmed} » créé et activé.` : `Workspace “${trimmed}” created and active.`
+      );
     } catch (caught) {
       setError(caught as ApiError);
     } finally {
@@ -163,7 +170,9 @@ export function WorkspacePage(): React.ReactElement {
       );
       setMembers((items) => [...(items ?? []), body.member]);
       setInviteEmail("");
-      setNotice(fr ? `${body.member.email} rejoint l'espace.` : `${body.member.email} joined the workspace.`);
+      setNotice(
+        fr ? `${body.member.email} rejoint l'espace.` : `${body.member.email} joined the workspace.`
+      );
     } catch (caught) {
       if (caught instanceof ApiErrorClass || (caught as ApiError).code) {
         setError(caught as ApiError);
@@ -187,7 +196,11 @@ export function WorkspacePage(): React.ReactElement {
       setMembers((items) =>
         (items ?? []).map((item) => (item.userId === member.userId ? { ...item, role } : item))
       );
-      setNotice(fr ? `${member.name} est maintenant ${roleLabel(role, fr).toLowerCase()}.` : `${member.name} is now ${roleLabel(role, fr)}.`);
+      setNotice(
+        fr
+          ? `${member.name} est maintenant ${roleLabel(role, fr).toLowerCase()}.`
+          : `${member.name} is now ${roleLabel(role, fr)}.`
+      );
     } catch (caught) {
       setError(caught as ApiError);
     } finally {
@@ -231,7 +244,11 @@ export function WorkspacePage(): React.ReactElement {
       await session.refresh();
       if (remaining[0]) session.setWorkspaceId(remaining[0].id);
       setConfirmingDelete(false);
-      setNotice(fr ? "Espace supprimé, avec tous ses projets et historiques." : "Workspace deleted, with all its projects and history.");
+      setNotice(
+        fr
+          ? "Espace supprimé, avec tous ses projets et historiques."
+          : "Workspace deleted, with all its projects and history."
+      );
     } catch (caught) {
       setError(caught as ApiError);
     } finally {
@@ -350,7 +367,11 @@ export function WorkspacePage(): React.ReactElement {
               onClick={() => void create()}
               disabled={creating || name.trim().length < 2}
             >
-              {creating ? <Loader2 size={13} className="animate-spin" aria-hidden /> : <Plus size={13} aria-hidden />}
+              {creating ? (
+                <Loader2 size={13} className="animate-spin" aria-hidden />
+              ) : (
+                <Plus size={13} aria-hidden />
+              )}
               {fr ? "Créer" : "Create"}
             </button>
           </div>
@@ -360,7 +381,9 @@ export function WorkspacePage(): React.ReactElement {
         <Card
           title={fr ? "Espace actif" : "Active workspace"}
           description={
-            detail ? `${detail.name} · ${detail.slug} · ${formatDay(detail.createdAt, locale)}` : undefined
+            detail
+              ? `${detail.name} · ${detail.slug} · ${formatDay(detail.createdAt, locale)}`
+              : undefined
           }
           actions={
             detail ? (
@@ -378,9 +401,7 @@ export function WorkspacePage(): React.ReactElement {
                   if (event.key === "Enter") void rename();
                 }}
                 maxLength={80}
-                placeholder={
-                  fr ? `Renommer « ${detail.name} »…` : `Rename “${detail.name}”…`
-                }
+                placeholder={fr ? `Renommer « ${detail.name} »…` : `Rename “${detail.name}”…`}
                 className="app-input min-w-[220px] flex-1"
                 aria-label={fr ? "Nouveau nom de l'espace" : "New workspace name"}
               />
@@ -407,7 +428,11 @@ export function WorkspacePage(): React.ReactElement {
                       onClick={() => void deleteWorkspace()}
                       disabled={deleting}
                     >
-                      {deleting ? <Loader2 size={13} className="animate-spin" aria-hidden /> : <Trash2 size={13} aria-hidden />}
+                      {deleting ? (
+                        <Loader2 size={13} className="animate-spin" aria-hidden />
+                      ) : (
+                        <Trash2 size={13} aria-hidden />
+                      )}
                       {fr ? "Confirmer la suppression" : "Confirm delete"}
                     </button>
                     <button
@@ -450,8 +475,7 @@ export function WorkspacePage(): React.ReactElement {
             <ul className="mt-2 grid gap-2">
               {(members ?? []).map((member) => {
                 const self = member.userId === session.user?.id;
-                const canTouch =
-                  isOwner || (canManage && !self && member.role !== "owner");
+                const canTouch = isOwner || (canManage && !self && member.role !== "owner");
                 return (
                   <li
                     key={member.userId}
@@ -467,9 +491,7 @@ export function WorkspacePage(): React.ReactElement {
                       <p className="truncate text-sm font-medium">
                         {member.name}
                         {self ? (
-                          <span className="ml-2 text-xs text-muted">
-                            ({fr ? "vous" : "you"})
-                          </span>
+                          <span className="ml-2 text-xs text-muted">({fr ? "vous" : "you"})</span>
                         ) : null}
                       </p>
                       <p className="truncate text-xs text-muted">{member.email}</p>
@@ -531,7 +553,9 @@ export function WorkspacePage(): React.ReactElement {
                     if (event.key === "Enter") void invite();
                   }}
                   placeholder={
-                    fr ? "email@exemple.dev — doit déjà avoir un compte" : "email@example.dev — must already have an account"
+                    fr
+                      ? "email@exemple.dev — doit déjà avoir un compte"
+                      : "email@example.dev — must already have an account"
                   }
                   className="app-input min-w-[220px] flex-1"
                   aria-label={fr ? "Email à inviter" : "Email to invite"}
@@ -539,7 +563,9 @@ export function WorkspacePage(): React.ReactElement {
                 <select
                   className="app-shell-pill app-shell-select"
                   value={inviteRole}
-                  onChange={(event) => setInviteRole(event.target.value as (typeof INVITABLE_ROLES)[number])}
+                  onChange={(event) =>
+                    setInviteRole(event.target.value as (typeof INVITABLE_ROLES)[number])
+                  }
                   aria-label={fr ? "Rôle attribué" : "Assigned role"}
                 >
                   {INVITABLE_ROLES.map((role) => (
@@ -554,7 +580,11 @@ export function WorkspacePage(): React.ReactElement {
                   onClick={() => void invite()}
                   disabled={inviting || !inviteEmail.includes("@")}
                 >
-                  {inviting ? <Loader2 size={13} className="animate-spin" aria-hidden /> : <Plus size={13} aria-hidden />}
+                  {inviting ? (
+                    <Loader2 size={13} className="animate-spin" aria-hidden />
+                  ) : (
+                    <Plus size={13} aria-hidden />
+                  )}
                   {fr ? "Inviter" : "Invite"}
                 </button>
               </div>

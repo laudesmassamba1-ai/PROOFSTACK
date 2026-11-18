@@ -343,16 +343,18 @@ export function Overview() {
           </p>
           {!hasProjects ? (
             <ol className="app-onboard mt-5">
-              {[t("ws.overview.onboard.step1"), t("ws.overview.onboard.step2"), t("ws.overview.onboard.step3")].map(
-                (step, index) => (
-                  <li key={step}>
-                    <span className="app-onboard-index" aria-hidden>
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-                    <span>{step}</span>
-                  </li>
-                )
-              )}
+              {[
+                t("ws.overview.onboard.step1"),
+                t("ws.overview.onboard.step2"),
+                t("ws.overview.onboard.step3"),
+              ].map((step, index) => (
+                <li key={step}>
+                  <span className="app-onboard-index" aria-hidden>
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <span>{step}</span>
+                </li>
+              ))}
             </ol>
           ) : null}
         </div>

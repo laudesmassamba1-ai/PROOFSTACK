@@ -380,7 +380,10 @@ export default config;`;
                           </div>
                           <div className="flex gap-2">
                             <dt className="text-muted">{fr ? "Empreinte" : "Fingerprint"} :</dt>
-                            <dd className="app-mono truncate" title={finding.fingerprint ?? undefined}>
+                            <dd
+                              className="app-mono truncate"
+                              title={finding.fingerprint ?? undefined}
+                            >
                               {finding.fingerprint ? `${finding.fingerprint.slice(0, 18)}…` : "—"}
                             </dd>
                           </div>
@@ -389,7 +392,9 @@ export default config;`;
                             <dd>{formatDate(finding.detectedAt)}</dd>
                           </div>
                           <div className="flex gap-2">
-                            <dt className="text-muted">{fr ? "Détail complet" : "Full detail"} :</dt>
+                            <dt className="text-muted">
+                              {fr ? "Détail complet" : "Full detail"} :
+                            </dt>
                             <dd>
                               {fr
                                 ? "Dans la charge du rapport : /api/v1/reports — visible dans le run correspondant."
@@ -420,7 +425,12 @@ export default config;`;
                 ? `${findings.length} affichés sur ${findingsTotal} constats.`
                 : `${findings.length} of ${findingsTotal} findings shown.`}
             </p>
-            <button type="button" className="app-btn" onClick={() => void loadMoreFindings()} disabled={findingsLoadingMore}>
+            <button
+              type="button"
+              className="app-btn"
+              onClick={() => void loadMoreFindings()}
+              disabled={findingsLoadingMore}
+            >
               {findingsLoadingMore ? (
                 <Loader2 size={13} className="animate-spin" aria-hidden />
               ) : (
