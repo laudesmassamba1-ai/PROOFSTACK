@@ -2,9 +2,12 @@ import {
   BadgeCheck,
   ChevronDown,
   Eraser,
+  FileText,
   Globe,
+  Loader2,
   Lock,
   PanelLeft,
+  Paperclip,
   Plug,
   Plus,
   Search,
@@ -22,7 +25,16 @@ import {
 } from "../../components/app/ChatMarkdown.js";
 import { AiMark } from "../../components/brand/AiMark.js";
 import { useI18n } from "../../i18n/index.js";
+import {
+  type Attachment,
+  AttachmentError,
+  attachmentSummary,
+  composeMessage,
+  extractAttachment,
+  MAX_TOTAL,
+} from "../../lib/attachments.js";
 import { useSession } from "../../lib/session.js";
+import "../../styles/chat-browser.css";
 
 interface EffortLevel {
   id: "quick" | "balanced" | "deep" | "ultra";
@@ -42,7 +54,7 @@ interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
-  trace?: { tool: string; summary: string }[];
+  trace?: AgentTraceStep[];
   error?: string;
 }
 
@@ -89,6 +101,73 @@ interface ProviderOption {
   label: string;
   kind: string;
   keyOptional?: boolean;
+}
+
+/**
+ * A tool the assistant ran, plus what it can show.
+ *
+ * Most tools only have a one-line summary. `browse_url` also returns a `view`: the page as a
+ * real browser saw it, with a screenshot. The model never receives the image — it gets the
+ * text — so the picture is for the person reading, which is also why it is optional.
+ */
+interface AgentTraceStep {
+  tool: string;
+  summary: string;
+  view?: {
+    kind: "browser";
+    url: string;
+    basis: string;
+    title?: string | null;
+    status?: number | null;
+    screenshot?: string;
+    note?: string;
+  };
+}
+
+/** The in-app browser: what the assistant actually opened, not a description of it. */
+function BrowserView({ view, fr }: { view: NonNullable<AgentTraceStep["view"]>; fr: boolean }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <figure className="chat-browser">
+      <figcaption className="chat-browser-bar">
+        <Globe size={12} />
+        <span className="chat-browser-url" title={view.url}>
+          {view.url}
+        </span>
+        <span
+          className={`chat-browser-basis ${view.basis === "rendered_dom" ? "is-rendered" : ""}`}
+        >
+          {view.basis === "rendered_dom"
+            ? fr
+              ? "rendu réel"
+              : "rendered"
+            : fr
+              ? "HTML serveur"
+              : "server HTML"}
+        </span>
+        {view.screenshot && (
+          <button
+            type="button"
+            className="chat-browser-toggle"
+            onClick={() => setOpen((value) => !value)}
+          >
+            {open ? (fr ? "masquer" : "hide") : fr ? "afficher" : "show"}
+          </button>
+        )}
+      </figcaption>
+      {view.screenshot && open && (
+        <img src={view.screenshot} alt={view.title ?? view.url} loading="lazy" />
+      )}
+      {!view.screenshot && (
+        <p className="chat-browser-note">
+          {view.note ??
+            (fr
+              ? "Aucune capture : le rendu n'est pas configuré."
+              : "No screenshot: no renderer is configured.")}
+        </p>
+      )}
+    </figure>
+  );
 }
 
 /** MCP connection recipes: PROOFCORE tools inside the user's coding agent. */
@@ -306,6 +385,12 @@ function Composer({
   effort,
   onEffort,
   fr,
+  attachments,
+  onAttach,
+  onRemoveAttachment,
+  onDismissNotice,
+  extracting,
+  notice,
 }: {
   draft: string;
   setDraft: (value: string) => void;
@@ -314,9 +399,60 @@ function Composer({
   effort: EffortLevel["id"];
   onEffort: (id: EffortLevel["id"]) => void;
   fr: boolean;
+  attachments: Attachment[];
+  onAttach: (files: File[]) => void;
+  onRemoveAttachment: (index: number) => void;
+  onDismissNotice: () => void;
+  extracting: boolean;
+  notice: { title: string; detail: string } | null;
 }): React.ReactElement {
+  const inputRef = useRef<HTMLInputElement>(null);
   return (
     <div className="chat-composer">
+      {attachments.length > 0 || extracting || notice ? (
+        <div className="chat-attach-row">
+          {attachments.map((attachment, index) => (
+            <span
+              key={`${attachment.name}:${attachmentSummary(attachment)}`}
+              className="chat-attach-chip"
+            >
+              <FileText size={11} aria-hidden />
+              <span className="chat-attach-name" title={attachmentSummary(attachment)}>
+                {attachmentSummary(attachment)}
+              </span>
+              <button
+                type="button"
+                className="chat-attach-remove"
+                aria-label={fr ? `Retirer ${attachment.name}` : `Remove ${attachment.name}`}
+                onClick={() => onRemoveAttachment(index)}
+              >
+                <X size={10} aria-hidden />
+              </button>
+            </span>
+          ))}
+          {extracting ? (
+            <span className="chat-attach-chip is-pending">
+              <Loader2 size={11} className="chat-spin" aria-hidden />
+              {fr ? "Extraction du texte…" : "Extracting text…"}
+            </span>
+          ) : null}
+          {notice ? (
+            <span className="chat-attach-chip is-error" role="alert">
+              <span className="chat-attach-name" title={notice.detail}>
+                {notice.title} — {notice.detail}
+              </span>
+              <button
+                type="button"
+                className="chat-attach-remove"
+                aria-label={fr ? "Fermer l'avertissement" : "Dismiss warning"}
+                onClick={onDismissNotice}
+              >
+                <X size={10} aria-hidden />
+              </button>
+            </span>
+          ) : null}
+        </div>
+      ) : null}
       <textarea
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
@@ -331,11 +467,44 @@ function Composer({
         className="chat-composer-input"
       />
       <div className="chat-composer-bar">
-        <EffortPicker effort={effort} onSelect={onEffort} fr={fr} />
+        <div className="chat-composer-tools">
+          <EffortPicker effort={effort} onSelect={onEffort} fr={fr} />
+          <button
+            type="button"
+            className="chat-attach-btn"
+            aria-label={
+              fr
+                ? "Joindre un document (texte, .md, .csv, .json, code, PDF textuel)"
+                : "Attach a document (text, .md, .csv, .json, code, text PDF)"
+            }
+            title={
+              fr
+                ? "Joindre un document — texte, code, CSV, JSON ou PDF textuel"
+                : "Attach a document — text, code, CSV, JSON or a text PDF"
+            }
+            onClick={() => inputRef.current?.click()}
+          >
+            <Paperclip size={13} aria-hidden />
+          </button>
+          <input
+            ref={inputRef}
+            type="file"
+            multiple
+            className="sr-only"
+            accept={
+              ".txt,.md,.markdown,.csv,.tsv,.json,.log,.yml,.yaml,.toml,.ini,.xml,.html,.htm,.svg,.css,.scss,.js,.jsx,.ts,.tsx,.py,.rb,.go,.rs,.java,.c,.h,.cpp,.sh,.sql,.env,.gitignore,.pdf"
+            }
+            onChange={(event) => {
+              const files = Array.from(event.target.files ?? []);
+              event.target.value = ""; // re-selecting the same file must fire change
+              if (files.length > 0) onAttach(files);
+            }}
+          />
+        </div>
         <button
           type="button"
           onClick={onSend}
-          disabled={busy || !draft.trim()}
+          disabled={busy || (!draft.trim() && attachments.length === 0)}
           className="chat-send"
           aria-label={fr ? "Envoyer" : "Send"}
         >
@@ -358,6 +527,11 @@ export function AiChatPage(): React.ReactElement {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  // Values unused for now (the notice UI is not wired yet); the setters are, so the
+  // attachment flow can report progress without a second refactor.
+  const [extracting, setExtracting] = useState(false);
+  const [attachNotice, setAttachNotice] = useState<{ title: string; detail: string } | null>(null);
   const [effort, setEffort] = useState<EffortLevel["id"]>("balanced");
   const [busy, setBusy] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -440,7 +614,7 @@ export function AiChatPage(): React.ReactElement {
       messages: {
         role: "user" | "assistant";
         content: string;
-        trace?: { tool: string; summary: string }[];
+        trace?: AgentTraceStep[];
       }[];
       effort: EffortLevel["id"];
     };
@@ -585,13 +759,23 @@ export function AiChatPage(): React.ReactElement {
 
   const send = useCallback(async () => {
     const text = draft.trim();
-    if (!text || busy || !activeWorkspaceId) return;
+    if ((!text && attachments.length === 0) || busy || !activeWorkspaceId) return;
     if (!profile?.configured) {
       setSettingsOpen(true);
       return;
     }
+    // The model receives the attachments' extracted text; the bubble shows the
+    // plain question plus a summary line.
+    const outgoing = composeMessage(text, attachments);
+    const shown =
+      attachments.length > 0
+        ? `${text || (fr ? "Analyse des pièces jointes" : "Analyse the attachments")}\n\n📎 ${attachments
+            .map((attachment) => attachment.name)
+            .join(" · ")}`
+        : text;
     setDraft("");
-    const userMessage: ChatMessage = { id: uid(), role: "user", content: text };
+    setAttachments([]);
+    const userMessage: ChatMessage = { id: uid(), role: "user", content: shown };
     const pendingId = uid();
     setMessages((items) => [
       ...items,
@@ -607,7 +791,7 @@ export function AiChatPage(): React.ReactElement {
         body: JSON.stringify({
           workspaceId: activeWorkspaceId,
           ...(activeId ? { conversationId: activeId } : {}),
-          message: text,
+          message: outgoing,
           effort,
         }),
       });
@@ -616,7 +800,7 @@ export function AiChatPage(): React.ReactElement {
         conversationId?: string;
         title?: string;
         message?: string;
-        trace?: { tool: string; summary: string }[];
+        trace?: AgentTraceStep[];
         error?: { code?: string; message?: string; details?: Record<string, unknown> };
       } = {};
       try {
@@ -661,7 +845,47 @@ export function AiChatPage(): React.ReactElement {
     } finally {
       setBusy(false);
     }
-  }, [draft, busy, activeWorkspaceId, profile, activeId, effort, fr]);
+  }, [draft, attachments, busy, activeWorkspaceId, profile, activeId, effort, fr]);
+
+  /** Reads each dropped/selected file, keeps successes, surfaces failures honestly. */
+  const handleAttach = useCallback(
+    async (files: File[]) => {
+      setExtracting(true);
+      setAttachNotice(null);
+      const kept: Attachment[] = [];
+      let total = attachments.reduce((sum, attachment) => sum + attachment.text.length, 0);
+      let failure: { title: string; detail: string } | null = null;
+      for (const file of files) {
+        try {
+          const attachment = await extractAttachment(file);
+          if (total + attachment.text.length > MAX_TOTAL) {
+            failure = {
+              title: file.name,
+              detail: fr
+                ? "Budget de texte atteint — retirez une pièce jointe ou envoyez-la dans un message séparé."
+                : "Text budget reached — remove an attachment or send it in a separate message.",
+            };
+            break;
+          }
+          total += attachment.text.length;
+          kept.push(attachment);
+        } catch (caught) {
+          if (caught instanceof AttachmentError) {
+            failure = { title: caught.title, detail: caught.detail };
+          } else {
+            failure = {
+              title: file.name,
+              detail: fr ? "Lecture impossible." : "Could not read the file.",
+            };
+          }
+        }
+      }
+      if (kept.length > 0) setAttachments((items) => [...items, ...kept]);
+      setAttachNotice(failure);
+      setExtracting(false);
+    },
+    [attachments, fr]
+  );
 
   const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId);
   const firstName = (user?.name ?? "").split(/\s+/)[0] ?? "";
@@ -819,6 +1043,14 @@ export function AiChatPage(): React.ReactElement {
                 effort={effort}
                 onEffort={setEffort}
                 fr={fr}
+                attachments={attachments}
+                onAttach={(files) => void handleAttach(files)}
+                onRemoveAttachment={(index) =>
+                  setAttachments((items) => items.filter((_, i) => i !== index))
+                }
+                onDismissNotice={() => setAttachNotice(null)}
+                extracting={extracting}
+                notice={attachNotice}
               />
               <p className="chat-disclaimer">
                 {fr
@@ -860,6 +1092,15 @@ export function AiChatPage(): React.ReactElement {
                             })}
                           </div>
                         )}
+                        {message.trace
+                          ?.filter((step) => step.view?.kind === "browser")
+                          .map((step) => (
+                            <BrowserView
+                              key={`view:${step.view?.url}:${step.summary}`}
+                              view={step.view as NonNullable<AgentTraceStep["view"]>}
+                              fr={fr}
+                            />
+                          ))}
                         {message.error ? (
                           <div className="chat-error">{message.error}</div>
                         ) : message.content ? (
@@ -891,6 +1132,14 @@ export function AiChatPage(): React.ReactElement {
                 effort={effort}
                 onEffort={setEffort}
                 fr={fr}
+                attachments={attachments}
+                onAttach={(files) => void handleAttach(files)}
+                onRemoveAttachment={(index) =>
+                  setAttachments((items) => items.filter((_, i) => i !== index))
+                }
+                onDismissNotice={() => setAttachNotice(null)}
+                extracting={extracting}
+                notice={attachNotice}
               />
               <p className="chat-disclaimer">
                 {fr

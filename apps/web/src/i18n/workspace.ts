@@ -6,6 +6,7 @@
 export const workspaceEn = {
   "ws.nav.overview": "Overview",
   "ws.nav.projects": "Projects",
+  "ws.nav.workspace": "Workspace",
   "ws.nav.engines": "Modules",
   "ws.nav.cli": "CLI",
   "ws.nav.ai": "AI",
@@ -359,6 +360,7 @@ export type WorkspaceKey = keyof typeof workspaceEn;
 export const workspaceFr: Record<WorkspaceKey, string> = {
   "ws.nav.overview": "Vue d'ensemble",
   "ws.nav.projects": "Projets",
+  "ws.nav.workspace": "Espace",
   "ws.nav.engines": "Modules",
   "ws.nav.cli": "CLI",
   "ws.nav.ai": "IA",

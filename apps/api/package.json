@@ -14,6 +14,7 @@
     "db:migrate:remote": "wrangler d1 migrations apply proofcore --remote"
   },
   "dependencies": {
+    "@cloudflare/puppeteer": "^2.0.1",
     "@proofcore/adapter-payments": "workspace:*",
     "@proofcore/adapter-reporting": "workspace:*",
     "@proofcore/billing": "workspace:*",

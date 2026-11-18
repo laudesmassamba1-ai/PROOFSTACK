@@ -39,3 +39,4 @@ reports/
 
 # local agent sessions and semantic index
 .proofcore/
+.env*

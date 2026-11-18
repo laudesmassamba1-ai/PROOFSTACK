@@ -1,6 +1,7 @@
 import {
   BadgeCheck,
   Box,
+  Boxes,
   ChevronDown,
   Command,
   CreditCard,
@@ -211,6 +212,7 @@ export function AppLayout() {
     const list: Array<[string, string, ReactNode]> = [
       [t("ws.nav.overview"), "/app", <LayoutDashboard key="overview" size={15} />],
       [t("ws.nav.projects"), "/app/projects", <FolderKanban key="projects" size={15} />],
+      [t("ws.nav.workspace"), "/app/workspace", <Boxes key="workspace" size={15} />],
       ["WORLD", "/app/modules/world", <Globe2 key="world" size={15} />],
       ["FLOW", "/app/modules/flow", <RouteIcon key="flow" size={15} />],
       ["EXIT", "/app/modules/exit", <PackageOpen key="exit" size={15} />],
@@ -326,6 +328,12 @@ export function AppLayout() {
             </NavLink>
             <NavLink to="/app/projects" className="app-toplink">
               {t("ws.nav.projects")}
+            </NavLink>
+            <NavLink
+              to="/app/workspace"
+              className={({ isActive }) => `app-toplink ${isActive ? "is-active" : ""}`}
+            >
+              {t("ws.nav.workspace")}
             </NavLink>
             <div className="app-engines">
               <button

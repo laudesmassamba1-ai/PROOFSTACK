@@ -1,0 +1,63 @@
+/* In-app browser for the assistant's `browse_url`: the page it opened, with the
+   honest badge for rendered vs fetched. Kept out of global.css so the two can move
+   independently. */
+/* ---------- in-app browser (assistant `browse_url`) ---------- */
+@layer components {
+  .chat-browser {
+    margin: 10px 0 2px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--surface-2);
+  }
+  .chat-browser-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--muted-foreground);
+    background: var(--surface-1);
+  }
+  .chat-browser-url {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--font-mono, ui-monospace, monospace);
+  }
+  .chat-browser-basis {
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 1px 7px;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .chat-browser-basis.is-rendered {
+    border-color: color-mix(in oklab, var(--primary) 45%, transparent);
+    color: var(--primary);
+  }
+  .chat-browser-toggle {
+    background: none;
+    border: 0;
+    color: var(--muted-foreground);
+    font-size: 11px;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .chat-browser img {
+    display: block;
+    width: 100%;
+    height: auto;
+    background: #fff;
+  }
+  .chat-browser-note {
+    margin: 0;
+    padding: 10px 12px;
+    font-size: 12px;
+    color: var(--muted-foreground);
+  }
+}

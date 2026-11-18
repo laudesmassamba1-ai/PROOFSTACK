@@ -33,3 +33,7 @@ API_ORIGIN = "https://proofcore-api.laudesmassamba1.workers.dev"
 # no "first user is admin" fallback. Set it to the creator's own account email:
 #   ADMIN_EMAILS = "you@example.com"
 ADMIN_EMAILS = "extends08@gmail.com"
+
+# Real browser for the assistant's browse_url tool: renders JavaScript, returns a screenshot.
+[browser]
+binding = "BROWSER"

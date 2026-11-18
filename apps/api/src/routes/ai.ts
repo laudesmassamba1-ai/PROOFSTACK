@@ -8,6 +8,7 @@ import {
   PROVIDERS,
   type ProviderDefinition,
 } from "../ai-providers.js";
+import { browsePage, describeBrowsedPage } from "../browser-render.js";
 import { clientAddress, HttpError, RateLimiter } from "../http/errors.js";
 import { readBody, requireWorkspace } from "../http/guards.js";
 import type { AppEnv, Services } from "../http/services.js";
@@ -479,6 +480,19 @@ const TOOLS: { name: string; description: string; parameters: Record<string, unk
     },
   },
   {
+    name: "browse_url",
+    description:
+      "Open a URL in a real browser and describe what is actually there: title, headings, visible text, and a screenshot the user can see in the chat. Use it when a page's behaviour depends on JavaScript. Reports whether the page was rendered or only fetched — never pretend a fetched shell is the rendered page.",
+    parameters: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "Absolute http(s) URL to open." },
+      },
+      required: ["url"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "probe_url",
     description:
       "Infrastructure probe of one URL: status, response time, redirects, content type. Use for availability questions.",
@@ -810,7 +824,7 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
       messages.push({ role: message.role, content: message.content });
     }
 
-    const trace: { tool: string; summary: string }[] = [];
+    const trace: { tool: string; summary: string; view?: unknown }[] = [];
     let finalContent = "";
     const deadline = Date.now() + 25_000;
     for (let turn = 0; turn < tuning.maxTurns; turn += 1) {
@@ -839,9 +853,18 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
           workspace.id,
           call.name,
           call.arguments,
-          tuning.maxFetchChars
+          tuning.maxFetchChars,
+          // The Worker's `browser` binding, when wrangler.toml declares one: a real
+          // Chromium on the account's own compute, with no API token to leak or expire.
+          // Optional chaining: a test harness and a Node deployment have no bindings at
+          // all, and a missing browser must mean "server_html", not a 500.
+          c.env?.BROWSER as unknown
         );
-        trace.push({ tool: call.name, summary: outcome.summary });
+        trace.push({
+          tool: call.name,
+          summary: outcome.summary,
+          ...(outcome.view ? { view: outcome.view } : {}),
+        });
         messages.push({
           role: "tool",
           tool_call_id: call.id,
@@ -908,8 +931,9 @@ async function executeTool(
   workspaceId: string,
   name: string,
   rawArguments: string,
-  maxFetchChars: number
-): Promise<{ content: string; summary: string }> {
+  maxFetchChars: number,
+  browserBinding?: unknown
+): Promise<{ content: string; summary: string; view?: unknown }> {
   let args: Record<string, unknown> = {};
   try {
     args = JSON.parse(rawArguments || "{}") as Record<string, unknown>;
@@ -1030,6 +1054,8 @@ async function executeTool(
         return fetchWeb(args, maxFetchChars);
       case "read_repo":
         return readRepo(args);
+      case "browse_url":
+        return browseUrl(args, services, browserBinding);
       case "probe_url":
         return probeUrl(args);
       case "fail_scan":
@@ -1048,6 +1074,42 @@ async function executeTool(
       summary: "tool error",
     };
   }
+}
+
+/**
+ * `browse_url` — opens the page in a browser, or says plainly that it only fetched it.
+ *
+ * The screenshot is returned to the browser, not to the model: `describeBrowsedPage`
+ * strips it, because a text model cannot read pixels and a base64 blob would consume the
+ * whole context window. The user sees the image; the model gets the text.
+ */
+async function browseUrl(
+  args: Record<string, unknown>,
+  services: Services,
+  browserBinding?: unknown
+): Promise<{ content: string; summary: string; view?: unknown }> {
+  const url = assertPublicUrl(String(args.url ?? ""));
+  const page = await browsePage({
+    url,
+    env: {
+      CF_ACCOUNT_ID: services.config.cfAccountId,
+      CF_BROWSER_TOKEN: services.config.cfBrowserToken,
+    },
+    ...(browserBinding ? { browserBinding } : {}),
+  });
+  return {
+    content: describeBrowsedPage(page),
+    summary: `${page.basis} · ${page.status ?? "?"} · ${page.title ?? "untitled"}`,
+    view: {
+      kind: "browser",
+      url: page.finalUrl,
+      basis: page.basis,
+      title: page.title,
+      status: page.status,
+      ...(page.screenshot ? { screenshot: page.screenshot } : {}),
+      ...(page.note ? { note: page.note } : {}),
+    },
+  };
 }
 
 /**
@@ -1158,7 +1220,7 @@ async function fetchWeb(args: Record<string, unknown>, maxFetchChars: number) {
  */
 export async function readRepo(
   args: Record<string, unknown>
-): Promise<{ content: string; summary: string }> {
+): Promise<{ content: string; summary: string; view?: unknown }> {
   const raw = typeof args.url === "string" ? args.url.trim() : "";
   if (!raw)
     return { content: stableStringify({ error: "url is required" }), summary: "missing url" };

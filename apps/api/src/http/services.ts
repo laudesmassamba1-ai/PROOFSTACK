@@ -75,4 +75,13 @@ export interface Variables {
   apiKey: ApiKeyRecord;
 }
 
-export type AppEnv = { Variables: Variables };
+export type AppEnv = {
+  Variables: Variables;
+  /**
+   * The Worker's `browser` binding, declared in wrangler.toml.
+   *
+   * Optional on purpose: a Worker without the binding still serves every tool, and
+   * `browse_url` then reports `server_html` instead of pretending it rendered the page.
+   */
+  Bindings: { BROWSER?: unknown };
+};

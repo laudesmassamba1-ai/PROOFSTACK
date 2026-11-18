@@ -11,6 +11,36 @@ comme tel.
 
 ---
 
+## The in-app browser (`browse_url`)
+
+The assistant can open a page in a real browser and show the screenshot in the chat. A
+Worker cannot run Chromium, so this needs Cloudflare Browser Rendering. Two ways, in order
+of preference:
+
+**1. The binding (configured in this repository, nothing to supply).**
+
+```toml
+# apps/api/wrangler.toml
+[browser]
+binding = "BROWSER"
+```
+
+The account's own compute renders the page; there is no API token to create, leak or
+rotate, and `wrangler deploy` reports `env.BROWSER → Browser`. Verified live: example.com
+returns `basis: rendered_dom` with a 76 KB screenshot.
+
+**2. The REST API, for a deployment without the binding.**
+
+```bash
+wrangler secret put CF_ACCOUNT_ID      # dashboard → Workers & Pages → Account ID
+wrangler secret put CF_BROWSER_TOKEN   # My Profile → API Tokens,
+                                       #   Account → Browser Rendering → Edit
+```
+
+Without them the tool still answers, and it says what it did: `basis: server_html` — the
+page as fetched, JavaScript not executed. The chat shows the badge "HTML serveur" instead of
+"rendu réel", so a single-page app's empty shell is never presented as the real page.
+
 ## 1. E-mail transactionnel — récupération de compte
 
 Sans cela : pas de réinitialisation de mot de passe livrée, pas de vérification

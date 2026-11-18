@@ -38,6 +38,15 @@ export interface AppConfig {
   mailFrom: string | undefined;
   /** Address shown to customers for support, and recipient of support notifications. */
   supportEmail: string;
+  /**
+   * Cloudflare Browser Rendering, used by the assistant's `browse_url` tool.
+   *
+   * A Worker cannot run Chromium, so a real rendered page needs this service. Without it
+   * the tool still works, but reports `server_html`: the page as fetched, JavaScript not
+   * executed. The distinction is shown to the user rather than hidden.
+   */
+  cfAccountId: string | undefined;
+  cfBrowserToken: string | undefined;
 }
 
 export type Env = Record<string, string | undefined>;
@@ -67,6 +76,8 @@ export function readConfig(env: Env): AppConfig {
     resendApiKey: env.RESEND_API_KEY,
     mailFrom: env.MAIL_FROM,
     supportEmail: env.SUPPORT_EMAIL ?? "support@proofcore.dev",
+    cfAccountId: env.CF_ACCOUNT_ID?.trim() || undefined,
+    cfBrowserToken: env.CF_BROWSER_TOKEN?.trim() || undefined,
   };
 }
 

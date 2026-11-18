@@ -39,6 +39,9 @@ const AppLayout = lazy(() =>
 const Overview = lazy(() =>
   import("./pages/app/Overview.js").then((m) => ({ default: m.Overview }))
 );
+const WorkspacePage = lazy(() =>
+  import("./pages/app/Workspace.js").then((m) => ({ default: m.WorkspacePage }))
+);
 const Projects = lazy(() =>
   import("./pages/app/Projects.js").then((m) => ({ default: m.Projects }))
 );
@@ -109,6 +112,7 @@ export function App() {
           <Route index element={<Overview />} />
           <Route path="projects" element={<Projects />} />
           <Route path="projects/:projectId" element={<ProjectDetail />} />
+          <Route path="workspace" element={<WorkspacePage />} />
           <Route path="modules/:module" element={<AppModulePage />} />
           <Route path="cli" element={<Cli />} />
           <Route path="billing" element={<Billing />} />

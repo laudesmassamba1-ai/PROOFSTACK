@@ -311,25 +311,161 @@ export function MessageActions({ text, fr }: { text: string; fr: boolean }): Rea
 
 /* ---------- conversation print (browser "Save as PDF") ---------- */
 
+/* ---------- print / PDF export ----------
+ * The printed document gets the same treatment as the screen: the block parser's
+ * grammar is re-walked to emit real HTML (tables are tables, code blocks keep
+ * their syntax colours through `tokenize`), with a print stylesheet in the
+ * design's typographic register. Nothing here trusts the message text — every
+ * piece goes through `esc` before any markup is composed. */
+
+function esc(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/** Inline markdown to HTML, on already-escaped text. */
+function inlineHtml(value: string): string {
+  return esc(value)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^*\s][^*]*)\*/g, "<em>$1</em>")
+    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2">$1</a>');
+}
+
+function codeBlockHtml(code: string, lang: string | undefined): string {
+  const tokens = tokenize(code, lang);
+  const body = tokens
+    .map((token) =>
+      token.cls ? `<span class="${token.cls}">${esc(token.text)}</span>` : esc(token.text)
+    )
+    .join("");
+  return `<figure class="print-code"><figcaption>${esc(lang || "code")}</figcaption><pre><code>${body}</code></pre></figure>`;
+}
+
+function blocksToHtml(source: string): string {
+  const lines = source.split("\n");
+  const out: string[] = [];
+  let index = 0;
+
+  const flushList = (ordered: boolean, start: number): number => {
+    const items: string[] = [];
+    let cursor = start;
+    const pattern = ordered ? /^\s*\d+[.)]\s+/ : /^\s*[-*]\s+/;
+    while (cursor < lines.length && pattern.test(lines[cursor] ?? "")) {
+      items.push(`<li>${inlineHtml((lines[cursor] ?? "").replace(pattern, ""))}</li>`);
+      cursor += 1;
+    }
+    out.push(ordered ? `<ol>${items.join("")}</ol>` : `<ul>${items.join("")}</ul>`);
+    return cursor;
+  };
+
+  while (index < lines.length) {
+    const line = lines[index] ?? "";
+
+    const fence = line.match(/^```(\w*)\s*$/);
+    if (fence) {
+      const body: string[] = [];
+      index += 1;
+      while (index < lines.length && !(lines[index] ?? "").startsWith("```")) {
+        body.push(lines[index] ?? "");
+        index += 1;
+      }
+      index += 1;
+      out.push(codeBlockHtml(body.join("\n"), fence[1] || undefined));
+      continue;
+    }
+
+    const heading = line.match(/^(#{1,4})\s+(.*)$/);
+    if (heading) {
+      const level = (heading[1] ?? "").length;
+      const tag = level <= 1 ? "h2" : level === 2 ? "h3" : "h4";
+      out.push(`<${tag}>${inlineHtml(heading[2] ?? "")}</${tag}>`);
+      index += 1;
+      continue;
+    }
+
+    if (/^\s*(---+|\*\*\*+)\s*$/.test(line)) {
+      out.push("<hr>");
+      index += 1;
+      continue;
+    }
+
+    if (/^\s*\|.+\|\s*$/.test(line) && /^\s*\|[\s:|-]+\|\s*$/.test(lines[index + 1] ?? "")) {
+      const cells = (row: string) =>
+        row
+          .trim()
+          .replace(/^\||\|$/g, "")
+          .split("|")
+          .map((cell) => cell.trim());
+      const head = cells(line)
+        .map((cell) => `<th>${inlineHtml(cell)}</th>`)
+        .join("");
+      index += 2;
+      const rows: string[] = [];
+      while (index < lines.length && /^\s*\|.+\|\s*$/.test(lines[index] ?? "")) {
+        rows.push(
+          `<tr>${cells(lines[index] ?? "")
+            .map((cell) => `<td>${inlineHtml(cell)}</td>`)
+            .join("")}</tr>`
+        );
+        index += 1;
+      }
+      out.push(`<table><thead><tr>${head}</tr></thead><tbody>${rows.join("")}</tbody></table>`);
+      continue;
+    }
+
+    if (/^>\s?/.test(line)) {
+      const quoted: string[] = [];
+      while (index < lines.length && /^>\s?/.test(lines[index] ?? "")) {
+        quoted.push((lines[index] ?? "").replace(/^>\s?/, ""));
+        index += 1;
+      }
+      out.push(`<blockquote>${blocksToHtml(quoted.join("\n"))}</blockquote>`);
+      continue;
+    }
+
+    if (/^\s*[-*]\s+/.test(line)) {
+      index = flushList(false, index);
+      continue;
+    }
+
+    if (/^\s*\d+[.)]\s+/.test(line)) {
+      index = flushList(true, index);
+      continue;
+    }
+
+    if (!line.trim()) {
+      index += 1;
+      continue;
+    }
+
+    const paragraph: string[] = [];
+    while (
+      index < lines.length &&
+      (lines[index] ?? "").trim() !== "" &&
+      !/^```/.test(lines[index] ?? "") &&
+      !/^#{1,4}\s/.test(lines[index] ?? "") &&
+      !/^\s*[-*]\s+/.test(lines[index] ?? "") &&
+      !/^\s*\d+[.)]\s+/.test(lines[index] ?? "") &&
+      !/^>\s?/.test(lines[index] ?? "") &&
+      !/^\s*\|.+\|\s*$/.test(lines[index] ?? "")
+    ) {
+      paragraph.push(lines[index] ?? "");
+      index += 1;
+    }
+    out.push(`<p>${inlineHtml(paragraph.join("\n"))}</p>`);
+  }
+  return out.join("\n");
+}
+
 export function printConversation(
   messages: { role: string; content: string }[],
   title: string
 ): void {
-  const esc = (value: string) =>
-    value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  // Blocks are pre-escaped; inline markdown is applied afterwards on the escaped
-  // text so user content can never inject markup.
-  const inline = (value: string) =>
-    esc(value)
-      .replace(/`([^`]+)`/g, "<code>$1</code>")
-      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-      .replace(/\*([^*\s][^*]*)\*/g, "<em>$1</em>")
-      .replace(/\n/g, "<br>");
   const body = messages
     .map((message) =>
       message.role === "user"
-        ? `<div class="user">${inline(message.content)}</div>`
-        : `<div class="ai">${inline(message.content)}</div>`
+        ? `<div class="print-user">${blocksToHtml(message.content)}</div>`
+        : `<div class="print-ai">${blocksToHtml(message.content)}</div>`
     )
     .join("\n");
   const win = window.open("", "_blank", "width=820,height=920");
@@ -337,15 +473,99 @@ export function printConversation(
   win.document.write(`<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><title>${esc(title)}</title>
 <style>
-  body { font: 12pt/1.6 Georgia, "Times New Roman", serif; color: #111; max-width: 46rem; margin: 3rem auto; padding: 0 1rem; }
-  h1 { font-size: 14pt; letter-spacing: 0.08em; text-transform: uppercase; border-bottom: 1px solid #111; padding-bottom: 0.4rem; }
-  .meta { font: 9pt monospace; color: #666; margin-bottom: 2rem; }
-  .user { background: #f2f0ea; border-radius: 8px; padding: 0.7rem 1rem; margin: 1.2rem 0 0.4rem; }
-  .ai { padding: 0.2rem 0 1rem; border-left: 2px solid #ddd; padding-left: 1rem; margin: 0.4rem 0 1.4rem; }
-  code { font: 9.5pt "JetBrains Mono", ui-monospace, monospace; background: #f2f0ea; padding: 0.05em 0.3em; border-radius: 3px; }
+  :root { color-scheme: light; }
+  body {
+    font: 10.5pt/1.65 "Georgia", "Times New Roman", serif;
+    color: #17150f;
+    max-width: 46rem;
+    margin: 2.6rem auto 3rem;
+    padding: 0 1.1rem;
+  }
+  header.print-head { border-bottom: 2px solid #17150f; padding-bottom: 0.9rem; margin-bottom: 2rem; }
+  header.print-head .mark { font: 700 10pt "JetBrains Mono", ui-monospace, monospace; letter-spacing: 0.22em; }
+  h1 { font-size: 13pt; letter-spacing: 0.1em; text-transform: uppercase; margin: 0.7rem 0 0.2rem; }
+  .meta { font: 8.5pt "JetBrains Mono", ui-monospace, monospace; color: #8a8577; margin: 0; }
+  .print-user {
+    background: #f4f1e9;
+    border: 1px solid #e4dfd2;
+    border-radius: 10px;
+    padding: 0.8rem 1.1rem;
+    margin: 1.4rem 0 0.5rem;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    font-size: 10pt;
+  }
+  .print-ai { padding: 0.2rem 0 1.2rem; margin: 0.3rem 0 1rem; }
+  .print-ai > :first-child { margin-top: 0; }
+  h2 { font-size: 12.5pt; border-bottom: 1px solid #e4dfd2; padding-bottom: 0.3rem; margin: 1.6rem 0 0.6rem; }
+  h3 { font-size: 11pt; margin: 1.4rem 0 0.5rem; }
+  h4 { font: 600 8.5pt "JetBrains Mono", ui-monospace, monospace; letter-spacing: 0.07em; text-transform: uppercase; color: #57503f; margin: 1.2rem 0 0.4rem; }
+  p { margin: 0.5rem 0; }
+  ul, ol { margin: 0.5rem 0; padding-left: 1.4rem; }
+  li { margin: 0.25rem 0; }
+  blockquote { border-left: 2px solid #c9c2ae; margin: 0.6rem 0; padding: 0.2rem 0 0.2rem 0.9rem; color: #57503f; }
+  hr { border: 0; border-top: 1px solid #e4dfd2; margin: 1.4rem 0; }
+  code {
+    font: 9pt "JetBrains Mono", ui-monospace, monospace;
+    background: #f4f1e9;
+    padding: 0.08em 0.32em;
+    border-radius: 4px;
+  }
+  figure.print-code {
+    border: 1px solid #e4dfd2;
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 0.8rem 0;
+    page-break-inside: avoid;
+  }
+  figure.print-code figcaption {
+    font: 600 7.5pt "JetBrains Mono", ui-monospace, monospace;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    background: #efece2;
+    border-bottom: 1px solid #e4dfd2;
+    padding: 0.35rem 0.8rem;
+    color: #57503f;
+  }
+  figure.print-code pre {
+    margin: 0;
+    padding: 0.7rem 0.9rem;
+    font: 9pt/1.6 "JetBrains Mono", ui-monospace, monospace;
+    overflow-x: auto;
+  }
+  /* Syntax palette — same roles as the app, tuned for the paper print sheet. */
+  .tok-key { color: #b13a2e; font-weight: 600; }
+  .tok-str { color: #0e6e59; }
+  .tok-num { color: #a05a12; }
+  .tok-fn, .tok-tag, .tok-sel { color: #1d4ed8; }
+  .tok-bif, .tok-prop, .tok-attr, .tok-flag { color: #0e6e59; }
+  .tok-var { color: #6d28d9; }
+  .tok-com { color: #9a927c; font-style: italic; }
+  .tok-punc { color: #6b6350; }
+  table { border-collapse: collapse; width: 100%; margin: 0.8rem 0; font-size: 9.5pt; page-break-inside: avoid; }
+  th {
+    text-align: left;
+    font: 600 8pt "JetBrains Mono", ui-monospace, monospace;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #57503f;
+    border-bottom: 1.5px solid #17150f;
+    padding: 0.35rem 0.6rem;
+  }
+  td { border-bottom: 1px solid #e4dfd2; padding: 0.35rem 0.6rem; vertical-align: top; }
+  tbody tr:nth-child(even) td { background: #faf8f1; }
+  a { color: #1d4ed8; }
+  @page { margin: 1.6cm; }
+  @media print {
+    body { max-width: none; margin: 0; }
+    .print-user, figure.print-code { page-break-inside: avoid; }
+    .print-ai { page-break-after: auto; }
+  }
 </style></head><body>
-<h1>${esc(title)}</h1>
-<p class="meta">PROOFCORE · ${new Date().toLocaleString("fr-FR")}</p>
+<header class="print-head">
+  <p class="mark">PROOFCORE</p>
+  <h1>${esc(title)}</h1>
+  <p class="meta">${new Date().toLocaleString("fr-FR")}</p>
+</header>
 ${body}
 </body></html>`);
   win.document.close();
@@ -357,8 +577,8 @@ ${body}
     win.print();
   };
   if (win.document.readyState === "complete") {
-    window.setTimeout(trigger, 150);
+    window.setTimeout(trigger, 200);
   } else {
-    win.addEventListener("load", () => window.setTimeout(trigger, 150));
+    win.addEventListener("load", () => window.setTimeout(trigger, 200));
   }
 }
