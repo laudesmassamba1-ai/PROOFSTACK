@@ -99,6 +99,52 @@ export function readConfig(env: Env): AppConfig {
   };
 }
 
+/**
+ * Is this `Origin` header one of ours?
+ *
+ * Exact matches cover the canonical deployments. A pattern entry may use `*` as one
+ * label — `https://*.proofstack-01z.pages.dev` — because Cloudflare Pages and Vercel
+ * give every deployment a fresh hostname (`6f0fee2d.proofstack-01z.pages.dev`,
+ * `proofstack-3lh66ezz5-<team>.vercel.app`) and an allowlist that only names the
+ * production alias silently rejects every write made from a preview URL. That is how a
+ * workspace invitation answered `cross_origin_denied` while the rest of the app looked
+ * fine.
+ *
+ * The match is deliberately narrow:
+ *   - the scheme must be identical, so `http://x` never matches `https://x`;
+ *   - `*` stands for exactly one label, so `evil.attacker.com.our.domain` cannot pass;
+ *   - no path, query or trailing slash is accepted in the header value.
+ *
+ * A bare wildcard over a shared suffix (`https://*.pages.dev`) is not a pattern this
+ * function can express safely and should never be configured: anyone can deploy to it.
+ */
+export function originAllowed(origins: readonly string[], candidate: string | undefined): boolean {
+  if (!candidate) return false;
+  // The header is a serialized origin, i.e. scheme://host[:port]. It always contains
+  // "//", so a naive "no slash" test rejects everything — including our own app. Parsing
+  // it is also what turns a hostile string like `https://x.dev/path` into a refusal
+  // instead of a lucky prefix match.
+  let parsed: URL;
+  try {
+    parsed = new URL(candidate.trim());
+  } catch {
+    return false;
+  }
+  if (parsed.pathname !== "/" || parsed.search !== "" || parsed.hash !== "") return false;
+  const value = parsed.origin;
+  for (const entry of origins) {
+    if (entry === value) return true;
+    const star = entry.indexOf("*");
+    if (star === -1) continue;
+    const prefix = entry.slice(0, star);
+    const suffix = entry.slice(star + 1);
+    if (!value.startsWith(prefix) || !value.endsWith(suffix)) continue;
+    const label = value.slice(prefix.length, value.length - suffix.length);
+    if (label.length > 0 && !label.includes(".")) return true;
+  }
+  return false;
+}
+
 function parseWebOrigins(raw: string | undefined): string[] {
   const values = (raw ?? "http://localhost:5173")
     .split(",")

@@ -3,7 +3,7 @@ import { API_VERSION } from "@proofcore/contracts";
 import { iso, uuid } from "@proofcore/core";
 import { Hono } from "hono";
 import type { Database } from "./db/types.js";
-import { type Env, readConfig } from "./env.js";
+import { type Env, originAllowed, readConfig } from "./env.js";
 import { HttpError, toErrorResponse } from "./http/errors.js";
 import { type AppEnv, createServices, type Services } from "./http/services.js";
 import { createPaymentProvider } from "./providers.js";
@@ -74,7 +74,7 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
   // up.
   app.use("*", async (c, next) => {
     const origin = c.req.header("origin");
-    if (origin && config.webOrigins.includes(origin)) {
+    if (origin && originAllowed(config.webOrigins, origin)) {
       c.header("Access-Control-Allow-Origin", origin);
       c.header("Access-Control-Allow-Credentials", "true");
       c.header("Vary", "Origin");
@@ -95,11 +95,14 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
   app.use("/api/v1/*", async (c, next) => {
     if (c.req.method !== "GET" && c.req.method !== "HEAD" && c.req.method !== "OPTIONS") {
       const origin = c.req.header("origin");
-      if (origin && !config.webOrigins.includes(origin)) {
+      if (origin && !originAllowed(config.webOrigins, origin)) {
+        // The origin is echoed in `details` on purpose: without it the message reads like
+        // a mystery, and the fix is always the same one line — add that host to WEB_ORIGIN.
         throw new HttpError(
           403,
           "cross_origin_denied",
-          "This origin is not allowed to call the API."
+          `This origin is not allowed to call the API: ${origin}. Add it to WEB_ORIGIN to allow it.`,
+          { origin }
         );
       }
     }

@@ -25,7 +25,14 @@ enabled = true
 
 [vars]
 NODE_ENV = "production"
-WEB_ORIGIN = "https://proofstack-iota.vercel.app,https://proofcore-iota.vercel.app,https://proofcore-01z.pages.dev"
+# Every web origin allowed to make credentialed calls, comma separated. The first entry
+# is the canonical one used when a link (password reset, email) needs an absolute URL.
+#
+# `*` covers exactly one label and exists for deployment previews: Cloudflare Pages and
+# Vercel mint a new hostname per deployment, and without it every write from a preview
+# URL fails with `cross_origin_denied`. Never use a wildcard over a shared suffix such
+# as `*.pages.dev` — anyone can deploy there.
+WEB_ORIGIN = "https://proofstack-iota.vercel.app,https://proofstack-01z.pages.dev,https://*.proofstack-01z.pages.dev,https://proofcore-iota.vercel.app,https://proofcore-01z.pages.dev,https://proofstack-*-laudesmassamba1-ais-projects.vercel.app"
 API_ORIGIN = "https://proofcore-api.laudesmassamba1.workers.dev"
 
 # Comma-separated allowlist for the read-only /app/admin operations console.
