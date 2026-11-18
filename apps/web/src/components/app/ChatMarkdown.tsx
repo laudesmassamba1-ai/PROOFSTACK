@@ -1,6 +1,7 @@
 import { Check, Copy, Download } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
+import { tokenize, type Token } from "./highlight.js";
 
 /**
  * The assistant's text surface, at the standard set by Claude/GPT.
@@ -56,6 +57,26 @@ function Inline({ text }: { text: string }): React.ReactNode[] {
 
 /* ---------- code block ---------- */
 
+/** Renders one token as its span; tokens never carry raw HTML. */
+function HighlightedCode({ code, lang }: { code: string; lang?: string }) {
+  const tokens: Token[] = tokenize(code, lang);
+  return (
+    <pre className="chat-code-body">
+      <code>
+        {tokens.map((token, index) =>
+          token.cls ? (
+            <span key={index} className={token.cls}>
+              {token.text}
+            </span>
+          ) : (
+            token.text
+          )
+        )}
+      </code>
+    </pre>
+  );
+}
+
 function CodeBlock({ code, lang }: { code: string; lang?: string }): React.ReactElement {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
@@ -76,9 +97,7 @@ function CodeBlock({ code, lang }: { code: string; lang?: string }): React.React
           {copied ? "Copié" : "Copier"}
         </button>
       </figcaption>
-      <pre className="chat-code-body">
-        <code>{code}</code>
-      </pre>
+      <HighlightedCode code={code} lang={lang} />
     </figure>
   );
 }

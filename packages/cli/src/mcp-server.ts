@@ -29,6 +29,7 @@ import {
   writeFileWithDiff,
 } from "./code-tools.js";
 import { assembleProviders, blockingSafetyWarnings } from "./providers.js";
+import { runInSandbox } from "./sandbox.js";
 
 /**
  * PROOFCORE's MCP server: `proofcore mcp`.
@@ -276,6 +277,26 @@ export function mcpToolDescriptors(): McpToolDescriptor[] {
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
     },
 
+    {
+      name: "run_sandboxed",
+      description:
+        "Run a command inside a throwaway container: no network, read-only root, no capabilities. Refuses rather than falling back to an unisolated run.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          command: { type: "string" },
+          args: { type: "array", items: { type: "string" } },
+          writable: { type: "boolean", description: "Mount the workspace read-write." },
+          network: { type: "boolean", description: "Allow outbound network." },
+          image: { type: "string" },
+          timeoutMs: { type: "integer", minimum: 1000, maximum: 600000 },
+        },
+        required: ["command"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false },
+    },
+
     // ------------------------------------------------- code intelligence
     {
       name: "build_semantic_index",
@@ -497,8 +518,17 @@ export async function handleMcpToolCall(
     case "run_command":
       return runCommand(toolContext(context.cwd), {
         command: String(args.command ?? ""),
-        ...(Array.isArray(args.args) ? { args: args.args.map(String) } : {}),
+        args: Array.isArray(args.args) ? args.args.map(String) : [],
         ...(typeof args.cwd === "string" ? { cwd: args.cwd } : {}),
+        ...(typeof args.timeoutMs === "number" ? { timeoutMs: args.timeoutMs } : {}),
+      });
+    case "run_sandboxed":
+      return runInSandbox(context.cwd, {
+        command: String(args.command ?? ""),
+        args: Array.isArray(args.args) ? args.args.map(String) : [],
+        ...(args.writable === true ? { writable: true } : {}),
+        ...(args.network === true ? { network: true } : {}),
+        ...(typeof args.image === "string" ? { image: args.image } : {}),
         ...(typeof args.timeoutMs === "number" ? { timeoutMs: args.timeoutMs } : {}),
       });
     case "build_semantic_index":

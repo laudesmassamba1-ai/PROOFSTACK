@@ -1,4 +1,4 @@
-import { ProofCoreError, stableStringify } from "@proofcore/core";
+import { ProofCoreError, shortId, stableStringify } from "@proofcore/core";
 import { Hono } from "hono";
 import { z } from "zod";
 import { decryptApiKey, encryptApiKey, hasEncryptionSecret, keyFingerprint } from "../ai-crypto.js";
@@ -69,6 +69,22 @@ const EFFORT_TUNING: Record<
     burn: "~8×",
   },
 };
+
+const importConversationSchema = z.object({
+  workspaceId: z.string().min(1).max(64),
+  title: z.string().max(200).default("Local session"),
+  effort: z.enum(["quick", "balanced", "deep", "ultra"]).optional(),
+  importId: z.string().min(1).max(120).optional(),
+  messages: z
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string().max(50_000),
+      })
+    )
+    .min(1)
+    .max(400),
+});
 
 const chatRequestSchema = z
   .object({
@@ -663,6 +679,42 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
         : true,
       message: catalogue.message,
     });
+  });
+
+  /**
+   * Imports a conversation that ran elsewhere (the local bridge).
+   *
+   * The cloud cannot reach a loopback address, so the agent that touched the developer's
+   * disk runs on that machine. This endpoint is how the resulting transcript reaches the
+   * account: the client posts it with its own session cookie, and the row is written with
+   * the same shape `/chat` uses. Nothing here trusts a client-supplied user or workspace.
+   */
+  app.post("/conversations", async (c) => {
+    const user = c.get("user");
+    const body = await readBody(c, importConversationSchema);
+    const { workspace } = await requireWorkspace(c, services, body.workspaceId);
+
+    const wanted =
+      typeof body.importId === "string" && body.importId.trim() ? body.importId : undefined;
+    const conversationId = wanted ? `local_${wanted}` : `conv_${shortId(20)}`;
+
+    // Re-posting the same local session must not create duplicates: the id is derived from
+    // the caller's stable key, and saving is an upsert.
+    const messages = body.messages.slice(-200).map((message) => ({
+      role: message.role,
+      content: message.content.slice(0, 20_000),
+    }));
+
+    const saved = await services.store.saveAiConversation({
+      id: conversationId,
+      userId: user.id,
+      workspaceId: workspace.id,
+      title: body.title.trim().slice(0, 120) || "Local session",
+      effort: body.effort ?? "balanced",
+      messages,
+    });
+
+    return c.json({ id: saved.id, updatedAt: saved.updatedAt });
   });
 
   app.get("/conversations", async (c) => {

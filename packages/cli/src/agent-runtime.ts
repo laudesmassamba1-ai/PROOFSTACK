@@ -28,6 +28,7 @@ export const MUTATING_TOOLS = new Set([
   "write_file",
   "apply_patch",
   "run_command",
+  "run_sandboxed",
   "run_tests",
   "generate_svg",
   "debug_script",
@@ -396,6 +397,11 @@ export class AgentSession {
       ? `${SYSTEM_PROMPT}\n\nProject instructions:\n${options.extraInstructions}`
       : SYSTEM_PROMPT;
     this.messages = [{ role: "system", content: system }, ...history];
+  }
+
+  /** Replaces the approval policy of a live session (a bridge swaps it per request). */
+  setApprover(approver: Approver): void {
+    this.options.approve = approver;
   }
 
   get history(): ChatMessage[] {

@@ -1,0 +1,42 @@
+{
+  "name": "proofcore",
+  "displayName": "PROOFCORE completions",
+  "description": "Inline completions from the proofcore CLI, using your project's own symbols when no model is configured.",
+  "version": "0.1.0",
+  "publisher": "proofcore",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Machine Learning"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "proofcore.complete",
+        "title": "PROOFCORE: suggest a completion here"
+      }
+    ],
+    "configuration": {
+      "title": "PROOFCORE",
+      "properties": {
+        "proofcore.binary": {
+          "type": "string",
+          "default": "proofcore",
+          "description": "Path to the proofcore executable."
+        },
+        "proofcore.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Suggest completions as you type."
+        }
+      }
+    }
+  },
+  "license": "UNLICENSED"
+}

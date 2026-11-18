@@ -29,6 +29,7 @@ import * as worldProfiles from "@proofcore/module-world";
 import { createWorldProvider, HttpProductUnderTest } from "@proofcore/module-world";
 import {
   buildSemanticIndex,
+  completeCode,
   debugScript,
   generateSvg,
   inspectPage,
@@ -54,7 +55,9 @@ import {
   runFailAudit,
 } from "./audit.js";
 import { mapArchitecture } from "./code-tools.js";
+import { type ServeHandle, serveLocal } from "./local-bridge.js";
 import { mcpToolDescriptors, ProofcoreMcpServer, serveMcpStdio } from "./mcp-server.js";
+import { describeSandbox, runInSandbox } from "./sandbox.js";
 import {
   apiGet,
   clearStoredSession,
@@ -212,6 +215,9 @@ async function main(argv: string[]): Promise<number> {
     "tools",
     "agent",
     "whoami",
+    "serve",
+    "exec",
+    "complete",
   ]);
   if (command && cwdCommands.has(command) && flags.cwdExplicit && !isDirectory(flags.cwd)) {
     err(
@@ -287,6 +293,12 @@ async function main(argv: string[]): Promise<number> {
       return commandAgent(flags, args);
     case "whoami":
       return commandWhoami(flags);
+    case "serve":
+      return commandServe(flags, args);
+    case "exec":
+      return commandExec(flags, args);
+    case "complete":
+      return commandComplete(flags, args);
     default:
       err(flags, `Unknown command: ${command}`);
       printHelp(flags);
@@ -2215,6 +2227,150 @@ async function commandAgent(flags: GlobalFlags, args: string[]): Promise<number>
   }
 }
 
+/**
+ * `proofcore serve` — the local agent, driven from a browser on this machine.
+ *
+ * The cloud cannot reach a loopback address, so the loop that touches this disk has to run
+ * here. The page is served by this process (same origin, no CORS, no token in a third-party
+ * page), and each finished turn is pushed to the signed-in account so the web app shows it.
+ */
+async function commandServe(flags: GlobalFlags, args: string[]): Promise<number> {
+  let provider: AgentProvider;
+  try {
+    provider = await resolveProvider({
+      ...(flagValue(args, "--model") ? { model: flagValue(args, "--model") as string } : {}),
+      ...(flagValue(args, "--base-url")
+        ? { baseUrl: flagValue(args, "--base-url") as string }
+        : {}),
+    });
+  } catch (error) {
+    err(flags, red(flags, describeError(error).message));
+    return 2;
+  }
+
+  const port = Number(flagValue(args, "--port") ?? "7317");
+  const allowWrite = args.includes("--allow-write");
+  const sync = !args.includes("--no-sync");
+  const account = await loadStoredSession().catch(() => null);
+
+  let handle: ServeHandle;
+  try {
+    handle = await serveLocal({
+      root: flags.cwd,
+      provider,
+      port: Number.isFinite(port) ? port : 7317,
+      allowWrite,
+      sync,
+      maxSteps: Number(flagValue(args, "--max-steps") ?? "24"),
+      log: (line) => err(flags, dim(flags, line)),
+      // Without the flag, a write asks here, in the terminal: a browser cannot grant itself
+      // the right to modify this machine.
+      approve: async (request) => {
+        out(flags, `\n${yellow(flags, "approve")} ${bold(flags, request.tool)} from the browser`);
+        if (request.preview) {
+          for (const line of request.preview.split("\n").slice(0, 60))
+            out(flags, `  ${dim(flags, line)}`);
+        }
+        const answer = (await ask("Apply? [y/N] ")).trim().toLowerCase();
+        return answer === "y" || answer === "yes";
+      },
+    });
+  } catch (error) {
+    err(flags, red(flags, describeError(error).message));
+    return 2;
+  }
+
+  if (flags.json) {
+    stdout.write(`${JSON.stringify({ url: handle.url, port: handle.port, sync })}\n`);
+  } else {
+    out(flags, `\n${bold(flags, "PROOFCORE local agent")}`);
+    out(flags, `  ${dim(flags, "open")} ${handle.url}`);
+    out(flags, `  ${dim(flags, "root")} ${flags.cwd}`);
+    out(flags, `  ${dim(flags, "model")} ${provider.model}`);
+    out(
+      flags,
+      `  ${dim(flags, "sync")} ${sync ? (account ? `account ${account.email}` : yellow(flags, "not signed in — run proofcore login")) : "off"}`
+    );
+    out(
+      flags,
+      `  ${dim(flags, "writes")} ${allowWrite ? yellow(flags, "auto-approved (--allow-write)") : "confirmed in this terminal"}`
+    );
+    out(
+      flags,
+      `\n${dim(flags, "Ctrl+C to stop. The URL carries a one-time token; keep it private.")}\n`
+    );
+  }
+
+  await new Promise<void>((resolvePromise) => {
+    const stop = () => {
+      void handle.close().then(() => resolvePromise());
+    };
+    process.once("SIGINT", stop);
+    process.once("SIGTERM", stop);
+  });
+  return 0;
+}
+
+/** Runs one command inside a container, or refuses. Never falls back to an unisolated run. */
+async function commandExec(flags: GlobalFlags, args: string[]): Promise<number> {
+  const command = args.find((arg) => !arg.startsWith("-"));
+  if (!command) {
+    err(flags, 'Usage: proofcore exec "<command>" [args…] [--writable] [--network] [--sandbox]');
+    return 2;
+  }
+  const rest = args.slice(args.indexOf(command) + 1).filter((arg) => !arg.startsWith("--"));
+  try {
+    const result = await runInSandbox(flags.cwd, {
+      command,
+      args: rest,
+      writable: args.includes("--writable"),
+      network: args.includes("--network"),
+      ...(flagValue(args, "--timeout") ? { timeoutMs: Number(flagValue(args, "--timeout")) } : {}),
+    });
+    if (flags.json) {
+      stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+      return result.exitCode === 0 ? 0 : 1;
+    }
+    out(flags, dim(flags, describeSandbox(result)));
+    if (result.stdout) stdout.write(result.stdout);
+    if (result.stderr) err(flags, dim(flags, result.stderr));
+    return result.exitCode === 0 ? 0 : 1;
+  } catch (error) {
+    err(flags, red(flags, describeError(error).message));
+    return 2;
+  }
+}
+
+/** `proofcore complete` — the completion a client can render inline. */
+async function commandComplete(flags: GlobalFlags, args: string[]): Promise<number> {
+  const file = args.find((arg) => !arg.startsWith("-"));
+  if (!file) {
+    err(flags, "Usage: proofcore complete <file> --line <n> [--column <n>] [--json]");
+    return 2;
+  }
+  try {
+    const result = await completeCode(
+      { root: flags.cwd },
+      {
+        path: file,
+        line: Number(flagValue(args, "--line") ?? "1"),
+        ...(flagValue(args, "--column") ? { column: Number(flagValue(args, "--column")) } : {}),
+        ...(flagValue(args, "--max") ? { maxCompletions: Number(flagValue(args, "--max")) } : {}),
+      }
+    );
+    if (flags.json) {
+      stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    } else {
+      out(flags, dim(flags, `${result.source}${result.note ? ` · ${result.note}` : ""}`));
+      for (const completion of result.completions) stdout.write(`${completion.text}\n`);
+    }
+    return 0;
+  } catch (error) {
+    err(flags, red(flags, describeError(error).message));
+    return 2;
+  }
+}
+
 /** Stores the model configuration once, in a 0600 file, with a hidden key prompt. */
 async function commandConfigureProvider(flags: GlobalFlags): Promise<number> {
   out(flags, bold(flags, "\nConnect a model"));
@@ -2528,6 +2684,9 @@ function printHelp(flags: GlobalFlags): void {
   w('  agent ["prompt"] [--yes]     local coding agent: reads, edits, runs, with diffs');
   w("  agent --configure           store the model URL/model/key (0600, local only)");
   w("  whoami                      which account and which model this CLI will use");
+  w("  serve [--port 7317]         local agent + web page, synced to the account");
+  w('  exec "<cmd>" [--writable]   run a command in a container, or refuse');
+  w("  complete <file> --line <n>  inline completion, for an editor integration");
   w("  mcp                      Serve PROOFCORE as an MCP server over stdio");
   w("");
   w(bold(flags, "test options"));
