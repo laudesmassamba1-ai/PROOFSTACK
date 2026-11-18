@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useId, useRef, useState } from "react";
 import { usePrefersReducedMotion } from "../../lib/theme.js";
 
 /**
@@ -105,10 +105,7 @@ export function WorldObject({ passed, failed, total }: ObjectProps) {
       ) : null}
       <g className="world-rings" style={{ transformOrigin: "140px 108px" }}>
         <ellipse
-          cx="140"
-          cy="108"
-          rx="102"
-          ry="47"
+          className="world-ring world-ring-a"
           fill="none"
           stroke={`url(#${uid}-ring)`}
           strokeWidth="1.4"
@@ -116,6 +113,7 @@ export function WorldObject({ passed, failed, total }: ObjectProps) {
           strokeDasharray={hasData ? undefined : "3 7"}
         />
         <ellipse
+          className="world-ring world-ring-b"
           cx="140"
           cy="108"
           rx="84"
@@ -129,8 +127,12 @@ export function WorldObject({ passed, failed, total }: ObjectProps) {
         />
         {hasData ? (
           <g className="world-satellites">
-            {items.map((item) => (
-              <g key={item.key}>
+            {items.map((item, satIndex) => (
+              <g
+                key={item.key}
+                className="world-sat"
+                style={{ "--sat-i": satIndex } as CSSProperties}
+              >
                 <circle cx={item.x} cy={item.y} r="7" fill="var(--object-halo)" opacity="0.16" />
                 <circle
                   cx={item.x}
@@ -146,7 +148,14 @@ export function WorldObject({ passed, failed, total }: ObjectProps) {
           </g>
         ) : null}
       </g>
-      <circle cx="140" cy="108" r="44" fill={`url(#${uid}-sphere)`} opacity={hasData ? 1 : 0.42} />
+      <circle
+        className="world-sphere"
+        cx="140"
+        cy="108"
+        r="44"
+        fill={`url(#${uid}-sphere)`}
+        opacity={hasData ? 1 : 0.42}
+      />
       <ellipse
         cx="124"
         cy="88"
@@ -225,38 +234,41 @@ export function FlowObject({ passed, failed, total }: ObjectProps) {
         opacity="0.16"
         filter={`url(#${uid}-shadow)`}
       />
-      {links.map((link) => (
+      {links.map((link, linkIndex) => (
         <g
           key={link.key}
           transform={`translate(${link.x} ${link.y}) rotate(${link.rotate})`}
-          className={link.failed ? "flow-link-broken" : undefined}
+          className={`flow-link ${link.failed ? "flow-link-broken" : ""}`.trim()}
+          style={{ "--flow-i": linkIndex } as CSSProperties}
         >
-          <path
-            d="M-22 0h44"
-            stroke={link.failed ? "#b62c36" : "#7a766d"}
-            strokeWidth="2"
-            opacity="0.35"
-          />
-          <ellipse
-            cx="0"
-            cy="0"
-            rx="28"
-            ry="16"
-            fill="none"
-            stroke={
-              link.failed ? "#b62c36" : link.passed ? `url(#${uid}-chrome)` : `url(#${uid}-matte)`
-            }
-            strokeWidth="9"
-            strokeDasharray={link.failed ? "34 12" : undefined}
-          />
-          <ellipse
-            cx="-5"
-            cy="-7"
-            rx="14"
-            ry="5"
-            fill="#ffffff"
-            opacity={link.passed ? 0.42 : 0.18}
-          />
+          <g className="flow-link-inner">
+            <path
+              d="M-22 0h44"
+              stroke={link.failed ? "#b62c36" : "#7a766d"}
+              strokeWidth="2"
+              opacity="0.35"
+            />
+            <ellipse
+              cx="0"
+              cy="0"
+              rx="28"
+              ry="16"
+              fill="none"
+              stroke={
+                link.failed ? "#b62c36" : link.passed ? `url(#${uid}-chrome)` : `url(#${uid}-matte)`
+              }
+              strokeWidth="9"
+              strokeDasharray={link.failed ? "34 12" : undefined}
+            />
+            <ellipse
+              cx="-5"
+              cy="-7"
+              rx="14"
+              ry="5"
+              fill="#ffffff"
+              opacity={link.passed ? 0.42 : 0.18}
+            />
+          </g>
         </g>
       ))}
       {!hasData ? (
@@ -321,7 +333,7 @@ export function ExitObject({ passed, failed, total }: ObjectProps) {
         filter={`url(#${uid}-shadow)`}
       />
       {!hasData ? (
-        <g>
+        <g className="exit-tray">
           <path d="M58 168l82-38 82 38-82 38z" fill="none" stroke="#8d8980" strokeDasharray="4 7" />
           <path
             d="M58 168v13l82 38 82-38v-13"
@@ -333,28 +345,35 @@ export function ExitObject({ passed, failed, total }: ObjectProps) {
         </g>
       ) : (
         <g className="exit-stack">
-          {slabs.map((slab) => (
-            <g key={slab.key} transform={`translate(${slab.failed ? 9 : 0} ${slab.y})`}>
-              <path
-                d="M58 0l82-37 82 37-82 37z"
-                fill={`url(#${uid}-amber)`}
-                stroke="#6d3900"
-                strokeOpacity="0.25"
-              />
-              <path d="M58 0v15l82 37 82-37V0" fill={`url(#${uid}-side)`} opacity="0.92" />
-              <path
-                d="M76 -3l66-29 44 20"
-                fill="none"
-                stroke="#fff8dc"
-                strokeOpacity="0.48"
-                strokeWidth="1.2"
-              />
-              {slab.failed ? (
-                <>
-                  <path d="M136 -38v16" stroke="#b62c36" strokeWidth="3" />
-                  <path d="M136 16v16" stroke="#b62c36" strokeWidth="3" />
-                </>
-              ) : null}
+          {slabs.map((slab, slabIndex) => (
+            <g
+              key={slab.key}
+              transform={`translate(${slab.failed ? 9 : 0} ${slab.y})`}
+              className="exit-slab"
+              style={{ "--exit-i": slabIndex } as CSSProperties}
+            >
+              <g className="exit-slab-inner">
+                <path
+                  d="M58 0l82-37 82 37-82 37z"
+                  fill={`url(#${uid}-amber)`}
+                  stroke="#6d3900"
+                  strokeOpacity="0.25"
+                />
+                <path d="M58 0v15l82 37 82-37V0" fill={`url(#${uid}-side)`} opacity="0.92" />
+                <path
+                  d="M76 -3l66-29 44 20"
+                  fill="none"
+                  stroke="#fff8dc"
+                  strokeOpacity="0.48"
+                  strokeWidth="1.2"
+                />
+                {slab.failed ? (
+                  <>
+                    <path d="M136 -38v16" stroke="#b62c36" strokeWidth="3" />
+                    <path d="M136 16v16" stroke="#b62c36" strokeWidth="3" />
+                  </>
+                ) : null}
+              </g>
             </g>
           ))}
         </g>
@@ -374,7 +393,11 @@ export function ModuleObject({
   return <ExitObject {...props} />;
 }
 
-/** FAIL/CLEAN audits: a shield or sparkle orbiting a gauge needle that moves with the pass rate. */
+/** FAIL/CLEAN audits: a gauge whose needle and arc carry the real pass rate.
+ * Entry: the arc fills up while the needle swings from zero and settles on the
+ * score (one beat of overshoot, like a physical meter). Hover: a diagnostic
+ * sweep — the needle walks the whole scale, then comes back to the truth. All
+ * motion is CSS on custom properties so the resting state is always the value. */
 function AuditObject({
   passed,
   total,
@@ -385,13 +408,16 @@ function AuditObject({
   total: number;
   variant: "fail" | "clean";
 }) {
+  const { ref, running } = useObjectMotion<SVGSVGElement>();
   const rate = total > 0 ? passed / total : 0;
   const angle = -90 + Math.min(1, Math.max(0, rate)) * 180;
   const color = variant === "fail" ? "#f43f5e" : "#10b981";
+  const arcLen = Math.PI * 60 * Math.min(1, Math.max(0, rate));
   return (
     <svg
+      ref={ref}
       viewBox="0 0 200 140"
-      className="h-full w-full"
+      className={`module-object module-object-audit audit-${variant} ${running ? "is-running" : ""}`}
       role="img"
       aria-label={`${variant} audit score`}
     >
@@ -401,25 +427,30 @@ function AuditObject({
         stroke="var(--object-track)"
         strokeWidth="10"
         strokeLinecap="round"
+        className="audit-track"
       />
       <path
+        className="audit-arc"
         d="M40 110 A60 60 0 0 1 160 110"
         fill="none"
         stroke={color}
         strokeWidth="10"
         strokeLinecap="round"
-        strokeDasharray={`${Math.PI * 60 * rate} 999`}
+        strokeDasharray={`${arcLen} 999`}
+        style={{ "--arc-len": `${arcLen}px` } as CSSProperties}
       />
-      <line
-        x1="100"
-        y1="110"
-        x2={100 + 44 * Math.sin((angle * Math.PI) / 180)}
-        y2={110 - 44 * Math.cos((angle * Math.PI) / 180)}
-        stroke="var(--object-glyph)"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
-      <circle cx="100" cy="110" r="5" fill="var(--object-glyph)" />
+      <g className="audit-needle" style={{ "--audit-angle": `${angle}deg` } as CSSProperties}>
+        <line
+          x1="100"
+          y1="110"
+          x2={100 + 44 * Math.sin((angle * Math.PI) / 180)}
+          y2={110 - 44 * Math.cos((angle * Math.PI) / 180)}
+          stroke="var(--object-glyph)"
+          strokeWidth="3"
+          strokeLinecap="round"
+        />
+      </g>
+      <circle cx="100" cy="110" r="5" fill="var(--object-glyph)" className="audit-hub" />
       <text
         x="100"
         y="70"
@@ -427,6 +458,7 @@ function AuditObject({
         fill="var(--object-glyph)"
         fontSize="26"
         fontWeight="700"
+        className="audit-score"
       >
         {total > 0 ? `${Math.round(rate * 100)}` : "—"}
       </text>

@@ -5097,3 +5097,272 @@ p {
     transform: rotate(360deg);
   }
 }
+
+/* ==========================================================================
+   OBJECT ANIMATIONS — one bespoke motion per module illustration.
+   Entry plays on every mount (each visit to the page); hover takes over with a
+   behaviour that matches what the drawing means:
+     WORLD  — a globe: satellites pop into orbit on entry, orbit spins up on hover.
+     FLOW   — transactions: links slide in as a chain, hover sends a wave through it.
+     EXIT   — an export stack: slabs drop and settle on entry, hover lifts the pile.
+     FAIL   — a gauge: fills to the score on entry, hover runs a diagnostic sweep.
+     CLEAN  — a gauge: same fill, hover sweeps and re-pulses the arc.
+   Everything is gated by `.is-running` (set by ModuleObjects' own motion hook),
+   so reduced-motion, background tabs and off-screen stages stay still.
+   ========================================================================== */
+
+/* ---------- WORLD ---------- */
+
+.module-object-world.is-running .world-sphere {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: obj-pop 640ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.module-object-world.is-running .world-ring {
+  animation: obj-fade-in 900ms var(--ease-emphasized) both;
+}
+
+/* Ring A also grows into place; ring B only fades — a CSS transform would
+ * override its baked-in 34° rotation attribute. */
+.module-object-world.is-running .world-ring-a {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: obj-ring-in 900ms var(--ease-emphasized) both;
+}
+
+.module-object-world.is-running .world-sat {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: obj-pop 480ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: calc(260ms + var(--sat-i, 0) * 70ms);
+}
+
+/* Hover: the orbit spins up — fast, alive — instead of its idle 42 s drift. */
+.app-object-card:hover .module-object-world.is-running .world-rings,
+.module-object-world.is-running:hover .world-rings {
+  animation-duration: 6s;
+}
+
+/* ---------- FLOW ---------- */
+
+.module-object-flow.is-running .flow-link-inner {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: obj-flow-in 620ms cubic-bezier(0.22, 0.9, 0.32, 1.2) both;
+  animation-delay: calc(var(--flow-i, 0) * 80ms);
+}
+
+/* Hover: one transaction wave rolls through the chain, link after link. */
+.app-object-card:hover .module-object-flow.is-running .flow-link-inner,
+.module-object-flow.is-running:hover .flow-link-inner {
+  animation: obj-flow-wave 1.5s var(--ease-standard) infinite;
+  animation-delay: calc(var(--flow-i, 0) * 110ms);
+}
+
+@keyframes obj-flow-wave {
+  0%,
+  55%,
+  100% {
+    transform: translateY(0);
+  }
+
+  22% {
+    transform: translateY(-9px) scaleY(1.06);
+  }
+
+  36% {
+    transform: translateY(2px);
+  }
+}
+
+/* ---------- EXIT ---------- */
+
+.module-object-exit.is-running .exit-slab-inner {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: obj-exit-in 560ms cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
+  animation-delay: calc((3 - var(--exit-i, 0)) * 110ms);
+}
+
+.module-object-exit.is-running .exit-tray {
+  animation: obj-fade-in 700ms var(--ease-standard) both;
+}
+
+/* Hover: the pile breathes — a lift ripples from the top slab downward. */
+.app-object-card:hover .module-object-exit.is-running .exit-slab-inner,
+.module-object-exit.is-running:hover .exit-slab-inner {
+  animation: obj-exit-lift 1.7s var(--ease-standard) infinite;
+  animation-delay: calc((3 - var(--exit-i, 0)) * 120ms);
+}
+
+@keyframes obj-exit-lift {
+  0%,
+  52%,
+  100% {
+    transform: translateY(0);
+  }
+
+  20% {
+    transform: translateY(-7px);
+  }
+
+  34% {
+    transform: translateY(2px);
+  }
+}
+
+/* ---------- GAUGES (FAIL / CLEAN) ---------- */
+
+.module-object-audit {
+  display: block;
+  width: 100%;
+  max-width: 330px;
+  height: auto;
+  overflow: visible;
+}
+
+.audit-needle {
+  transform-box: view-box;
+  transform-origin: 100px 110px;
+  transform: rotate(var(--audit-angle, 0deg));
+}
+
+/* Entry: the arc draws itself to the score… */
+.module-object-audit.is-running .audit-arc {
+  animation: audit-fill 1s var(--ease-emphasized) 180ms both;
+}
+
+@keyframes audit-fill {
+  from {
+    stroke-dashoffset: var(--arc-len, 0px);
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* …while the needle swings up from zero and settles on the value. */
+.module-object-audit.is-running .audit-needle {
+  animation: audit-settle 1.15s cubic-bezier(0.3, 0.9, 0.3, 1.1) 140ms both;
+}
+
+@keyframes audit-settle {
+  0% {
+    transform: rotate(-90deg);
+  }
+
+  62% {
+    transform: rotate(calc(var(--audit-angle, 0deg) + 17deg));
+  }
+
+  100% {
+    transform: rotate(var(--audit-angle, 0deg));
+  }
+}
+
+.module-object-audit.is-running .audit-score,
+.module-object-audit.is-running .audit-hub {
+  animation: obj-fade-in 500ms var(--ease-standard) 900ms both;
+}
+
+/* Hover: a diagnostic sweep — the needle walks the whole scale, both ends,
+ * then comes home to the true value. */
+.app-object-card:hover .module-object-audit.is-running .audit-needle,
+.module-object-audit.is-running:hover .audit-needle {
+  animation: audit-sweep 1.9s cubic-bezier(0.4, 0, 0.3, 1) both;
+}
+
+@keyframes audit-sweep {
+  0% {
+    transform: rotate(var(--audit-angle, 0deg));
+  }
+
+  30% {
+    transform: rotate(84deg);
+  }
+
+  58% {
+    transform: rotate(-88deg);
+  }
+
+  100% {
+    transform: rotate(var(--audit-angle, 0deg));
+  }
+}
+
+/* Hover on CLEAN: the mint arc re-pulses — the page "passes" under the cursor. */
+.app-object-card:hover .module-object-audit.audit-clean.is-running .audit-arc,
+.module-object-audit.audit-clean.is-running:hover .audit-arc {
+  animation:
+    audit-fill 0s linear both,
+    audit-pulse 1.9s var(--ease-standard) both;
+}
+
+@keyframes audit-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  45% {
+    opacity: 0.55;
+  }
+}
+
+.app-object-card:hover .module-object-audit.audit-fail.is-running .audit-arc,
+.module-object-audit.audit-fail.is-running:hover .audit-arc {
+  animation:
+    audit-fill 0s linear both,
+    audit-pulse 1.9s var(--ease-standard) both;
+}
+
+/* ---------- shared keyframes ---------- */
+
+/* Entry keyframes are "from-only": the implicit end state is the element's own
+ * value, so state-bearing attributes (empty-state opacity, baked rotations)
+ * survive the animation. */
+@keyframes obj-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+}
+
+@keyframes obj-ring-in {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+}
+
+@keyframes obj-flow-in {
+  from {
+    opacity: 0;
+    transform: translateX(-34px);
+  }
+}
+
+@keyframes obj-exit-in {
+  from {
+    opacity: 0;
+    transform: translateY(-26px);
+  }
+}
+
+@keyframes obj-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .module-object * {
+    animation: none !important;
+  }
+}

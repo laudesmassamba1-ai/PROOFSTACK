@@ -527,7 +527,7 @@ function systemPrompt(workspaceName: string, effort: Effort): string {
 
 export function aiRoutes(services: Services): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
-  const limiter = new RateLimiter(40, 60 * 60_000);
+  const limiter = new RateLimiter(services.config.aiRateLimitPerHour, 60 * 60_000);
 
   // ------------------------------------------------------------- profile
 

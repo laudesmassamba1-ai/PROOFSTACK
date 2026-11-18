@@ -46,10 +46,25 @@ export interface AppConfig {
    * executed. The distinction is shown to the user rather than hidden.
    */
   cfAccountId: string | undefined;
+  /**
+   * Assistant requests allowed per hour, per account and address.
+   *
+   * 40 was too tight to be useful: a single afternoon of real work, or a demo, hit the
+   * wall and the user saw "trop de demandes" with no way forward. The default also has to
+   * absorb retries, because a failed turn still counted.
+   */
+  aiRateLimitPerHour: number;
   cfBrowserToken: string | undefined;
 }
 
 export type Env = Record<string, string | undefined>;
+
+/** A bounded positive integer from the environment, or the default. */
+function positiveInt(raw: string | undefined, fallback: number): number {
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) return fallback;
+  return Math.min(Math.round(value), 10_000);
+}
 
 export function readConfig(env: Env): AppConfig {
   const environment = (
@@ -77,6 +92,7 @@ export function readConfig(env: Env): AppConfig {
     mailFrom: env.MAIL_FROM,
     supportEmail: env.SUPPORT_EMAIL ?? "support@proofcore.dev",
     cfAccountId: env.CF_ACCOUNT_ID?.trim() || undefined,
+    aiRateLimitPerHour: positiveInt(env.AI_RATE_LIMIT_PER_HOUR, 200),
     cfBrowserToken: env.CF_BROWSER_TOKEN?.trim() || undefined,
   };
 }
