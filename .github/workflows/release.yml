@@ -90,7 +90,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: installers-${{ matrix.target }}
-          path: artifacts/installers/*
+          path: |
+            artifacts/installers/*
+            artifacts/bin/*
 
   publish:
     needs: installers
@@ -100,6 +102,31 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+
+      - name: Write the update manifest
+        run: |
+          node -e '
+          const fs = require("fs"), path = require("path"), crypto = require("crypto");
+          const version = require("./packages/cli/package.json").version;
+          const files = {};
+          for (const name of fs.readdirSync("dist")) {
+            // Only the runnable binaries: the manifest tells the CLI which file to fetch.
+            if (!/^proofcore-(linux|darwin|win)/.test(name) || name.endsWith(".sha256")) continue;
+            const target = name.replace(/^proofcore-/, "").replace(/\.exe$/, "");
+            const bytes = fs.readFileSync(path.join("dist", name));
+            files[target] = {
+              binary: name,
+              sha256: crypto.createHash("sha256").update(bytes).digest("hex"),
+              size: bytes.length,
+            };
+          }
+          if (!Object.keys(files).length) throw new Error("no binaries to describe");
+          fs.writeFileSync(
+            "dist/manifest.json",
+            JSON.stringify({ version, channel: "stable", publishedAt: new Date().toISOString(), files }, null, 2)
+          );
+          console.log("manifest.json covers", Object.keys(files).join(", "));
+          '
 
       - name: Attach every artifact to the release
         uses: softprops/action-gh-release@v2
@@ -118,6 +145,11 @@ jobs:
             - or `chmod +x proofcore-*-installer-linux-x64.run && ./proofcore-*-installer-linux-x64.run`
 
             **macOS** — `chmod +x proofcore-*-installer-darwin-*.run && ./proofcore-*-installer-darwin-*.run`
+
+            **Updates** — `proofcore update` checks the release manifest and shows what it
+            would install; `proofcore update --yes` verifies the sha256 and replaces the
+            binary (the old one is renamed aside first, so a failed update leaves a working
+            command). The hub header shows `↑ x.y.z · /update` when a release is available.
 
             Then, once:
 

@@ -54,6 +54,55 @@ if ! grep -qsF "$line" "$profile" 2>/dev/null; then
   say "added $BIN_DIR to PATH in $profile (open a new terminal, or run: source $profile)"
 fi
 
+# The icon and the two ways to open the app: a terminal hub, and the interface in its own
+# window. An installer that leaves nothing clickable is a folder, not an install.
+icon_dir="$HOME/.local/share/icons/hicolor/256x256/apps"
+app_dir="$HOME/.local/share/applications"
+mkdir -p "$icon_dir" "$app_dir"
+
+if [ -n "${PROOFCORE_ICON_SOURCE:-}" ] && [ -f "$PROOFCORE_ICON_SOURCE" ]; then
+  cp "$PROOFCORE_ICON_SOURCE" "$icon_dir/proofcore.png"
+elif [ -f "$(dirname "$0")/proofcore.png" ]; then
+  cp "$(dirname "$0")/proofcore.png" "$icon_dir/proofcore.png"
+fi
+
+write_entry() {
+  # $1 path, $2 name, $3 exec, $4 terminal, $5 comment
+  cat > "$1" <<ENTRY
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=$2
+Comment=$5
+Exec=$3
+Icon=$icon_dir/proofcore.png
+Terminal=$4
+Categories=Development;Utility;
+StartupNotify=true
+StartupWMClass=proofcore
+ENTRY
+  chmod 644 "$1"
+}
+
+write_entry "$app_dir/proofcore.desktop" "PROOFCORE" "$BIN_DIR/$APP" "true" \
+  "Software quality and reliability: the hub"
+write_entry "$app_dir/proofcore-interface.desktop" "PROOFCORE interface" "$BIN_DIR/$APP app" "false" \
+  "The PROOFCORE application, in its own window"
+
+# The desktop copy is what makes it clickable in the place people look. Some file managers
+# refuse to launch an entry that is not marked trusted; `gio` is how Mint marks it.
+desktop_dir="$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Desktop")"
+if [ -d "$desktop_dir" ]; then
+  cp "$app_dir/proofcore.desktop" "$desktop_dir/PROOFCORE.desktop"
+  chmod +x "$desktop_dir/PROOFCORE.desktop"
+  gio set "$desktop_dir/PROOFCORE.desktop" metadata::trusted true 2>/dev/null || true
+  say "added an icon on the Desktop"
+fi
+
+command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$app_dir" 2>/dev/null || true
+command -v gtk-update-icon-cache >/dev/null 2>&1 && gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
+say "added PROOFCORE to the application menu"
+
 export PATH="$BIN_DIR:$PATH"
 version="$("$BIN_DIR/$APP" --version 2>/dev/null || true)"
 [ -n "$version" ] || fail "the installed binary did not run: nothing was left half-installed"
@@ -63,6 +112,7 @@ cat <<'TXT'
 
 PROOFCORE is installed. Next:
   proofcore login     sign in once, through the browser
+  proofcore app       the application window (or click the PROOFCORE icon)
   proofcore           the full-screen hub: /help, Tab completes, arrows recall
 
 TXT

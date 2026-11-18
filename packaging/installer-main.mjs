@@ -17,6 +17,7 @@ import { createHash } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
+import { iconIco, windowsLauncherScript } from "./assets.mjs";
 
 const MARKER = "PROOFCORE_PAYLOAD_V1";
 const VERSION = process.env.PROOFCORE_VERSION ?? "0.0.0";
@@ -86,20 +87,39 @@ async function main() {
   );
   say("added the folder to your user PATH");
 
-  // Start Menu entry, so it can be found without a terminal at all.
-  const shortcut = `
+  // The icon and the launcher, so the install is something to click rather than a folder
+  // to explore. The .cmd exists because a shortcut cannot say "use Windows Terminal if it
+  // is installed"; this one can, and it passes arguments through.
+  const iconPath = join(root, "PROOFCORE", "icon.ico");
+  writeFileSync(iconPath, iconIco());
+  const launcher = join(root, "PROOFCORE", "PROOFCORE.cmd");
+  writeFileSync(launcher, windowsLauncherScript());
+  say(`wrote ${iconPath}`);
+
+  // Two faces of one app: the hub in a terminal, and the application in its own window.
+  const quote = (value) => value.replace(/'/g, "''");
+  const shortcutScript = `
     $shell = New-Object -ComObject WScript.Shell
-    $start = [Environment]::GetFolderPath('Programs')
-    $link = $shell.CreateShortcut((Join-Path $start 'PROOFCORE.lnk'))
-    $link.TargetPath = '${target.replace(/'/g, "''")}'
-    $link.Arguments = ''
-    $link.IconLocation = '${target.replace(/'/g, "''")}'
-    $link.Description = 'PROOFCORE - software quality and reliability'
-    $link.Save()`;
-  await run("powershell", ["-NoProfile", "-Command", shortcut]).catch(() =>
-    say("could not create the Start Menu shortcut (not required)")
+    $links = @(
+      @{ Name = 'PROOFCORE'; Target = '${quote(launcher)}'; Args = ''; Desc = 'PROOFCORE - the hub' },
+      @{ Name = 'PROOFCORE interface'; Target = '$env:ComSpec'; Args = '/c start "" "${quote(target)}" app'; Desc = 'PROOFCORE - the application' }
+    )
+    foreach ($folder in @([Environment]::GetFolderPath('Programs'), [Environment]::GetFolderPath('Desktop'))) {
+      foreach ($link in $links) {
+        $shortcut = $shell.CreateShortcut((Join-Path $folder ($link.Name + '.lnk')))
+        $shortcut.TargetPath = $link.Target
+        $shortcut.Arguments = $link.Args
+        $shortcut.Description = $link.Desc
+        $shortcut.IconLocation = '${quote(iconPath)},0'
+        $shortcut.WorkingDirectory = '${quote(binDir)}'
+        $shortcut.WindowStyle = 7
+        $shortcut.Save()
+      }
+    }`;
+  await run("powershell", ["-NoProfile", "-Command", shortcutScript]).catch(() =>
+    say("could not create the shortcuts (start PROOFCORE from a terminal instead)")
   );
-  say("added a Start Menu entry named PROOFCORE");
+  say("added icons to the Start Menu and the Desktop");
 
   const version = await new Promise((resolve) => {
     const child = spawn(target, ["--version"], { windowsHide: true });
@@ -116,12 +136,14 @@ async function main() {
   process.stdout.write(
     [
       "",
-      "PROOFCORE is installed. Open a new terminal, then:",
+      "PROOFCORE is installed. The PROOFCORE icons on your Desktop and Start Menu open it.",
       "",
+      "From a terminal:",
       "  proofcore login     sign in once, through the browser",
       "  proofcore           the full-screen hub: /help, Tab completes, arrows recall",
+      "  proofcore app       the application, in its own window",
       "",
-      `To uninstall: delete ${join(root, "PROOFCORE")} and remove it from PATH.`,
+      `To uninstall: delete ${join(root, "PROOFCORE")}, the two shortcuts, and remove it from PATH.`,
       "This setup file can be deleted.",
       "",
     ].join("\n")

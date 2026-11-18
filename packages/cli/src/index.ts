@@ -56,11 +56,20 @@ import {
   runFailAudit,
 } from "./audit.js";
 import { mapArchitecture } from "./code-tools.js";
+import { evaluate, inspectMachine, summarize } from "./doctor-env.js";
 import { HUB_COMMANDS, hubWebPath, runHub } from "./hub.js";
 import { HubTui } from "./hub-tui.js";
+import {
+  appModeCommand,
+  browserPathCandidates,
+  defaultBrowserCommand,
+  launchDetached,
+  resolveUiUrl,
+} from "./launch.js";
 import { type ServeHandle, serveLocal } from "./local-bridge.js";
 import { mcpToolDescriptors, ProofcoreMcpServer, serveMcpStdio } from "./mcp-server.js";
 import { describeSandbox, runInSandbox } from "./sandbox.js";
+import { analyzeStack, readStackFacts } from "./stack-check.js";
 import {
   apiGet,
   clearStoredSession,
@@ -76,6 +85,15 @@ import {
   type SessionPayload,
   sessionFilePath,
 } from "./ui.js";
+import {
+  applyUpdate,
+  checkForUpdate,
+  installKind,
+  platformKey,
+  readState,
+  updateAvailable,
+} from "./update.js";
+import { CLI_VERSION as CLI_VERSION_SOURCE } from "./version.js";
 
 /**
  * The PROOFCORE CLI.
@@ -92,7 +110,7 @@ import {
  *     written to a report or a config file.
  */
 
-const CLI_VERSION = "0.2.0";
+const CLI_VERSION = CLI_VERSION_SOURCE;
 
 interface GlobalFlags {
   cwd: string;
@@ -259,9 +277,22 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     case "--version":
     case "-v":
-    case "version":
+    case "version": {
       stdout.write(`${CLI_VERSION}\n`);
+      // A newer release is worth one line, on stderr so a script reading the version is
+      // unaffected. Read from the cache: `--version` must not wait for the network.
+      const pending = updateAvailable(readState());
+      if (pending && stdin.isTTY && !flags.json) {
+        process.stderr.write(
+          `\u001b[2m${CLI_VERSION} → ${pending} available · proofcore update\u001b[0m\n`
+        );
+      }
       return 0;
+    }
+    case "update":
+      return commandUpdate(flags, args);
+    case "app":
+      return commandApp(flags, args);
     case "init":
       return commandInit(flags, args);
     case "doctor":
@@ -379,6 +410,166 @@ async function commandInit(flags: GlobalFlags, args: string[]): Promise<number> 
   return 0;
 }
 
+/**
+ * `proofcore app` - the application, in its own window.
+ *
+ * This is what the desktop icon runs. It prefers a Chromium `--app=` window (no address bar,
+ * own task bar entry, same look as the site), and falls back to the default browser with a
+ * line saying so - never silently pretending a window was created.
+ */
+async function commandApp(flags: GlobalFlags, args: string[]): Promise<number> {
+  const loaded = await loadConfig({ cwd: flags.cwd, skipValidation: true }).catch(() => null);
+  const url = resolveUiUrl({
+    ...(flagValue(args, "--url") ? { flag: flagValue(args, "--url") as string } : {}),
+    ...(process.env.PROOFCORE_UI_URL ? { env: process.env.PROOFCORE_UI_URL } : {}),
+    ...(loaded?.config.project?.baseUrl ? { configBase: loaded.config.project.baseUrl } : {}),
+  });
+
+  if (args.includes("--print-url")) {
+    stdout.write(`${url}\n`);
+    return 0;
+  }
+  if (flags.json) {
+    stdout.write(`${JSON.stringify({ url, appMode: Boolean(appModeCommand(url)) }, null, 2)}\n`);
+    return 0;
+  }
+
+  const command = appModeCommand(url);
+  out(
+    flags,
+    dim(flags, command ? `opening ${url} in its own window` : `opening ${url} in your browser`)
+  );
+  try {
+    await launchDetached(command ?? defaultBrowserCommand(url));
+  } catch (error) {
+    err(flags, red(flags, describeError(error).message));
+    if (command) {
+      // A Chromium that exists but cannot start should not leave a blank screen and no clue.
+      try {
+        await launchDetached(defaultBrowserCommand(url));
+        out(flags, dim(flags, "opened in the default browser instead"));
+        return 0;
+      } catch {
+        return 1;
+      }
+    }
+    return 1;
+  }
+  if (!command) {
+    out(
+      flags,
+      dim(
+        flags,
+        `no Chromium-based browser found (looked for ${browserPathCandidates(process.platform)
+          .slice(0, 3)
+          .map((path) => path.split(/[\\/]/).pop())
+          .join(", ")})`
+      )
+    );
+  }
+  return 0;
+}
+
+/**
+ * `proofcore update` - check, verify, replace.
+ *
+ * Without `--yes` it only says what it would do: replacing the executable someone is
+ * currently running is not something to do because they typed a command that also means
+ * "show me".
+ */
+async function commandUpdate(flags: GlobalFlags, args: string[]): Promise<number> {
+  const kind = installKind();
+  const channel = (flagValue(args, "--channel") === "beta" ? "beta" : "stable") as
+    | "stable"
+    | "beta";
+  const check = await checkForUpdate({
+    currentVersion: CLI_VERSION,
+    channel,
+    force: true,
+    timeoutMs: 8000,
+  });
+  const available = updateAvailable(check);
+
+  if (flags.json) {
+    stdout.write(
+      `${JSON.stringify(
+        {
+          current: CLI_VERSION,
+          latest: check.latestVersion,
+          available,
+          channel,
+          install: kind,
+          error: check.error ?? null,
+        },
+        null,
+        2
+      )}\n`
+    );
+    return check.error ? 1 : 0;
+  }
+
+  out(flags, `${bold(flags, "PROOFCORE")} ${dim(flags, `update · current ${CLI_VERSION}`)}`);
+  if (check.error) {
+    out(flags, `${yellow(flags, "warn")} could not read the release manifest: ${check.error}`);
+    out(flags, dim(flags, `  from ${check.channel} · ${check.checkedAt}`));
+    return 1;
+  }
+  if (!available) {
+    out(
+      flags,
+      `${green(flags, "ok  ")} already on the latest ${channel} release (${check.latestVersion})`
+    );
+    return 0;
+  }
+
+  out(
+    flags,
+    `${cyan(flags, "new ")} ${check.latestVersion} ${dim(flags, `(installed ${CLI_VERSION})`)}`
+  );
+  if (kind !== "binary") {
+    out(flags, "");
+    out(
+      flags,
+      kind === "npm"
+        ? "This copy comes from npm. Update it with:  npm install -g proofcore@latest"
+        : "This copy runs from a checkout. Update it with:  git pull && pnpm install"
+    );
+    return 2;
+  }
+  if (!args.includes("--yes")) {
+    out(flags, "");
+    out(flags, `Would download the ${platformKey()} build, verify its sha256, and replace:`);
+    out(flags, dim(flags, `  ${process.execPath}`));
+    out(
+      flags,
+      dim(
+        flags,
+        "The previous binary is renamed aside first, so a failure leaves a working command."
+      )
+    );
+    out(flags, "");
+    out(flags, `Run again with ${cyan(flags, "--yes")} to install it.`);
+    return 0;
+  }
+
+  try {
+    const result = await applyUpdate({
+      currentVersion: CLI_VERSION,
+      onProgress: (message) => out(flags, dim(flags, `  ${message}`)),
+    });
+    if (!result.ok) {
+      err(flags, red(flags, result.reason));
+      return 2;
+    }
+    out(flags, `${green(flags, "ok  ")} ${result.from} → ${result.to} ${dim(flags, result.path)}`);
+    out(flags, dim(flags, "Restart the hub to run the new version."));
+    return 0;
+  } catch (error) {
+    err(flags, red(flags, describeError(error).message));
+    return 1;
+  }
+}
+
 async function commandDoctor(flags: GlobalFlags): Promise<number> {
   const problems: string[] = [];
   const notes: string[] = [];
@@ -447,6 +638,60 @@ async function commandDoctor(flags: GlobalFlags): Promise<number> {
     } else {
       out(flags, dim(flags, "—    AI   disabled (ai.enabled = false)"));
     }
+
+    // Project conflicts first: a lockfile war or a duplicated React explains more failures
+    // than any machine setting.
+    const stack = analyzeStack(readStackFacts(flags.cwd, process.versions.node));
+    // The section is worth its lines whenever there is a package.json at all: which
+    // framework, which lockfile, which runtime the project expects.
+    if (stack.some((check) => check.status !== "skip")) {
+      out(flags, "");
+      out(flags, bold(flags, "project"));
+      for (const check of stack) {
+        const mark =
+          check.status === "ok"
+            ? green(flags, "ok  ")
+            : check.status === "warn"
+              ? yellow(flags, "warn")
+              : check.status === "fail"
+                ? red(flags, "FAIL")
+                : dim(flags, "—   ");
+        out(flags, `${mark} ${check.name.padEnd(19)} ${dim(flags, check.detail)}`);
+        if (check.fix && check.status !== "ok") out(flags, dim(flags, `     fix: ${check.fix}`));
+        if (check.status === "warn") notes.push(`${check.name}: ${check.detail}`);
+        if (check.status === "fail") problems.push(`${check.name}: ${check.detail}`);
+      }
+    }
+
+    // Machine and permissions: every line is the result of a real probe, and every
+    // problem carries the command that fixes it.
+    const facts = await inspectMachine({ cwd: flags.cwd });
+    const machine = evaluate(facts);
+    out(flags, "");
+    out(flags, bold(flags, "machine"));
+    for (const check of machine) {
+      const mark =
+        check.status === "ok"
+          ? green(flags, "ok  ")
+          : check.status === "warn"
+            ? yellow(flags, "warn")
+            : check.status === "fail"
+              ? red(flags, "FAIL")
+              : dim(flags, "—   ");
+      out(flags, `${mark} ${check.name.padEnd(19)} ${dim(flags, check.detail)}`);
+      if (check.fix && check.status !== "ok") out(flags, dim(flags, `     fix: ${check.fix}`));
+      if (check.status === "fail") problems.push(`${check.name}: ${check.detail}`);
+      if (check.status === "warn") notes.push(`${check.name}: ${check.detail}`);
+    }
+    const totals = summarize(machine);
+    out(
+      flags,
+      dim(
+        flags,
+        `  ${totals.ok} ok · ${totals.warn} warning(s) · ${totals.fail} failure(s) · ${totals.skip} skipped`
+      )
+    );
+    out(flags, "");
 
     // Secrets: presence only, never the value.
     for (const [label, envVar] of [
@@ -2321,7 +2566,7 @@ function box(flags: GlobalFlags, lines: string[], width = 58): string[] {
 async function startHub(flags: GlobalFlags): Promise<number> {
   insideHub = true;
   const where = basename(flags.cwd);
-  const identity = { account: "", model: "" };
+  const identity = { account: "", model: "", update: "" };
 
   const refreshIdentity = async () => {
     const session = await loadStoredSession().catch(() => null);
@@ -2334,9 +2579,20 @@ async function startHub(flags: GlobalFlags): Promise<number> {
   await refreshIdentity();
 
   const header = () => [
-    `${bold(flags, "PROOFCORE")} ${dim(flags, `hub ${CLI_VERSION}`)} ${dim(flags, "·")} ${where} ${dim(flags, `· ${identity.model}`)}`,
+    `${bold(flags, "PROOFCORE")} ${dim(flags, `hub ${CLI_VERSION}`)} ${dim(flags, "·")} ${where} ${dim(flags, `· ${identity.model}`)}${identity.update}`,
     `${dim(flags, identity.account)}`,
   ];
+
+  // Cached answer first, network afterwards: the hub must open instantly and still learn
+  // about a release by the time anyone looks at the header.
+  const applyUpdateState = () => {
+    const pending = updateAvailable(readState());
+    identity.update = pending ? ` ${yellow(flags, `↑ ${pending} · /update`)}` : "";
+  };
+  applyUpdateState();
+  void checkForUpdate({ currentVersion: CLI_VERSION, maxAgeMs: 6 * 60 * 60 * 1000 })
+    .then(() => applyUpdateState())
+    .catch(() => undefined);
 
   const helpLines = () => {
     const lines: string[] = [""];
@@ -2344,7 +2600,7 @@ async function startHub(flags: GlobalFlags): Promise<number> {
       ["Agent", "/agent — reads, edits and runs in this repository"],
       ["Audits", "/test, /audit fail|clean <url>, /report, /modules"],
       ["Code", "/tools, /index, /search, /map, /devtools, /debug, /svg"],
-      ["Account", "/whoami, /login, /logout, /projects, /billing"],
+      ["Account", "/whoami, /login, /logout, /projects, /billing, /update"],
       ["Session", "/help, /clear, /exit"],
     ];
     for (const [group, blurb] of groups) {
@@ -2931,6 +3187,7 @@ function printHelp(flags: GlobalFlags): void {
   w("  debug <file> --line <n>     breakpoints and real variable scopes");
   w("  svg <name> [--out file]     deterministic SVG icon");
   w("  tools                       list every agent tool and where it lives");
+  w("  app                         the application, in its own window (what the icon runs)");
   w('  agent ["prompt"] [--yes]     local coding agent: reads, edits, runs, with diffs');
   w("  agent --configure           store the model URL/model/key (0600, local only)");
   w("  whoami                      which account and which model this CLI will use");

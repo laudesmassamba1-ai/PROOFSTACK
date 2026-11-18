@@ -23,12 +23,15 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gunzipSync, gzipSync } from "node:zlib";
+import { desktopEntry, iconPng } from "../../packaging/assets.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const binDir = join(root, "artifacts", "bin");
@@ -58,11 +61,30 @@ const say = (message) => process.stdout.write(`\u001b[2m▸\u001b[0m ${message}\
 const run = (command, args, options = {}) =>
   execFileSync(command, args, { stdio: "inherit", cwd: root, ...options });
 
+/** Newest modification time in the CLI sources and its build output. */
+function newestSourceMtime() {
+  let newest = 0;
+  const walk = (directory) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (/\.(ts|json)$/.test(entry.name)) newest = Math.max(newest, statSync(path).mtimeMs);
+    }
+  };
+  for (const directory of [join(root, "packages/cli/src"), join(root, "packages/cli/dist")]) {
+    if (existsSync(directory)) walk(directory);
+  }
+  return newest;
+}
+
 function ensureBinary(target) {
   const spec = TARGETS[target];
   const binary = join(binDir, spec.binary);
   const runtime = join(cache, spec.runtime);
-  if (!existsSync(binary) || !existsSync(runtime)) {
+  // A stale binary silently shipping yesterday's CLI is the kind of bug that only shows up
+  // on a user's machine, so compare against the sources instead of trusting the file's name.
+  const stale = existsSync(binary) && newestSourceMtime() > statSync(binary).mtimeMs + 1000;
+  if (!existsSync(binary) || !existsSync(runtime) || stale) {
     say(`building ${target} first`);
     run(process.execPath, [join(root, "tooling/scripts/build-binary.mjs"), "--target", target]);
   }
@@ -181,6 +203,7 @@ function buildShellInstaller(target) {
   mkdirSync(stage, { recursive: true });
   copyFileSync(binary, join(stage, `proofcore-${target}`));
   copyFileSync(join(root, "packaging/install.sh"), join(stage, "install.sh"));
+  writeFileSync(join(stage, "proofcore.png"), iconPng(256));
   chmodSync(join(stage, "install.sh"), 0o755);
   chmodSync(join(stage, `proofcore-${target}`), 0o755);
 
@@ -240,6 +263,35 @@ function buildDeb(target) {
       "Homepage: https://proofstack-iota.vercel.app",
     ].join("\n")}\n`
   );
+  const applications = join(stage, "usr", "share", "applications");
+  const icons = join(stage, "usr", "share", "icons", "hicolor", "256x256", "apps");
+  mkdirSync(applications, { recursive: true });
+  mkdirSync(icons, { recursive: true });
+  writeFileSync(join(icons, "proofcore.png"), iconPng(256));
+  writeFileSync(
+    join(applications, "proofcore.desktop"),
+    desktopEntry({
+      name: "PROOFCORE",
+      comment: "Software quality and reliability: the hub",
+      exec: "/usr/bin/proofcore",
+      icon: "proofcore",
+      terminal: true,
+      categories: "Development;",
+      desktopActions: [{ id: "application", name: "Interface", exec: "/usr/bin/proofcore app" }],
+    })
+  );
+  writeFileSync(
+    join(applications, "proofcore-interface.desktop"),
+    desktopEntry({
+      name: "PROOFCORE interface",
+      comment: "The PROOFCORE application, in its own window",
+      exec: "/usr/bin/proofcore app",
+      icon: "proofcore",
+      terminal: false,
+      categories: "Development;",
+    })
+  );
+
   writeFileSync(
     join(control, "postinst"),
     [

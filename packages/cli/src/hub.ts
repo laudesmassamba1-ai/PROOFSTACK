@@ -28,6 +28,12 @@ export const HUB_COMMANDS: {
   group: HubGroup;
 }[] = [
   { group: "Session", command: "/help", args: "", description: "this list" },
+  {
+    group: "Account",
+    command: "/update",
+    args: "[--yes]",
+    description: "check the release manifest and replace this binary",
+  },
   { group: "Account", command: "/whoami", args: "", description: "account and model in use" },
   { group: "Account", command: "/login", args: "", description: "sign in through the browser" },
   { group: "Account", command: "/logout", args: "", description: "remove the stored session" },
@@ -125,6 +131,7 @@ const ALIASES: Record<string, string[]> = {
   "/devtools": ["devtools"],
   "/debug": ["debug"],
   "/svg": ["svg"],
+  "/update": ["update"],
 };
 
 /** Splits a command line, honouring double quotes so `/search "a b"` stays one argument. */
