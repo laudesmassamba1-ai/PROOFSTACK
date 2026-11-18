@@ -88,6 +88,17 @@ The API says `emailVerification: "not_configured"` instead of claiming an email 
 sent. The adapter boundary is documented in
 `docs/deployment/ENVIRONMENT_VARIABLES.md`.
 
+### Web origins
+
+Credentialed calls are accepted only from an allowlist (`WEB_ORIGIN`), matched by
+`originAllowed()`: exact hostnames plus `*` for exactly one label, which is how preview
+deployments (`6f0fee2d.proofstack-01z.pages.dev`) are covered without allowing an
+attacker-controlled `*.pages.dev`. The guard runs on every non-GET `/api/*` request —
+account and auth routes included — and `/api/webhooks/*` is exempt because those calls are
+signature-authenticated and carry no `Origin`. Renaming a Pages project changes its
+hostname: a deployment that suddenly answers `cross_origin_denied` is almost always a
+missing entry here, which is why the error names the refused origin.
+
 ### Tenant isolation
 
 Every tenant-owned query takes the caller's workspace as an argument and filters on
@@ -96,6 +107,28 @@ A workspace the caller is not a member of answers **404**, not 403, so ids canno
 enumerated. Roles are `owner | admin | member | viewer`, and destructive or billing
 actions require owner/admin. Project tokens are scoped to one project, hashed at
 rest, and can only `runs:write` / `reports:read`.
+
+### List endpoints
+
+Every list that can grow answers the same shape, built by `http/pagination.ts`:
+
+```json
+{ "items": [], "total": 340, "limit": 25, "offset": 0 }
+```
+
+`limit` is clamped to 1–100 and an unparsable value falls back to the default instead of
+reaching SQL as `NaN`; `offset` is never negative. `total` is always present, because a
+page that omits it reads as "this is everything" — the old conversation list stopped at 50
+rows and silently hid the rest, and the runs list accepted a `limit` with no way to reach
+page two. Pagination is a visibility guarantee, not an optimisation.
+
+The corresponding queries are backed by indexes that match their `ORDER BY`
+(migration `0010`), and a test asserts the query plan keeps using them: a missing index
+fails slowly, and `EXPLAIN QUERY PLAN` is the only place that shows it.
+
+On the client, `lib/usePagedList.ts` owns the four states (rows, total, loading, error) and
+`components/app/LoadMore.tsx` renders the control, so "load more" cannot behave three
+different ways in three screens.
 
 ### Reports
 
