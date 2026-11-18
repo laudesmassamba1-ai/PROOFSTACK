@@ -41,6 +41,7 @@ const Settings = lazy(() =>
   import("./pages/app/Settings.js").then((m) => ({ default: m.Settings }))
 );
 const Admin = lazy(() => import("./pages/app/Admin.js").then((m) => ({ default: m.Admin })));
+const AiChat = lazy(() => import("./pages/app/AiChat.js").then((m) => ({ default: m.AiChat })));
 
 function RouteFallback() {
   return (
@@ -90,6 +91,7 @@ export function App() {
           <Route path="cli" element={<Cli />} />
           <Route path="billing" element={<Billing />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="ai" element={<AiChat />} />
           <Route path="admin" element={<Admin />} />
         </Route>
       </Routes>

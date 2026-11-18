@@ -3,6 +3,7 @@ import type { ModuleId } from "@proofcore/contracts";
 import { moduleIdSchema } from "@proofcore/contracts";
 import { Hono } from "hono";
 import { z } from "zod";
+import { createApiKeyToken } from "../auth.js";
 import {
   entitlementMap,
   projectDto,
@@ -13,6 +14,7 @@ import {
 import { HttpError } from "../http/errors.js";
 import { readBody, requireUser, requireWorkspace } from "../http/guards.js";
 import type { AppEnv, Services } from "../http/services.js";
+import { isValidWebhookUrl, WEBHOOK_EVENTS } from "../outbound.js";
 
 const createWorkspaceSchema = z.object({ name: z.string().min(2).max(80) }).strict();
 
@@ -34,6 +36,14 @@ const patchProjectSchema = z
     stack: z.string().max(60).nullable().optional(),
     environment: z.enum(["local", "staging", "production", "ci"]).optional(),
     enabledModules: z.array(moduleIdSchema).min(1).optional(),
+  })
+  .strict();
+
+const createWebhookSchema = z
+  .object({
+    workspaceId: z.string().min(1),
+    url: z.string().min(8).max(2048),
+    events: z.array(z.enum(WEBHOOK_EVENTS)).min(1).max(WEBHOOK_EVENTS.length),
   })
   .strict();
 
@@ -307,6 +317,90 @@ export function workspaceRoutes(services: Services): Hono<AppEnv> {
       },
       subscription: subscription.view,
     });
+  });
+
+  // ------------------------------------------------------- outbound webhooks
+
+  /** The user's own automations: PROOFCORE posts signed events after commit. */
+  app.get("/webhooks", async (c) => {
+    const { workspace } = await requireWorkspace(c, services, c.req.query("workspaceId"), [
+      "owner",
+      "admin",
+    ]);
+    const webhooks = await services.store.listWorkspaceWebhooks(workspace.id);
+    return c.json({
+      events: WEBHOOK_EVENTS,
+      items: webhooks.map((webhook) => ({
+        id: webhook.id,
+        url: webhook.url,
+        events: webhook.events,
+        secretPrefix: webhook.secretPrefix,
+        createdAt: webhook.createdAt,
+        lastStatus: webhook.lastStatus,
+        lastStatusAt: webhook.lastStatusAt,
+        lastError: webhook.lastError,
+      })),
+    });
+  });
+
+  app.post("/webhooks", async (c) => {
+    const body = await readBody(c, createWebhookSchema);
+    const { workspace } = await requireWorkspace(c, services, body.workspaceId, ["owner", "admin"]);
+    if (!isValidWebhookUrl(body.url, services.config.environment)) {
+      throw new HttpError(
+        400,
+        "webhook_url_invalid",
+        services.config.environment === "production"
+          ? "Use a public https URL."
+          : "The URL is not a valid http(s) endpoint."
+      );
+    }
+
+    const { token, prefix } = await createApiKeyToken();
+    const secret = token.replace("psk_", "wsk_");
+    const webhook = await services.store.createWorkspaceWebhook({
+      workspaceId: workspace.id,
+      url: body.url,
+      secret,
+      secretPrefix: prefix,
+      events: body.events,
+    });
+    await services.store.appendAudit({
+      workspaceId: workspace.id,
+      actor: c.get("user").id,
+      action: "webhook.created",
+      detail: { webhookId: webhook.id, url: body.url, events: body.events },
+    });
+    return c.json(
+      {
+        id: webhook.id,
+        url: webhook.url,
+        events: webhook.events,
+        secretPrefix: webhook.secretPrefix,
+        secret,
+        warning: "This secret is shown once. Receivers verify x-proofcore-signature with it.",
+      },
+      201
+    );
+  });
+
+  app.delete("/webhooks/:webhookId", async (c) => {
+    const { workspace } = await requireWorkspace(c, services, c.req.query("workspaceId"), [
+      "owner",
+      "admin",
+    ]);
+    const removed = await services.store.deleteWorkspaceWebhook(
+      workspace.id,
+      c.req.param("webhookId")
+    );
+    if (!removed) throw new HttpError(404, "webhook_not_found", "Webhook not found.");
+    await services.store.appendAudit({
+      workspaceId: workspace.id,
+      actor: c.get("user").id,
+      action: "webhook.deleted",
+      detail: { webhookId: c.req.param("webhookId") },
+    });
+    return c.json({ ok: true });
   });
 
   return app;

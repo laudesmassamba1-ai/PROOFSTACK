@@ -47,8 +47,10 @@ describe("proofcore MCP server", () => {
       clientInfo: { name: "test", version: "0" },
     });
     expect(response.result?.protocolVersion).toBe("2025-06-18");
-    expect(response.result?.capabilities).toEqual({ tools: { listChanged: false } });
+    const capabilities = response.result?.capabilities as Record<string, unknown> | undefined;
+    expect(capabilities).toEqual({ tools: { listChanged: false } });
     const info = response.result?.serverInfo as { name: string; version: string };
+    expect(info).toBeTruthy();
     expect(info.name).toBe("proofcore");
     expect(info.version).toBeTruthy();
     expect(response.result?.instructions).toBe(PROOFCORE_MCP_INSTRUCTIONS);
@@ -76,7 +78,9 @@ describe("proofcore MCP server", () => {
 
   it("lists exactly the advertised tools with schemas", async () => {
     const response = await call(server(), 1, "tools/list");
-    const tools = (response.result?.tools as { name: string; inputSchema: object }[]) ?? [];
+    const toolsRaw = response.result?.tools;
+    expect(Array.isArray(toolsRaw)).toBe(true);
+    const tools = toolsRaw as { name: string; inputSchema: object }[];
     expect(tools.map((t) => t.name)).toEqual([
       "project_summary",
       "doctor",
@@ -98,7 +102,9 @@ describe("proofcore MCP server", () => {
       arguments: {},
     });
     expect(response.result?.isError).toBe(false);
-    const text = (response.result?.content as { type: string; text: string }[])[0].text;
+    const content = response.result?.content as { type: string; text: string }[] | undefined;
+    expect(Array.isArray(content)).toBe(true);
+    const text = content[0].text;
     const data = JSON.parse(text) as { project: { name: string }; enabledModules: string[] };
     expect(data.project.name).toBe("Fixture App");
     expect(data.enabledModules).toContain("world");
@@ -106,7 +112,9 @@ describe("proofcore MCP server", () => {
 
   it("doctor runs real checks against the fixture project", async () => {
     const response = await call(server(), 1, "tools/call", { name: "doctor", arguments: {} });
-    const data = JSON.parse((response.result?.content as { text: string }[])[0].text) as {
+    const content = response.result?.content as { text: string }[] | undefined;
+    expect(Array.isArray(content)).toBe(true);
+    const data = JSON.parse(content[0].text) as {
       checks: { name: string; status: string }[];
       problems: number;
     };
@@ -121,7 +129,9 @@ describe("proofcore MCP server", () => {
       name: "validate_config",
       arguments: {},
     });
-    const data = JSON.parse((response.result?.content as { text: string }[])[0].text) as {
+    const content = response.result?.content as { text: string }[] | undefined;
+    expect(Array.isArray(content)).toBe(true);
+    const data = JSON.parse(content[0].text) as {
       ok: boolean;
       project?: string;
       errors?: unknown[];
@@ -135,8 +145,9 @@ describe("proofcore MCP server", () => {
     const response = await call(server(), 1, "tools/call", { name: "last_report", arguments: {} });
     // A missing report is a *result* (isError) the agent can read, not a crash.
     expect(response.result?.isError).toBe(true);
-    const text = (response.result?.content as { text: string }[])[0].text;
-    expect(text).toContain("no_report");
+    const content = response.result?.content as { text: string }[] | undefined;
+    expect(Array.isArray(content)).toBe(true);
+    expect(content[0].text).toContain("no_report");
   });
 
   it("unknown tool calls fail as tool results the agent can read", async () => {
@@ -145,6 +156,8 @@ describe("proofcore MCP server", () => {
       arguments: {},
     });
     expect(response.result?.isError).toBe(true);
-    expect((response.result?.content as { text: string }[])[0].text).toContain("unknown_tool");
+    const content = response.result?.content as { text: string }[] | undefined;
+    expect(Array.isArray(content)).toBe(true);
+    expect(content[0].text).toContain("unknown_tool");
   });
 });

@@ -62,6 +62,21 @@ export interface DeviceGrantRecord {
   ip: string | null;
 }
 
+export interface WorkspaceWebhookRecord {
+  id: string;
+  workspaceId: string;
+  url: string;
+  /** Kept server-side to sign deliveries; shown in plaintext only at creation. */
+  secret: string;
+  secretPrefix: string;
+  events: string[];
+  disabled: boolean;
+  createdAt: string;
+  lastStatus: number | null;
+  lastStatusAt: string | null;
+  lastError: string | null;
+}
+
 export interface WorkspaceRecord {
   id: string;
   name: string;
@@ -402,6 +417,75 @@ export class AppStore {
 
   async deleteExpiredDeviceGrants(now = this.clock()): Promise<void> {
     await this.db.prepare("DELETE FROM device_grants WHERE expires_at <= ?").bind(iso(now)).run();
+  }
+
+  // ------------------------------------------------------ outbound webhooks
+
+  async createWorkspaceWebhook(input: {
+    workspaceId: string;
+    url: string;
+    secret: string;
+    secretPrefix: string;
+    events: string[];
+  }): Promise<WorkspaceWebhookRecord> {
+    const record: WorkspaceWebhookRecord = {
+      id: `whk_${uuid().replaceAll("-", "").slice(0, 20)}`,
+      workspaceId: input.workspaceId,
+      url: input.url,
+      secret: input.secret,
+      secretPrefix: input.secretPrefix,
+      events: input.events,
+      disabled: false,
+      createdAt: iso(this.clock()),
+      lastStatus: null,
+      lastStatusAt: null,
+      lastError: null,
+    };
+    await this.db
+      .prepare(
+        `INSERT INTO workspace_webhooks (id, workspace_id, url, secret, secret_prefix, events, disabled, created_at, last_status, last_status_at, last_error)
+         VALUES (?, ?, ?, ?, ?, ?, 0, ?, NULL, NULL, NULL)`
+      )
+      .bind(
+        record.id,
+        record.workspaceId,
+        record.url,
+        record.secret,
+        record.secretPrefix,
+        record.events.join(","),
+        record.createdAt
+      )
+      .run();
+    return record;
+  }
+
+  async listWorkspaceWebhooks(workspaceId: string): Promise<WorkspaceWebhookRecord[]> {
+    const rows = await this.db
+      .prepare("SELECT * FROM workspace_webhooks WHERE workspace_id = ? ORDER BY created_at ASC")
+      .bind(workspaceId)
+      .all<Row>();
+    return rows.filter((row) => !row.disabled).map(mapWorkspaceWebhook);
+  }
+
+  async deleteWorkspaceWebhook(workspaceId: string, id: string): Promise<boolean> {
+    const result = await this.db
+      .prepare("DELETE FROM workspace_webhooks WHERE workspace_id = ? AND id = ?")
+      .bind(workspaceId, id)
+      .run();
+    return result.changes > 0;
+  }
+
+  async markWebhookDelivery(
+    id: string,
+    status: number | null,
+    error: string | null
+  ): Promise<void> {
+    await this.db
+      .prepare(
+        "UPDATE workspace_webhooks SET last_status = ?, last_status_at = ?, last_error = ? WHERE id = ?"
+      )
+      .bind(status, iso(this.clock()), error, id)
+      .run();
   }
 
   // ------------------------------------------------------------- workspaces
@@ -771,6 +855,16 @@ export class AppStore {
     return parseJson<TestRun | null>(row.payload, null);
   }
 
+  /** Resolve a report through the run id the model already knows. */
+  async getReportByRunId(workspaceId: string, runId: string): Promise<TestRun | null> {
+    const row = await this.db
+      .prepare("SELECT payload FROM reports WHERE workspace_id = ? AND run_id = ?")
+      .bind(workspaceId, runId)
+      .first<Row>();
+    if (!row) return null;
+    return parseJson<TestRun | null>(row.payload, null);
+  }
+
   async listReports(workspaceId: string, projectId: string, limit = 25) {
     const rows = await this.db
       .prepare(
@@ -976,6 +1070,22 @@ function mapUser(row: Row): UserRecord {
     passwordHash: str(row, "password_hash"),
     createdAt: str(row, "created_at"),
     emailVerifiedAt: nullableStr(row, "email_verified_at"),
+  };
+}
+
+function mapWorkspaceWebhook(row: Row): WorkspaceWebhookRecord {
+  return {
+    id: str(row, "id"),
+    workspaceId: str(row, "workspace_id"),
+    url: str(row, "url"),
+    secret: str(row, "secret"),
+    secretPrefix: str(row, "secret_prefix"),
+    events: str(row, "events").split(",").filter(Boolean),
+    disabled: Number(row.disabled) === 1,
+    createdAt: str(row, "created_at"),
+    lastStatus: typeof row.last_status === "number" ? row.last_status : null,
+    lastStatusAt: nullableStr(row, "last_status_at"),
+    lastError: nullableStr(row, "last_error"),
   };
 }
 

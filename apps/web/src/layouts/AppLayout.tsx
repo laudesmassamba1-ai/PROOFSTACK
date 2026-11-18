@@ -1,4 +1,5 @@
 import {
+  Bot,
   Box,
   ChevronDown,
   Command,
@@ -201,6 +202,7 @@ export function AppLayout() {
       ["FLOW", "/app/modules/flow", <RouteIcon key="flow" size={15} />],
       ["EXIT", "/app/modules/exit", <PackageOpen key="exit" size={15} />],
       [t("ws.nav.cli"), "/app/cli", <Terminal key="cli" size={15} />],
+      [t("ws.nav.ai"), "/app/ai", <Bot key="ai" size={15} />],
       [t("ws.nav.billing"), "/app/billing", <CreditCard key="billing" size={15} />],
       [t("ws.nav.settings"), "/app/settings", <SettingsIcon key="settings" size={15} />],
     ];
@@ -341,6 +343,9 @@ export function AppLayout() {
             </div>
             <NavLink to="/app/cli" className="app-toplink">
               {t("ws.nav.cli")}
+            </NavLink>
+            <NavLink to="/app/ai" className="app-toplink">
+              {t("ws.nav.ai")}
             </NavLink>
             <NavLink to="/app/billing" className="app-toplink">
               {t("ws.nav.billing")}

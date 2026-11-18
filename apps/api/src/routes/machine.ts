@@ -3,6 +3,7 @@ import { type Context, Hono } from "hono";
 import { hashToken } from "../auth.js";
 import { HttpError } from "../http/errors.js";
 import type { AppEnv, Services } from "../http/services.js";
+import { deliverWorkspaceEvent } from "../outbound.js";
 import type { ApiKeyRecord, RunTotals } from "../store/app-store.js";
 
 /**
@@ -175,6 +176,33 @@ export function machineRoutes(services: Services): Hono<AppEnv> {
       },
     });
 
+    // Outbound webhooks fire after the commit: receivers observe truth, they
+    // never gate it. A slow endpoint must not delay the CLI response, so the
+    // delivery runs in the background where the runtime allows it.
+    const webhookTask = deliverWorkspaceEvent(services, {
+      event:
+        run.status === "COMPLETED" && totalsFailed(totals) > 0
+          ? "findings.failed"
+          : "run.completed",
+      workspaceId: key.workspaceId,
+      occurredAt: new Date(services.clock()).toISOString(),
+      data: {
+        runId: saved.runId,
+        reportId: saved.reportId,
+        projectId: run.projectId,
+        status: run.status,
+        modules: run.modules,
+        totals,
+        endedAt: run.endedAt,
+      },
+    });
+    try {
+      c.executionCtx.waitUntil(webhookTask);
+    } catch {
+      // Hono's Node adapter has no executionCtx; local dev may await it.
+      await webhookTask;
+    }
+
     const snapshot = await services.meter.snapshot(key.workspaceId, services.clock());
     const limit = snapshot.entitlements.entitlements.monthly_test_runs;
     const response = {
@@ -212,6 +240,10 @@ async function authenticate(c: Context<AppEnv>, services: Services): Promise<Api
     throw new HttpError(401, "invalid_api_key", "This API key is unknown, revoked or expired.");
   await services.store.touchApiKey(key.id);
   return key;
+}
+
+function totalsFailed(totals: Record<string, RunTotals>): number {
+  return Object.values(totals).reduce((sum, t) => sum + t.failed + t.errors, 0);
 }
 
 function retentionBoundary(endedAt: string, days: number): string {

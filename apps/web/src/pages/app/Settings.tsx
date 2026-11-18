@@ -1,4 +1,4 @@
-import { KeyRound, Moon, Sun, Trash2 } from "lucide-react";
+import { Globe, KeyRound, Moon, Sun, Trash2, Webhook } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Cannot, Card, Empty, ErrorState, Loading } from "../../components/app/ui.js";
 import { useI18n } from "../../i18n/index.js";
@@ -25,6 +25,17 @@ interface ApiKey {
   revokedAt: string | null;
 }
 
+interface WebhookEntry {
+  id: string;
+  url: string;
+  events: string[];
+  secretPrefix: string;
+  createdAt: string;
+  lastStatus: number | null;
+  lastStatusAt: string | null;
+  lastError: string | null;
+}
+
 export function Settings() {
   const { theme, setTheme } = useTheme();
   const { locale, setLocale, t } = useI18n();
@@ -35,6 +46,11 @@ export function Settings() {
     null
   );
   const [keys, setKeys] = useState<ApiKey[] | null>(null);
+  const [webhooks, setWebhooks] = useState<WebhookEntry[] | null>(null);
+  const [showWhForm, setShowWhForm] = useState(false);
+  const [whUrl, setWhUrl] = useState("https://");
+  const [whEvents, setWhEvents] = useState<string[]>(["run.completed"]);
+  const [whSecret, setWhSecret] = useState<string | null>(null);
   const [error, setError] = useState<ApiError | Error | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -59,6 +75,14 @@ export function Settings() {
       } else {
         setKeys([]);
       }
+      if (body.myRole === "owner" || body.myRole === "admin") {
+        const webhookBody = await apiFetch<{ items: WebhookEntry[] }>(
+          `/api/v1/webhooks?workspaceId=${session.workspaceId}`
+        );
+        setWebhooks(webhookBody.items);
+      } else {
+        setWebhooks([]);
+      }
     } catch (caught) {
       setError(caught as ApiError);
     }
@@ -80,6 +104,50 @@ export function Settings() {
           ? "Jeton révoqué. La CI qui l'utilise recevra 401 à son prochain envoi."
           : "Token revoked. CI using it will receive 401 on its next upload."
       );
+      await load();
+    } catch (caught) {
+      setError(caught as ApiError);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const createWebhook = async () => {
+    if (!session.workspaceId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const created = await apiFetch<{
+        id: string;
+        secret: string;
+      }>("/api/v1/webhooks", {
+        method: "POST",
+        body: {
+          workspaceId: session.workspaceId,
+          url: whUrl.trim(),
+          events: whEvents,
+        },
+      });
+      setWhSecret(created.secret);
+      setShowWhForm(false);
+      setWhUrl("https://");
+      setWhEvents(["run.completed"]);
+      setNotice(fr ? "Webhook créé." : "Webhook created.");
+      await load();
+    } catch (caught) {
+      setError(caught as ApiError);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const deleteWebhook = async (id: string) => {
+    if (!session.workspaceId) return;
+    setBusy(true);
+    try {
+      await apiFetch(`/api/v1/webhooks/${id}?workspaceId=${session.workspaceId}`, {
+        method: "DELETE",
+      });
       await load();
     } catch (caught) {
       setError(caught as ApiError);
@@ -350,6 +418,169 @@ export function Settings() {
           </div>
         )}
       </Card>
+
+      {canManage ? (
+        <>
+          {whSecret ? (
+            <div
+              className="app-card mt-4 border-2 p-4"
+              style={{ borderColor: "var(--warning, #b45309)" }}
+              role="alert"
+            >
+              <p className="text-sm font-medium">
+                {fr ? "Secret du webhook — copiez-le maintenant" : "Webhook secret — copy it now"}
+              </p>
+              <code className="app-mono mt-2 block break-all rounded-lg bg-surface px-3 py-2 text-xs">
+                {whSecret}
+              </code>
+              <button type="button" className="app-btn mt-3" onClick={() => setWhSecret(null)}>
+                {fr ? "Je l'ai copié" : "Done, I copied it"}
+              </button>
+            </div>
+          ) : null}
+
+          <Card className="mt-4" title={t("wh.title")} description={t("wh.description")} enhanced>
+            {!webhooks ? (
+              <Loading label={fr ? "Chargement des webhooks…" : "Loading webhooks…"} />
+            ) : (
+              <>
+                {showWhForm ? (
+                  <div className="px-5 py-4">
+                    <label className="block">
+                      <span className="app-label">{t("wh.url")}</span>
+                      <input
+                        className="app-input"
+                        value={whUrl}
+                        onChange={(event) => setWhUrl(event.target.value)}
+                        placeholder="https://votre-n8n.exemple/webhook/proofcore"
+                        spellCheck={false}
+                        dir="ltr"
+                      />
+                    </label>
+                    <fieldset className="mt-3">
+                      <legend className="app-label">{t("wh.events")}</legend>
+                      <div className="flex flex-wrap gap-2">
+                        {(["run.completed", "findings.failed"] as const).map((eventKey) => (
+                          <label
+                            key={eventKey}
+                            className="flex cursor-pointer items-center gap-2 text-xs"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={whEvents.includes(eventKey)}
+                              onChange={(event) =>
+                                setWhEvents((current) =>
+                                  event.target.checked
+                                    ? [...current, eventKey]
+                                    : current.filter((e) => e !== eventKey)
+                                )
+                              }
+                            />
+                            {t(`wh.event.${eventKey}`)}
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                    <div className="mt-4 flex gap-2">
+                      <button
+                        type="button"
+                        className="app-btn app-btn-primary"
+                        onClick={() => void createWebhook()}
+                        disabled={busy || !whUrl.trim().startsWith("https://")}
+                      >
+                        <Webhook size={13} /> {t("wh.create")}
+                      </button>
+                      <button
+                        type="button"
+                        className="app-btn"
+                        onClick={() => setShowWhForm(false)}
+                      >
+                        {t("wh.cancel")}
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
+                {webhooks.length === 0 && !showWhForm ? (
+                  <Empty
+                    title={fr ? "Aucun webhook" : "No webhook yet"}
+                    body={t("wh.empty")}
+                    action={
+                      <button
+                        type="button"
+                        className="app-btn app-btn-primary"
+                        onClick={() => setShowWhForm(true)}
+                      >
+                        <Webhook size={13} /> {t("wh.add")}
+                      </button>
+                    }
+                  />
+                ) : webhooks.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="app-table">
+                      <thead>
+                        <tr>
+                          <th>{t("wh.url")}</th>
+                          <th>{t("wh.events")}</th>
+                          <th>{t("wh.lastDelivery")}</th>
+                          <th />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {webhooks.map((webhook) => (
+                          <tr key={webhook.id}>
+                            <td className="max-w-[24rem]">
+                              <code className="app-mono break-all text-xs">{webhook.url}</code>
+                            </td>
+                            <td className="text-xs">{webhook.events.join(", ")}</td>
+                            <td className="text-xs text-muted">
+                              {webhook.lastStatus === null
+                                ? t("wh.never")
+                                : `HTTP ${webhook.lastStatus} · ${relativeTime(webhook.lastStatusAt)}`}
+                              {webhook.lastError ? (
+                                <p className="mt-0.5 text-red-600 dark:text-red-400">
+                                  {webhook.lastError}
+                                </p>
+                              ) : null}
+                            </td>
+                            <td>
+                              <button
+                                type="button"
+                                className="app-btn app-btn-danger"
+                                onClick={() => void deleteWebhook(webhook.id)}
+                                disabled={busy}
+                              >
+                                <Trash2 size={13} /> {t("wh.delete")}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
+
+                {!showWhForm && webhooks.length > 0 ? (
+                  <div className="px-5 pb-4 pt-3">
+                    <button type="button" className="app-btn" onClick={() => setShowWhForm(true)}>
+                      <Webhook size={13} /> {t("wh.add")}
+                    </button>
+                  </div>
+                ) : null}
+              </>
+            )}
+          </Card>
+
+          <Card className="mt-4" title={t("wh.n8n.title")} description={t("wh.n8n.body")} enhanced>
+            <div className="flex items-center gap-3 px-5 py-4 text-sm">
+              <Globe size={16} className="shrink-0 text-muted" />
+              <code className="app-mono text-xs text-muted">
+                automation/n8n · docker compose up -d → http://localhost:5678
+              </code>
+            </div>
+          </Card>
+        </>
+      ) : null}
     </>
   );
 }

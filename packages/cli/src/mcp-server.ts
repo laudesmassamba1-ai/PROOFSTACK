@@ -4,8 +4,8 @@ import { renderReport } from "@proofcore/adapter-reporting";
 import { type LoadedConfig, loadConfig } from "@proofcore/config";
 import type { ModuleId, ReportFormat, TestRun } from "@proofcore/contracts";
 import { Logger, ProofCoreError, stableStringify } from "@proofcore/core";
-import { ENGINE_VERSION, type ModuleProvider, runEngine } from "@proofcore/engine";
-import { assembleProviders, blockingSafetyWarnings, resolveProfileIds } from "./providers.js";
+import { ENGINE_VERSION, runEngine } from "@proofcore/engine";
+import { assembleProviders, blockingSafetyWarnings } from "./providers.js";
 
 /**
  * PROOFCORE's MCP server: `proofcore mcp`.
