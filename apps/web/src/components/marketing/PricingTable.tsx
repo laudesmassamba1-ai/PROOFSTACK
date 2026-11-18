@@ -1,7 +1,8 @@
 import { PLANS, SUPPORTED_CURRENCIES, yearlySavingPercent } from "@proofcore/billing";
 import { type EntitlementKey, planSchema } from "@proofcore/contracts";
 import { Money } from "@proofcore/core";
-import { Check, Minus } from "lucide-react";
+import { Check, Minus, ShieldCheck, Sparkles, Zap } from "lucide-react";
+import type React from "react";
 import { useState } from "react";
 import { Link } from "react-router";
 import { useI18n } from "../../i18n/index.js";
@@ -31,11 +32,16 @@ export function PricingTable({ currentPlanKey }: { currentPlanKey?: string }) {
               type="button"
               onClick={() => setPeriod(option)}
               aria-pressed={period === option}
-              className={`rounded-full px-4 py-2 text-[0.84rem] transition-colors ${
+              className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-[0.84rem] transition-colors ${
                 period === option ? "bg-white text-[#050708]" : "text-white/62 hover:text-white"
               }`}
             >
               {t(option === "monthly" ? "pricing.monthly" : "pricing.yearly")}
+              {option === "yearly" && period === "yearly" ? (
+                <span className="rounded-full bg-brand-emerald px-1.5 py-0.5 text-[0.62rem] font-semibold text-[#05231b]">
+                  {t("pricing.bestValue")}
+                </span>
+              ) : null}
             </button>
           ))}
         </div>
@@ -56,8 +62,13 @@ export function PricingTable({ currentPlanKey }: { currentPlanKey?: string }) {
         </label>
       </div>
 
+      <p className="mx-auto mb-6 flex w-fit items-center gap-2 rounded-full border border-brand-mint/25 bg-brand-emerald/8 px-4 py-1.5 text-[0.78rem] text-brand-mint/90">
+        <Zap size={13} />
+        {t("pricing.founding")}
+      </p>
+
       <div className="grid gap-5 lg:grid-cols-4">
-        {featured.map((plan) => {
+        {featured.map((plan, planIndex) => {
           const price = plan.prices.find(
             (entry) => entry.period === period && entry.amount.currency === currency
           );
@@ -67,13 +78,14 @@ export function PricingTable({ currentPlanKey }: { currentPlanKey?: string }) {
           return (
             <article
               key={plan.id}
-              className={`brand-panel relative flex flex-col p-6 ${
-                plan.key === "studio" ? "ring-1 ring-brand-mint/35" : ""
+              style={{ "--pk-delay": `${planIndex * 90}ms` } as React.CSSProperties}
+              className={`brand-panel pk-enter pk-plan relative flex flex-col p-6 ${
+                plan.key === "studio" ? "pk-plan-featured ring-1 ring-brand-mint/35" : ""
               }`}
             >
               {plan.key === "studio" ? (
-                <span className="absolute -top-3 left-6 rounded-full bg-brand-mint px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-[#05231b]">
-                  {t("mkt.pricing.featured")}
+                <span className="absolute -top-3 left-6 flex items-center gap-1 rounded-full bg-brand-mint px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-[#05231b]">
+                  <Sparkles size={11} /> {t("mkt.pricing.featured")}
                 </span>
               ) : null}
 
@@ -89,7 +101,10 @@ export function PricingTable({ currentPlanKey }: { currentPlanKey?: string }) {
                   </span>
                 ) : price ? (
                   <>
-                    <span className="text-[2.1rem] font-semibold tracking-tight tabular-nums">
+                    <span
+                      key={`${period}-${currency}`}
+                      className="pk-price-swap text-[2.1rem] font-semibold tracking-tight tabular-nums"
+                    >
                       {Money.of(price.amount.currency, BigInt(price.amount.minor)).format(
                         locale === "fr" ? "fr-FR" : "en-US",
                         { maximumFractionDigits: price.amount.currency === "XOF" ? 0 : 2 }
@@ -173,6 +188,12 @@ export function PricingTable({ currentPlanKey }: { currentPlanKey?: string }) {
               {plan.prepaidOnly ? (
                 <p className="mt-3 text-[0.72rem] leading-relaxed text-white/38">
                   {t("mkt.pricing.prepaid").replace("{days}", String(plan.graceDays))}
+                </p>
+              ) : null}
+              {!isFree && !isCurrent ? (
+                <p className="mt-2 flex items-start gap-1.5 text-[0.72rem] leading-relaxed text-white/44">
+                  <ShieldCheck size={13} className="mt-0.5 shrink-0 text-brand-mint/70" />
+                  {t("pricing.guarantee")}
                 </p>
               ) : null}
             </article>

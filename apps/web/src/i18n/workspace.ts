@@ -96,6 +96,12 @@ export const workspaceEn = {
   "ws.module.flow.summary": "Can users complete the critical operations?",
   "ws.module.flow.body":
     "Journeys, checkout scenarios, webhook ordering and idempotency. Failures name the step that broke.",
+  "ws.module.fail.summary": "Where does the app leak or break?",
+  "ws.module.fail.body":
+    "Security and defect scans of your app: security headers, cookie flags, mixed content, version banners, verbose error disclosure. Every check shows the exact observed value.",
+  "ws.module.clean.summary": "Is the interface polished and coherent?",
+  "ws.module.clean.body":
+    "UI quality audits with a score: structure, accessibility basics, semantics, weight, response time. The assistant shows you precisely where it fails and compares against best practices.",
   "ws.module.exit.summary": "Can users retrieve their information without losing it?",
   "ws.module.exit.body":
     "Export formats, schema validity, referential integrity and round-trip fidelity. Nothing runs against production data by default.",
@@ -449,6 +455,12 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
   "ws.module.flow.summary": "Les utilisateurs peuvent-ils mener à bien les opérations critiques ?",
   "ws.module.flow.body":
     "Parcours, scénarios de paiement, ordre des webhooks et idempotence. Un échec nomme l'étape rompue.",
+  "ws.module.fail.summary": "Où l'application fuit-elle ou casse-t-elle ?",
+  "ws.module.fail.body":
+    "Scans de sécurité et de défauts de votre app : en-têtes de sécurité, cookies, contenu mixte, bannières de version, divulgation d'erreurs. Chaque vérification montre la valeur observée exacte.",
+  "ws.module.clean.summary": "L'interface est-elle soignée et cohérente ?",
+  "ws.module.clean.body":
+    "Audits qualité d'interface avec score : structure, accessibilité, sémantique, poids, temps de réponse. L'assistant montre précisément où ça coince et compare aux meilleures pratiques.",
   "ws.module.exit.summary":
     "Les utilisateurs peuvent-ils récupérer leurs informations sans les perdre ?",
   "ws.module.exit.body":

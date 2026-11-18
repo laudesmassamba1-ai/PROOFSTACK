@@ -13,7 +13,9 @@ import {
   Route as RouteIcon,
   Search,
   Settings as SettingsIcon,
+  ShieldAlert,
   ShieldCheck,
+  Sparkles,
   Terminal,
   X,
 } from "lucide-react";
@@ -201,6 +203,8 @@ export function AppLayout() {
       ["WORLD", "/app/modules/world", <Globe2 key="world" size={15} />],
       ["FLOW", "/app/modules/flow", <RouteIcon key="flow" size={15} />],
       ["EXIT", "/app/modules/exit", <PackageOpen key="exit" size={15} />],
+      ["FAIL", "/app/modules/fail", <ShieldAlert key="fail" size={15} />],
+      ["CLEAN", "/app/modules/clean", <Sparkles key="clean" size={15} />],
       [t("ws.nav.cli"), "/app/cli", <Terminal key="cli" size={15} />],
       [t("ws.nav.ai"), "/app/ai", <Bot key="ai" size={15} />],
       [t("ws.nav.billing"), "/app/billing", <CreditCard key="billing" size={15} />],
@@ -328,6 +332,8 @@ export function AppLayout() {
                     ["WORLD", "/app/modules/world", <Globe2 key="world" size={14} />],
                     ["FLOW", "/app/modules/flow", <RouteIcon key="flow" size={14} />],
                     ["EXIT", "/app/modules/exit", <PackageOpen key="exit" size={14} />],
+                    ["FAIL", "/app/modules/fail", <ShieldAlert key="fail" size={14} />],
+                    ["CLEAN", "/app/modules/clean", <Sparkles key="clean" size={14} />],
                   ].map(([label, to, icon]) => (
                     <NavLink
                       key={String(label)}

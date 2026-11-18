@@ -27,6 +27,13 @@ import { createExitProvider, defaultExportSource } from "@proofcore/module-exit"
 import { createFlowProvider, defaultFlowTarget } from "@proofcore/module-flow";
 import * as worldProfiles from "@proofcore/module-world";
 import { createWorldProvider, HttpProductUnderTest } from "@proofcore/module-world";
+import {
+  parseAuditTarget,
+  printAuditHelp,
+  renderAudit,
+  runCleanAudit,
+  runFailAudit,
+} from "./audit.js";
 import { mcpToolDescriptors, ProofcoreMcpServer, serveMcpStdio } from "./mcp-server.js";
 import {
   apiGet,
@@ -155,6 +162,7 @@ async function main(argv: string[]): Promise<number> {
     "sync",
     "ai",
     "mcp",
+    "audit",
   ]);
   if (command && cwdCommands.has(command) && flags.cwdExplicit && !isDirectory(flags.cwd)) {
     err(
@@ -215,6 +223,8 @@ async function main(argv: string[]): Promise<number> {
       return commandAi(flags, args);
     case "mcp":
       return commandMcp(flags, args);
+    case "audit":
+      return commandAudit(flags, args);
     default:
       err(flags, `Unknown command: ${command}`);
       printHelp(flags);
@@ -1881,6 +1891,44 @@ function printBanner(flags: GlobalFlags): void {
   );
 }
 
+async function commandAudit(flags: GlobalFlags, args: string[]): Promise<number> {
+  const kind = args[0];
+  const target = args.find((a, index) => index > 0 && !a.startsWith("-"));
+  if (
+    kind === "--help" ||
+    kind === "-h" ||
+    kind === "help" ||
+    !kind ||
+    (!target && kind !== "--help")
+  ) {
+    printAuditHelp(flags);
+    return kind && target ? 2 : 0;
+  }
+  if (kind !== "fail" && kind !== "clean") {
+    err(flags, `Unknown audit kind: ${kind}. Available: fail, clean.`);
+    printAuditHelp(flags);
+    return 2;
+  }
+  if (!target) {
+    err(flags, "Give the URL to audit, e.g. proofcore audit fail https://app.example/");
+    return 2;
+  }
+  try {
+    const url = parseAuditTarget(target);
+    const result =
+      kind === "fail" ? await runFailAudit(url.toString()) : await runCleanAudit(url.toString());
+    if (flags.json) {
+      stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    } else {
+      renderAudit(result, flags);
+    }
+    return result.checks.some((check) => check.status === "FAIL") ? 1 : 0;
+  } catch (error) {
+    err(flags, error instanceof Error ? error.message : String(error));
+    return 2;
+  }
+}
+
 function printHelp(flags: GlobalFlags): void {
   const w = (text: string): void => {
     stdout.write(`${text}\n`);
@@ -1902,6 +1950,7 @@ function printHelp(flags: GlobalFlags): void {
   w("  login | logout           Sign in interactively / remove the stored session");
   w("  sync                     Upload the last run to the API");
   w("  ai <status|tools|ask|agent>  MCP servers, AI providers and external agents");
+  w("  audit fail|clean <url>       FAIL: security scan · CLEAN: UI quality score");
   w("  mcp                      Serve PROOFCORE as an MCP server over stdio");
   w("");
   w(bold(flags, "test options"));

@@ -6,6 +6,7 @@ import {
   Globe,
   Lock,
   PanelLeft,
+  Plug,
   Plus,
   Send,
   ShieldAlert,
@@ -85,6 +86,131 @@ const TOOL_ICONS: Record<string, typeof Bot> = {
   fetch_web: Globe,
 };
 
+/** One-click provider presets: pick one, paste the key, done. All OpenAI-compatible. */
+interface ProviderPreset {
+  id: string;
+  label: string;
+  baseUrl: string;
+  models: string[];
+  note?: string;
+}
+
+const PROVIDER_PRESETS: ProviderPreset[] = [
+  {
+    id: "openai",
+    label: "OpenAI",
+    baseUrl: "https://api.openai.com/v1",
+    models: ["gpt-4o-mini", "gpt-4o", "gpt-4.1"],
+  },
+  {
+    id: "groq",
+    label: "Groq",
+    baseUrl: "https://api.groq.com/openai/v1",
+    models: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "qwen-2.5-32b"],
+    note: "très rapide, généreux gratuit",
+  },
+  {
+    id: "openrouter",
+    label: "OpenRouter",
+    baseUrl: "https://openrouter.ai/api/v1",
+    models: [
+      "openai/gpt-4o-mini",
+      "anthropic/claude-sonnet-4",
+      "meta-llama/llama-3.3-70b-instruct",
+    ],
+    note: "tous les modèles, une clé",
+  },
+  {
+    id: "gemini",
+    label: "Google Gemini",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+    models: ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-pro"],
+  },
+  {
+    id: "mistral",
+    label: "Mistral",
+    baseUrl: "https://api.mistral.ai/v1",
+    models: ["mistral-large-latest", "mistral-small-latest"],
+  },
+  {
+    id: "deepseek",
+    label: "DeepSeek",
+    baseUrl: "https://api.deepseek.com/v1",
+    models: ["deepseek-chat", "deepseek-reasoner"],
+  },
+  {
+    id: "together",
+    label: "Together",
+    baseUrl: "https://api.together.xyz/v1",
+    models: ["meta-llama/Llama-3.3-70B-Instruct-Turbo", "Qwen/Qwen2.5-72B-Instruct-Turbo"],
+  },
+  {
+    id: "cerebras",
+    label: "Cerebras",
+    baseUrl: "https://api.cerebras.ai/v1",
+    models: ["llama-3.3-70b", "llama3.1-8b"],
+    note: "inférence la plus rapide",
+  },
+  { id: "xai", label: "xAI", baseUrl: "https://api.x.ai/v1", models: ["grok-3", "grok-3-mini"] },
+  {
+    id: "ollama",
+    label: "Ollama",
+    baseUrl: "http://localhost:11434/v1",
+    models: ["llama3.2", "qwen2.5", "mistral"],
+    note: "100 % local, aucune clé",
+  },
+];
+
+/** MCP connection recipes: PROOFCORE tools inside the user's coding agent. */
+const MCP_RECIPES = [
+  {
+    id: "claude-code",
+    label: "Claude Code",
+    file: ".mcp.json",
+    snippet: JSON.stringify(
+      { mcpServers: { proofcore: { command: "proofcore", args: ["mcp"] } } },
+      null,
+      2
+    ),
+  },
+  {
+    id: "codex",
+    label: "Codex CLI",
+    file: "~/.codex/config.toml",
+    snippet: `[mcp_servers.proofcore]\ncommand = "proofcore"\nargs = ["mcp"]`,
+  },
+  {
+    id: "opencode",
+    label: "OpenCode",
+    file: "~/.config/opencode/config.json",
+    snippet: JSON.stringify(
+      { mcp: { proofcore: { type: "local", command: ["proofcore", "mcp"] } } },
+      null,
+      2
+    ),
+  },
+  {
+    id: "gemini",
+    label: "Gemini CLI",
+    file: "~/.gemini/settings.json",
+    snippet: JSON.stringify(
+      { mcpServers: { proofcore: { command: "proofcore", args: ["mcp"] } } },
+      null,
+      2
+    ),
+  },
+  {
+    id: "cursor",
+    label: "Cursor",
+    file: "~/.cursor/mcp.json",
+    snippet: JSON.stringify(
+      { mcpServers: { proofcore: { command: "proofcore", args: ["mcp"] } } },
+      null,
+      2
+    ),
+  },
+];
+
 function uid(): string {
   return `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -143,10 +269,13 @@ export function AiChatPage(): React.ReactElement {
   const [profile, setProfile] = useState<ProfileState | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [baseUrlDraft, setBaseUrlDraft] = useState("https://api.openai.com/v1");
+  const [activePreset, setActivePreset] = useState<string>("openai");
   const [modelDraft, setModelDraft] = useState("gpt-4o-mini");
   const [keyDraft, setKeyDraft] = useState("");
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileSaving, setProfileSaving] = useState(false);
+  const [mcpOpen, setMcpOpen] = useState(false);
+  const [mcpTab, setMcpTab] = useState(MCP_RECIPES[0]?.id ?? "claude-code");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const activeEffort: EffortLevel = useMemo(() => {
@@ -171,6 +300,8 @@ export function AiChatPage(): React.ReactElement {
         if (data.configured) {
           setBaseUrlDraft(data.baseUrl ?? "");
           setModelDraft(data.model ?? "");
+          const preset = PROVIDER_PRESETS.find((entry) => entry.baseUrl === data.baseUrl);
+          setActivePreset(preset?.id ?? "custom");
         }
       })
       .catch(() => setProfile({ configured: false }));
@@ -609,23 +740,77 @@ export function AiChatPage(): React.ReactElement {
                 : "Your key is encrypted (AES-256-GCM) server-side and never returned to the browser. Replace or delete it anytime."}
             </p>
             <div className="mt-4 space-y-3">
-              <label className="block text-xs font-medium">
-                {fr ? "URL de base (compatible OpenAI)" : "Base URL (OpenAI-compatible)"}
-                <input
-                  value={baseUrlDraft}
-                  onChange={(event) => setBaseUrlDraft(event.target.value)}
-                  className="mt-1 w-full rounded-lg border border-border/70 bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary/60"
-                  placeholder="https://api.openai.com/v1"
-                />
-              </label>
+              {/* provider presets: one click fills URL + model */}
+              <div>
+                <p className="text-xs font-medium">{fr ? "Fournisseur" : "Provider"}</p>
+                <div className="mt-1.5 grid max-h-44 grid-cols-2 gap-1.5 overflow-y-auto pr-1 sm:grid-cols-2">
+                  {PROVIDER_PRESETS.map((preset) => {
+                    const active = baseUrlDraft === preset.baseUrl;
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => {
+                          setBaseUrlDraft(preset.baseUrl);
+                          setModelDraft(preset.models[0] ?? "");
+                          setActivePreset(preset.id);
+                        }}
+                        title={preset.note ?? preset.baseUrl}
+                        className={`flex items-center justify-between rounded-lg border px-2.5 py-2 text-left text-xs transition ${
+                          active
+                            ? "border-primary/70 bg-primary/10 text-primary"
+                            : "border-border/60 bg-surface-2 text-foreground/80 hover:border-primary/40"
+                        }`}
+                      >
+                        <span className="font-medium">{preset.label}</span>
+                        {preset.note && (
+                          <span className="ml-1 truncate text-[9.5px] text-muted-foreground">
+                            {preset.note}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActivePreset("custom")}
+                  className={`mt-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition ${
+                    activePreset === "custom"
+                      ? "border-primary/70 bg-primary/10 text-primary"
+                      : "border-border/60 bg-surface-2 text-foreground/80 hover:border-primary/40"
+                  }`}
+                >
+                  {fr ? "URL personnalisée…" : "Custom URL…"}
+                </button>
+              </div>
+              {activePreset === "custom" && (
+                <label className="block text-xs font-medium">
+                  {fr ? "URL de base (compatible OpenAI)" : "Base URL (OpenAI-compatible)"}
+                  <input
+                    value={baseUrlDraft}
+                    onChange={(event) => setBaseUrlDraft(event.target.value)}
+                    className="mt-1 w-full rounded-lg border border-border/70 bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary/60"
+                    placeholder="https://api.openai.com/v1"
+                  />
+                </label>
+              )}
               <label className="block text-xs font-medium">
                 {fr ? "Modèle" : "Model"}
                 <input
                   value={modelDraft}
                   onChange={(event) => setModelDraft(event.target.value)}
+                  list="proofcore-model-list"
                   className="mt-1 w-full rounded-lg border border-border/70 bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary/60"
                   placeholder="gpt-4o-mini"
                 />
+                <datalist id="proofcore-model-list">
+                  {PROVIDER_PRESETS.find((preset) => preset.baseUrl === baseUrlDraft)?.models.map(
+                    (model) => (
+                      <option key={model} value={model} />
+                    )
+                  )}
+                </datalist>
               </label>
               <label className="block text-xs font-medium">
                 {fr ? "Clé API" : "API key"}
@@ -670,6 +855,75 @@ export function AiChatPage(): React.ReactElement {
                 {profileSaving ? (fr ? "Enregistrement…" : "Saving…") : fr ? "Enregistrer" : "Save"}
               </button>
             </div>
+          </div>
+          {/* MCP connect: use PROOFCORE tools inside any coding agent */}
+          <div className="mt-4 border-t border-border/60 pt-3">
+            <button
+              type="button"
+              onClick={() => setMcpOpen((open) => !open)}
+              className="flex w-full items-center justify-between text-xs font-medium text-foreground/85 transition hover:text-foreground"
+            >
+              <span className="flex items-center gap-2">
+                <Plug className="h-3.5 w-3.5 text-primary" />
+                {fr
+                  ? "Connecter via MCP (Claude Code, Codex, OpenCode…)"
+                  : "Connect via MCP (Claude Code, Codex, OpenCode…)"}
+              </span>
+              <ChevronDown
+                className={`h-3.5 w-3.5 text-muted-foreground transition ${mcpOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+            {mcpOpen && (
+              <div className="mt-3">
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  {fr
+                    ? "Donne les outils PROOFCORE (WORLD, FLOW, EXIT, FAIL, CLEAN) à ton agent de code préféré : il lance les audits directement dans ton terminal, sur ton app locale."
+                    : "Give PROOFCORE's tools (WORLD, FLOW, EXIT, FAIL, CLEAN) to your favorite coding agent: it runs the audits in your terminal, on your local app."}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {MCP_RECIPES.map((recipe) => (
+                    <button
+                      key={recipe.id}
+                      type="button"
+                      onClick={() => setMcpTab(recipe.id)}
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
+                        mcpTab === recipe.id
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-surface-2 text-foreground/70 hover:bg-surface-1"
+                      }`}
+                    >
+                      {recipe.label}
+                    </button>
+                  ))}
+                </div>
+                {(() => {
+                  const recipe = MCP_RECIPES.find((entry) => entry.id === mcpTab);
+                  if (!recipe) return null;
+                  return (
+                    <div className="mt-2">
+                      <div className="flex items-center justify-between">
+                        <code className="text-[10px] text-muted-foreground">{recipe.file}</code>
+                        <button
+                          type="button"
+                          onClick={() => void navigator.clipboard.writeText(recipe.snippet)}
+                          className="rounded-md border border-border/60 px-2 py-0.5 text-[10px] text-muted-foreground transition hover:text-foreground"
+                        >
+                          {fr ? "Copier" : "Copy"}
+                        </button>
+                      </div>
+                      <pre className="mt-1 overflow-x-auto rounded-lg bg-[#07120d] p-3 font-mono text-[10.5px] leading-relaxed text-emerald-200/90">
+                        {recipe.snippet}
+                      </pre>
+                      <p className="mt-1.5 text-[10.5px] text-muted-foreground">
+                        {fr
+                          ? "Nécessite le CLI : npm i -g proofcore"
+                          : "Requires the CLI: npm i -g proofcore"}
+                      </p>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
           </div>
         </div>
       )}

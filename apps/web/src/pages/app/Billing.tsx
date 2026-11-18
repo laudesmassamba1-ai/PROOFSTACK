@@ -1,4 +1,5 @@
-import { CreditCard, Download, RefreshCw, TriangleAlert } from "lucide-react";
+import { CreditCard, Download, PartyPopper, RefreshCw, TriangleAlert } from "lucide-react";
+import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { Card, Empty, ErrorState, Loading, Metric, StatusBadge } from "../../components/app/ui.js";
 import { useI18n } from "../../i18n/index.js";
@@ -98,6 +99,7 @@ export function Billing() {
   const [error, setError] = useState<ApiError | Error | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ tone: "ok" | "bad"; text: string } | null>(null);
+  const [celebrate, setCelebrate] = useState<{ planKey: string } | null>(null);
   const [checkout, setCheckout] = useState<{
     intentId: string;
     planKey: string;
@@ -202,7 +204,10 @@ export function Billing() {
         `/api/v1/checkout/${checkout.intentId}?workspaceId=${workspaceId}`
       );
       setNotice({ tone: status.entitled ? "ok" : "bad", text: status.message });
-      if (status.entitled) setCheckout(null);
+      if (status.entitled) {
+        setCheckout(null);
+        setCelebrate({ planKey: checkout.planKey ?? "paid" });
+      }
       await load();
     } catch (caught) {
       setNotice({ tone: "bad", text: caught instanceof Error ? caught.message : String(caught) });
@@ -229,7 +234,10 @@ export function Billing() {
           ? `Le fournisseur sandbox a renvoyé ${result.state}. L'abonnement a été recalculé depuis cet état vérifié.`
           : `Sandbox provider reported ${result.state}. The subscription was recalculated from that verified state.`,
       });
-      if (result.outcome === "credited") setCheckout(null);
+      if (result.outcome === "credited") {
+        setCheckout(null);
+        setCelebrate({ planKey: checkout.planKey ?? "paid" });
+      }
       await load();
     } catch (caught) {
       setNotice({ tone: "bad", text: caught instanceof Error ? caught.message : String(caught) });
@@ -276,6 +284,80 @@ export function Billing() {
           </button>
         }
       />
+
+      {celebrate ? (
+        <div
+          className="pk-celebrate relative mb-4 overflow-hidden rounded-[var(--radius)] border border-accent/50 bg-accent/10 px-6 py-6"
+          role="status"
+        >
+          {/* confetti burst: purely decorative */}
+          <span aria-hidden className="pointer-events-none absolute inset-0">
+            {Array.from({ length: 16 }, (_, i) => {
+              const angle = (i / 16) * Math.PI * 2;
+              const distance = 60 + (i % 4) * 28;
+              const colors = ["#10b981", "#34d399", "#a3e635", "#fbbf24", "#38bdf8"];
+              return (
+                <span
+                  key={`${Math.round(Math.cos(angle) * 100)}-${distance}-${Math.round((angle * 180) / Math.PI)}`} // position-encoded, stable
+                  className="pk-confetti-piece"
+                  style={
+                    {
+                      "--cx": `${Math.cos(angle) * distance}px`,
+                      "--cy": `${Math.sin(angle) * distance + 20}px`,
+                      "--cr": `${(i % 2 ? 1 : -1) * 240}deg`,
+                      "--pd": `${(i % 5) * 70}ms`,
+                      backgroundColor: colors[i % colors.length],
+                    } as React.CSSProperties
+                  }
+                />
+              );
+            })}
+          </span>
+          <div className="relative flex items-center gap-4">
+            <svg width="44" height="44" viewBox="0 0 48 48" aria-hidden>
+              <circle
+                cx="24"
+                cy="24"
+                r="21"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                className="text-accent/60"
+              />
+              <path
+                d="M15 24.5 L21.5 31 L33 18.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="pk-celebrate-path text-accent"
+              />
+            </svg>
+            <div className="min-w-0">
+              <p className="flex items-center gap-2 text-sm font-semibold text-accent">
+                <PartyPopper size={15} />
+                {fr
+                  ? `Abonnement ${celebrate.planKey} activé`
+                  : `${celebrate.planKey} plan activated`}
+              </p>
+              <p className="mt-0.5 text-xs text-muted">
+                {fr
+                  ? "Crédité après vérification du fournisseur. Vos nouveaux droits sont actifs immédiatement."
+                  : "Credited after provider verification. Your new entitlements are live immediately."}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="ml-auto rounded-lg p-1.5 text-muted transition hover:bg-surface-2 hover:text-foreground"
+              onClick={() => setCelebrate(null)}
+              aria-label={fr ? "Fermer" : "Dismiss"}
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {notice ? (
         <p

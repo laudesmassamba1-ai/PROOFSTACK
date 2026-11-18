@@ -366,8 +366,63 @@ export function ExitObject({ passed, failed, total }: ObjectProps) {
 export function ModuleObject({
   module,
   ...props
-}: ObjectProps & { module: "world" | "flow" | "exit" }) {
+}: ObjectProps & { module: "world" | "flow" | "exit" | "fail" | "clean" }) {
   if (module === "world") return <WorldObject {...props} />;
   if (module === "flow") return <FlowObject {...props} />;
+  if (module === "fail") return <AuditObject {...props} variant="fail" />;
+  if (module === "clean") return <AuditObject {...props} variant="clean" />;
   return <ExitObject {...props} />;
+}
+
+/** FAIL/CLEAN audits: a shield or sparkle orbiting a gauge needle that moves with the pass rate. */
+function AuditObject({
+  passed,
+  total,
+  variant,
+}: {
+  passed: number;
+  failed?: number;
+  total: number;
+  variant: "fail" | "clean";
+}) {
+  const rate = total > 0 ? passed / total : 0;
+  const angle = -90 + Math.min(1, Math.max(0, rate)) * 180;
+  const color = variant === "fail" ? "#f43f5e" : "#10b981";
+  return (
+    <svg
+      viewBox="0 0 200 140"
+      className="h-full w-full"
+      role="img"
+      aria-label={`${variant} audit score`}
+    >
+      <path
+        d="M40 110 A60 60 0 0 1 160 110"
+        fill="none"
+        stroke="#ffffff22"
+        strokeWidth="10"
+        strokeLinecap="round"
+      />
+      <path
+        d="M40 110 A60 60 0 0 1 160 110"
+        fill="none"
+        stroke={color}
+        strokeWidth="10"
+        strokeLinecap="round"
+        strokeDasharray={`${Math.PI * 60 * rate} 999`}
+      />
+      <line
+        x1="100"
+        y1="110"
+        x2={100 + 44 * Math.sin((angle * Math.PI) / 180)}
+        y2={110 - 44 * Math.cos((angle * Math.PI) / 180)}
+        stroke="#e8f5ef"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+      <circle cx="100" cy="110" r="5" fill="#e8f5ef" />
+      <text x="100" y="70" textAnchor="middle" fill="#e8f5ef" fontSize="26" fontWeight="700">
+        {total > 0 ? `${Math.round(rate * 100)}` : "—"}
+      </text>
+    </svg>
+  );
 }

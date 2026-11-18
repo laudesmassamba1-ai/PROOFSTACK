@@ -103,6 +103,11 @@ export const en = {
   "pricing.perYear": "/ year",
   "pricing.save": "Save {percent}%",
   "pricing.free": "Free",
+  "pricing.founding":
+    "Founding-member pricing — your rate stays locked as long as you keep the subscription.",
+  "pricing.guarantee":
+    "Cancel anytime. Your data stays yours, and nothing is deleted when you downgrade.",
+  "pricing.bestValue": "Best value",
   currency: "Currency",
   "pricing.cta": "Choose {plan}",
   "pricing.current": "Current plan",
@@ -294,6 +299,11 @@ export const fr: Messages = {
   "pricing.perYear": "/ an",
   "pricing.save": "Économisez {percent} %",
   "pricing.free": "Gratuit",
+  "pricing.founding":
+    "Prix membre fondateur — votre tarif reste gelé tant que vous gardez l'abonnement.",
+  "pricing.guarantee":
+    "Résiliable à tout moment. Vos données restent les vôtres, rien n'est supprimé en cas de rétrogradation.",
+  "pricing.bestValue": "Meilleure valeur",
   currency: "Devise",
   "pricing.cta": "Choisir {plan}",
   "pricing.current": "Plan actuel",

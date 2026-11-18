@@ -883,6 +883,14 @@ pre,
   --module-accent: var(--brand-orange);
 }
 
+.module-fail {
+  --module-accent: #f43f5e;
+}
+
+.module-clean {
+  --module-accent: #a3e635;
+}
+
 .module-accent-text {
   color: var(--module-accent);
 }
@@ -3356,5 +3364,135 @@ pre,
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* ==========================================================================
+   Motion system: staggered entrances, price swaps, purchase celebration.
+   Every rule below is disabled under prefers-reduced-motion.
+   ========================================================================== */
+
+@keyframes pk-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes pk-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  60% {
+    transform: scale(1.03);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes pk-price-swap {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes pk-ring {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(16, 185, 129, 0);
+  }
+}
+@keyframes pk-confetti {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0deg) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--cx), var(--cy)) rotate(var(--cr)) scale(0.4);
+  }
+}
+@keyframes pk-check {
+  from {
+    stroke-dashoffset: 48;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Entrance: applies to cards and panels; children can stagger via --pk-delay */
+.pk-enter {
+  opacity: 0;
+  animation: pk-fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: var(--pk-delay, 0ms);
+}
+
+/* Plan cards: hover lift + border glow; featured card carries a breathing ring */
+.pk-plan {
+  transition:
+    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.35s ease,
+    border-color 0.25s ease;
+  will-change: transform;
+}
+.pk-plan:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 18px 40px -18px rgba(16, 185, 129, 0.35);
+}
+.pk-plan-featured {
+  animation: pk-ring 2.6s ease-in-out infinite;
+}
+
+/* Price digits swap when the period/currency toggle changes */
+.pk-price-swap {
+  animation: pk-price-swap 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Success celebration */
+.pk-celebrate {
+  animation: pk-pop 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.pk-celebrate-path {
+  stroke-dasharray: 48;
+  animation: pk-check 0.6s 0.15s ease-out forwards;
+}
+.pk-confetti-piece {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  opacity: 0;
+  animation: pk-confetti 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: var(--pd, 0ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pk-enter,
+  .pk-plan-featured,
+  .pk-price-swap,
+  .pk-celebrate,
+  .pk-confetti-piece {
+    animation: none;
+    opacity: 1;
+  }
+  .pk-plan,
+  .pk-plan:hover {
+    transform: none;
+    transition: none;
   }
 }

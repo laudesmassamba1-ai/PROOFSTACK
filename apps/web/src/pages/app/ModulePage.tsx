@@ -1,4 +1,12 @@
-import { ArrowRight, Globe2, PackageOpen, Route as RouteIcon, Terminal } from "lucide-react";
+import {
+  ArrowRight,
+  Globe2,
+  PackageOpen,
+  Route as RouteIcon,
+  ShieldAlert,
+  Sparkles,
+  Terminal,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import { ModuleObject } from "../../components/app/ModuleObjects.js";
@@ -35,6 +43,20 @@ const MODULES = {
     summary: "ws.module.exit.summary",
     body: "ws.module.exit.body",
     command: "proofcore test --module exit",
+  },
+  fail: {
+    name: "FAIL",
+    icon: ShieldAlert,
+    summary: "ws.module.fail.summary",
+    body: "ws.module.fail.body",
+    command: "proofcore audit fail <url>",
+  },
+  clean: {
+    name: "CLEAN",
+    icon: Sparkles,
+    summary: "ws.module.clean.summary",
+    body: "ws.module.clean.body",
+    command: "proofcore audit clean <url>",
   },
 } as const;
 
@@ -74,7 +96,9 @@ const ZERO = { passed: 0, failed: 0, warnings: 0, errors: 0, skipped: 0, total: 
 export function ModulePage() {
   const { module: raw } = useParams();
   const module = (
-    raw === "world" || raw === "flow" || raw === "exit" ? raw : null
+    raw === "world" || raw === "flow" || raw === "exit" || raw === "fail" || raw === "clean"
+      ? raw
+      : null
   ) as ModuleId | null;
   const { workspaceId } = useSession();
   const { locale, t } = useI18n();
@@ -110,8 +134,8 @@ export function ModulePage() {
         title={fr ? "Module inconnu" : "Unknown module"}
         body={
           fr
-            ? "PROOFCORE a trois modules : WORLD, FLOW et EXIT."
-            : "PROOFCORE has three modules: WORLD, FLOW and EXIT."
+            ? "PROOFCORE a cinq modules : WORLD, FLOW, EXIT, FAIL et CLEAN."
+            : "PROOFCORE has five modules: WORLD, FLOW, EXIT, FAIL and CLEAN."
         }
         tester="lost"
       />

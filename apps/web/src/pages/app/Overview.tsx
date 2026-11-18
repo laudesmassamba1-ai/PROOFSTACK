@@ -1,4 +1,5 @@
 import { ArrowRight, FolderPlus, Terminal } from "lucide-react";
+import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { ModulePassRates, RunsTrend, SeverityBreakdown } from "../../components/app/Insights.js";
@@ -77,8 +78,8 @@ interface Overview {
   };
 }
 
-type ModuleId = "world" | "flow" | "exit";
-const MODULE_IDS: ModuleId[] = ["world", "flow", "exit"];
+type ModuleId = "world" | "flow" | "exit" | "fail" | "clean";
+const MODULE_IDS: ModuleId[] = ["world", "flow", "exit", "fail", "clean"];
 
 const EMPTY_TOTALS = { passed: 0, failed: 0, warnings: 0, errors: 0, skipped: 0, total: 0 };
 
@@ -162,7 +163,7 @@ export function Overview() {
 
   return (
     <div className="app-page app-overview">
-      <EnhancedCard className="app-situation" enable3d={undefined}>
+      <EnhancedCard className="app-situation pk-enter" enable3d={undefined}>
         <section className="app-situation">
           <div className="app-situation-copy">
             <p className="app-eyebrow">
@@ -218,8 +219,9 @@ export function Overview() {
             return (
               <Link
                 key={module}
+                style={{ "--pk-delay": `${140 + index * 80}ms` } as React.CSSProperties}
                 to={`/app/modules/${module}`}
-                className={`app-object-card module-${module} app-object-card-${index + 1}`}
+                className={`app-object-card pk-enter module-${module} app-object-card-${index + 1}`}
               >
                 <div className="app-object-card-head">
                   <span className="app-object-index">0{index + 1}</span>
