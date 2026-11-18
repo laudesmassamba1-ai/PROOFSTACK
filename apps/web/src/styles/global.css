@@ -4515,7 +4515,27 @@ p {
 .chat-prose {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+  /* A paragraph rhythm the eye can scan: comfortable measure, optically even
+   * line height, and headings that own the space above them. */
+  font-size: 0.87rem;
+  line-height: 1.68;
+}
+
+.chat-prose > *:first-child {
+  margin-top: 0;
+}
+
+.chat-prose h3 + *,
+.chat-prose h4 + *,
+.chat-prose h5 + * {
+  margin-top: -2px;
+}
+
+.chat-prose h3,
+.chat-prose h4,
+.chat-prose h5 {
+  scroll-margin-block: 60px;
 }
 
 .chat-prose .chat-p {
@@ -4534,24 +4554,46 @@ p {
 }
 
 .chat-prose h3 {
-  font-size: 1rem;
+  margin-top: 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 1.02rem;
 }
 
 .chat-prose h4 {
-  font-size: 0.92rem;
+  margin-top: 6px;
+  font-size: 0.94rem;
 }
 
 .chat-prose h5 {
-  font-size: 0.86rem;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
 }
 
 .chat-prose ul,
 .chat-prose ol {
   margin: 0;
-  padding-left: 1.2rem;
+  padding-left: 1.35rem;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
+}
+
+.chat-prose ul ul,
+.chat-prose ol ol,
+.chat-prose ul ol,
+.chat-prose ol ul {
+  margin-top: 5px;
+  gap: 3px;
+}
+
+.chat-prose li > .chat-code,
+.chat-prose li > .chat-table-wrap {
+  margin-top: 6px;
 }
 
 .chat-prose ul {
@@ -4655,10 +4697,15 @@ p {
 .chat-code-body {
   margin: 0;
   overflow-x: auto;
-  padding: 11px 13px;
+  padding: 12px 14px;
   font-family: var(--font-mono);
-  font-size: 0.72rem;
-  line-height: 1.62;
+  font-size: 0.74rem;
+  line-height: 1.7;
+  tab-size: 2;
+}
+
+.chat-code-body code {
+  white-space: pre;
 }
 
 /* ---------- tables ---------- */
@@ -4690,11 +4737,94 @@ p {
 .chat-table td {
   border-bottom: 1px solid var(--rule);
   padding: 7px 10px;
+  vertical-align: top;
+}
+
+.chat-table tbody tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
 }
 
 .chat-table tr:last-child td {
   border-bottom: 0;
 }
+
+/* ---------- syntax tokens (chat code blocks) ----------
+ * The code plate inverts with the theme (ink plate in light, paper plate in
+ * dark), so each theme carries its own token tints. Both stay inside the
+ * palette: mint/turquoise for strings and attributes, the blue family for
+ * tags and functions, one warm hue for keywords. */
+.tok-com {
+  color: color-mix(in srgb, var(--paper-raised) 45%, transparent);
+  font-style: italic;
+}
+
+.tok-str {
+  color: var(--brand-mint);
+}
+
+.tok-num {
+  color: var(--brand-orange);
+}
+
+.tok-key {
+  color: #ff9e64;
+}
+
+.tok-fn,
+.tok-tag,
+.tok-sel {
+  color: #7dcfff;
+}
+
+.tok-bif,
+.tok-prop,
+.tok-attr,
+.tok-flag {
+  color: var(--brand-mint);
+}
+
+.tok-var {
+  color: #bb9af7;
+}
+
+.tok-punc {
+  color: color-mix(in srgb, var(--paper-raised) 62%, transparent);
+}
+
+/* Dark theme: the plate is paper, so tokens go dark. */
+[data-theme="dark"] .tok-str,
+[data-theme="dark"] .tok-attr,
+[data-theme="dark"] .tok-flag {
+  color: #0e8f75;
+}
+
+[data-theme="dark"] .tok-key {
+  color: #b13a2e;
+}
+
+[data-theme="dark"] .tok-fn,
+[data-theme="dark"] .tok-tag,
+[data-theme="dark"] .tok-sel,
+[data-theme="dark"] .tok-bif,
+[data-theme="dark"] .tok-prop {
+  color: #1d4ed8;
+}
+
+[data-theme="dark"] .tok-var {
+  color: #6d28d9;
+}
+
+/* In dark theme the plate is paper: comments and punctuation take dark inks.
+ * (--ink is cream there; --paper-raised is the dark plate text colour.) */
+[data-theme="dark"] .tok-com {
+  color: color-mix(in srgb, var(--paper-raised) 45%, transparent);
+}
+
+[data-theme="dark"] .tok-punc {
+  color: color-mix(in srgb, var(--paper-raised) 62%, transparent);
+}
+
+/* ---------- message actions + export ---------- */
 
 /* ---------- message actions + export ---------- */
 
@@ -4758,5 +4888,169 @@ p {
   .chat-msg-actions {
     opacity: 1;
     transition: none;
+  }
+}
+
+/* ==========================================================================
+   3D TILT LAYER — the pointer-driven card enhancement.
+   The transform values are driven per-frame by EnhancedCard (CSS custom
+   properties), so the CSS here only defines the stage, the glare and the
+   transition that softens the spring-back.
+   ========================================================================== */
+
+.enhanced-3d[data-tilt-enabled="true"] {
+  transform: perspective(1100px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+  transform-style: preserve-3d;
+  will-change: transform;
+  position: relative;
+}
+
+.enhanced-3d[data-tilt-enabled="true"] .enhanced-3d-glare {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    36% 36% at var(--glare-x, 50%) var(--glare-y, 50%),
+    color-mix(in srgb, var(--brand-mint, #78e3cb) 16%, transparent),
+    transparent 72%
+  );
+  opacity: var(--glare-opacity, 0);
+  transition: opacity 260ms var(--ease-standard);
+  mix-blend-mode: screen;
+}
+
+.enhanced-3d[data-tilt-enabled="true"].is-tilting .enhanced-3d-glare {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enhanced-3d[data-tilt-enabled="true"] {
+    transform: none;
+  }
+
+  .enhanced-3d-glare {
+    display: none;
+  }
+}
+
+/* ==========================================================================
+   REVEAL PASS — scroll-choreographed entrances (the AE timeline feel).
+   `[data-reveal]` elements start blurred and offset; IntersectionObserver adds
+   .is-in as each enters the viewport, with a stagger via --reveal-delay set by
+   lib/reveal.ts. Reduced-motion readers see everything instantly.
+   ========================================================================== */
+
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(20px) scale(0.985);
+  filter: blur(7px);
+}
+
+[data-reveal].is-in {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  filter: blur(0);
+  transition:
+    opacity 640ms var(--ease-emphasized),
+    transform 640ms var(--ease-emphasized),
+    filter 640ms var(--ease-emphasized);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal] {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+/* ---------- the 3D toggle ---------- */
+
+.app-btn-3d {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  transition:
+    background var(--dur-1) var(--ease-standard),
+    border-color var(--dur-1) var(--ease-standard),
+    box-shadow var(--dur-2) var(--ease-standard),
+    color var(--dur-1) var(--ease-standard);
+}
+
+.app-btn-3d.is-on {
+  border-color: color-mix(in srgb, var(--mint) 60%, transparent);
+  background: color-mix(in srgb, var(--mint) 14%, transparent);
+  color: var(--ink);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--mint) 30%, transparent) inset,
+    0 4px 16px -6px color-mix(in srgb, var(--mint) 55%, transparent);
+}
+
+.app-btn-3d.is-on svg {
+  color: var(--accent);
+}
+
+/* ---------- in-app browser (assistant `browse_url`) ---------- */
+@layer components {
+  .chat-browser {
+    margin: 10px 0 2px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--surface-2);
+  }
+  .chat-browser-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--muted-foreground);
+    background: var(--surface-1);
+  }
+  .chat-browser-url {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--font-mono, ui-monospace, monospace);
+  }
+  .chat-browser-basis {
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 1px 7px;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .chat-browser-basis.is-rendered {
+    border-color: color-mix(in oklab, var(--primary) 45%, transparent);
+    color: var(--primary);
+  }
+  .chat-browser-toggle {
+    background: none;
+    border: 0;
+    color: var(--muted-foreground);
+    font-size: 11px;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .chat-browser img {
+    display: block;
+    width: 100%;
+    height: auto;
+    background: #fff;
+  }
+  .chat-browser-note {
+    margin: 0;
+    padding: 10px 12px;
+    font-size: 12px;
+    color: var(--muted-foreground);
   }
 }

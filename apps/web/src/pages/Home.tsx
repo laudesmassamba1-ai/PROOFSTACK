@@ -83,7 +83,10 @@ export function Home() {
             </div>
           </div>
 
-          <div className="grid max-w-[820px] gap-3 border-t border-white/10 py-5 sm:grid-cols-3 lg:grid-cols-5">
+          <div
+            data-reveal
+            className="grid max-w-[820px] gap-3 border-t border-white/10 py-5 sm:grid-cols-3 lg:grid-cols-5"
+          >
             {MODULE_CARDS.map((module) => {
               const Icon = module.icon;
               return (
@@ -112,7 +115,7 @@ export function Home() {
           title={t("modules.title")}
           lede={t("modules.lede")}
         />
-        <div className="mt-10">
+        <div className="mt-10" data-reveal>
           <ModuleShowcase />
         </div>
       </Section>
@@ -137,7 +140,9 @@ export function Home() {
               ))}
             </ul>
           </div>
-          <EngineDiagram />
+          <div data-reveal>
+            <EngineDiagram />
+          </div>
         </div>
       </Section>
 
@@ -148,7 +153,7 @@ export function Home() {
           title={t("home.flow.title")}
           lede={t("home.flow.lede")}
         />
-        <ol className="mt-10 grid gap-3 md:grid-cols-3">
+        <ol data-reveal className="mt-10 grid gap-3 md:grid-cols-3">
           {(["1", "2", "3"] as const).map((index) => (
             <li key={index} className="brand-panel p-5">
               <p className="font-mono text-[0.68rem] tracking-[0.2em] text-brand-mint/80">
@@ -163,14 +168,17 @@ export function Home() {
             </li>
           ))}
         </ol>
-        <div className="mt-10">
+        <div className="mt-10" data-reveal>
           <CliPreview />
         </div>
       </Section>
 
       {/* ---------- final CTA ---------- */}
       <Section tone="deeper">
-        <div className="brand-panel relative overflow-hidden px-6 py-14 text-center sm:px-10">
+        <div
+          data-reveal
+          className="brand-panel relative overflow-hidden px-6 py-14 text-center sm:px-10"
+        >
           <div
             aria-hidden="true"
             className="pointer-events-none absolute inset-0"

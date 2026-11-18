@@ -202,7 +202,7 @@ export function Overview() {
         </section>
       </EnhancedCard>
 
-      <section className="app-section" aria-labelledby="module-objects-title">
+      <section className="app-section" data-reveal aria-labelledby="module-objects-title">
         <div className="app-section-head">
           <p className="app-eyebrow">02 / {t("ws.overview.modules")}</p>
           <h2 id="module-objects-title" className="app-section-title">
@@ -261,7 +261,7 @@ export function Overview() {
         </div>
       </section>
 
-      <section className="app-section" aria-labelledby="insights-title">
+      <section className="app-section" data-reveal aria-labelledby="insights-title">
         <div className="app-section-head">
           <p className="app-eyebrow">03 / {fr ? "Évolution" : "Evolution"}</p>
           <h2 id="insights-title" className="app-section-title">

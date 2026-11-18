@@ -25,6 +25,7 @@ import { AiMark } from "../components/brand/AiMark.js";
 import { Mark } from "../components/brand/Logo.js";
 import { useI18n } from "../i18n/index.js";
 import { API_BASE, apiFetch } from "../lib/api.js";
+import { initReveals, teardownReveals } from "../lib/reveal.js";
 import { useSession } from "../lib/session.js";
 
 interface ShellProject {
@@ -119,6 +120,16 @@ export function AppLayout() {
     setAccountOpen(false);
     setEnginesOpen(false);
     setPaletteOpen(false);
+  }, [location.pathname]);
+
+  // Scroll-choreographed reveals, re-armed per route.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: pathname IS the dependency
+  useEffect(() => {
+    const timer = window.setTimeout(initReveals, 60);
+    return () => {
+      window.clearTimeout(timer);
+      teardownReveals();
+    };
   }, [location.pathname]);
 
   useEffect(() => {
@@ -418,11 +429,15 @@ export function AppLayout() {
 
             <button
               type="button"
-              className="app-btn"
+              className={`app-btn app-btn-3d ${threeDEnabled ? "is-on" : ""}`}
               aria-label={t("ws.shell.enable3d")}
               onClick={toggleThreeD}
               aria-pressed={threeDEnabled}
-              title="3D mode"
+              title={
+                locale === "fr"
+                  ? "Relief 3D des cartes au survol"
+                  : "3D tilt on cards, pointer-driven"
+              }
             >
               <Box size={14} /> 3D
             </button>
