@@ -179,14 +179,20 @@
     flex: 1;
     min-height: 0;
     overflow: auto;
-    background: #0e1116;
+    /* The page is captured at 1280x800; the panel is taller than its aspect, so the image
+       is centred on the page's own white rather than floating over a black void. */
+    background: #fff;
     display: grid;
-    place-items: start center;
+    place-items: center start;
+    padding: 0;
   }
   .pc-browser-viewport img {
     display: block;
     width: 100%;
     height: auto;
+    max-height: 100%;
+    object-fit: contain;
+    object-position: center top;
     cursor: crosshair;
     background: #fff;
     transition: opacity 0.12s ease;

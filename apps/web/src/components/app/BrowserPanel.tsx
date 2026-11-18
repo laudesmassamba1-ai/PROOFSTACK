@@ -115,8 +115,20 @@ export function BrowserPanel({
     const image = imageRef.current;
     if (!image || !state || status === "loading") return;
     const rect = image.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) / rect.width) * SERVER_VIEWPORT.width;
-    const y = ((event.clientY - rect.top) / rect.height) * SERVER_VIEWPORT.height;
+    // `object-fit: contain` letterboxes the picture inside the element: the drawn area is
+    // smaller than the box, and clicking the box's edges must not be scaled as if it were
+    // the page. Compute the drawn rectangle, then map through it.
+    const scale = Math.min(
+      rect.width / SERVER_VIEWPORT.width,
+      rect.height / SERVER_VIEWPORT.height
+    );
+    const drawnWidth = SERVER_VIEWPORT.width * scale;
+    const drawnHeight = SERVER_VIEWPORT.height * scale;
+    const originX = rect.left + (rect.width - drawnWidth) / 2;
+    const originY = rect.top;
+    const x = ((event.clientX - originX) / drawnWidth) * SERVER_VIEWPORT.width;
+    const y = ((event.clientY - originY) / drawnHeight) * SERVER_VIEWPORT.height;
+    if (x < 0 || y < 0 || x > SERVER_VIEWPORT.width || y > SERVER_VIEWPORT.height) return;
     void act({ kind: "click", x: Math.round(x), y: Math.round(y) });
   };
 
