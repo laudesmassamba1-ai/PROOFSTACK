@@ -17,6 +17,7 @@ interface Harness {
   request: (path: string, init?: RequestInit) => Promise<Response>;
   close: () => Promise<void>;
   store: ReturnType<typeof createApp>["services"]["store"];
+  db: NodeSqliteDatabase;
 }
 
 const PASSWORD = "correct horse battery";
@@ -34,6 +35,7 @@ async function bootstrap(): Promise<Harness> {
       }),
     close: async () => db.close(),
     store: built.services.store,
+    db,
   };
 }
 
@@ -106,6 +108,30 @@ describe("pagination contract", () => {
     const body = (await first.json()) as Record<string, unknown>;
     expect(body).toMatchObject({ total: 0, limit: 5, offset: 10 });
     expect(body.items).toEqual([]);
+  });
+
+  it("walks an index instead of scanning the table for every page", async () => {
+    // The paginated lists filter by workspace and sort by a timestamp. Without the
+    // matching index that is a full scan plus a temporary sort per request — invisible in
+    // a test with ten rows, and the dominant cost at a hundred thousand.
+    const plan = async (sql: string) =>
+      (await harness.db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all<{ detail: string }>())
+        .map((row) => row.detail)
+        .join(" | ");
+
+    const findingsPlan = await plan(
+      "SELECT * FROM findings WHERE workspace_id = 'w' AND (NULL IS NULL OR module = NULL) ORDER BY detected_at DESC LIMIT 25 OFFSET 0"
+    );
+    expect(findingsPlan).toContain("USING INDEX");
+    expect(findingsPlan).not.toContain("SCAN findings");
+    expect(findingsPlan).not.toContain("TEMP B-TREE");
+
+    const runsPlan = await plan(
+      "SELECT r.* FROM test_runs r WHERE r.workspace_id = 'w' ORDER BY r.started_at DESC LIMIT 25 OFFSET 0"
+    );
+    expect(runsPlan).toContain("USING INDEX");
+    expect(runsPlan).not.toContain("SCAN");
+    expect(runsPlan).not.toContain("TEMP B-TREE");
   });
 
   it("pages conversations, which used to stop at 50 in silence", async () => {
