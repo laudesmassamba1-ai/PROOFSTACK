@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { spawn } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -55,6 +56,7 @@ import {
   runFailAudit,
 } from "./audit.js";
 import { mapArchitecture } from "./code-tools.js";
+import { HUB_COMMANDS, runHub } from "./hub.js";
 import { type ServeHandle, serveLocal } from "./local-bridge.js";
 import { mcpToolDescriptors, ProofcoreMcpServer, serveMcpStdio } from "./mcp-server.js";
 import { describeSandbox, runInSandbox } from "./sandbox.js";
@@ -218,6 +220,7 @@ async function main(argv: string[]): Promise<number> {
     "serve",
     "exec",
     "complete",
+    "hub",
   ]);
   if (command && cwdCommands.has(command) && flags.cwdExplicit && !isDirectory(flags.cwd)) {
     err(
@@ -293,6 +296,8 @@ async function main(argv: string[]): Promise<number> {
       return commandAgent(flags, args);
     case "whoami":
       return commandWhoami(flags);
+    case "hub":
+      return startHub(flags);
     case "serve":
       return commandServe(flags, args);
     case "exec":
@@ -1029,13 +1034,37 @@ async function commandAuth(
   }
 
   const apiUrl = resolveApiUrl(flagValue(args, "--api"));
-  if (args.includes("--device")) {
+
+  // Default path: the browser. Sign in on the site, approve the code, the CLI becomes that
+  // account. Asking someone to copy a cookie out of devtools is not a login.
+  //
+  // Without a terminal nobody can approve a code, so `login` prints the instructions
+  // instead of polling for two minutes: an instruction is not an error, and CI gets the
+  // exit code it expects.
+  if (
+    (!args.includes("--interactive") &&
+      !args.includes("--cookie") &&
+      // Both ends must be a terminal: a piped stdout is a script, not a person who can
+      // approve a code in a browser.
+      Boolean(stdin.isTTY) &&
+      Boolean(stdout.isTTY)) ||
+    args.includes("--device")
+  ) {
     try {
-      await loginDevice({ apiUrl, print: (line) => out(flags, line), sleep: waitMs });
-      out(flags, dim(flags, "Next: run `proofcore` to open the terminal console."));
+      await loginDevice({
+        apiUrl,
+        print: (line) => out(flags, line),
+        sleep: waitMs,
+        openBrowser: (url) => openExternal(flags, url),
+      });
+      if (stdin.isTTY && !flags.json && !insideHub) return startHub(flags);
       return 0;
     } catch (error) {
       err(flags, red(flags, describeError(error).message));
+      err(
+        flags,
+        dim(flags, "If the browser cannot open, the URL and code above work on any device.")
+      );
       return 2;
     }
   }
@@ -2224,6 +2253,96 @@ async function commandAgent(flags: GlobalFlags, args: string[]): Promise<number>
     return controller.signal.aborted ? 3 : 2;
   } finally {
     process.off("SIGINT", onInterrupt);
+  }
+}
+
+/** Opens a URL in the user's browser, best effort. Never fatal: the URL is printed too. */
+function openExternal(flags: GlobalFlags, url: string): void {
+  const command =
+    process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
+  try {
+    const child = spawn(command, [url], { detached: true, stdio: "ignore", shell: false });
+    child.on("error", () => undefined);
+    child.unref();
+    out(flags, dim(flags, "Opened it in your browser."));
+  } catch {
+    // No opener on this machine: the printed URL is the fallback, not an error.
+  }
+}
+
+/** The site's app page for a hub command that is a page rather than a CLI verb. */
+function appUrl(path: string): string {
+  const base = process.env.PROOFCORE_WEB_URL ?? "https://proofstack-iota.vercel.app";
+  return `${base.replace(/\/+$/, "")}${path}`;
+}
+
+/**
+ * The hub: `proofcore` with no arguments.
+ *
+ * One readline for the whole session (a fresh interface per question is what garbled the
+ * prompts), one prompt, and a `/help` that lists everything. Each slash command runs the
+ * ordinary CLI command, so the output and the exit codes are the same ones.
+ */
+let insideHub = false;
+
+async function startHub(flags: GlobalFlags): Promise<number> {
+  insideHub = true;
+  const session = await loadStoredSession().catch(() => null);
+  const provider = await loadStoredProvider();
+  const rl = createInterface({ input: stdin, output: stdout, terminal: stdin.isTTY });
+
+  const hubHelp = () => {
+    out(flags, `\n${bold(flags, "PROOFCORE")} ${dim(flags, CLI_VERSION)}`);
+    out(flags, dim(flags, session ? `account ${session.email}` : "not signed in · /login"));
+    out(
+      flags,
+      dim(flags, provider.baseUrl ? `model ${provider.model}` : "no model · /agent --configure")
+    );
+    out(flags, "");
+    for (const entry of HUB_COMMANDS) {
+      const left = `${entry.command} ${entry.args}`.trim();
+      out(flags, `  ${left.padEnd(30)} ${dim(flags, entry.description)}`);
+    }
+    out(flags, "");
+    out(flags, dim(flags, "Anything without a slash goes to the coding agent."));
+    out(flags, dim(flags, "WORLD · FLOW · EXIT · FAIL · CLEAN — /test, /audit"));
+    out(flags, "");
+  };
+
+  if (stdin.isTTY && !flags.json) {
+    out(flags, bold(flags, "\nPROOFCORE hub"));
+    out(flags, dim(flags, `"${"/help"}" for the commands, Ctrl+D to leave.\n`));
+  }
+
+  // `readline/promises`: question() rejects when the stream closes (Ctrl+D), which is the
+  // signal to leave the hub rather than to crash.
+  const ask = async (prompt: string): Promise<string | null> => {
+    try {
+      return await rl.question(prompt);
+    } catch {
+      return null;
+    }
+  };
+
+  try {
+    return await runHub(
+      { ask, write: (text) => stdout.write(text) },
+      {
+        dispatch: async (argv) => main(argv),
+        agent: async (prompt) => {
+          const code = await commandAgent(flags, [prompt]);
+          return code;
+        },
+        help: hubHelp,
+        openWeb: (path) => openExternal(flags, appUrl(path)),
+        clear: () => {
+          stdout.write("\u001b[2J\u001b[H");
+        },
+        onError: (message) => err(flags, red(flags, message)),
+      }
+    );
+  } finally {
+    rl.close();
   }
 }
 

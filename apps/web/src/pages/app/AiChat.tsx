@@ -462,7 +462,7 @@ function Composer({
             onSend();
           }
         }}
-        rows={Math.min(4, Math.max(1, draft.split("\n").length))}
+        rows={Math.min(7, Math.max(1, draft.split("\n").length))}
         placeholder={fr ? "Comment puis-je vous aider aujourd'hui ?" : "How can I help you today?"}
         className="chat-composer-input"
       />

@@ -92,7 +92,7 @@ export function readConfig(env: Env): AppConfig {
     mailFrom: env.MAIL_FROM,
     supportEmail: env.SUPPORT_EMAIL ?? "support@proofcore.dev",
     cfAccountId: env.CF_ACCOUNT_ID?.trim() || undefined,
-    aiRateLimitPerHour: positiveInt(env.AI_RATE_LIMIT_PER_HOUR, 200),
+    aiRateLimitPerHour: positiveInt(env.AI_RATE_LIMIT_PER_HOUR, 600),
     cfBrowserToken: env.CF_BROWSER_TOKEN?.trim() || undefined,
   };
 }

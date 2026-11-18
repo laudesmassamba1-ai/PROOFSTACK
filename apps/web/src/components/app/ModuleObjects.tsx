@@ -90,6 +90,14 @@ export function WorldObject({ passed, failed, total }: ObjectProps) {
         <filter id={`${uid}-soft`} x="-30%" y="-30%" width="160%" height="160%">
           <feGaussianBlur stdDeviation="5" />
         </filter>
+        <clipPath id={`${uid}-globe-clip`}>
+          <circle cx="140" cy="108" r="44" />
+        </clipPath>
+        <linearGradient id={`${uid}-scan`} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#5cf2c4" stopOpacity="0" />
+          <stop offset="70%" stopColor="#5cf2c4" stopOpacity="0.4" />
+          <stop offset="100%" stopColor="#d9fff2" stopOpacity="0.85" />
+        </linearGradient>
       </defs>
       <ellipse
         cx="140"
@@ -156,6 +164,10 @@ export function WorldObject({ passed, failed, total }: ObjectProps) {
         fill={`url(#${uid}-sphere)`}
         opacity={hasData ? 1 : 0.42}
       />
+      {/* Radar sweep: one activation pass on entry, a continuous scan on hover. */}
+      <g className="world-scan" clipPath={`url(#${uid}-globe-clip)`} opacity={hasData ? 0.75 : 0.3}>
+        <path d="M140 108 L140 58 A50 50 0 0 1 183 87 Z" fill={`url(#${uid}-scan)`} />
+      </g>
       <ellipse
         cx="124"
         cy="88"
@@ -324,6 +336,7 @@ export function ExitObject({ passed, failed, total }: ObjectProps) {
         </filter>
       </defs>
       <ellipse
+        className="exit-shadow"
         cx="140"
         cy="198"
         rx="92"

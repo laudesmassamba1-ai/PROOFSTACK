@@ -289,8 +289,8 @@ async function callUpstream(input: {
     if (response.status === 429) {
       throw new HttpError(
         429,
-        "ai_rate_limited",
-        "Le fournisseur limite le débit de cette clé. Réessaie dans un instant.",
+        "provider_rate_limited",
+        "Le fournisseur limite le débit de cette clé. Réessaie dans un instant ou change de modèle.",
         { detail: text.slice(0, 200) }
       );
     }
@@ -767,7 +767,15 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
     const limited = limiter.check(`${address}|${user.id}`);
     if (!limited.allowed) {
       c.header("Retry-After", String(limited.retryAfterSeconds));
-      throw new HttpError(429, "ai_rate_limited", "Too many AI requests this hour.");
+      // Say when, not just "later": a message without a horizon sends the user away for
+      // good. The value comes from the limiter, so it is the real remaining window.
+      const minutes = Math.max(1, Math.ceil(limited.retryAfterSeconds / 60));
+      throw new HttpError(
+        429,
+        "ai_rate_limited",
+        `Trop de demandes sur cette heure. Réessaie dans ${minutes} min.`,
+        { retryAfterSeconds: limited.retryAfterSeconds }
+      );
     }
 
     const body = await readBody(c, chatRequestSchema);

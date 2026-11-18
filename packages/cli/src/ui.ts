@@ -499,6 +499,8 @@ export async function loginDevice(input: {
   clientName?: string;
   print: (line: string) => void;
   sleep: (ms: number) => Promise<void>;
+  /** Opens the verification URL in the user's browser. Optional, and never fatal. */
+  openBrowser?: (url: string) => void;
 }): Promise<StoredSession> {
   const apiUrl = resolveApiUrl(input.apiUrl);
   const startResponse = await fetch(`${apiUrl}/api/auth/device/start`, {
@@ -518,6 +520,14 @@ export async function loginDevice(input: {
   input.print("");
   input.print("Open this URL on any device where you are signed in:");
   input.print(`  ${start.verificationUrl}`);
+  // Open the page first: the person is looking at their browser, not scrolling back to
+  // find a URL they have to copy by hand.
+  try {
+    input.openBrowser?.(start.verificationUrl);
+  } catch {
+    // A machine without an opener is not an error; the URL is printed below either way.
+  }
+
   input.print("");
   input.print("Then enter this code:");
   input.print(`  ${start.userCode}`);
