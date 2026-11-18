@@ -56,7 +56,8 @@ import {
   runFailAudit,
 } from "./audit.js";
 import { mapArchitecture } from "./code-tools.js";
-import { HUB_COMMANDS, runHub } from "./hub.js";
+import { HUB_COMMANDS, hubWebPath, runHub } from "./hub.js";
+import { HubTui } from "./hub-tui.js";
 import { type ServeHandle, serveLocal } from "./local-bridge.js";
 import { mcpToolDescriptors, ProofcoreMcpServer, serveMcpStdio } from "./mcp-server.js";
 import { describeSandbox, runInSandbox } from "./sandbox.js";
@@ -2306,29 +2307,6 @@ function appUrl(path: string): string {
  * sake — each line answers "where am I, and what can I type next".
  */
 
-/** Braille spinner: cheap, and it stops cleanly on a non-TTY (no frames at all). */
-const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-
-function startSpinner(flags: GlobalFlags, label: string): { stop: () => void } {
-  if (!stdout.isTTY || flags.json) return { stop: () => undefined };
-  let frame = 0;
-  const started = Date.now();
-  const timer = setInterval(() => {
-    const seconds = Math.max(1, Math.round((Date.now() - started) / 1000));
-    stdout.write(
-      `\r\u001b[2K  ${dim(flags, SPINNER_FRAMES[frame % SPINNER_FRAMES.length] ?? "⠋")} ${dim(flags, label)} ${dim(flags, `${seconds}s`)}`
-    );
-    frame += 1;
-  }, 90);
-  timer.unref?.();
-  return {
-    stop: () => {
-      clearInterval(timer);
-      stdout.write("\r\u001b[2K");
-    },
-  };
-}
-
 /** Rounded box, used for the banner and for the help header. */
 function box(flags: GlobalFlags, lines: string[], width = 58): string[] {
   const top = `  ${dim(flags, `╭${"─".repeat(width)}╮`)}`;
@@ -2342,12 +2320,26 @@ function box(flags: GlobalFlags, lines: string[], width = 58): string[] {
 
 async function startHub(flags: GlobalFlags): Promise<number> {
   insideHub = true;
-  const session = await loadStoredSession().catch(() => null);
-  const provider = await loadStoredProvider();
-  const rl = createInterface({ input: stdin, output: stdout, terminal: stdin.isTTY });
   const where = basename(flags.cwd);
+  const identity = { account: "", model: "" };
 
-  const hubHelp = () => {
+  const refreshIdentity = async () => {
+    const session = await loadStoredSession().catch(() => null);
+    const provider = await loadStoredProvider();
+    identity.account = session ? session.email : "not signed in · /login";
+    identity.model = provider.baseUrl
+      ? `${provider.model}${provider.apiKey ? ` · ${keyFingerprint(provider.apiKey)}` : ""}`
+      : "no model · /agent --configure";
+  };
+  await refreshIdentity();
+
+  const header = () => [
+    `${bold(flags, "PROOFCORE")} ${dim(flags, `hub ${CLI_VERSION}`)} ${dim(flags, "·")} ${where} ${dim(flags, `· ${identity.model}`)}`,
+    `${dim(flags, identity.account)}`,
+  ];
+
+  const helpLines = () => {
+    const lines: string[] = [""];
     const groups: [string, string][] = [
       ["Agent", "/agent — reads, edits and runs in this repository"],
       ["Audits", "/test, /audit fail|clean <url>, /report, /modules"],
@@ -2355,52 +2347,81 @@ async function startHub(flags: GlobalFlags): Promise<number> {
       ["Account", "/whoami, /login, /logout, /projects, /billing"],
       ["Session", "/help, /clear, /exit"],
     ];
-    out(flags, "");
     for (const [group, blurb] of groups) {
-      out(flags, `  ${bold(flags, group)} ${dim(flags, "·")} ${dim(flags, blurb)}`);
+      lines.push(`  ${bold(flags, group)} ${dim(flags, "·")} ${dim(flags, blurb)}`);
       for (const entry of HUB_COMMANDS.filter((item) => item.group === group)) {
         const left = `${entry.command} ${entry.args}`.trim();
-        out(flags, `    ${cyan(flags, left.padEnd(28))} ${dim(flags, entry.description)}`);
+        lines.push(`    ${cyan(flags, left.padEnd(28))} ${dim(flags, entry.description)}`);
       }
-      out(flags, "");
+      lines.push("");
     }
-    out(
-      flags,
-      dim(flags, "  Anything without a slash goes to the agent. Ctrl+C interrupts a turn.")
+    lines.push(
+      dim(flags, "  Anything without a slash goes to the agent. Tab completes a command.")
     );
-    out(flags, "");
+    lines.push("");
+    return lines;
   };
 
-  if (stdin.isTTY && !flags.json) {
-    const accountLine = session
-      ? `${green(flags, "●")} ${session.email}`
-      : `${yellow(flags, "○")} ${dim(flags, "not signed in")} ${dim(flags, "· /login")}`;
-    const modelLine = provider.baseUrl
-      ? `${green(flags, "●")} ${provider.model} ${dim(flags, `· ${provider.apiKey ? keyFingerprint(provider.apiKey) : "no key"}`)}`
-      : `${yellow(flags, "○")} ${dim(flags, "no model")} ${dim(flags, "· /agent --configure")}`;
-    for (const line of box(
-      flags,
-      [
-        `${bold(flags, "PROOFCORE")} ${dim(flags, `hub ${CLI_VERSION}`)}`,
-        `${dim(flags, "software quality & reliability")}`,
-        "",
-        accountLine,
-        modelLine,
-        `${dim(flags, "workspace")} ${where}`,
-      ],
-      58
-    )) {
-      out(flags, line);
+  const unknown = (command: string): string => {
+    const webPath = hubWebPath(command);
+    if (webPath) {
+      openExternal(flags, appUrl(webPath));
+      return `  ${dim(flags, `opened ${webPath} in your browser`)}`;
     }
-    out(flags, "");
-    out(
-      flags,
-      `  ${dim(flags, "Type")} ${cyan(flags, "/help")} ${dim(flags, "for the commands, or just ask something.")}`
-    );
-    out(flags, dim(flags, "  Ctrl+C interrupts a turn; twice in a row leaves."));
-    out(flags, "");
+    return `  ${yellow(flags, `unknown command ${command}`)} ${dim(flags, "· /help")}`;
+  };
+
+  const dispatch = async (argv: string[]) => {
+    const code = await main(argv);
+    await refreshIdentity();
+    return code;
+  };
+  const agent = async (prompt: string) => {
+    const code = await commandAgent(flags, [prompt]);
+    await refreshIdentity();
+    return code;
+  };
+
+  // A real terminal gets the full-screen hub: alternate screen, a menu under the prompt,
+  // arrows, history. Anything else (a pipe, CI, --json, a dumb terminal) keeps the plain
+  // line reader, which is scriptable and cannot emit escape codes into a log.
+  const interactive =
+    Boolean(stdin.isTTY) && Boolean(stdout.isTTY) && !flags.json && process.env.TERM !== "dumb";
+
+  if (interactive) {
+    const session = await loadStoredSession().catch(() => null);
+    const provider = await loadStoredProvider();
+    // First frame: the identity box, so the first thing on screen answers "who am I".
+    const banner = [
+      `${bold(flags, "PROOFCORE")} ${dim(flags, `hub ${CLI_VERSION} · ${where}`)}`,
+      session
+        ? `${green(flags, "●")} ${session.email}`
+        : `${yellow(flags, "○")} ${dim(flags, "not signed in")} ${dim(flags, "· /login")}`,
+      provider.baseUrl
+        ? `${green(flags, "●")} ${provider.model} ${dim(flags, `· ${provider.apiKey ? keyFingerprint(provider.apiKey) : "no key"}`)}`
+        : `${yellow(flags, "○")} ${dim(flags, "no model")} ${dim(flags, "· /agent --configure")}`,
+      "",
+    ];
+    process.stdout.write(`${[box(flags, banner, 58).join("\n"), ""].join("\n")}\n`);
+    // Let the banner show once, then take the screen; the alternate buffer keeps the
+    // scrollback above it untouched for when the hub exits.
+    await new Promise((resolve) => setTimeout(resolve, 220));
+    const tui = new HubTui({
+      header,
+      dim: (text) => dim(flags, text),
+      bold: (text) => bold(flags, text),
+      accent: (text) => cyan(flags, text),
+      ok: (text) => green(flags, text),
+      warn: (text) => yellow(flags, text),
+      help: helpLines,
+      onUnknown: unknown,
+      dispatch,
+      agent,
+    });
+    return tui.run();
   }
 
+  const rl = createInterface({ input: stdin, output: stdout, terminal: stdin.isTTY });
   const ask = async (prompt: string): Promise<string | null> => {
     try {
       return await rl.question(prompt);
@@ -2421,27 +2442,28 @@ async function startHub(flags: GlobalFlags): Promise<number> {
   };
   process.on("SIGINT", onSigint);
 
+  for (const line of box(
+    flags,
+    [
+      `${bold(flags, "PROOFCORE")} ${dim(flags, `hub ${CLI_VERSION}`)}`,
+      `${dim(flags, `workspace ${where}`)}`,
+      `${dim(flags, `account ${identity.account}`)}`,
+      `${dim(flags, `model ${identity.model}`)}`,
+    ],
+    58
+  )) {
+    out(flags, line);
+  }
+
   try {
     return await runHub(
+      { ask, write: (text) => stdout.write(text) },
       {
-        ask,
-        write: (text) => stdout.write(text),
-      },
-      {
-        dispatch: async (argv) => {
-          interrupts = 0;
-          return main(argv);
+        dispatch,
+        agent,
+        help: () => {
+          for (const line of helpLines()) out(flags, line);
         },
-        agent: async (prompt) => {
-          interrupts = 0;
-          const spinner = startSpinner(flags, "thinking");
-          try {
-            return await commandAgent(flags, [prompt]);
-          } finally {
-            spinner.stop();
-          }
-        },
-        help: hubHelp,
         openWeb: (path) => openExternal(flags, appUrl(path)),
         clear: () => {
           stdout.write("\u001b[2J\u001b[H");

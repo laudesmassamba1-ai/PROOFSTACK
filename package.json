@@ -2,7 +2,7 @@
   "name": "proofcore",
   "version": "0.1.0",
   "private": true,
-  "description": "PROOFCORE \u2014 integrated software quality and reliability suite: WORLD (global compatibility), FLOW (transaction reliability), EXIT (data portability).",
+  "description": "PROOFCORE — integrated software quality and reliability suite: WORLD (global compatibility), FLOW (transaction reliability), EXIT (data portability).",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "engines": {
@@ -28,13 +28,18 @@
     "cli:package": "node tooling/scripts/package-cli.mjs",
     "cli:install": "pnpm cli:package && node tooling/scripts/install-cli.mjs",
     "cli:publish": "pnpm cli:package && node tooling/scripts/publish-cli.mjs",
-    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "cli:binary": "node tooling/scripts/build-binary.mjs",
+    "cli:binary:all": "node tooling/scripts/build-binary.mjs --all",
+    "cli:installers": "node tooling/scripts/build-installers.mjs",
+    "cli:installers:all": "node tooling/scripts/build-installers.mjs --all"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",
     "@playwright/test": "1.65.1",
     "@types/node": "22.19.2",
     "esbuild": "0.28.2",
+    "postject": "1.0.0-alpha.6",
     "typescript": "5.9.3",
     "vitest": "3.2.4"
   }

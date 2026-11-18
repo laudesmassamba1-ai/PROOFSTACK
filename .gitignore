@@ -40,3 +40,9 @@ reports/
 # local agent sessions and semantic index
 .proofcore/
 .env*
+
+# build outputs
+artifacts/bin/
+artifacts/installers/
+artifacts/.cache/
+artifacts/.work/

@@ -1,0 +1,128 @@
+name: release
+
+# Produces the installers people download. Run it by pushing a tag:
+#
+#   git tag v0.2.0 && git push origin v0.2.0
+#
+# Each job builds the installer for its own platform, runs it for real, checks that the
+# installed binary answers, and only then attaches it to the release. An installer that was
+# never installed is not a tested installer.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  installers:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x64
+            artifact: "proofcore-*-installer-linux-x64.run"
+            extra: "proofcore_*_amd64.deb"
+          - os: windows-latest
+            target: win-x64
+            artifact: "proofcore-*-setup-win-x64.exe"
+          - os: macos-14
+            target: darwin-arm64
+            artifact: "proofcore-*-installer-darwin-arm64.run"
+          - os: macos-13
+            target: darwin-x64
+            artifact: "proofcore-*-installer-darwin-x64.run"
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build the CLI and the installer
+        run: |
+          pnpm exec node tooling/scripts/build-binary.mjs --target ${{ matrix.target }}
+          pnpm exec node tooling/scripts/build-installers.mjs --target ${{ matrix.target }}
+
+      - name: Install it the way a user would, on Linux
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          chmod +x artifacts/installers/proofcore-*-installer-linux-x64.run
+          PROOFCORE_PREFIX="$RUNNER_TEMP/proofcore" ./artifacts/installers/proofcore-*-installer-linux-x64.run
+          "$RUNNER_TEMP/proofcore/bin/proofcore" --version
+          dpkg-deb -I artifacts/installers/proofcore_*_amd64.deb >/dev/null
+
+      - name: Install it the way a user would, on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem artifacts/installers/proofcore-*-setup-win-x64.exe | Select-Object -First 1
+          # Double-click equivalent: run it, then check the installed command answers.
+          $env:LOCALAPPDATA = Join-Path $env:RUNNER_TEMP "localappdata"
+          New-Item -ItemType Directory -Force -Path $env:LOCALAPPDATA | Out-Null
+          & $setup.FullName
+          if ($LASTEXITCODE -ne 0) { throw "installer exited $LASTEXITCODE" }
+          $installed = Join-Path $env:LOCALAPPDATA "PROOFCORE\bin\proofcore.exe"
+          if (-not (Test-Path $installed)) { throw "nothing was installed at $installed" }
+          & $installed --version
+
+      - name: Install it the way a user would, on macOS
+        if: runner.os == 'macOS'
+        run: |
+          set -euo pipefail
+          chmod +x artifacts/installers/proofcore-*-installer-darwin-*.run
+          PROOFCORE_PREFIX="$RUNNER_TEMP/proofcore" ./artifacts/installers/proofcore-*-installer-darwin-*.run
+          "$RUNNER_TEMP/proofcore/bin/proofcore" --version
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.target }}
+          path: artifacts/installers/*
+
+  publish:
+    needs: installers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Attach every artifact to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          body: |
+            ## Install
+
+            **Windows** — download `proofcore-*-setup-win-x64.exe` and double-click it.
+            It installs for the current user, adds the command to your PATH, creates a Start
+            Menu entry, and prints the version it installed. No administrator rights.
+
+            **Linux** (Mint, Ubuntu, Debian) — either:
+            - `sudo dpkg -i proofcore_*_amd64.deb`
+            - or `chmod +x proofcore-*-installer-linux-x64.run && ./proofcore-*-installer-linux-x64.run`
+
+            **macOS** — `chmod +x proofcore-*-installer-darwin-*.run && ./proofcore-*-installer-darwin-*.run`
+
+            Then, once:
+
+                proofcore login     sign in through the browser
+                proofcore           the full-screen hub
+
+            Everything you run afterwards executes on your machine. The account is used for
+            sign-in, projects, reports and billing — not to compute for you.
