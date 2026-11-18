@@ -292,6 +292,21 @@ export function accountRoutes(services: Services): Hono<AppEnv> {
     });
   });
 
+  /** One queued message, with its body, so an operator can deliver it manually. */
+  app.get("/outbox/:id", async (c) => {
+    const token = readCookie(c.req.header("cookie"), SESSION_COOKIE);
+    const found = token
+      ? await services.store.findSessionByTokenHash(await hashToken(token))
+      : undefined;
+    if (!found) throw new HttpError(401, "not_authenticated", "Connecte-toi d'abord.");
+    if (!isAdmin(services, found.user.email)) {
+      throw new HttpError(403, "forbidden", "Réservé à l'opérateur.");
+    }
+    const entry = await services.store.getEmailOutboxEntry(c.req.param("id"));
+    if (!entry) throw new HttpError(404, "not_found", "Message introuvable.");
+    return c.json(entry);
+  });
+
   return app;
 }
 

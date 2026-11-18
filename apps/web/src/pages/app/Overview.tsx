@@ -278,11 +278,11 @@ export function Overview() {
               </div>
               <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
                 <span className="flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-sm bg-emerald-500/70" />
+                  <span className="h-2 w-2 rounded-sm bg-success/70" />
                   {fr ? "réussis" : "passed"}
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-sm bg-rose-500/80" />
+                  <span className="h-2 w-2 rounded-sm bg-danger/80" />
                   {fr ? "échoués" : "failed"}
                 </span>
               </div>

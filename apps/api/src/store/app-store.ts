@@ -388,6 +388,30 @@ export class AppStore {
     }));
   }
 
+  /**
+   * Full body of one queued message.
+   *
+   * Only the operator endpoint calls this: it is how a human delivers a reset link by
+   * hand when no mail provider is configured. Without it the fallback I documented
+   * would be a promise with no implementation.
+   */
+  async getEmailOutboxEntry(
+    id: string
+  ): Promise<{ id: string; to: string; subject: string; body: string; status: string } | null> {
+    const row = await this.db
+      .prepare("SELECT id, to_address, subject, body_text, status FROM email_outbox WHERE id = ?")
+      .bind(id)
+      .first<Row>();
+    if (!row) return null;
+    return {
+      id: str(row, "id"),
+      to: str(row, "to_address"),
+      subject: str(row, "subject"),
+      body: str(row, "body_text"),
+      status: str(row, "status"),
+    };
+  }
+
   async createSupportMessage(input: {
     id: string;
     userId?: string | null;

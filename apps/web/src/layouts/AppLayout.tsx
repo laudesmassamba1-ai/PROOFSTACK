@@ -1,5 +1,5 @@
 import {
-  Bot,
+  BadgeCheck,
   Box,
   ChevronDown,
   Command,
@@ -15,13 +15,13 @@ import {
   Settings as SettingsIcon,
   ShieldAlert,
   ShieldCheck,
-  Sparkles,
   Terminal,
   X,
 } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 
+import { AiMark } from "../components/brand/AiMark.js";
 import { Mark } from "../components/brand/Logo.js";
 import { useI18n } from "../i18n/index.js";
 import { API_BASE, apiFetch } from "../lib/api.js";
@@ -204,9 +204,9 @@ export function AppLayout() {
       ["FLOW", "/app/modules/flow", <RouteIcon key="flow" size={15} />],
       ["EXIT", "/app/modules/exit", <PackageOpen key="exit" size={15} />],
       ["FAIL", "/app/modules/fail", <ShieldAlert key="fail" size={15} />],
-      ["CLEAN", "/app/modules/clean", <Sparkles key="clean" size={15} />],
+      ["CLEAN", "/app/modules/clean", <BadgeCheck key="clean" size={15} />],
       [t("ws.nav.cli"), "/app/cli", <Terminal key="cli" size={15} />],
-      [t("ws.nav.ai"), "/app/ai", <Bot key="ai" size={15} />],
+      [t("ws.nav.ai"), "/app/ai", <AiMark key="ai" size={16} />],
       [t("ws.nav.billing"), "/app/billing", <CreditCard key="billing" size={15} />],
       [t("ws.nav.settings"), "/app/settings", <SettingsIcon key="settings" size={15} />],
     ];
@@ -333,7 +333,7 @@ export function AppLayout() {
                     ["FLOW", "/app/modules/flow", <RouteIcon key="flow" size={14} />],
                     ["EXIT", "/app/modules/exit", <PackageOpen key="exit" size={14} />],
                     ["FAIL", "/app/modules/fail", <ShieldAlert key="fail" size={14} />],
-                    ["CLEAN", "/app/modules/clean", <Sparkles key="clean" size={14} />],
+                    ["CLEAN", "/app/modules/clean", <BadgeCheck key="clean" size={14} />],
                   ].map(([label, to, icon]) => (
                     <NavLink
                       key={String(label)}

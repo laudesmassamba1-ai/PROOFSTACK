@@ -93,6 +93,100 @@ interface AdminOverview {
   }[];
 }
 
+interface OutboxRow {
+  id: string;
+  to: string;
+  subject: string;
+  kind: string;
+  status: string;
+  error: string | null;
+  createdAt: string;
+}
+
+/**
+ * Operator view of the outbox.
+ *
+ * It exists because "no mail provider configured" is a real state on this deployment and
+ * the queue is then the delivery mechanism: the operator copies the link and sends it.
+ * Nothing here pretends a message was delivered.
+ */
+function PendingMail() {
+  const [state, setState] = useState<{
+    emailConfigured: boolean;
+    recent: OutboxRow[];
+  } | null>(null);
+  const [body, setBody] = useState<{ id: string; body: string } | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const data = await apiFetch<{ emailConfigured: boolean; recent: OutboxRow[] }>(
+          "/api/account/delivery-status"
+        );
+        setState(data);
+      } catch {
+        setState(null);
+      }
+    })();
+  }, []);
+
+  if (!state || state.recent.length === 0) return null;
+
+  return (
+    <EnhancedCard className="mt-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold">Messages non remis</h2>
+        <span className="text-[11px] text-muted-foreground">
+          {state.emailConfigured
+            ? "Fournisseur e-mail actif : ces lignes sont des échecs ou des messages en attente."
+            : "Aucun fournisseur e-mail : ces messages doivent être remis à la main."}
+        </span>
+      </div>
+      <div className="mt-3 space-y-1.5">
+        {state.recent.slice(0, 8).map((entry) => (
+          <div key={entry.id} className="rounded-lg border border-border/60 bg-surface-2 px-3 py-2">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="font-mono text-[10.5px] text-muted-foreground">{entry.kind}</span>
+              <span className="font-medium">{entry.to}</span>
+              <span
+                className={`rounded px-1.5 py-0.5 text-[10px] ${
+                  entry.status === "sent"
+                    ? "bg-success/12 text-success"
+                    : "bg-warning/12 text-warning"
+                }`}
+              >
+                {entry.status}
+              </span>
+              <button
+                type="button"
+                className="ml-auto text-[11px] text-primary hover:underline"
+                onClick={() =>
+                  void (async () => {
+                    const full = await apiFetch<{ body: string }>(
+                      `/api/account/outbox/${entry.id}`
+                    );
+                    setBody({ id: entry.id, body: full.body });
+                  })()
+                }
+              >
+                Voir le contenu
+              </button>
+            </div>
+            {entry.error && (
+              <p className="mt-1 text-[10.5px] text-muted-foreground">{entry.error}</p>
+            )}
+            {body?.id === entry.id && (
+              <pre className="mt-2 max-h-40 overflow-auto rounded bg-surface-1 p-2 text-[10.5px] leading-relaxed text-foreground/80">
+                {body.body}
+              </pre>
+            )}
+          </div>
+        ))}
+      </div>
+    </EnhancedCard>
+  );
+}
+
 export function Admin() {
   const { t } = useI18n();
   const [data, setData] = useState<AdminOverview | null>(null);
@@ -195,6 +289,10 @@ export function Admin() {
           }
         />
       </div>
+
+      {/* Undelivered mail. Without a provider the queue is the only way a customer gets
+          a reset link, so the operator needs to read it here and send it by hand. */}
+      <PendingMail />
 
       <EnhancedCard className="mt-6 grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <Card title={t("admin.revenue.title")} description={t("admin.revenue.description")}>

@@ -69,7 +69,7 @@ export function RunsTrend({
                 width={barW * 0.7}
                 height={passedH}
                 rx={2}
-                className="fill-emerald-500/70"
+                className="fill-success/70"
               />
             )}
             {failedH > 0 && (
@@ -79,7 +79,7 @@ export function RunsTrend({
                 width={barW * 0.7}
                 height={failedH}
                 rx={2}
-                className="fill-rose-500/80"
+                className="fill-danger/80"
               />
             )}
             {(index % Math.ceil(runs.length / 7) === 0 || runs.length <= 7) && (
@@ -185,7 +185,7 @@ export function ModulePassRates({
             <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-surface-2">
               {rate !== null && (
                 <div
-                  className={`h-full rounded-full ${rate >= 90 ? "bg-emerald-500" : rate >= 60 ? "bg-amber-500" : "bg-rose-500"}`}
+                  className={`h-full rounded-full ${rate >= 90 ? "bg-success" : rate >= 60 ? "bg-warning" : "bg-danger"}`}
                   style={{ width: `${rate}%` }}
                 />
               )}

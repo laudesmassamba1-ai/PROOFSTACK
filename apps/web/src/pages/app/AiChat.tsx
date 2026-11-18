@@ -1,21 +1,21 @@
 import {
-  Bot,
+  BadgeCheck,
   ChevronDown,
   Eraser,
-  Gauge,
   Globe,
   Lock,
   PanelLeft,
   Plug,
   Plus,
+  Search,
   Send,
   ShieldAlert,
-  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AiMark } from "../../components/brand/AiMark.js";
 import { useI18n } from "../../i18n/index.js";
 import { useSession } from "../../lib/session.js";
 
@@ -24,7 +24,6 @@ interface EffortLevel {
   label: string;
   hint: string;
   burn: string;
-  tone: string;
 }
 
 interface ConversationSummary {
@@ -53,43 +52,22 @@ interface ProfileState {
 }
 
 const EFFORTS: EffortLevel[] = [
-  {
-    id: "quick",
-    label: "Rapide",
-    hint: "Réponse directe, 1 outil max",
-    burn: "1×",
-    tone: "text-emerald-500",
-  },
-  {
-    id: "balanced",
-    label: "Équilibré",
-    hint: "Données utiles, réponse focalisée",
-    burn: "2×",
-    tone: "text-sky-500",
-  },
-  {
-    id: "deep",
-    label: "Approfondi",
-    hint: "Croise runs, findings et audits",
-    burn: "4×",
-    tone: "text-violet-500",
-  },
+  { id: "quick", label: "Rapide", hint: "Réponse directe, 1 outil max", burn: "1×" },
+  { id: "balanced", label: "Équilibré", hint: "Données utiles, réponse focalisée", burn: "2×" },
+  { id: "deep", label: "Approfondi", hint: "Croise runs, findings et audits", burn: "4×" },
   {
     id: "ultra",
     label: "Ultra",
     hint: "Audit complet multi-sources, rapport structuré",
     burn: "8×",
-    tone: "text-amber-500",
   },
 ];
 
-const TOOL_ICONS: Record<string, typeof Bot> = {
+const TOOL_ICONS: Record<string, typeof BadgeCheck> = {
   fail_scan: ShieldAlert,
-  clean_audit: Sparkles,
+  clean_audit: BadgeCheck,
   fetch_web: Globe,
 };
-
-/** One-click provider presets: pick one, paste the key, done. All OpenAI-compatible. */
 
 /** Short notes only. The provider list itself is read from /api/v1/ai/providers. */
 const PROVIDER_HINTS: Record<string, string> = {
@@ -245,22 +223,17 @@ function uid(): string {
 function Markdownish({ text }: { text: string }): React.ReactElement {
   const blocks = text.split(/\n{2,}/);
   return (
-    <div className="space-y-2">
+    <div className="chat-prose space-y-2">
       {blocks.map((block, index) => {
         const key = `b${index}-${block.slice(0, 12)}`;
         if (block.startsWith("### ") || block.startsWith("## ") || block.startsWith("# ")) {
           return (
-            <h4 key={key} className="pt-1 text-sm font-semibold tracking-tight text-foreground">
-              {block.replace(/^#+\s*/, "")}
-            </h4>
+            <h4 key={key}>{block.replace(/^#+\s*/, "")}</h4>
           );
         }
         if (/^[-*]\s/m.test(block)) {
           return (
-            <ul
-              key={key}
-              className="ml-4 list-disc space-y-1 text-[13.5px] leading-relaxed text-foreground/90"
-            >
+            <ul key={key} className="space-y-1">
               {block.split("\n").map((line) => (
                 <li key={`${key}-${line.slice(0, 12)}`}>{line.replace(/^[-*]\s*/, "")}</li>
               ))}
@@ -268,10 +241,7 @@ function Markdownish({ text }: { text: string }): React.ReactElement {
           );
         }
         return (
-          <p
-            key={key}
-            className="whitespace-pre-wrap text-[13.5px] leading-relaxed text-foreground/90"
-          >
+          <p key={key} className="whitespace-pre-wrap">
             {block}
           </p>
         );
@@ -280,17 +250,142 @@ function Markdownish({ text }: { text: string }): React.ReactElement {
   );
 }
 
+/* ---------- pieces of the composer ---------- */
+
+function EffortPicker({
+  effort,
+  onSelect,
+  fr,
+}: {
+  effort: EffortLevel["id"];
+  onSelect: (id: EffortLevel["id"]) => void;
+  fr: boolean;
+}): React.ReactElement {
+  const [open, setOpen] = useState(false);
+  const active = EFFORTS.find((level) => level.id === effort) ?? EFFORTS[1];
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (event: PointerEvent) => {
+      if (!wrapRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [open]);
+
+  if (!active) return <span />;
+
+  return (
+    <div className="chat-effort" ref={wrapRef}>
+      <button
+        type="button"
+        className="chat-effort-trigger"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        onClick={() => setOpen((value) => !value)}
+      >
+        {active.label} <span className="chat-effort-burn">· {active.burn}</span>
+        <ChevronDown
+          size={12}
+          style={{ transform: open ? "rotate(180deg)" : undefined, transition: "transform 140ms" }}
+        />
+      </button>
+      {open && (
+        <div className="chat-effort-menu" role="menu">
+          {EFFORTS.map((level) => (
+            <button
+              key={level.id}
+              type="button"
+              role="menuitem"
+              className={`chat-effort-item ${effort === level.id ? "is-active" : ""}`}
+              onClick={() => {
+                onSelect(level.id);
+                setOpen(false);
+              }}
+            >
+              <span className="min-w-0 flex-1">
+                <span className="chat-effort-name">
+                  {level.label} <span className="chat-effort-burn">· {level.burn}</span>
+                </span>
+                <span className="chat-effort-hint">{level.hint}</span>
+              </span>
+            </button>
+          ))}
+          <p className="chat-effort-note">
+            {fr
+              ? "Plus l'effort est élevé, plus l'assistant interroge d'outils et consomme de crédits sur votre fournisseur IA."
+              : "Higher effort means more tool calls and more credits burned on your AI provider."}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Composer({
+  draft,
+  setDraft,
+  onSend,
+  busy,
+  effort,
+  onEffort,
+  fr,
+}: {
+  draft: string;
+  setDraft: (value: string) => void;
+  onSend: () => void;
+  busy: boolean;
+  effort: EffortLevel["id"];
+  onEffort: (id: EffortLevel["id"]) => void;
+  fr: boolean;
+}): React.ReactElement {
+  return (
+    <div className="chat-composer">
+      <textarea
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            onSend();
+          }
+        }}
+        rows={Math.min(4, Math.max(1, draft.split("\n").length))}
+        placeholder={
+          fr ? "Comment puis-je vous aider aujourd'hui ?" : "How can I help you today?"
+        }
+        className="chat-composer-input"
+      />
+      <div className="chat-composer-bar">
+        <EffortPicker effort={effort} onSelect={onEffort} fr={fr} />
+        <button
+          type="button"
+          onClick={onSend}
+          disabled={busy || !draft.trim()}
+          className="chat-send"
+          aria-label={fr ? "Envoyer" : "Send"}
+        >
+          <Send size={14} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- the page ---------- */
+
 export function AiChatPage(): React.ReactElement {
   const { locale } = useI18n();
-  const { workspaces, workspaceId: activeWorkspaceId } = useSession();
+  const { user, workspaces, workspaceId: activeWorkspaceId } = useSession();
   const fr = locale === "fr";
 
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [conversationFilter, setConversationFilter] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [effort, setEffort] = useState<EffortLevel["id"]>("balanced");
-  const [effortOpen, setEffortOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [profile, setProfile] = useState<ProfileState | null>(null);
@@ -333,12 +428,6 @@ export function AiChatPage(): React.ReactElement {
   const [mcpOpen, setMcpOpen] = useState(false);
   const [mcpTab, setMcpTab] = useState(MCP_RECIPES[0]?.id ?? "claude-code");
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  const activeEffort: EffortLevel = useMemo(() => {
-    const found = EFFORTS.find((level) => level.id === effort);
-    const fallback = EFFORTS[1];
-    return found ?? (fallback as EffortLevel);
-  }, [effort]);
 
   useEffect(() => {
     if (!activeWorkspaceId) return;
@@ -602,278 +691,250 @@ export function AiChatPage(): React.ReactElement {
   }, [draft, busy, activeWorkspaceId, profile, activeId, effort, fr]);
 
   const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId);
+  const firstName = (user?.name ?? "").split(/\s+/)[0] ?? "";
+  const greeting = fr
+    ? `Bonjour${firstName ? `, ${firstName}` : ""}`
+    : `Hello${firstName ? `, ${firstName}` : ""}`;
+  const filteredConversations = conversations.filter((conversation) =>
+    conversation.title.toLowerCase().includes(conversationFilter.trim().toLowerCase())
+  );
+  const hasMessages = messages.length > 0;
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
+    <div className="chat-shell">
       {/* ---------------------------------------------------- sidebar */}
-      <aside
-        className={`${
-          sidebarOpen ? "w-72" : "w-0"
-        } shrink-0 overflow-hidden border-r border-border/60 bg-surface-1/60 transition-all duration-200`}
-      >
-        <div className="flex h-full w-72 flex-col">
-          <div className="flex items-center justify-between px-3 pt-3">
-            <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-              {fr ? "Historique" : "History"}
+      <aside className={`chat-sidebar ${sidebarOpen ? "" : "is-collapsed"}`}>
+        <div className="chat-sidebar-head">
+          <button type="button" onClick={startNewChat} className="chat-new-chat">
+            <span className="chat-new-chat-mark">
+              <Plus size={13} />
             </span>
-            <button
-              type="button"
-              onClick={startNewChat}
-              className="flex items-center gap-1.5 rounded-lg bg-primary/10 px-2.5 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/15"
-            >
-              <Plus className="h-3.5 w-3.5" /> {fr ? "Nouveau" : "New"}
-            </button>
-          </div>
-          <div className="mt-2 flex-1 space-y-1 overflow-y-auto px-2 pb-3">
-            {conversations.length === 0 && (
-              <p className="px-2 pt-6 text-center text-xs text-muted-foreground">
-                {fr ? "Aucune conversation pour l'instant." : "No conversations yet."}
-              </p>
-            )}
-            {conversations.map((conversation) => (
-              <div
-                key={conversation.id}
-                className={`group flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs transition ${
-                  activeId === conversation.id
-                    ? "bg-primary/10 text-primary"
-                    : "text-foreground/75 hover:bg-surface-2"
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => loadConversation(conversation.id)}
-                  className="min-w-0 flex-1 truncate text-left"
-                  title={conversation.title}
-                >
-                  {conversation.title}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => deleteConversation(conversation.id)}
-                  className="opacity-0 transition group-hover:opacity-100"
-                  aria-label={fr ? "Supprimer" : "Delete"}
-                >
-                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
-                </button>
-              </div>
-            ))}
-          </div>
+            {fr ? "Nouvelle conversation" : "New conversation"}
+          </button>
           <button
             type="button"
-            onClick={() => setSettingsOpen(true)}
-            className="flex items-center gap-2 border-t border-border/60 px-4 py-3 text-xs text-muted-foreground transition hover:text-foreground"
+            className="chat-icon-btn"
+            onClick={() => setSidebarOpen(false)}
+            aria-label={fr ? "Masquer l'historique" : "Hide history"}
           >
-            <Lock className="h-3.5 w-3.5" />
-            {profile?.configured
-              ? `${profile.model} · ${fr ? "clé" : "key"} ${profile.keyFingerprint?.slice(0, 4) ?? ""}…`
-              : fr
-                ? "Connecter un modèle"
-                : "Connect a model"}
+            <PanelLeft size={15} />
+          </button>
+        </div>
+
+        <div className="chat-search">
+          <Search size={13} aria-hidden />
+          <input
+            value={conversationFilter}
+            onChange={(event) => setConversationFilter(event.target.value)}
+            placeholder={fr ? "Rechercher…" : "Search…"}
+            aria-label={fr ? "Rechercher une conversation" : "Search conversations"}
+          />
+        </div>
+
+        <div className="chat-list">
+          {filteredConversations.length === 0 && (
+            <p className="chat-list-empty">
+              {conversations.length === 0
+                ? fr
+                  ? "Aucune conversation pour l'instant."
+                  : "No conversations yet."
+                : fr
+                  ? "Aucun résultat."
+                  : "No matches."}
+            </p>
+          )}
+          {filteredConversations.length > 0 && (
+            <p className="chat-list-label">
+              {fr
+                ? `Conversations · ${filteredConversations.length}`
+                : `Conversations · ${filteredConversations.length}`}
+            </p>
+          )}
+          {filteredConversations.map((conversation) => (
+            <div
+              key={conversation.id}
+              className="chat-row"
+              aria-current={activeId === conversation.id}
+            >
+              <button
+                type="button"
+                onClick={() => void loadConversation(conversation.id)}
+                className="chat-row-title"
+                title={conversation.title}
+              >
+                {conversation.title}
+              </button>
+              <button
+                type="button"
+                onClick={() => void deleteConversation(conversation.id)}
+                className="chat-row-delete"
+                aria-label={fr ? "Supprimer" : "Delete"}
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div className="chat-sidebar-foot">
+          <button type="button" onClick={() => setSettingsOpen(true)}>
+            <Lock size={13} />
+            <span className="truncate">
+              {profile?.configured
+                ? `${profile.model} · ${fr ? "clé" : "key"} ${profile.keyFingerprint?.slice(0, 4) ?? ""}…`
+                : fr
+                  ? "Connecter un modèle"
+                  : "Connect a model"}
+            </span>
           </button>
         </div>
       </aside>
 
       {/* ------------------------------------------------- main column */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-border/60 px-4 py-2.5">
-          <div className="flex items-center gap-2">
+      <div className="chat-main">
+        <header className="chat-topbar">
+          {!sidebarOpen && (
             <button
               type="button"
-              onClick={() => setSidebarOpen((open) => !open)}
-              className="rounded-lg p-1.5 text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
-              aria-label={fr ? "Historique" : "History"}
+              onClick={() => setSidebarOpen(true)}
+              className="chat-icon-btn"
+              aria-label={fr ? "Afficher l'historique" : "Show history"}
             >
-              <PanelLeft className="h-4 w-4" />
+              <PanelLeft size={15} />
             </button>
-            <Bot className="h-4 w-4 text-primary" />
-            <span className="text-sm font-semibold">
-              {fr ? "Assistant PROOFCORE" : "PROOFCORE Assistant"}
-            </span>
-            {activeWorkspace && (
-              <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] text-muted-foreground">
-                {activeWorkspace.name}
-              </span>
-            )}
+          )}
+          <div className="chat-topbar-title">
+            <AiMark size={15} className="text-accent" />
+            {fr ? "Assistant PROOFCORE" : "PROOFCORE Assistant"}
           </div>
-          {/* effort slider */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setEffortOpen((open) => !open)}
-              className="flex items-center gap-2 rounded-full border border-border/70 bg-surface-1 px-3 py-1.5 text-xs font-medium transition hover:border-primary/40"
-            >
-              <Gauge className={`h-3.5 w-3.5 ${activeEffort.tone}`} />
-              <span className={activeEffort.tone}>{activeEffort.label}</span>
-              <span className="text-muted-foreground">· {activeEffort.burn}</span>
-              <ChevronDown className="h-3 w-3 text-muted-foreground" />
-            </button>
-            {effortOpen && (
-              <>
-                <button
-                  type="button"
-                  className="fixed inset-0 z-30 cursor-default"
-                  onClick={() => setEffortOpen(false)}
-                  aria-label={fr ? "Fermer" : "Close"}
-                />
-                <div className="absolute right-0 z-40 mt-2 w-72 rounded-xl border border-border bg-surface-1 p-2 shadow-xl">
-                  {EFFORTS.map((level) => (
-                    <button
-                      key={level.id}
-                      type="button"
-                      onClick={() => {
-                        setEffort(level.id);
-                        setEffortOpen(false);
-                      }}
-                      className={`flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition ${
-                        effort === level.id ? "bg-primary/10" : "hover:bg-surface-2"
-                      }`}
-                    >
-                      <Gauge className={`mt-0.5 h-4 w-4 ${level.tone}`} />
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-xs font-semibold">
-                          {level.label}{" "}
-                          <span className="font-normal text-muted-foreground">· {level.burn}</span>
-                        </span>
-                        <span className="block text-[11px] text-muted-foreground">
-                          {level.hint}
-                        </span>
-                      </span>
-                      {effort === level.id && (
-                        <span className="mt-1 h-2 w-2 rounded-full bg-primary" />
-                      )}
-                    </button>
-                  ))}
-                  <p className="px-3 pb-1.5 pt-2 text-[10.5px] leading-relaxed text-muted-foreground">
-                    {fr
-                      ? "Plus l'effort est élevé, plus l'assistant interroge d'outils et consomme de crédits sur votre fournisseur IA."
-                      : "Higher effort means more tool calls and more credits burned on your AI provider."}
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
+          {activeWorkspace && <span className="chat-workspace-chip">{activeWorkspace.name}</span>}
         </header>
 
-        {/* messages */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6">
-          <div className="mx-auto max-w-3xl space-y-6">
-            {messages.length === 0 && <EmptyState fr={fr} />}
-            {messages.map((message) =>
-              message.role === "user" ? (
-                <div key={message.id} className="flex justify-end">
-                  <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-primary px-4 py-2.5 text-sm leading-relaxed text-primary-foreground shadow-sm">
-                    {message.content}
-                  </div>
-                </div>
-              ) : (
-                <div key={message.id} className="flex gap-3">
-                  <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-fuchsia-600 text-primary-foreground shadow">
-                    <Sparkles className="h-3.5 w-3.5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    {message.trace && message.trace.length > 0 && (
-                      <div className="mb-2 flex flex-wrap gap-1.5">
-                        {message.trace.map((step) => {
-                          const Icon = TOOL_ICONS[step.tool] ?? Bot;
-                          return (
-                            <span
-                              key={`${step.tool}:${step.summary}`}
-                              className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-surface-1 px-2 py-0.5 text-[10.5px] text-muted-foreground"
-                            >
-                              <Icon className="h-3 w-3" /> {step.tool} · {step.summary}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    )}
-                    {message.error ? (
-                      <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                        {message.error}
-                      </div>
-                    ) : message.content ? (
-                      <Markdownish text={message.content} />
-                    ) : busy ? (
-                      <div className="flex gap-1 py-2">
-                        {[0, 1, 2].map((dot) => (
-                          <span
-                            key={dot}
-                            className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/60"
-                            style={{ animationDelay: `${dot * 120}ms` }}
-                          />
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              )
-            )}
-            <div ref={endSentinel} />
-          </div>
-        </div>
-
-        {/* composer */}
-        <div className="border-t border-border/60 bg-surface-1/40 px-4 py-3">
-          <div className="mx-auto max-w-3xl">
-            <div className="flex items-end gap-2 rounded-2xl border border-border/70 bg-surface-1 p-2 shadow-sm focus-within:border-primary/50">
-              <textarea
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    void send();
-                  }
-                }}
-                rows={Math.min(4, draft.split("\n").length)}
-                placeholder={
-                  fr
-                    ? "Demandez une analyse, un audit FAIL ou CLEAN, une recherche…"
-                    : "Ask for an analysis, a FAIL or CLEAN audit, research…"
-                }
-                className="max-h-32 flex-1 resize-none bg-transparent px-2 py-1.5 text-sm outline-none placeholder:text-muted-foreground/70"
-              />
-              <button
-                type="button"
-                onClick={() => void send()}
-                disabled={busy || !draft.trim()}
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground transition hover:brightness-110 disabled:opacity-40"
-                aria-label={fr ? "Envoyer" : "Send"}
-              >
-                <Send className="h-4 w-4" />
-              </button>
-            </div>
-            <p className="mt-1.5 text-center text-[10.5px] text-muted-foreground">
+        {/* empty state: centered greeting + composer, like the reference */}
+        {!hasMessages && (
+          <div className="chat-greeting">
+            <AiMark size={44} className="chat-greeting-mark" decorative />
+            <h1 className="chat-greeting-title">{greeting}</h1>
+            <p className="chat-greeting-support">
               {fr
-                ? "L'assistant lit vos vraies données d'espace de travail. Vérifiez les informations importantes."
-                : "The assistant reads your real workspace data. Verify important information."}
+                ? "WORLD · FLOW · EXIT — vos données, vos audits, aucune invention."
+                : "WORLD · FLOW · EXIT — your data, your audits, no invention."}
             </p>
+            <div className="chat-composer-zone is-center w-full">
+              <Composer
+                draft={draft}
+                setDraft={setDraft}
+                onSend={() => void send()}
+                busy={busy}
+                effort={effort}
+                onEffort={setEffort}
+                fr={fr}
+              />
+              <p className="chat-disclaimer">
+                {fr
+                  ? "L'assistant lit vos vraies données d'espace de travail. Vérifiez les informations importantes."
+                  : "The assistant reads your real workspace data. Verify important information."}
+              </p>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* conversation */}
+        {hasMessages && (
+          <>
+            <div ref={scrollRef} className="chat-scroll">
+              <div className="chat-thread">
+                {messages.map((message) =>
+                  message.role === "user" ? (
+                    <div key={message.id} className="chat-msg chat-msg-user">
+                      <div className="chat-msg-user-bubble">{message.content}</div>
+                    </div>
+                  ) : (
+                    <div key={message.id} className="chat-msg chat-msg-ai">
+                      <div className="chat-msg-avatar">
+                        <AiMark size={15} />
+                      </div>
+                      <div className="chat-msg-body">
+                        {message.trace && message.trace.length > 0 && (
+                          <div className="chat-trace">
+                            {message.trace.map((step) => {
+                              const Icon = TOOL_ICONS[step.tool] ?? BadgeCheck;
+                              return (
+                                <span
+                                  key={`${step.tool}:${step.summary}`}
+                                  className="chat-trace-chip"
+                                >
+                                  <Icon size={10} /> {step.tool} · {step.summary}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
+                        {message.error ? (
+                          <div className="chat-error">{message.error}</div>
+                        ) : message.content ? (
+                          <Markdownish text={message.content} />
+                        ) : busy ? (
+                          <div className="chat-thinking" aria-live="polite">
+                            <span />
+                            <span />
+                            <span />
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  )
+                )}
+                <div ref={endSentinel} />
+              </div>
+            </div>
+
+            <div className="chat-composer-zone is-docked">
+              <Composer
+                draft={draft}
+                setDraft={setDraft}
+                onSend={() => void send()}
+                busy={busy}
+                effort={effort}
+                onEffort={setEffort}
+                fr={fr}
+              />
+              <p className="chat-disclaimer">
+                {fr
+                  ? "L'assistant lit vos vraies données d'espace de travail. Vérifiez les informations importantes."
+                  : "The assistant reads your real workspace data. Verify important information."}
+              </p>
+            </div>
+          </>
+        )}
       </div>
 
       {/* ---------------------------------------------- settings modal */}
       {settingsOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="chat-dialog-backdrop"
           role="dialog"
           aria-modal="true"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setSettingsOpen(false);
+          }}
         >
-          <div className="w-full max-w-md rounded-2xl border border-border bg-surface-1 p-6 shadow-2xl">
+          <div className="chat-dialog">
             <div className="flex items-center justify-between">
-              <h3 className="flex items-center gap-2 text-sm font-semibold">
-                <Lock className="h-4 w-4 text-primary" />
+              <h3 className="flex items-center gap-2">
+                <AiMark size={15} />
                 {fr ? "Connexion du modèle IA" : "AI model connection"}
               </h3>
               <button
                 type="button"
                 onClick={() => setSettingsOpen(false)}
-                className="rounded-lg p-1 text-muted-foreground hover:bg-surface-2"
+                className="chat-icon-btn"
                 aria-label={fr ? "Fermer" : "Close"}
               >
-                <X className="h-4 w-4" />
+                <X size={15} />
               </button>
             </div>
-            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+            <p className="mt-2 text-xs leading-relaxed text-muted">
               {fr
                 ? "Votre clé est chiffrée (AES-256-GCM) côté serveur et n'est jamais renvoyée au navigateur. Vous pouvez la remplacer ou la supprimer à tout moment."
                 : "Your key is encrypted (AES-256-GCM) server-side and never returned to the browser. Replace or delete it anytime."}
@@ -882,10 +943,8 @@ export function AiChatPage(): React.ReactElement {
               {/* Step 1 — which provider. The model is never asked for: the server reads
                   the provider catalogue and picks one from it. */}
               <div>
-                <p className="text-xs font-medium">
-                  1. {fr ? "Choisis le fournisseur" : "Choose the provider"}
-                </p>
-                <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+                <p className="app-label">1. {fr ? "Choisis le fournisseur" : "Choose the provider"}</p>
+                <div className="chat-provider-grid">
                   {providers.map((preset) => {
                     const active = activePreset === preset.id;
                     const note = PROVIDER_HINTS[preset.id];
@@ -900,18 +959,10 @@ export function AiChatPage(): React.ReactElement {
                           setProfileError(null);
                         }}
                         title={note ?? preset.label}
-                        className={`flex items-center justify-between rounded-lg border px-2.5 py-2 text-left text-xs transition ${
-                          active
-                            ? "border-primary/70 bg-primary/10 text-primary"
-                            : "border-border/60 bg-surface-2 text-foreground/80 hover:border-primary/40"
-                        }`}
+                        className={`chat-provider ${active ? "is-active" : ""}`}
                       >
-                        <span className="font-medium">{preset.label}</span>
-                        {note && (
-                          <span className="ml-1 truncate text-[9.5px] text-muted-foreground">
-                            {note}
-                          </span>
-                        )}
+                        <span className="truncate">{preset.label}</span>
+                        {note && <span className="chat-provider-note">{note}</span>}
                       </button>
                     );
                   })}
@@ -924,7 +975,7 @@ export function AiChatPage(): React.ReactElement {
                   <input
                     value={baseUrlDraft}
                     onChange={(event) => setBaseUrlDraft(event.target.value)}
-                    className="mt-1 w-full rounded-lg border border-border/70 bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary/60"
+                    className="app-input"
                     placeholder="https://api.example.com/v1"
                   />
                 </label>
@@ -937,7 +988,7 @@ export function AiChatPage(): React.ReactElement {
                   type="password"
                   value={keyDraft}
                   onChange={(event) => setKeyDraft(event.target.value)}
-                  className="mt-1 w-full rounded-lg border border-border/70 bg-surface-2 px-3 py-2 font-mono text-sm outline-none focus:border-primary/60"
+                  className="app-input font-mono"
                   placeholder={
                     profile?.configured
                       ? fr
@@ -950,7 +1001,7 @@ export function AiChatPage(): React.ReactElement {
                   autoComplete="off"
                   spellCheck={false}
                 />
-                <span className="mt-1 block text-[10.5px] font-normal leading-relaxed text-muted-foreground">
+                <span className="mt-1 block text-[10.5px] font-normal leading-relaxed text-muted">
                   {fr
                     ? "Créée chez le fournisseur, jamais stockée en clair ici. PROOFCORE lit la liste des modèles de la clé et choisit le meilleur modèle de conversation — tu n'as rien à connaître."
                     : "Created at the provider, never stored in clear here. PROOFCORE reads the key's model list and picks the best chat model — nothing to know on your side."}
@@ -959,18 +1010,18 @@ export function AiChatPage(): React.ReactElement {
 
               {/* Connected state: what was chosen for the user, and how to change it. */}
               {profile?.configured && (
-                <div className="mt-3 rounded-xl border border-border/60 bg-surface-2/60 px-3 py-2.5">
+                <div className="rounded-xl border border-line bg-surface-2/60 px-3 py-2.5">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-medium text-foreground">
+                    <p className="min-w-0 truncate text-xs font-medium text-foreground">
                       {profile.providerLabel ?? profile.providerId ?? "—"}
-                      <span className="ml-1.5 font-mono text-[10.5px] font-normal text-muted-foreground">
+                      <span className="ml-1.5 font-mono text-[10.5px] font-normal text-muted">
                         {profile.model}
                       </span>
                     </p>
                     <button
                       type="button"
                       onClick={() => setAdvancedOpen((open) => !open)}
-                      className="shrink-0 text-[10.5px] text-primary hover:underline"
+                      className="shrink-0 text-[10.5px] text-accent hover:underline"
                     >
                       {advancedOpen
                         ? fr
@@ -986,7 +1037,7 @@ export function AiChatPage(): React.ReactElement {
                       <select
                         value={profile.model}
                         onChange={(event) => setModelDraft(event.target.value)}
-                        className="w-full rounded-lg border border-border/70 bg-surface-1 px-2 py-1.5 font-mono text-[11px] outline-none focus:border-primary/60"
+                        className="app-select font-mono text-[11px]"
                       >
                         {[
                           profile.model,
@@ -1002,12 +1053,12 @@ export function AiChatPage(): React.ReactElement {
                           type="button"
                           onClick={() => void connectProvider()}
                           disabled={profileSaving}
-                          className="rounded-lg bg-primary px-3 py-1.5 text-[11px] font-semibold text-primary-foreground disabled:opacity-50"
+                          className="app-btn app-btn-primary app-btn-sm"
                         >
                           {fr ? "Appliquer" : "Apply"}
                         </button>
                       )}
-                      <p className="text-[10px] leading-relaxed text-muted-foreground">
+                      <p className="text-[10px] leading-relaxed text-muted">
                         {fr
                           ? "Liste lue depuis ta clé. Un modèle absent de cette liste ne fonctionnera pas."
                           : "List read from your key. A model absent from it will not work."}
@@ -1017,19 +1068,9 @@ export function AiChatPage(): React.ReactElement {
                 </div>
               )}
             </div>
-            {profileError && (
-              <p className="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs leading-relaxed text-destructive">
-                {profileError}
-              </p>
-            )}
+            {profileError && <p className="chat-status is-error mt-3">{profileError}</p>}
             {testResult && (
-              <div
-                className={`mt-3 rounded-lg border px-3 py-2 text-xs leading-relaxed ${
-                  testResult.ok
-                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                    : "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
-                }`}
-              >
+              <div className={`chat-status mt-3 ${testResult.ok ? "is-ok" : "is-warn"}`}>
                 <p className="font-medium">
                   {testResult.ok ? "✓ " : "× "}
                   {testResult.message}
@@ -1042,7 +1083,7 @@ export function AiChatPage(): React.ReactElement {
                         key={model}
                         type="button"
                         onClick={() => setModelDraft(model)}
-                        className="rounded-md border border-border/60 bg-surface-1 px-1.5 py-0.5 font-mono text-[10px] text-foreground/75 transition hover:border-primary/50 hover:text-foreground"
+                        className="chat-model-chip"
                       >
                         {model}
                       </button>
@@ -1062,7 +1103,7 @@ export function AiChatPage(): React.ReactElement {
                   }}
                   className="flex items-center gap-1.5 text-xs text-destructive hover:underline"
                 >
-                  <Eraser className="h-3.5 w-3.5" /> {fr ? "Supprimer la clé" : "Delete the key"}
+                  <Eraser size={13} /> {fr ? "Supprimer la clé" : "Delete the key"}
                 </button>
               ) : (
                 <span />
@@ -1072,7 +1113,7 @@ export function AiChatPage(): React.ReactElement {
                   type="button"
                   onClick={() => void testConnection()}
                   disabled={testing || (!keyDraft && !profile?.configured)}
-                  className="rounded-xl border border-border/70 px-3 py-2 text-xs font-medium transition hover:border-primary/50 disabled:opacity-40"
+                  className="app-btn app-btn-sm"
                 >
                   {testing ? (fr ? "Test…" : "Testing…") : fr ? "Tester la clé" : "Test the key"}
                 </button>
@@ -1084,7 +1125,7 @@ export function AiChatPage(): React.ReactElement {
                     (!keyDraft && !profile?.configured) ||
                     (activePreset === "custom" && !baseUrlDraft.trim())
                   }
-                  className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition hover:brightness-110 disabled:opacity-50"
+                  className="app-btn app-btn-primary app-btn-sm"
                 >
                   {profileSaving
                     ? fr
@@ -1096,139 +1137,80 @@ export function AiChatPage(): React.ReactElement {
                 </button>
               </div>
             </div>
-          </div>
-          {/* MCP connect: use PROOFCORE tools inside any coding agent */}
-          <div className="mt-4 border-t border-border/60 pt-3">
-            <button
-              type="button"
-              onClick={() => setMcpOpen((open) => !open)}
-              className="flex w-full items-center justify-between text-xs font-medium text-foreground/85 transition hover:text-foreground"
-            >
-              <span className="flex items-center gap-2">
-                <Plug className="h-3.5 w-3.5 text-primary" />
-                {fr
-                  ? "Connecter via MCP (Claude Code, Codex, OpenCode…)"
-                  : "Connect via MCP (Claude Code, Codex, OpenCode…)"}
-              </span>
-              <ChevronDown
-                className={`h-3.5 w-3.5 text-muted-foreground transition ${mcpOpen ? "rotate-180" : ""}`}
-              />
-            </button>
-            {mcpOpen && (
-              <div className="mt-3">
-                <p className="text-[11px] leading-relaxed text-muted-foreground">
+
+            {/* MCP connect: use PROOFCORE tools inside any coding agent */}
+            <div className="mt-4 border-t border-line pt-3">
+              <button
+                type="button"
+                onClick={() => setMcpOpen((open) => !open)}
+                className="flex w-full items-center justify-between text-xs font-medium text-foreground/85 transition hover:text-foreground"
+              >
+                <span className="flex items-center gap-2">
+                  <Plug size={13} className="text-accent" />
                   {fr
-                    ? "Donne les outils PROOFCORE (WORLD, FLOW, EXIT, FAIL, CLEAN) à ton agent de code préféré : il lance les audits directement dans ton terminal, sur ton app locale."
-                    : "Give PROOFCORE's tools (WORLD, FLOW, EXIT, FAIL, CLEAN) to your favorite coding agent: it runs the audits in your terminal, on your local app."}
-                </p>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {MCP_RECIPES.map((recipe) => (
-                    <button
-                      key={recipe.id}
-                      type="button"
-                      onClick={() => setMcpTab(recipe.id)}
-                      className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
-                        mcpTab === recipe.id
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-surface-2 text-foreground/70 hover:bg-surface-1"
-                      }`}
-                    >
-                      {recipe.label}
-                    </button>
-                  ))}
-                </div>
-                {(() => {
-                  const recipe = MCP_RECIPES.find((entry) => entry.id === mcpTab);
-                  if (!recipe) return null;
-                  return (
-                    <div className="mt-2">
-                      <div className="flex items-center justify-between">
-                        <code className="text-[10px] text-muted-foreground">{recipe.file}</code>
-                        <button
-                          type="button"
-                          onClick={() => void navigator.clipboard.writeText(recipe.snippet)}
-                          className="rounded-md border border-border/60 px-2 py-0.5 text-[10px] text-muted-foreground transition hover:text-foreground"
-                        >
-                          {fr ? "Copier" : "Copy"}
-                        </button>
+                    ? "Connecter via MCP (Claude Code, Codex, OpenCode…)"
+                    : "Connect via MCP (Claude Code, Codex, OpenCode…)"}
+                </span>
+                <ChevronDown
+                  size={13}
+                  className="text-muted transition"
+                  style={{ transform: mcpOpen ? "rotate(180deg)" : undefined }}
+                />
+              </button>
+              {mcpOpen && (
+                <div className="mt-3">
+                  <p className="text-[11px] leading-relaxed text-muted">
+                    {fr
+                      ? "Donne les outils PROOFCORE (WORLD, FLOW, EXIT, FAIL, CLEAN) à ton agent de code préféré : il lance les audits directement dans ton terminal, sur ton app locale."
+                      : "Give PROOFCORE's tools (WORLD, FLOW, EXIT, FAIL, CLEAN) to your favorite coding agent: it runs the audits in your terminal, on your local app."}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {MCP_RECIPES.map((recipe) => (
+                      <button
+                        key={recipe.id}
+                        type="button"
+                        onClick={() => setMcpTab(recipe.id)}
+                        className={`chat-model-chip ${mcpTab === recipe.id ? "is-active" : ""}`}
+                        style={
+                          mcpTab === recipe.id
+                            ? { borderColor: "var(--ink)", fontWeight: 600 }
+                            : undefined
+                        }
+                      >
+                        {recipe.label}
+                      </button>
+                    ))}
+                  </div>
+                  {(() => {
+                    const recipe = MCP_RECIPES.find((entry) => entry.id === mcpTab);
+                    if (!recipe) return null;
+                    return (
+                      <div className="mt-2">
+                        <div className="flex items-center justify-between">
+                          <code className="text-[10px] text-muted">{recipe.file}</code>
+                          <button
+                            type="button"
+                            onClick={() => void navigator.clipboard.writeText(recipe.snippet)}
+                            className="chat-model-chip"
+                          >
+                            {fr ? "Copier" : "Copy"}
+                          </button>
+                        </div>
+                        <pre className="chat-code-block mt-1">{recipe.snippet}</pre>
+                        <p className="mt-1.5 text-[10.5px] text-muted">
+                          {fr
+                            ? "Nécessite le CLI : npm i -g proofcore"
+                            : "Requires the CLI: npm i -g proofcore"}
+                        </p>
                       </div>
-                      <pre className="mt-1 overflow-x-auto rounded-lg bg-[#07120d] p-3 font-mono text-[10.5px] leading-relaxed text-emerald-200/90">
-                        {recipe.snippet}
-                      </pre>
-                      <p className="mt-1.5 text-[10.5px] text-muted-foreground">
-                        {fr
-                          ? "Nécessite le CLI : npm i -g proofcore"
-                          : "Requires the CLI: npm i -g proofcore"}
-                      </p>
-                    </div>
-                  );
-                })()}
-              </div>
-            )}
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function EmptyState({ fr }: { fr: boolean }): React.ReactElement {
-  const suggestions = fr
-    ? [
-        {
-          icon: ShieldAlert,
-          title: "Audit FAIL",
-          text: "« Analyse les failles de sécurité de https://mon-app.com »",
-        },
-        { icon: Sparkles, title: "Audit CLEAN", text: "« Note l'interface de mon app sur 100 »" },
-        {
-          icon: Globe,
-          title: "Recherche",
-          text: "« Cherche les bonnes pratiques de design 2026 »",
-        },
-        {
-          icon: Bot,
-          title: "Analyse des runs",
-          text: "« Pourquoi le dernier run FLOW a échoué ? »",
-        },
-      ]
-    : [
-        {
-          icon: ShieldAlert,
-          title: "FAIL audit",
-          text: '"Scan https://myapp.com for security flaws"',
-        },
-        { icon: Sparkles, title: "CLEAN audit", text: '"Score my app\'s UI out of 100"' },
-        { icon: Globe, title: "Research", text: '"Research 2026 UI best practices"' },
-        { icon: Bot, title: "Run analysis", text: '"Why did the last FLOW run fail?"' },
-      ];
-  return (
-    <div className="py-10 text-center">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-fuchsia-600 text-primary-foreground shadow-lg">
-        <Sparkles className="h-6 w-6" />
-      </div>
-      <h2 className="mt-4 text-lg font-semibold tracking-tight">
-        {fr ? "Que pouvons-nous prouver aujourd'hui ?" : "What can we prove today?"}
-      </h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        {fr
-          ? "WORLD · FLOW · EXIT — vos données, vos audits, aucune invention."
-          : "WORLD · FLOW · EXIT — your data, your audits, no invention."}
-      </p>
-      <div className="mx-auto mt-6 grid max-w-xl gap-2 sm:grid-cols-2">
-        {suggestions.map((suggestion) => (
-          <div
-            key={suggestion.title}
-            className="flex items-start gap-3 rounded-xl border border-border/60 bg-surface-1 px-4 py-3 text-left"
-          >
-            <suggestion.icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-            <div className="min-w-0">
-              <p className="text-xs font-semibold">{suggestion.title}</p>
-              <p className="truncate text-[11px] text-muted-foreground">{suggestion.text}</p>
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
