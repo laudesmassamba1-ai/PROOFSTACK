@@ -108,6 +108,7 @@ export const en = {
   "pricing.guarantee":
     "Cancel anytime. Your data stays yours, and nothing is deleted when you downgrade.",
   "pricing.bestValue": "Best value",
+  "mkt.pricing.pending": "coming",
   currency: "Currency",
   "pricing.cta": "Choose {plan}",
   "pricing.current": "Current plan",
@@ -304,6 +305,7 @@ export const fr: Messages = {
   "pricing.guarantee":
     "Résiliable à tout moment. Vos données restent les vôtres, rien n'est supprimé en cas de rétrogradation.",
   "pricing.bestValue": "Meilleure valeur",
+  "mkt.pricing.pending": "bientôt",
   currency: "Devise",
   "pricing.cta": "Choisir {plan}",
   "pricing.current": "Plan actuel",

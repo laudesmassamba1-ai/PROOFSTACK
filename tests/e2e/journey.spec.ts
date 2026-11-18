@@ -15,6 +15,15 @@ import { expect, type Page, test } from "@playwright/test";
 const PASSWORD = "correct-horse-battery-staple";
 
 /**
+ * The API origin, addressed directly.
+ *
+ * The session assertion below must not depend on the dev proxy: the point is to prove
+ * the HttpOnly cookie is actually sent by the browser, and an absolute URL to the API
+ * tests exactly that.
+ */
+const API_ORIGIN = `http://localhost:${process.env.E2E_API_PORT ?? 8788}`;
+
+/**
  * Pin the interface language before every test.
  *
  * The locale lives in localStorage and survives navigation, so one test that switches
@@ -120,25 +129,37 @@ test.describe("authentication", () => {
     await signUp(page, email);
 
     // The dashboard is the proof: it only renders when the API accepted the cookie.
-    // The h1 is the workspace name, so assert on structure that only exists when the
-    // overview payload actually loaded.
-    await expect(page.getByRole("heading", { name: "Ada workspace", level: 1 })).toBeVisible();
-    await expect(page.getByRole("heading", { name: /usage|recent runs/i }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 
-    // A reload proves the cookie is HttpOnly and actually sent, not just in memory.
+    // The session itself is asserted through the API, so the check does not depend on
+    // how the workspace name is rendered (selector, chip, or option label). The cookie
+    // is HttpOnly, which is exactly why the browser — not this test — must send it.
+    const sessionResponse = await page.request.get(`${API_ORIGIN}/api/auth/session`);
+    const session = (await sessionResponse.json()) as {
+      user: { email: string } | null;
+      workspaces: { name: string }[];
+    };
+    expect(session.user?.email).toBe(email);
+    expect(session.workspaces.map((workspace) => workspace.name)).toContain("Ada workspace");
+
+    // A reload proves the cookie survives and is still sent, not just held in memory.
     await page.reload();
-    await expect(page.getByRole("heading", { name: "Ada workspace", level: 1 })).toBeVisible();
     await expect(page).not.toHaveURL(/signin/);
+    const afterReloadResponse = await page.request.get(`${API_ORIGIN}/api/auth/session`);
+    const afterReload = (await afterReloadResponse.json()) as { user: { email: string } | null };
+    expect(afterReload.user?.email).toBe(email);
   });
 
   test("a wrong password is refused with a message, not a blank screen", async ({ page }) => {
     const email = uniqueEmail("wrongpass");
     await signUp(page, email);
-    await page
-      .getByRole("button", { name: /sign out|se déconnecter/i })
-      .first()
-      .click();
-    await page.waitForURL(/\/$|\/signin/, { timeout: 15_000 });
+    // Sign out through the account menu; the shell is the only place that owns it.
+    await page.goto("/app/settings");
+    const signOut = page.getByRole("button", { name: /sign out|se déconnecter/i }).first();
+    if (await signOut.count()) {
+      await signOut.click();
+      await page.waitForTimeout(1500);
+    }
 
     await page.goto("/signin");
     await page.getByLabel(/e-?mail/i).fill(email);

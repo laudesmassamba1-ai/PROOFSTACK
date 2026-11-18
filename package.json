@@ -2,7 +2,7 @@
   "name": "proofcore",
   "version": "0.1.0",
   "private": true,
-  "description": "PROOFCORE — integrated software quality and reliability suite: WORLD (global compatibility), FLOW (transaction reliability), EXIT (data portability).",
+  "description": "PROOFCORE \u2014 integrated software quality and reliability suite: WORLD (global compatibility), FLOW (transaction reliability), EXIT (data portability).",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "engines": {
@@ -20,8 +20,6 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test --config tests/playwright.config.ts",
-    "db:generate": "pnpm --filter @proofcore/db generate",
-    "db:migrate:local": "pnpm --filter @proofcore/db migrate:local",
     "web:dev": "pnpm --filter @proofcore/web dev",
     "dev:stack": "node tooling/scripts/dev-stack.mjs",
     "api:dev": "pnpm --filter @proofcore/api dev",

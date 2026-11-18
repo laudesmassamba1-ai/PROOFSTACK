@@ -51,6 +51,14 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
     c.header("X-Content-Type-Options", "nosniff");
     c.header("Referrer-Policy", "no-referrer");
     c.header("Cache-Control", "no-store");
+    // The API only returns JSON and never renders HTML, so a maximally strict policy
+    // costs nothing and removes an entire class of reflected-content attacks.
+    c.header("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
+    c.header("X-Frame-Options", "DENY");
+    c.header("Cross-Origin-Resource-Policy", "same-site");
+    c.header("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+    // HSTS is set on every response; the Worker is only reachable over https.
+    c.header("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
     await next();
   });
 

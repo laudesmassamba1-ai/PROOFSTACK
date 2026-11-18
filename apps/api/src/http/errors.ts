@@ -141,6 +141,9 @@ export class RateLimiter {
 
   check(key: string): { allowed: boolean; retryAfterSeconds: number } {
     const now = this.clock();
+    // Expired windows are pruned on every call: an unbounded map keyed by client
+    // address is a memory leak an attacker controls, and an isolate is long-lived.
+    if (this.hits.size > 1024) this.prune(now);
     const entry = this.hits.get(key);
     if (!entry || entry.resetAt <= now) {
       this.hits.set(key, { count: 1, resetAt: now + this.windowMs });
@@ -151,5 +154,11 @@ export class RateLimiter {
       allowed: entry.count <= this.limit,
       retryAfterSeconds: Math.max(1, Math.ceil((entry.resetAt - now) / 1000)),
     };
+  }
+
+  private prune(now: number): void {
+    for (const [key, entry] of this.hits) {
+      if (entry.resetAt <= now) this.hits.delete(key);
+    }
   }
 }

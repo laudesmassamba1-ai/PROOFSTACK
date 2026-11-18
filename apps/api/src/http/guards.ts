@@ -64,12 +64,29 @@ export async function requireWorkspace(
 }
 
 /** Parse and validate a JSON body. A malformed body is a 400, never a 500. */
+/**
+ * Largest accepted JSON body.
+ *
+ * Parsing happens before validation, so an unbounded body is a memory amplifier: a
+ * single request could allocate far more than any legitimate payload needs. The
+ * `content-length` header is checked first, and the parsed size is checked again for
+ * chunked requests that omit it.
+ */
+const MAX_BODY_BYTES = 2 * 1024 * 1024;
+
 export async function readBody<T>(c: Context<AppEnv>, schema: ZodType<T>): Promise<T> {
+  const declared = Number(c.req.header("content-length") ?? "0");
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
+    throw new HttpError(413, "payload_too_large", "The request body exceeds 2 MB.");
+  }
   let raw: unknown;
   try {
     raw = await c.req.json();
   } catch {
     throw new HttpError(400, "invalid_json", "Request body must be JSON.");
+  }
+  if (JSON.stringify(raw ?? null).length > MAX_BODY_BYTES) {
+    throw new HttpError(413, "payload_too_large", "The request body exceeds 2 MB.");
   }
   const parsed = schema.safeParse(raw);
   if (!parsed.success) {

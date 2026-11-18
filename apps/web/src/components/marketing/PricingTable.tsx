@@ -10,6 +10,20 @@ import { useI18n } from "../../i18n/index.js";
 type Period = "monthly" | "yearly";
 
 /**
+ * Entitlements that are sold but not shipped yet.
+ *
+ * Showing a checkmark for something the product cannot do is the one kind of
+ * dishonesty this pricing page must never commit: a paying customer would buy a
+ * promise and find nothing. They are rendered as "coming" until they exist.
+ */
+const NOT_YET_SHIPPED = new Set<EntitlementKey>([
+  "github_integration",
+  "client_sharing",
+  "advanced_reports",
+  "priority_support",
+]);
+
+/**
  * Prices are read from the plan definitions, formatted through the same Money type
  * the checkout uses. Nothing here computes a price, converts a currency, or repeats
  * a number that the billing layer also owns.
@@ -161,14 +175,17 @@ export function PricingTable({ currentPlanKey }: { currentPlanKey?: string }) {
                 <FlagLine
                   label={t("mkt.pricing.github")}
                   value={plan.entitlements.github_integration}
+                  pending={NOT_YET_SHIPPED.has("github_integration")}
                 />
                 <FlagLine
                   label={t("mkt.pricing.advanced")}
                   value={plan.entitlements.advanced_reports}
+                  pending={NOT_YET_SHIPPED.has("advanced_reports")}
                 />
                 <FlagLine
                   label={t("mkt.pricing.client")}
                   value={plan.entitlements.client_sharing}
+                  pending={NOT_YET_SHIPPED.has("client_sharing")}
                 />
               </ul>
 
@@ -235,9 +252,27 @@ function LimitLine({
   );
 }
 
-function FlagLine({ label, value }: { label: string; value: boolean | number | undefined }) {
+function FlagLine({
+  label,
+  value,
+  pending = false,
+}: {
+  label: string;
+  value: boolean | number | undefined;
+  pending?: boolean;
+}) {
   const { t } = useI18n();
   const on = value === true;
+  if (on && pending) {
+    return (
+      <li className="flex items-center justify-between gap-3 text-[0.85rem]">
+        <span className="text-white/56">{label}</span>
+        <span className="rounded-full border border-white/15 px-2 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wider text-white/45">
+          {t("mkt.pricing.pending")}
+        </span>
+      </li>
+    );
+  }
   return (
     <li className="flex items-center justify-between gap-3 text-[0.85rem]">
       <span className="text-white/56">{label}</span>

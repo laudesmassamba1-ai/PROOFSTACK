@@ -460,16 +460,21 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
       );
     }
 
+    // Bounded history: a conversation that grows without limit eventually hits the
+    // row size limit and would break permanently. Keep the most recent turns.
+    const MAX_PERSISTED = 80;
+    const persisted = [
+      ...history,
+      { role: "assistant" as const, content: finalContent, ...(trace.length > 0 ? { trace } : {}) },
+    ].slice(-MAX_PERSISTED);
+
     const updated = await services.store.saveAiConversation({
       id: conversationId,
       userId: user.id,
       workspaceId: workspace.id,
       title,
       effort,
-      messages: [
-        ...history,
-        { role: "assistant", content: finalContent, ...(trace.length > 0 ? { trace } : {}) },
-      ],
+      messages: persisted,
     });
 
     return c.json({
@@ -641,7 +646,58 @@ async function executeTool(
   }
 }
 
+/**
+ * Outbound fetch guard.
+ *
+ * Two of the assistant's tools accept an arbitrary URL. Without a guard, a prompt
+ * could turn the API into an SSRF proxy pointed at the deployment's own network:
+ * loopback, link-local metadata endpoints, private ranges, or the API itself.
+ * Only http(s), only public hostnames, only standard ports.
+ */
+const BLOCKED_HOSTS =
+  /^(localhost|127\.|0\.0\.0\.0|::1|\[::1\]|169\.254\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/i;
+const BLOCKED_SUFFIXES = [".local", ".internal", ".localhost", ".home.arpa"];
+
+function assertPublicUrl(raw: string): URL {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new ProofCoreError({
+      message: "invalid URL",
+      category: "VALIDATION",
+      code: "invalid_url",
+    });
+  }
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    throw new ProofCoreError({
+      message: "only http(s) URLs are supported",
+      category: "VALIDATION",
+      code: "unsupported_scheme",
+    });
+  }
+  if (
+    BLOCKED_HOSTS.test(parsed.hostname) ||
+    BLOCKED_SUFFIXES.some((suffix) => parsed.hostname.endsWith(suffix))
+  ) {
+    throw new ProofCoreError({
+      message: "this host is not reachable from the assistant",
+      category: "PERMISSION",
+      code: "host_not_allowed",
+    });
+  }
+  if (parsed.port && !["80", "443", "8080", "3000", "5173"].includes(parsed.port)) {
+    throw new ProofCoreError({
+      message: `port ${parsed.port} is not allowed`,
+      category: "PERMISSION",
+      code: "port_not_allowed",
+    });
+  }
+  return parsed;
+}
+
 async function fetchFrom(url: string): Promise<{ response: Response; text: string; ms: number }> {
+  assertPublicUrl(url);
   const started = Date.now();
   const response = await fetch(url, {
     redirect: "follow",

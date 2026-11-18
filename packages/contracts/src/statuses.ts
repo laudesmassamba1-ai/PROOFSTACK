@@ -48,7 +48,18 @@ export const SEVERITIES = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"] as const
 export const severitySchema = z.enum(SEVERITIES);
 export type Severity = z.infer<typeof severitySchema>;
 
-export const MODULE_IDS = ["world", "flow", "exit"] as const;
+/**
+ * Every module id the data model accepts.
+ *
+ * WORLD, FLOW and EXIT are engine modules: they run fixture/transaction/export cases
+ * from a config. FAIL and CLEAN are **audits**: they drive real HTTP checks against a
+ * deployed URL and produce findings with scores. They share the run/ finding/report
+ * pipeline (so history, insights, webhooks and the module pages all work), but they are
+ * launched by `proofcore audit`, not by `proofcore test`.
+ */
+export const ENGINE_MODULE_IDS = ["world", "flow", "exit"] as const;
+export const AUDIT_MODULE_IDS = ["fail", "clean"] as const;
+export const MODULE_IDS = [...ENGINE_MODULE_IDS, ...AUDIT_MODULE_IDS] as const;
 export const moduleIdSchema = z.enum(MODULE_IDS);
 export type ModuleId = z.infer<typeof moduleIdSchema>;
 
@@ -76,6 +87,14 @@ export const MODULE_LABELS: Record<ModuleId, { name: string; question: string }>
   exit: {
     name: "EXIT",
     question: "Can users retrieve their information without losing it?",
+  },
+  fail: {
+    name: "FAIL",
+    question: "Where does the deployed app leak or break under real HTTP conditions?",
+  },
+  clean: {
+    name: "CLEAN",
+    question: "Is the deployed interface structurally sound and accessible?",
   },
 };
 

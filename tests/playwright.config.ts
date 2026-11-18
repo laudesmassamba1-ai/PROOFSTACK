@@ -68,6 +68,9 @@ export default defineConfig({
       timeout: 60_000,
       env: {
         PORT: String(WEB_PORT),
+        // The dev proxy target: without it, a web process that receives PORT would
+        // proxy /api back to itself.
+        API_PORT: String(API_PORT),
         VITE_API_URL: `http://localhost:${API_PORT}`,
       },
     },

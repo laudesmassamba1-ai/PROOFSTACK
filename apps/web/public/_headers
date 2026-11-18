@@ -1,0 +1,22 @@
+# Security headers for Cloudflare Pages.
+#
+# The marketing site and the dashboard are one SPA: a strict CSP is applied to every
+# route. `'unsafe-inline'` is required for styles because the design system sets
+# custom properties inline (theme tokens, chart widths, staggered animation delays);
+# scripts are not granted inline privileges. If a component ever needs an inline
+# script, add a nonce instead of widening this policy.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://proofcore-api.laudesmassamba1.workers.dev; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=()
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+  Cross-Origin-Opener-Policy: same-origin
+
+# Hashed build assets are immutable; HTML must never be cached stale.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/index.html
+  Cache-Control: no-cache

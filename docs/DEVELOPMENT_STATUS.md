@@ -5,16 +5,20 @@ uses the Ink & Object direction; this file records what is true and what remains
 
 ## Implemented and checked
 
-- One engine and three modules: WORLD, FLOW, EXIT.
-- CLI with init, doctor, validate, test, sync, JSON/JUnit/HTML/text reports and stable
-  exit codes.
+- One engine, three fixture modules (WORLD, FLOW, EXIT) and two HTTP audit modules
+  (FAIL, CLEAN) that share the run, finding, report, insight and webhook pipeline.
+- CLI commands: init, doctor, validate, test, report, audit (fail|clean), sync,
+  login/logout (session or device flow), ai, mcp.
+- Report formats: JSON, JUnit, HTML and text, with stable exit codes (0 pass, 1 defect,
+  2 harness error, 3 cancelled).
 - SaaS API on Node 22 SQLite and Cloudflare Worker/D1: auth, workspaces, projects, run
   ingestion, reports, API keys, billing, signed webhooks, entitlements and usage.
 - Authenticated workspace: paper frame, top navigation, workspace/project selectors,
   command palette, full-screen mobile menu, state-driven Overview, data-bound module
   objects and project/module/CLI screens.
 - Empty, loading and 404 states use the inline Testers cast; errors and billing do not.
-- Overview, Projects, WORLD/FLOW/EXIT, CLI and the shell have FR/EN copy.
+- Overview, Projects, all five module pages, FAIL/CLEAN audits, Billing, Settings and
+  the shell have FR/EN copy.
 - Bricolage Grotesque, Geist and JetBrains Mono are bundled locally; no runtime UI
   dependency was added.
 - Marketing, docs, workspace and admin routes are code-split.
@@ -35,19 +39,30 @@ uses the Ink & Object direction; this file records what is true and what remains
 ## Verification
 
 - `pnpm typecheck`: passes across the workspace.
-- `pnpm test`: 223 tests pass.
+- `pnpm test`: 253 tests pass (20 files).
+- `pnpm test:e2e`: 26 tests pass (desktop + mobile), including the HttpOnly session
+  surviving a reload and no horizontal overflow on any dashboard page.
 - `pnpm --filter @proofcore/web build`: passes; route-level chunks replace the previous
   single 554 kB bundle.
 - Visual QA: 42 route/viewport combinations from 1920×1080 to 375×812, zero horizontal
   overflow; screenshots generated with no console/page errors.
-- `pnpm lint`: the repository still has pre-existing Biome diagnostics. The visual
-  redesign did not claim a clean lint.
+- `pnpm lint`: clean across 256 files.
 
 ## Known gaps
 
-- **The creator operations console (`/app/admin`) is still English.** The customer
-  workspace — shell, Overview, Projects, modules, CLI, Billing and Settings — is FR/EN.
-  The internal console is explicitly outside the language switch.
+The full, evidence-based list lives in `docs/AUDIT_2026-11.md`. The short version:
+
+- No password recovery, no email verification and no transactional email provider:
+  a user who forgets a password cannot recover the account.
+- No OAuth (Google, GitHub) and no two-factor authentication.
+- No support channel, no legal pages (terms, privacy, cookies).
+- Four sold entitlements have no implementation (GitHub integration, client sharing,
+  advanced reports, priority support). The pricing table now labels them "coming".
+- FAIL/CLEAN audit results are not yet uploaded as runs, so the two module pages stay
+  empty until `proofcore audit --sync` exists.
+- CLEAN scores server HTML, which is structurally wrong for client-rendered apps.
+- No CI. No tests for the WORLD module or the payment adapters.
+- No retention job, no backup procedure, no pagination, no search.
 - No email provider: verification, password reset and invitations are absent, not faked.
 - The CLI is distributable as a self-contained global tarball (`pnpm cli:install`), but
   `@proofcore/cli` is not published on the npm registry yet.

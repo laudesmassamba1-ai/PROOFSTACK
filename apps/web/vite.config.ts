@@ -18,11 +18,14 @@ const lucideAlias = fileURLToPath(
  * pre-bundled: their sources are transformed by Vite directly.
  *
  * Dev proxy: /api, /v1 and /health are forwarded to the local API so the browser
- * talks to one origin and the HttpOnly session cookie stays first-party. The
- * proxy target follows PORT (the API's own override) — one env var moves the
- * whole stack.
+ * talks to one origin and the HttpOnly session cookie stays first-party.
+ *
+ * `API_PORT` wins over `PORT` on purpose. `PORT` is also how a *web* process is told
+ * which port to listen on (the e2e harness does exactly that), so reading only `PORT`
+ * made the proxy point at the web server itself and answer 502 for every API call —
+ * a loop that looks like a dead backend.
  */
-const apiPort = process.env.PORT ? Number(process.env.PORT) : 8787;
+const apiPort = Number(process.env.API_PORT ?? process.env.PORT ?? 8787);
 
 export default defineConfig(() => ({
   build: {
@@ -57,6 +60,8 @@ export default defineConfig(() => ({
     strictPort: true,
     host: true,
     proxy: {
+      // 127.0.0.1, not localhost: on some hosts "localhost" resolves to ::1 first and
+      // the proxy stalls on a DNS/IPv6 lookup instead of failing fast.
       "/api": `http://localhost:${apiPort}`,
       "/v1": `http://localhost:${apiPort}`,
       "/health": `http://localhost:${apiPort}`,
