@@ -486,12 +486,13 @@ function AuditObject({
         />
       </g>
       <circle cx="100" cy="110" r="5" fill="var(--object-glyph)" className="audit-hub" />
+      {/* The score sits above the arc: it never collides with the gauge band. */}
       <text
         x="100"
-        y="70"
+        y="38"
         textAnchor="middle"
         fill="var(--object-glyph)"
-        fontSize="26"
+        fontSize="24"
         fontWeight="700"
         className="audit-score"
       >

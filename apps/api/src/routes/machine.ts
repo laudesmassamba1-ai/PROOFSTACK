@@ -196,11 +196,28 @@ export function machineRoutes(services: Services): Hono<AppEnv> {
         endedAt: run.endedAt,
       },
     });
+
+    // The people IN the app learn about a failed run too, not just the webhook
+    // receivers: every non-viewer member gets one email, best-effort, only when
+    // the sender is configured. It never gates the CLI response.
+    const runFailed = run.status !== "COMPLETED" || totalsFailed(totals) > 0;
+    const emailTask = runFailed
+      ? notifyRunFailure(services, key.workspaceId, {
+          runId: saved.runId,
+          projectId: run.projectId,
+          projectName: project.name,
+          status: run.status,
+          failed: totalsFailed(totals),
+          endedAt: run.endedAt,
+        })
+      : Promise.resolve();
     try {
       c.executionCtx.waitUntil(webhookTask);
+      c.executionCtx.waitUntil(emailTask);
     } catch {
       // Hono's Node adapter has no executionCtx; local dev may await it.
       await webhookTask;
+      await emailTask;
     }
 
     const snapshot = await services.meter.snapshot(key.workspaceId, services.clock());
@@ -244,6 +261,44 @@ async function authenticate(c: Context<AppEnv>, services: Services): Promise<Api
 
 function totalsFailed(totals: Record<string, RunTotals>): number {
   return Object.values(totals).reduce((sum, t) => sum + t.failed + t.errors, 0);
+}
+
+/** Best-effort failure notice to the workspace's non-viewer members. Never
+ * throws into the CLI response: an email outage must not fail an upload. */
+async function notifyRunFailure(
+  services: Services,
+  workspaceId: string,
+  run: {
+    runId: string;
+    projectId: string;
+    projectName: string;
+    status: string;
+    failed: number;
+    endedAt: string;
+  }
+): Promise<void> {
+  try {
+    if (!services.email.configured) return;
+    const members = await services.store.listMembers(workspaceId);
+    const recipients = members.filter((member) => member.role !== "viewer");
+    if (recipients.length === 0) return;
+    const when = new Date(run.endedAt).toLocaleString("fr-FR");
+    for (const member of recipients) {
+      await services.email.send({
+        userId: member.userId,
+        to: member.email,
+        kind: "run.failed",
+        subject: `Échec de run · ${run.projectName} · ${run.failed} anomalie(s)`,
+        text:
+          `Le run ${run.runId} du projet ${run.projectName} s'est terminé en échec` +
+          ` (${run.failed} anomalie(s), statut ${run.status}, ${when}).\n\n` +
+          "Ouvrez PROOFCORE pour examiner les constats et relancer : https://proofstack-iota.vercel.app/app",
+      });
+    }
+  } catch (error) {
+    // Logged through the email journal inside the sender; never propagate.
+    console.error("run failure notice failed", error);
+  }
 }
 
 function retentionBoundary(endedAt: string, days: number): string {

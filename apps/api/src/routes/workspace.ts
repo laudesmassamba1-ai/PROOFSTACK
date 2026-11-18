@@ -18,6 +18,16 @@ import { isValidWebhookUrl, WEBHOOK_EVENTS } from "../outbound.js";
 
 const createWorkspaceSchema = z.object({ name: z.string().min(2).max(80) }).strict();
 
+const renameWorkspaceSchema = z.object({ name: z.string().min(2).max(80) }).strict();
+
+const addMemberSchema = z
+  .object({ email: z.string().email().max(200), role: z.enum(["admin", "member", "viewer"]) })
+  .strict();
+
+const updateMemberSchema = z
+  .object({ role: z.enum(["owner", "admin", "member", "viewer"]) })
+  .strict();
+
 const createProjectSchema = z
   .object({
     workspaceId: z.string().min(1),
@@ -103,9 +113,144 @@ export function workspaceRoutes(services: Services): Hono<AppEnv> {
     return c.json({ ...workspace, myRole: role, members });
   });
 
+  app.patch("/workspaces/:workspaceId", async (c) => {
+    const { workspace } = await requireWorkspace(c, services, c.req.param("workspaceId"), [
+      "owner",
+      "admin",
+    ]);
+    const body = await readBody(c, renameWorkspaceSchema);
+    const renamed = await services.store.renameWorkspace(workspace.id, body.name.trim());
+    if (!renamed) throw new HttpError(404, "workspace_not_found", "Workspace not found.");
+    await services.store.appendAudit({
+      workspaceId: workspace.id,
+      actor: c.get("user").id,
+      action: "workspace.renamed",
+      detail: { from: workspace.name, to: renamed.name },
+    });
+    return c.json({ workspace: renamed });
+  });
+
+  /** Owner-only. The cascade is explicit (see the store): projects, runs,
+   * findings, keys and history all go with the workspace. */
+  app.delete("/workspaces/:workspaceId", async (c) => {
+    const { workspace } = await requireWorkspace(c, services, c.req.param("workspaceId"), [
+      "owner",
+    ]);
+    const deleted = await services.store.deleteWorkspace(workspace.id);
+    if (!deleted) throw new HttpError(404, "workspace_not_found", "Workspace not found.");
+    return c.json({ ok: true });
+  });
+
   app.get("/workspaces/:workspaceId/members", async (c) => {
     const { workspace } = await requireWorkspace(c, services, c.req.param("workspaceId"));
     return c.json({ items: await services.store.listMembers(workspace.id) });
+  });
+
+  /** Adds an existing account as a member. There are no ghost invitations: a
+   * person who never signed up is reported as such, never silently subscribed. */
+  app.post("/workspaces/:workspaceId/members", async (c) => {
+    const { workspace } = await requireWorkspace(c, services, c.req.param("workspaceId"), [
+      "owner",
+      "admin",
+    ]);
+    const body = await readBody(c, addMemberSchema);
+    const user = await services.store.findUserByNormalizedEmail(body.email.trim().toLowerCase());
+    if (!user) {
+      throw new HttpError(
+        404,
+        "user_not_found",
+        `No PROOFCORE account uses ${body.email}. Ask them to sign up first, then invite them.`
+      );
+    }
+    const existing = await services.store.workspaceMemberRole(workspace.id, user.id);
+    if (existing) {
+      throw new HttpError(
+        409,
+        "already_member",
+        "This person is already a member of the workspace."
+      );
+    }
+    const member = await services.store.addWorkspaceMember({
+      workspaceId: workspace.id,
+      userId: user.id,
+      role: body.role,
+    });
+    await services.store.appendAudit({
+      workspaceId: workspace.id,
+      actor: c.get("user").id,
+      action: "member.added",
+      detail: { userId: user.id, email: user.email, role: body.role },
+    });
+    return c.json({ member: { ...member, name: user.name, email: user.email } }, 201);
+  });
+
+  /** Owner-only role change, with a last-owner guard: a workspace always keeps
+   * at least one owner. */
+  app.patch("/workspaces/:workspaceId/members/:userId", async (c) => {
+    const { workspace } = await requireWorkspace(c, services, c.req.param("workspaceId"), [
+      "owner",
+    ]);
+    const body = await readBody(c, updateMemberSchema);
+    const targetUserId = c.req.param("userId");
+    const current = await services.store.workspaceMemberRole(workspace.id, targetUserId);
+    if (!current) {
+      throw new HttpError(404, "member_not_found", "This user is not a member of the workspace.");
+    }
+    if (
+      current === "owner" &&
+      body.role !== "owner" &&
+      (await services.store.ownerCount(workspace.id)) <= 1
+    ) {
+      throw new HttpError(
+        409,
+        "last_owner",
+        "The workspace needs at least one owner. Promote another member first."
+      );
+    }
+    await services.store.updateWorkspaceMemberRole(workspace.id, targetUserId, body.role);
+    await services.store.appendAudit({
+      workspaceId: workspace.id,
+      actor: c.get("user").id,
+      action: "member.role_changed",
+      detail: { userId: targetUserId, from: current, to: body.role },
+    });
+    return c.json({ ok: true });
+  });
+
+  /** Removes a member. Owners and admins may remove others; a member may leave
+   * on their own. The last owner cannot be removed. */
+  app.delete("/workspaces/:workspaceId/members/:userId", async (c) => {
+    const { workspace, role: actorRole } = await requireWorkspace(
+      c,
+      services,
+      c.req.param("workspaceId")
+    );
+    const targetUserId = c.req.param("userId");
+    if (actorRole !== "owner" && actorRole !== "admin" && actorRole !== "member") {
+      throw new HttpError(403, "insufficient_role", "Viewers cannot manage members.");
+    }
+    if (actorRole === "member" && targetUserId !== c.get("user").id) {
+      throw new HttpError(403, "insufficient_role", "Members can only remove themselves.");
+    }
+    const current = await services.store.workspaceMemberRole(workspace.id, targetUserId);
+    if (!current) {
+      throw new HttpError(404, "member_not_found", "This user is not a member of the workspace.");
+    }
+    if (current === "owner" && (await services.store.ownerCount(workspace.id)) <= 1) {
+      throw new HttpError(
+        409,
+        "last_owner",
+        "The workspace needs at least one owner. Promote another member first."
+      );
+    }
+    await services.store.removeWorkspaceMember(workspace.id, targetUserId);
+    await services.store.appendAudit({
+      workspaceId: workspace.id,
+      actor: c.get("user").id,
+      action: "member.removed",
+      detail: { userId: targetUserId, role: current },
+    });
+    return c.json({ ok: true });
   });
 
   // -------------------------------------------------------------- projects
@@ -228,8 +373,13 @@ export function workspaceRoutes(services: Services): Hono<AppEnv> {
     const { workspace } = await requireWorkspace(c, services, c.req.query("workspaceId"));
     const project = await services.store.getProject(workspace.id, c.req.param("projectId"));
     if (!project) throw new HttpError(404, "project_not_found", "Project not found.");
-    const findings = await services.store.listFindings(workspace.id, project.id);
-    return c.json({ items: findings });
+    const limit = Math.min(100, Math.max(1, Number(c.req.query("limit") ?? 25) || 25));
+    const offset = Math.max(0, Number(c.req.query("offset") ?? 0) || 0);
+    const [items, total] = await Promise.all([
+      services.store.listFindings(workspace.id, project.id, limit, offset),
+      services.store.countFindings(workspace.id, project.id),
+    ]);
+    return c.json({ items, total, limit, offset });
   });
 
   /** The stored run payload, exactly as the engine produced it. */

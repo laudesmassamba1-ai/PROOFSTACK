@@ -1,4 +1,4 @@
-import { ArrowLeft, FileJson, KeyRound, Trash2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, FileJson, KeyRound, Loader2, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { Card, Empty, ErrorState, Loading, StatusBadge } from "../../components/app/ui.js";
@@ -32,6 +32,7 @@ interface Finding {
   severity: string;
   status: string;
   code: string | null;
+  fingerprint: string | null;
   detectedAt: string;
 }
 
@@ -44,6 +45,9 @@ export function ProjectDetail() {
   const [project, setProject] = useState<Project | null>(null);
   const [runs, setRuns] = useState<Run[]>([]);
   const [findings, setFindings] = useState<Finding[]>([]);
+  const [findingsTotal, setFindingsTotal] = useState(0);
+  const [findingsLoadingMore, setFindingsLoadingMore] = useState(false);
+  const [expandedFinding, setExpandedFinding] = useState<string | null>(null);
   const [error, setError] = useState<ApiError | Error | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [keyError, setKeyError] = useState<ApiError | Error | null>(null);
@@ -57,17 +61,35 @@ export function ProjectDetail() {
       const [projectBody, runBody, findingBody] = await Promise.all([
         apiFetch<{ project: Project }>(`/api/v1/projects/${projectId}?workspaceId=${workspaceId}`),
         apiFetch<{ items: Run[] }>(`/api/v1/projects/${projectId}/runs?workspaceId=${workspaceId}`),
-        apiFetch<{ items: Finding[] }>(
-          `/api/v1/projects/${projectId}/findings?workspaceId=${workspaceId}`
+        apiFetch<{ items: Finding[]; total: number }>(
+          `/api/v1/projects/${projectId}/findings?workspaceId=${workspaceId}&limit=25`
         ),
       ]);
       setProject(projectBody.project);
       setRuns(runBody.items);
       setFindings(findingBody.items);
+      setFindingsTotal(findingBody.total);
     } catch (caught) {
       setError(caught as ApiError);
     }
   }, [projectId, workspaceId]);
+
+  const loadMoreFindings = useCallback(async () => {
+    if (!workspaceId || !projectId || findingsLoadingMore) return;
+    setFindingsLoadingMore(true);
+    setError(null);
+    try {
+      const body = await apiFetch<{ items: Finding[]; total: number }>(
+        `/api/v1/projects/${projectId}/findings?workspaceId=${workspaceId}&limit=25&offset=${findings.length}`
+      );
+      setFindings((items) => [...items, ...body.items]);
+      setFindingsTotal(body.total);
+    } catch (caught) {
+      setError(caught as ApiError);
+    } finally {
+      setFindingsLoadingMore(false);
+    }
+  }, [workspaceId, projectId, findings.length, findingsLoadingMore]);
 
   useEffect(() => {
     void load();
@@ -338,8 +360,45 @@ export default config;`;
               </thead>
               <tbody>
                 {findings.map((finding) => (
-                  <tr key={finding.id}>
-                    <td className="font-medium">{finding.title}</td>
+                  <tr key={finding.id} className="align-top">
+                    <td className="font-medium">
+                      <button
+                        type="button"
+                        className="text-left"
+                        onClick={() =>
+                          setExpandedFinding((value) => (value === finding.id ? null : finding.id))
+                        }
+                        aria-expanded={expandedFinding === finding.id}
+                      >
+                        {finding.title}
+                      </button>
+                      {expandedFinding === finding.id ? (
+                        <dl className="mt-2 space-y-1 rounded-[var(--radius)] bg-surface-alt px-3 py-2 text-xs">
+                          <div className="flex gap-2">
+                            <dt className="text-muted">{fr ? "Code" : "Code"} :</dt>
+                            <dd className="app-mono">{finding.code ?? "—"}</dd>
+                          </div>
+                          <div className="flex gap-2">
+                            <dt className="text-muted">{fr ? "Empreinte" : "Fingerprint"} :</dt>
+                            <dd className="app-mono truncate" title={finding.fingerprint ?? undefined}>
+                              {finding.fingerprint ? `${finding.fingerprint.slice(0, 18)}…` : "—"}
+                            </dd>
+                          </div>
+                          <div className="flex gap-2">
+                            <dt className="text-muted">{fr ? "Détecté le" : "Detected on"} :</dt>
+                            <dd>{formatDate(finding.detectedAt)}</dd>
+                          </div>
+                          <div className="flex gap-2">
+                            <dt className="text-muted">{fr ? "Détail complet" : "Full detail"} :</dt>
+                            <dd>
+                              {fr
+                                ? "Dans la charge du rapport : /api/v1/reports — visible dans le run correspondant."
+                                : "Inside the report payload: /api/v1/reports — visible from the matching run."}
+                            </dd>
+                          </div>
+                        </dl>
+                      ) : null}
+                    </td>
                     <td className="uppercase text-muted">{finding.module}</td>
                     <td>
                       <span className="app-badge app-badge-danger">
@@ -354,6 +413,23 @@ export default config;`;
             </table>
           </div>
         )}
+        {findings.length < findingsTotal ? (
+          <div className="flex items-center gap-3 border-t border-line px-5 py-3">
+            <p className="text-xs text-muted">
+              {fr
+                ? `${findings.length} affichés sur ${findingsTotal} constats.`
+                : `${findings.length} of ${findingsTotal} findings shown.`}
+            </p>
+            <button type="button" className="app-btn" onClick={() => void loadMoreFindings()} disabled={findingsLoadingMore}>
+              {findingsLoadingMore ? (
+                <Loader2 size={13} className="animate-spin" aria-hidden />
+              ) : (
+                <ChevronDown size={13} aria-hidden />
+              )}
+              {fr ? "Charger 25 de plus" : "Load 25 more"}
+            </button>
+          </div>
+        ) : null}
       </Card>
 
       <Card title="CLI" className="mt-4">

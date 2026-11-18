@@ -5613,3 +5613,40 @@ p {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--rule));
   transform: translateY(-1px);
 }
+
+/* ---------- onboarding steps (empty overview) ---------- */
+
+.app-onboard {
+  display: grid;
+  gap: 10px;
+  max-width: 62ch;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-onboard li {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
+  padding: 10px 14px;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.app-onboard-index {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+/* ---------- gauge headroom (FAIL/CLEAN audit cards) ---------- */
+
+.module-object-audit {
+  max-width: 300px;
+}

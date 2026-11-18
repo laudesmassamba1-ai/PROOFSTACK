@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+Disallow: /app
+Disallow: /app/
+Disallow: /signin
+Disallow: /signup
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /verify-email
+Disallow: /device
+Disallow: /legal
+Disallow: /admin
+
+Sitemap: https://proofstack-iota.vercel.app/sitemap.xml

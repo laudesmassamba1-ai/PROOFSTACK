@@ -673,6 +673,19 @@ export class AppStore {
     return { id: row.id, targetSessionId: row.target_session_id, url: row.url };
   }
 
+  async listBrowserSessions(userId: string): Promise<{ id: string; targetSessionId: string }[]> {
+    const rows = await this.db
+      .prepare(
+        "SELECT id, target_session_id FROM browser_sessions WHERE user_id = ? ORDER BY updated_at DESC"
+      )
+      .bind(userId)
+      .all<{ id: string; target_session_id: string }>();
+    return rows.map((row) => ({
+      id: row.id,
+      targetSessionId: row.target_session_id,
+    }));
+  }
+
   async touchBrowserSession(userId: string, id: string, url: string): Promise<void> {
     await this.db
       .prepare("UPDATE browser_sessions SET url = ?, updated_at = ? WHERE id = ? AND user_id = ?")
@@ -997,6 +1010,96 @@ export class AppStore {
       role: str(row, "role") as Role,
       joinedAt: str(row, "created_at"),
     }));
+  }
+
+  /** Adds a user to a workspace. The caller resolved the user and the role guard. */
+  async addWorkspaceMember(input: {
+    workspaceId: string;
+    userId: string;
+    role: Role;
+  }): Promise<{ userId: string; role: Role; joinedAt: string }> {
+    const joinedAt = iso(this.clock());
+    await this.db
+      .prepare(
+        "INSERT INTO workspace_members (workspace_id, user_id, role, created_at) VALUES (?, ?, ?, ?)"
+      )
+      .bind(input.workspaceId, input.userId, input.role, joinedAt)
+      .run();
+    return { userId: input.userId, role: input.role, joinedAt };
+  }
+
+  async workspaceMemberRole(workspaceId: string, userId: string): Promise<Role | null> {
+    // Same query as workspaceRole, named for the member-management reads so the
+    // intent in callers is not "can this user in" but "what is this member".
+    return this.workspaceRole(workspaceId, userId);
+  }
+
+  async updateWorkspaceMemberRole(
+    workspaceId: string,
+    userId: string,
+    role: Role
+  ): Promise<boolean> {
+    const result = await this.db
+      .prepare("UPDATE workspace_members SET role = ? WHERE workspace_id = ? AND user_id = ?")
+      .bind(role, workspaceId, userId)
+      .run();
+    return result.changes > 0;
+  }
+
+  async removeWorkspaceMember(workspaceId: string, userId: string): Promise<boolean> {
+    const result = await this.db
+      .prepare("DELETE FROM workspace_members WHERE workspace_id = ? AND user_id = ?")
+      .bind(workspaceId, userId)
+      .run();
+    return result.changes > 0;
+  }
+
+  async ownerCount(workspaceId: string): Promise<number> {
+    const row = await this.db
+      .prepare(
+        "SELECT COUNT(*) AS count FROM workspace_members WHERE workspace_id = ? AND role = 'owner'"
+      )
+      .bind(workspaceId)
+      .first<Row>();
+    return row ? num(row, "count") : 0;
+  }
+
+  /** Renames a workspace. The slug stays: it is a stable address, not a label. */
+  async renameWorkspace(workspaceId: string, name: string): Promise<WorkspaceRecord | null> {
+    await this.db
+      .prepare("UPDATE workspaces SET name = ? WHERE id = ?")
+      .bind(name, workspaceId)
+      .run();
+    return this.getWorkspace(workspaceId);
+  }
+
+  /** Deletes a workspace and every row that hangs off it, explicitly: the
+   * schema declares ON DELETE CASCADE, but D1 connections do not enable
+   * foreign keys by default — the deletion walks its own tables. */
+  async deleteWorkspace(workspaceId: string): Promise<boolean> {
+    const workspace = await this.getWorkspace(workspaceId);
+    if (!workspace) return false;
+    // The db port has no batch; sequential deletes are correct (a failure stops
+    // the walk and the workspace row survives — deletion stays all-or-nothing
+    // from the caller's point of view because it is retried, not partial-by-silence).
+    const tables = [
+      "findings",
+      "reports",
+      "test_runs",
+      "api_keys",
+      "webhook_events",
+      "usage_events",
+      "audit_logs",
+      "idempotency_keys",
+      "projects",
+      "workspace_members",
+    ];
+    for (const table of tables) {
+      await this.db.prepare(`DELETE FROM ${table} WHERE workspace_id = ?`).bind(workspaceId).run();
+    }
+    // The workspaces row carries its own id column, not workspace_id.
+    await this.db.prepare("DELETE FROM workspaces WHERE id = ?").bind(workspaceId).run();
+    return true;
   }
 
   // --------------------------------------------------------------- projects
@@ -1397,16 +1500,25 @@ export class AppStore {
   async listFindings(
     workspaceId: string,
     projectId: string,
-    limit = 100
+    limit = 100,
+    offset = 0
   ): Promise<FindingRecord[]> {
     const rows = await this.db
       .prepare(
         `SELECT * FROM findings WHERE workspace_id = ? AND project_id = ?
-         ORDER BY detected_at DESC LIMIT ?`
+         ORDER BY detected_at DESC LIMIT ? OFFSET ?`
       )
-      .bind(workspaceId, projectId, limit)
+      .bind(workspaceId, projectId, limit, offset)
       .all<Row>();
     return rows.map(mapFinding);
+  }
+
+  async countFindings(workspaceId: string, projectId: string): Promise<number> {
+    const row = await this.db
+      .prepare("SELECT COUNT(*) AS count FROM findings WHERE workspace_id = ? AND project_id = ?")
+      .bind(workspaceId, projectId)
+      .first<Row>();
+    return row ? num(row, "count") : 0;
   }
 
   // --------------------------------------------------------------- api keys

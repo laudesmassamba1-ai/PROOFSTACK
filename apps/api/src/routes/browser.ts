@@ -214,10 +214,52 @@ export function browserRoutes(services: Services): Hono<AppEnv> {
     const target = assertPublicUrl(normalizeUrl(body.url ?? "https://example.com"));
 
     const puppeteer = await puppeteerModule();
-    const browser = await puppeteer.launch(binding, {
-      keep_alive: KEEP_ALIVE_MS,
-      defaultViewport: { width: VIEWPORT.width, height: VIEWPORT.height },
-    });
+
+    // One browser per person. Browser Rendering caps concurrent sessions, and a page that
+    // was closed without telling the server (tab killed, network gone) would hold a slot
+    // until its keep-alive expired - so opening the panel again would start failing with
+    // someone else's limit. Close the previous one first, then open the new one.
+    // Best effort, and never fatal: closing a browser that is already gone must not stop
+    // the new one from opening. Any failure here is logged as part of the request, not
+    // surfaced as an error the user cannot act on.
+    try {
+      for (const stale of await services.store.listBrowserSessions(user.id)) {
+        if (!stale.targetSessionId) continue;
+        try {
+          const previous = await puppeteer.connect(binding, stale.targetSessionId);
+          await previous.close();
+        } catch {
+          // Already closed by the platform, or expired: nothing to do.
+        }
+        await services.store.deleteBrowserSession(user.id, stale.id);
+      }
+    } catch {
+      // A cleanup failure is not a reason to refuse a browser.
+    }
+
+    const browser = await puppeteer
+      .launch(binding, {
+        keep_alive: KEEP_ALIVE_MS,
+        defaultViewport: { width: VIEWPORT.width, height: VIEWPORT.height },
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        // The platform caps concurrent browsers per account. Saying "internal error" for a
+        // quota is useless: the person can wait a minute, and that is the only thing that
+        // helps. Everything else stays a real error.
+        if (/429|rate limit|too many/i.test(message)) {
+          throw new HttpError(
+            429,
+            "browser_quota",
+            "Trop de navigateurs ouverts récemment (limite Cloudflare). Réessaie dans une minute."
+          );
+        }
+        throw new HttpError(
+          502,
+          "browser_launch_failed",
+          `Le navigateur n'a pas démarré : ${message.slice(0, 200)}`
+        );
+      });
     const sessionId = browser.sessionId?.() ?? "";
     const page = (await browser.pages())[0] ?? (await browser.newPage());
     await page.setViewport({ width: VIEWPORT.width, height: VIEWPORT.height });

@@ -1,8 +1,7 @@
-import { Languages, Menu, Moon, Sun, X } from "lucide-react";
+import { Languages, Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router";
 import { useI18n } from "../../i18n/index.js";
-import { useTheme } from "../../lib/theme.js";
 import { Wordmark } from "../brand/Logo.js";
 
 const LINKS = [
@@ -19,7 +18,6 @@ const LINKS = [
 
 export function Nav() {
   const { t, locale, setLocale } = useI18n();
-  const { theme, toggle } = useTheme();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const location = useLocation();
@@ -80,14 +78,6 @@ export function Nav() {
             <Languages size={15} />
             {locale.toUpperCase()}
           </button>
-          <button
-            type="button"
-            onClick={toggle}
-            className="rounded-full border border-white/12 p-2 text-white/72 transition-colors hover:border-brand-mint/60 hover:text-white"
-            aria-label={t("nav.theme")}
-          >
-            {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
-          </button>
           <Link to="/signin" className="btn btn-ghost ml-1">
             {t("nav.signin")}
           </Link>
@@ -132,14 +122,6 @@ export function Nav() {
               className="btn btn-ghost flex-1 justify-center"
             >
               <Languages size={15} /> {locale === "en" ? "Français" : "English"}
-            </button>
-            <button
-              type="button"
-              onClick={toggle}
-              className="btn btn-ghost"
-              aria-label={t("nav.theme")}
-            >
-              {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
             </button>
           </div>
           <div className="mt-3 flex gap-2">
