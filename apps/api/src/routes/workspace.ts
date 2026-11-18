@@ -147,14 +147,25 @@ export function workspaceRoutes(services: Services): Hono<AppEnv> {
     return c.json({ items: await services.store.listMembers(workspace.id) });
   });
 
-  /** Adds an existing account as a member. There are no ghost invitations: a
-   * person who never signed up is reported as such, never silently subscribed. */
-  app.post("/workspaces/:workspaceId/members", async (c) => {
+  /**
+   * Invite an existing account.
+   *
+   * This used to write the membership row immediately, which meant one person could grant
+   * another person access to a tenant without their knowledge or consent — and the
+   * notification the product advertised did not exist. Now it records a *pending*
+   * invitation, tells the invitee (email plus the in-app list), and the membership is
+   * created only when they accept on `/api/account/invitations`.
+   *
+   * There are still no ghost invitations: an address with no account is reported as such
+   * rather than being subscribed to a workspace that cannot reach it.
+   */
+  app.post("/workspaces/:workspaceId/invitations", async (c) => {
     const { workspace } = await requireWorkspace(c, services, c.req.param("workspaceId"), [
       "owner",
       "admin",
     ]);
     const body = await readBody(c, addMemberSchema);
+    const inviter = c.get("user");
     const user = await services.store.findUserByNormalizedEmail(body.email.trim().toLowerCase());
     if (!user) {
       throw new HttpError(
@@ -163,26 +174,87 @@ export function workspaceRoutes(services: Services): Hono<AppEnv> {
         `No PROOFCORE account uses ${body.email}. Ask them to sign up first, then invite them.`
       );
     }
-    const existing = await services.store.workspaceMemberRole(workspace.id, user.id);
-    if (existing) {
+    if (await services.store.workspaceMemberRole(workspace.id, user.id)) {
       throw new HttpError(
         409,
         "already_member",
         "This person is already a member of the workspace."
       );
     }
-    const member = await services.store.addWorkspaceMember({
+    const invitation = await services.store.createInvitation({
       workspaceId: workspace.id,
-      userId: user.id,
+      invitedUserId: user.id,
+      invitedByUserId: inviter.id,
       role: body.role,
     });
+    if (!invitation) {
+      throw new HttpError(
+        409,
+        "invitation_pending",
+        "This person already has a pending invitation to the workspace."
+      );
+    }
+    await services.store.appendAudit({
+      workspaceId: workspace.id,
+      actor: inviter.id,
+      action: "invitation.sent",
+      detail: { invitationId: invitation.id, userId: user.id, email: user.email, role: body.role },
+    });
+
+    // The email is a courtesy, not the authority: the invitation exists in the database
+    // either way, and the reply says whether a message was actually accepted by a provider.
+    const delivered = await services.email.send({
+      to: user.email,
+      subject: `${inviter.name} ${"t'invite"} à rejoindre ${workspace.name}`,
+      text: `${inviter.name} (${inviter.email}) t'invite à rejoindre l'espace de travail "${workspace.name}" sur PROOFCORE, avec le rôle ${body.role}. Ouvre /app pour accepter ou refuser : rien ne t'est accordé tant que tu n'as pas répondu.`,
+      kind: "workspace_invitation",
+      userId: user.id,
+    });
+
+    return c.json(
+      {
+        invitation: {
+          id: invitation.id,
+          role: invitation.role,
+          createdAt: invitation.createdAt,
+          status: invitation.status,
+        },
+        invitee: { name: user.name, email: user.email },
+        email: { delivered: delivered.status === "sent", status: delivered.status },
+      },
+      201
+    );
+  });
+
+  /** Pending invitations of a workspace, for the owner or admin who sent them. */
+  app.get("/workspaces/:workspaceId/invitations", async (c) => {
+    const { workspace } = await requireWorkspace(c, services, c.req.param("workspaceId"), [
+      "owner",
+      "admin",
+    ]);
+    const items = await services.store.listWorkspaceInvitations(workspace.id);
+    return c.json({ items });
+  });
+
+  app.delete("/workspaces/:workspaceId/invitations/:invitationId", async (c) => {
+    const { workspace } = await requireWorkspace(c, services, c.req.param("workspaceId"), [
+      "owner",
+      "admin",
+    ]);
+    const revoked = await services.store.revokeInvitation(
+      workspace.id,
+      c.req.param("invitationId")
+    );
+    if (!revoked) {
+      throw new HttpError(404, "invitation_not_found", "No pending invitation with this id.");
+    }
     await services.store.appendAudit({
       workspaceId: workspace.id,
       actor: c.get("user").id,
-      action: "member.added",
-      detail: { userId: user.id, email: user.email, role: body.role },
+      action: "invitation.revoked",
+      detail: { invitationId: c.req.param("invitationId") },
     });
-    return c.json({ member: { ...member, name: user.name, email: user.email } }, 201);
+    return c.json({ ok: true });
   });
 
   /** Owner-only role change, with a last-owner guard: a workspace always keeps

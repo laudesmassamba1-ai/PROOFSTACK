@@ -38,6 +38,17 @@ export interface UserRecord {
   emailVerifiedAt: string | null;
 }
 
+export interface InvitationRecord {
+  id: string;
+  workspaceId: string;
+  invitedUserId: string;
+  invitedByUserId: string;
+  role: Role;
+  status: "pending" | "accepted" | "declined" | "revoked";
+  createdAt: string;
+  respondedAt: string | null;
+}
+
 export interface SessionRecord {
   id: string;
   userId: string;
@@ -624,6 +635,13 @@ export class AppStore {
       "email_outbox",
       "workspace_members",
     ];
+    // Invitations are addressed to a person, not owned by them: drop both directions.
+    await this.db
+      .prepare(
+        "DELETE FROM workspace_invitations WHERE invited_user_id = ? OR invited_by_user_id = ?"
+      )
+      .bind(userId, userId)
+      .run();
     for (const table of userScoped) {
       await this.db.prepare(`DELETE FROM ${table} WHERE user_id = ?`).bind(userId).run();
     }
@@ -1142,6 +1160,152 @@ export class AppStore {
   }
 
   /** Adds a user to a workspace. The caller resolved the user and the role guard. */
+  // ------------------------------------------------------------ invitations
+
+  /**
+   * Invitations are the only way in, and they need the invitee's answer.
+   *
+   * Returns the new invitation, or `null` when a pending one already exists for that
+   * person — the partial unique index is the authority, so two admins clicking "invite"
+   * at the same time cannot produce two rows.
+   */
+  async createInvitation(input: {
+    workspaceId: string;
+    invitedUserId: string;
+    invitedByUserId: string;
+    role: Role;
+  }): Promise<InvitationRecord | null> {
+    const existing = await this.db
+      .prepare(
+        `SELECT id FROM workspace_invitations
+         WHERE workspace_id = ? AND invited_user_id = ? AND status = 'pending'`
+      )
+      .bind(input.workspaceId, input.invitedUserId)
+      .first<Row>();
+    if (existing) return null;
+    const invitation: InvitationRecord = {
+      id: `inv_${uuid().replaceAll("-", "").slice(0, 20)}`,
+      workspaceId: input.workspaceId,
+      invitedUserId: input.invitedUserId,
+      invitedByUserId: input.invitedByUserId,
+      role: input.role,
+      status: "pending",
+      createdAt: iso(this.clock()),
+      respondedAt: null,
+    };
+    await this.db
+      .prepare(
+        `INSERT INTO workspace_invitations
+           (id, workspace_id, invited_user_id, invited_by_user_id, role, status, created_at, responded_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`
+      )
+      .bind(
+        invitation.id,
+        invitation.workspaceId,
+        invitation.invitedUserId,
+        invitation.invitedByUserId,
+        invitation.role,
+        invitation.status,
+        invitation.createdAt
+      )
+      .run();
+    return invitation;
+  }
+
+  async getInvitation(id: string): Promise<InvitationRecord | null> {
+    const row = await this.db
+      .prepare("SELECT * FROM workspace_invitations WHERE id = ?")
+      .bind(id)
+      .first<Row>();
+    return row ? mapInvitation(row) : null;
+  }
+
+  /** What the invitee sees, with the workspace name and who asked. */
+  async listInvitationsForUser(
+    userId: string
+  ): Promise<(InvitationRecord & { workspaceName: string; invitedByName: string })[]> {
+    const rows = await this.db
+      .prepare(
+        `SELECT i.*, w.name AS workspace_name, u.name AS invited_by_name
+         FROM workspace_invitations i
+         JOIN workspaces w ON w.id = i.workspace_id
+         LEFT JOIN users u ON u.id = i.invited_by_user_id
+         WHERE i.invited_user_id = ? AND i.status = 'pending'
+         ORDER BY i.created_at DESC`
+      )
+      .bind(userId)
+      .all<Row>();
+    return rows.map((row) => ({
+      ...mapInvitation(row),
+      workspaceName: str(row, "workspace_name"),
+      invitedByName: nullableStr(row, "invited_by_name") ?? "",
+    }));
+  }
+
+  /** What an owner or admin sees on the workspace, with the invitee's identity. */
+  async listWorkspaceInvitations(
+    workspaceId: string
+  ): Promise<(InvitationRecord & { email: string; name: string })[]> {
+    const rows = await this.db
+      .prepare(
+        `SELECT i.*, u.email, u.name
+         FROM workspace_invitations i JOIN users u ON u.id = i.invited_user_id
+         WHERE i.workspace_id = ? AND i.status = 'pending'
+         ORDER BY i.created_at DESC`
+      )
+      .bind(workspaceId)
+      .all<Row>();
+    return rows.map((row) => ({
+      ...mapInvitation(row),
+      email: str(row, "email"),
+      name: str(row, "name"),
+    }));
+  }
+
+  async countPendingInvitations(userId: string): Promise<number> {
+    const row = await this.db
+      .prepare(
+        "SELECT COUNT(*) AS count FROM workspace_invitations WHERE invited_user_id = ? AND status = 'pending'"
+      )
+      .bind(userId)
+      .first<Row>();
+    return row ? num(row, "count") : 0;
+  }
+
+  /**
+   * Answer an invitation.
+   *
+   * The update is conditional on `status = 'pending'`, so two clicks (or two tabs) cannot
+   * both succeed: the second one changes zero rows and the route reports `409`. Returns
+   * false when nothing changed, which is the honest answer for "already answered",
+   * "revoked", or "not yours" — the route maps that to 404/409 without leaking which.
+   */
+  async respondToInvitation(
+    id: string,
+    invitedUserId: string,
+    status: "accepted" | "declined"
+  ): Promise<boolean> {
+    const result = await this.db
+      .prepare(
+        `UPDATE workspace_invitations SET status = ?, responded_at = ?
+         WHERE id = ? AND invited_user_id = ? AND status = 'pending'`
+      )
+      .bind(status, iso(this.clock()), id, invitedUserId)
+      .run();
+    return result.changes > 0;
+  }
+
+  async revokeInvitation(workspaceId: string, id: string): Promise<boolean> {
+    const result = await this.db
+      .prepare(
+        `UPDATE workspace_invitations SET status = 'revoked', responded_at = ?
+         WHERE id = ? AND workspace_id = ? AND status = 'pending'`
+      )
+      .bind(iso(this.clock()), id, workspaceId)
+      .run();
+    return result.changes > 0;
+  }
+
   async addWorkspaceMember(input: {
     workspaceId: string;
     userId: string;
@@ -1235,6 +1399,7 @@ export class AppStore {
       "ai_conversations",
       "browser_sessions",
       "support_messages",
+      "workspace_invitations",
     ];
     for (const table of tables) {
       await this.db.prepare(`DELETE FROM ${table} WHERE workspace_id = ?`).bind(workspaceId).run();
@@ -1873,6 +2038,19 @@ function mapWorkspaceWebhook(row: Row): WorkspaceWebhookRecord {
     lastStatus: typeof row.last_status === "number" ? row.last_status : null,
     lastStatusAt: nullableStr(row, "last_status_at"),
     lastError: nullableStr(row, "last_error"),
+  };
+}
+
+function mapInvitation(row: Row): InvitationRecord {
+  return {
+    id: str(row, "id"),
+    workspaceId: str(row, "workspace_id"),
+    invitedUserId: str(row, "invited_user_id"),
+    invitedByUserId: str(row, "invited_by_user_id"),
+    role: str(row, "role") as Role,
+    status: str(row, "status") as InvitationRecord["status"],
+    createdAt: str(row, "created_at"),
+    respondedAt: nullableStr(row, "responded_at"),
   };
 }
 

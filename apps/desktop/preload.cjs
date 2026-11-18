@@ -9,5 +9,9 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("proofcoreDesktop", {
   info: () => ipcRenderer.invoke("proofcore:info"),
+  state: () => ipcRenderer.invoke("proofcore:state"),
+  login: () => ipcRenderer.invoke("proofcore:login"),
+  logout: () => ipcRenderer.invoke("proofcore:logout"),
+  openExternal: (url) => ipcRenderer.invoke("proofcore:open-external", String(url)),
   isDesktop: true,
 });

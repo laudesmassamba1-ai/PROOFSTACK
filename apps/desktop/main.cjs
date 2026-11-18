@@ -13,11 +13,26 @@
  * silently turns into a browser wrapper is not a native app.
  */
 
-const { app, BrowserWindow, Menu, dialog, shell, ipcMain, nativeTheme } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  Menu,
+  dialog,
+  shell,
+  ipcMain,
+  nativeTheme,
+  safeStorage,
+  net,
+} = require("electron");
 const { spawn, spawnSync } = require("node:child_process");
 const { existsSync } = require("node:fs");
 const { createServer } = require("node:net");
 const { join } = require("node:path");
+const { homedir } = require("node:os");
+const { readFileSync } = require("node:fs");
+const { evaluateAccess, formatRemaining } = require("./src/access.cjs");
+const { createStore } = require("./src/store.cjs");
+const { loginPageHtml } = require("./src/login-page.cjs");
 
 const SMOKE = process.env.PROOFCORE_SMOKE === "1";
 
@@ -27,6 +42,9 @@ if (!SMOKE && !app.requestSingleInstanceLock()) {
 }
 
 let mainWindow = null;
+let loginWindow = null;
+let accessState = null;
+let store = null;
 let sidecar = null;
 let sidecarPort = 0;
 let sidecarUrl = null;
@@ -159,6 +177,238 @@ async function startSidecar() {
   return { port: sidecarPort, url };
 }
 
+/** Where the CLI keeps its session, which is the same account this app uses. */
+function cliSessionPath() {
+  const home = homedir();
+  const base =
+    process.env.PROOFCORE_CONFIG_HOME?.trim() ||
+    (process.platform === "win32"
+      ? join(process.env.APPDATA ?? join(home, "AppData", "Roaming"), "proofcore")
+      : join(home, ".config", "proofcore"));
+  return join(base, "session.json");
+}
+
+function readCliSession() {
+  try {
+    const parsed = JSON.parse(readFileSync(cliSessionPath(), "utf8"));
+    if (parsed && (parsed.cookie || parsed.token)) return parsed;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Asks the site whether this session is still good. Three answers matter and they lead to
+ * three different screens: 2xx = verified, 401/403 = refused (expired, revoked, subscription
+ * ended), anything else = the site is unreachable and the grace window applies.
+ */
+function verifySession(session) {
+  const apiUrl = typeof session?.apiUrl === "string" ? session.apiUrl : null;
+  if (!apiUrl) return Promise.resolve({ online: null, revoked: false });
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (value) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    try {
+      const request = net.request({
+        method: "GET",
+        url: new URL("/api/auth/session", apiUrl).toString(),
+      });
+      if (session.cookie) request.setHeader("Cookie", session.cookie);
+      else if (session.token) request.setHeader("Authorization", `Bearer ${session.token}`);
+      const timer = setTimeout(() => {
+        request.abort();
+        done({ online: false, revoked: false });
+      }, 4000);
+      request.on("response", (response) => {
+        clearTimeout(timer);
+        response.on("data", () => undefined);
+        response.on("end", () => {
+          if (response.statusCode >= 200 && response.statusCode < 300)
+            done({ online: true, revoked: false });
+          else if (response.statusCode === 401 || response.statusCode === 403)
+            done({ online: true, revoked: true });
+          else done({ online: true, revoked: false });
+        });
+      });
+      request.on("error", () => {
+        clearTimeout(timer);
+        done({ online: false, revoked: false });
+      });
+      request.end();
+    } catch {
+      done({ online: false, revoked: false });
+    }
+  });
+}
+
+/**
+ * Decides whether the app may run, and remembers where the answer came from.
+ *
+ * Order matters: the vault first (it is the copy this app owns), then the CLI's session (so
+ * signing in once with the terminal is enough), then the site, then the clock.
+ */
+async function gate() {
+  store = createStore({ dir: app.getPath("userData"), safeStorage });
+  let session = store.load();
+  let importedFromCli = false;
+
+  if (!session || session.error) {
+    const fromCli = readCliSession();
+    if (fromCli) {
+      store.save(fromCli);
+      session = fromCli;
+      importedFromCli = true;
+    } else if (session?.error === "vault-locked") {
+      // Do not overwrite a sealed file we cannot read: it is a login that exists, and
+      // destroying it would force a new one for a keyring that is only temporarily locked.
+      session = null;
+    }
+  }
+
+  const probe = await verifySession(session);
+  accessState = {
+    ...evaluateAccess({
+      session,
+      now: Date.now(),
+      online: probe.online,
+      revoked: probe.revoked,
+      graceDays: Number(process.env.PROOFCORE_OFFLINE_GRACE_DAYS ?? 7),
+    }),
+    source: importedFromCli ? "cli" : "vault",
+    vault: store.mode,
+    checkedAt: new Date().toISOString(),
+  };
+  return accessState;
+}
+
+/** The locked screen: a local page that explains, with one action that can actually work. */
+function showLoginWindow(state) {
+  if (loginWindow) {
+    loginWindow.focus();
+    return;
+  }
+  loginWindow = new BrowserWindow({
+    width: 580,
+    height: 520,
+    resizable: false,
+    maximizable: false,
+    backgroundColor: "#0b0d10",
+    title: "PROOFCORE · connexion",
+    icon: join(__dirname, "build", "icon.png"),
+    webPreferences: {
+      preload: join(__dirname, "preload.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+  loginWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(loginPageHtml(state))}`);
+  loginWindow.on("closed", () => {
+    loginWindow = null;
+    // Closing the sign-in window without signing in leaves the app closed rather than open
+    // in a half-state: the window is the app, and there is nothing behind it yet.
+    if (!mainWindow) app.quit();
+  });
+  if (SMOKE) {
+    process.stdout.write(`SMOKE_LOCKED reason=${state.reason}\n`);
+    setTimeout(() => app.exit(0), 200);
+  }
+}
+
+/** Runs the CLI login, then re-runs the gate. Resolves with the new state. */
+async function signIn() {
+  const command = sidecarCommand(sidecarPort || 7317);
+  if (!command) return { allowed: false, detail: "Le moteur local est introuvable dans ce build." };
+  await new Promise((resolve) => {
+    const child = spawn(command.file, ["login"], {
+      cwd: command.cwd,
+      env: { ...process.env, ...(command.env ?? {}) },
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    });
+    let output = "";
+    child.stdout.on("data", (chunk) => {
+      output += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      output += chunk;
+    });
+    child.on("close", () => {
+      log(`login: ${output.trim().split("\n").slice(-3).join(" | ")}`);
+      resolve();
+    });
+    child.on("error", resolve);
+  });
+
+  const state = await gate();
+  if (!state.allowed) return state;
+  if (loginWindow) {
+    loginWindow.close();
+    loginWindow = null;
+  }
+  if (!mainWindow) {
+    try {
+      const { port, url } = await startSidecar();
+      buildMenu();
+      createWindow(port, url);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      dialog.showErrorBox("PROOFCORE", message);
+    }
+  }
+  return state;
+}
+
+/**
+ * Updating the app itself.
+ *
+ * The sidecar updates the *engine* (`proofcore update`, checksummed, atomic). This updates
+ * the *window*: electron-builder writes `latest-linux.yml`/`latest.yml` with each release, and
+ * electron-updater reads it, downloads in the background and installs on quit. Two updaters
+ * because they are two different files with two different lifetimes; a half-updated pair
+ * would be a window that speaks a protocol the engine no longer has.
+ */
+function setupAppUpdates() {
+  if (!app.isPackaged || SMOKE || process.env.PROOFCORE_NO_UPDATE === "1") return;
+  let autoUpdater;
+  try {
+    ({ autoUpdater } = require("electron-updater"));
+  } catch {
+    log("app updater not installed in this build: engine updates only");
+    return;
+  }
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.on("update-available", (info) =>
+    log(`app update ${info.version} disponible, téléchargement`)
+  );
+  autoUpdater.on("update-downloaded", (info) => {
+    log(`app update ${info.version} prête`);
+    if (!mainWindow) return;
+    dialog
+      .showMessageBox(mainWindow, {
+        message: `PROOFCORE ${info.version} est prête`,
+        detail: "Elle s'installera à la fermeture, ou maintenant si vous préférez.",
+        buttons: ["Installer maintenant", "Plus tard"],
+        defaultId: 0,
+        cancelId: 1,
+      })
+      .then((answer) => {
+        if (answer.response === 0) autoUpdater.quitAndInstall();
+      })
+      .catch(() => undefined);
+  });
+  autoUpdater.on("error", (error) => log(`app update: ${error?.message ?? error}`));
+  autoUpdater
+    .checkForUpdates()
+    .catch((error) => log(`app update check: ${error?.message ?? error}`));
+}
+
 function buildMenu() {
   const account = () =>
     spawnSidecarOnce("whoami", [], (text) => {
@@ -184,6 +434,28 @@ function buildMenu() {
             }),
         },
         { label: "Mon compte", click: () => account() },
+        { type: "separator" },
+        {
+          label: accessState?.account
+            ? `Session : ${accessState.account} (${formatRemaining((accessState.expiresAt ?? 0) - Date.now())})`
+            : "Session : non connecté",
+          enabled: false,
+        },
+        ...(accessState?.status === "offline"
+          ? [{ label: "Hors ligne : outils locaux disponibles", enabled: false }]
+          : []),
+        { type: "separator" },
+        {
+          label: "Se déconnecter",
+          click: async () => {
+            store?.clear();
+            await dialog.showMessageBox(mainWindow ?? loginWindow, {
+              message: "Session supprimée sur cette machine.",
+              detail: "Relancez PROOFCORE pour vous reconnecter.",
+              buttons: ["Fermer"],
+            });
+          },
+        },
         {
           label: "Ouvrir le site",
           click: () => shell.openExternal("https://proofstack-iota.vercel.app"),
@@ -348,6 +620,19 @@ function createWindow(port, url) {
 }
 
 /** Preferences that the window legitimately needs: where the engine listens, and versions. */
+ipcMain.handle("proofcore:state", () => accessState);
+ipcMain.handle("proofcore:login", () => signIn());
+ipcMain.handle("proofcore:logout", () => {
+  store?.clear();
+  return { cleared: true };
+});
+ipcMain.handle("proofcore:open-external", (_event, url) => {
+  // Only http(s): a login page must not be able to ask the shell to run a file.
+  if (typeof url !== "string" || !/^https?:\/\//.test(url)) return false;
+  shell.openExternal(url);
+  return true;
+});
+
 ipcMain.handle("proofcore:info", () => ({
   port: sidecarPort,
   version: app.getVersion(),
@@ -365,9 +650,16 @@ app.on("second-instance", () => {
 app.whenReady().then(async () => {
   nativeTheme.themeSource = "dark";
   try {
+    const state = await gate();
+    if (!state.allowed) {
+      buildMenu();
+      showLoginWindow(state);
+      return;
+    }
     const { port, url } = await startSidecar();
     buildMenu();
     createWindow(port, url);
+    setupAppUpdates();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (SMOKE) {

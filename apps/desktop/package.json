@@ -17,7 +17,8 @@
   },
   "devDependencies": {
     "electron": "31.7.7",
-    "electron-builder": "25.1.8"
+    "electron-builder": "25.1.8",
+    "electron-updater": "^6.8.11"
   },
   "homepage": "https://proofstack-iota.vercel.app"
 }

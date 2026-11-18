@@ -361,6 +361,78 @@ export function accountRoutes(services: Services): Hono<AppEnv> {
     });
   });
 
+  // ---------------------------------------------------------- invitations
+
+  /**
+   * Invitations waiting for an answer.
+   *
+   * The invitee is the only one who can decide, and this list is how they find out: the
+   * workspace they were added to does not appear in their session until they accept.
+   */
+  app.get("/invitations", async (c) => {
+    const user = await requireUser(c, services);
+    const items = await services.store.listInvitationsForUser(user.id);
+    return c.json({ items });
+  });
+
+  app.post("/invitations/:invitationId/accept", async (c) => {
+    const user = await requireUser(c, services);
+    const invitation = await services.store.getInvitation(c.req.param("invitationId"));
+    // Someone else's invitation answers 404, never 403: ids stay unenumerable.
+    if (!invitation || invitation.invitedUserId !== user.id) {
+      throw new HttpError(404, "invitation_not_found", "This invitation does not exist.");
+    }
+    if (invitation.status !== "pending") {
+      throw new HttpError(
+        409,
+        "invitation_already_answered",
+        `This invitation was already ${invitation.status}.`
+      );
+    }
+    const workspace = await services.store.getWorkspace(invitation.workspaceId);
+    if (!workspace) {
+      await services.store.respondToInvitation(invitation.id, user.id, "declined");
+      throw new HttpError(404, "workspace_not_found", "This workspace no longer exists.");
+    }
+    const answered = await services.store.respondToInvitation(invitation.id, user.id, "accepted");
+    if (!answered) {
+      // Lost the race against another tab: it has an answer already.
+      throw new HttpError(409, "invitation_already_answered", "This invitation was answered.");
+    }
+    // The membership row is created only now, which is the whole point: invited is not
+    // the same as member.
+    if (!(await services.store.workspaceMemberRole(workspace.id, user.id))) {
+      await services.store.addWorkspaceMember({
+        workspaceId: workspace.id,
+        userId: user.id,
+        role: invitation.role,
+      });
+    }
+    await services.store.appendAudit({
+      workspaceId: workspace.id,
+      actor: user.id,
+      action: "invitation.accepted",
+      detail: { invitationId: invitation.id, role: invitation.role },
+    });
+    return c.json({
+      ok: true,
+      workspace: { id: workspace.id, name: workspace.name, role: invitation.role },
+    });
+  });
+
+  app.post("/invitations/:invitationId/decline", async (c) => {
+    const user = await requireUser(c, services);
+    const invitation = await services.store.getInvitation(c.req.param("invitationId"));
+    if (!invitation || invitation.invitedUserId !== user.id) {
+      throw new HttpError(404, "invitation_not_found", "This invitation does not exist.");
+    }
+    const answered = await services.store.respondToInvitation(invitation.id, user.id, "declined");
+    if (!answered) {
+      throw new HttpError(409, "invitation_already_answered", "This invitation was answered.");
+    }
+    return c.json({ ok: true });
+  });
+
   // ------------------------------------------------------------- sessions
 
   /**
