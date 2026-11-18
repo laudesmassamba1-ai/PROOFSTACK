@@ -247,7 +247,9 @@ function renderBlocks(source: string): React.ReactNode[] {
 }
 
 export function ChatMarkdown({ text }: { text: string }): React.ReactElement {
-  return <div className="chat-prose">{renderBlocks(text)}</div>;
+  // Providers answer with CRLF endings sometimes; the block parser splits on \n
+  // and a stray \r would break the table and fence matches at line end.
+  return <div className="chat-prose">{renderBlocks(text.replace(/\r\n?/g, "\n"))}</div>;
 }
 
 /* ---------- message-level actions ---------- */
@@ -324,7 +326,18 @@ export function printConversation(
 <h1>${esc(title)}</h1>
 <p class="meta">PROOFCORE · ${new Date().toLocaleString("fr-FR")}</p>
 ${body}
-<script>window.onload = () => window.print();</script>
 </body></html>`);
   win.document.close();
+  // No inline script in the generated document: the app's CSP is `script-src
+  // 'self'`, and an about:blank popup inherits it, which would block the
+  // print-on-load snippet. The opener drives the print dialog instead.
+  const trigger = () => {
+    win.focus();
+    win.print();
+  };
+  if (win.document.readyState === "complete") {
+    window.setTimeout(trigger, 150);
+  } else {
+    win.addEventListener("load", () => window.setTimeout(trigger, 150));
+  }
 }
