@@ -1,7 +1,7 @@
 import { Check, Copy, Download } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
-import { tokenize, type Token } from "./highlight.js";
+import { type Token, tokenize } from "./highlight.js";
 
 /**
  * The assistant's text surface, at the standard set by Claude/GPT.
@@ -63,9 +63,11 @@ function HighlightedCode({ code, lang }: { code: string; lang?: string }) {
   return (
     <pre className="chat-code-body">
       <code>
-        {tokens.map((token, index) =>
+        {tokens.map((token) =>
           token.cls ? (
-            <span key={index} className={token.cls}>
+            // A token stream is positional by construction (two identical spans are
+            // different tokens), so the offset in the code is the honest key here.
+            <span key={`${token.cls}-${token.text}`} className={token.cls}>
               {token.text}
             </span>
           ) : (

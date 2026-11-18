@@ -77,7 +77,10 @@ const FAMILIES: Record<string, Family> = {
       ["str", /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/],
       ["num", /\b\d[\d.]*\b/],
       ["flag", /\s-{1,2}[\w-]+/],
-      ["key", /\b(?:if|then|else|fi|for|while|do|done|case|esac|in|function|export|local|return|echo|cd|sudo|npm|pnpm|npx|node|git|curl|proofcore)\b/],
+      [
+        "key",
+        /\b(?:if|then|else|fi|for|while|do|done|case|esac|in|function|export|local|return|echo|cd|sudo|npm|pnpm|npx|node|git|curl|proofcore)\b/,
+      ],
       ["var", /\$\{?[\w]+\}?/],
       ["punc", /[|&;(){}<>]+/],
     ],
@@ -110,8 +113,9 @@ export function tokenize(code: string, lang: string | undefined): Token[] {
   const combined = new RegExp(sources.join("|"), "g");
   const tokens: Token[] = [];
   let last = 0;
-  let match: RegExpExecArray | null;
-  while ((match = combined.exec(code)) !== null) {
+  // `for` keeps the assignment out of the loop condition: `exec` both tests and advances,
+  // and hiding that behind an assignment is what the linter objects to.
+  for (let match = combined.exec(code); match !== null; match = combined.exec(code)) {
     if (match.index > last) tokens.push({ text: code.slice(last, match.index) });
     const groupIndex = match.slice(1).findIndex((value) => value !== undefined);
     const [name] = family.rules[Math.max(0, groupIndex)] ?? [];
