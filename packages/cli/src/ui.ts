@@ -510,10 +510,22 @@ export async function loginDevice(input: {
   openBrowser?: (url: string) => void;
 }): Promise<StoredSession> {
   const apiUrl = resolveApiUrl(input.apiUrl);
+  // Say where we are calling before calling it: "fetch failed" with no address is a dead
+  // end, and the address is the one fact that makes it actionable.
+  input.print(`Contacting ${apiUrl} …`);
   const startResponse = await fetch(`${apiUrl}/api/auth/device/start`, {
     method: "POST",
     headers: { accept: "application/json", "content-type": "application/json" },
     body: JSON.stringify({ clientName: input.clientName ?? "proofcore CLI" }),
+    signal: AbortSignal.timeout(20_000),
+  }).catch((error: unknown) => {
+    const cause = (error as { cause?: { code?: string; message?: string } }).cause;
+    const detail = [cause?.code, cause?.message].filter(Boolean).join(" · ");
+    throw new UiApiError(
+      `Cannot reach ${apiUrl}${detail ? ` (${detail})` : ""}. Check the network, or set PROOFCORE_API_URL to your API.`,
+      0,
+      "api_unreachable"
+    );
   });
   if (!startResponse.ok) {
     throw new UiApiError(

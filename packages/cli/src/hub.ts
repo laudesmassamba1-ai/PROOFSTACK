@@ -19,32 +19,85 @@ export type HubAction =
   | { kind: "unknown"; command: string };
 
 /** Slash commands, mapped to the CLI argv they run. `args` is for `/help` only. */
-export const HUB_COMMANDS: { command: string; args: string; description: string }[] = [
-  { command: "/help", args: "", description: "this list" },
-  { command: "/whoami", args: "", description: "account and model in use" },
-  { command: "/login", args: "", description: "sign in through the browser" },
-  { command: "/logout", args: "", description: "remove the stored session" },
-  { command: "/agent", args: "<prompt>", description: "coding agent: reads, edits, runs" },
+export type HubGroup = "Agent" | "Audits" | "Code" | "Account" | "Session";
+
+export const HUB_COMMANDS: {
+  command: string;
+  args: string;
+  description: string;
+  group: HubGroup;
+}[] = [
+  { group: "Session", command: "/help", args: "", description: "this list" },
+  { group: "Account", command: "/whoami", args: "", description: "account and model in use" },
+  { group: "Account", command: "/login", args: "", description: "sign in through the browser" },
+  { group: "Account", command: "/logout", args: "", description: "remove the stored session" },
   {
+    group: "Agent",
+    command: "/agent",
+    args: "<prompt>",
+    description: "coding agent: reads, edits, runs",
+  },
+  {
+    group: "Agent",
     command: "/serve",
     args: "[--port 7317]",
     description: "local agent + page, synced to the account",
   },
-  { command: "/projects", args: "", description: "projects in the signed-in workspace" },
-  { command: "/test", args: "[--only WORLD]", description: "run WORLD · FLOW · EXIT" },
-  { command: "/audit", args: "fail|clean <url>", description: "security or UI-quality audit" },
-  { command: "/report", args: "", description: "last run report" },
-  { command: "/tools", args: "", description: "every agent tool and where it lives" },
-  { command: "/index", args: "", description: "build the semantic index" },
-  { command: "/search", args: "<query>", description: "concept search over the index" },
-  { command: "/map", args: "[dir]", description: "architecture as a Mermaid graph" },
-  { command: "/devtools", args: "<url>", description: "console, network, DOM, a11y" },
-  { command: "/debug", args: "<file> --line <n>", description: "breakpoints and real scopes" },
-  { command: "/svg", args: "<name>", description: "deterministic icon" },
-  { command: "/billing", args: "", description: "plan, seats and usage" },
-  { command: "/modules", args: "", description: "WORLD · FLOW · EXIT · FAIL · CLEAN" },
-  { command: "/clear", args: "", description: "clear the screen" },
-  { command: "/exit", args: "", description: "leave the hub" },
+  {
+    group: "Account",
+    command: "/projects",
+    args: "",
+    description: "projects in the signed-in workspace",
+  },
+  {
+    group: "Audits",
+    command: "/test",
+    args: "[--only WORLD]",
+    description: "run WORLD · FLOW · EXIT",
+  },
+  {
+    group: "Audits",
+    command: "/audit",
+    args: "fail|clean <url>",
+    description: "security or UI-quality audit",
+  },
+  { group: "Audits", command: "/report", args: "", description: "last run report" },
+  {
+    group: "Code",
+    command: "/tools",
+    args: "",
+    description: "every agent tool and where it lives",
+  },
+  { group: "Code", command: "/index", args: "", description: "build the semantic index" },
+  {
+    group: "Code",
+    command: "/search",
+    args: "<query>",
+    description: "concept search over the index",
+  },
+  { group: "Code", command: "/map", args: "[dir]", description: "architecture as a Mermaid graph" },
+  {
+    group: "Code",
+    command: "/devtools",
+    args: "<url>",
+    description: "console, network, DOM, a11y",
+  },
+  {
+    group: "Code",
+    command: "/debug",
+    args: "<file> --line <n>",
+    description: "breakpoints and real scopes",
+  },
+  { group: "Code", command: "/svg", args: "<name>", description: "deterministic icon" },
+  { group: "Account", command: "/billing", args: "", description: "plan, seats and usage" },
+  {
+    group: "Audits",
+    command: "/modules",
+    args: "",
+    description: "WORLD · FLOW · EXIT · FAIL · CLEAN",
+  },
+  { group: "Session", command: "/clear", args: "", description: "clear the screen" },
+  { group: "Session", command: "/exit", args: "", description: "leave the hub" },
 ];
 
 /** `/billing` is a web page, not an API read: the hub opens it instead of guessing. */
@@ -121,6 +174,9 @@ export function hubWebPath(command: string): string | undefined {
   return WEB_ONLY[command.toLowerCase()];
 }
 
+/** `❯` in the colour of the brand, preceded by the workspace name. */
+export const PROMPT = "\u001b[38;5;79m❯\u001b[0m ";
+
 export interface HubIo {
   /** Returns null on end of input. */
   ask(prompt: string): Promise<string | null>;
@@ -138,7 +194,7 @@ export interface HubDeps {
 
 export async function runHub(io: HubIo, deps: HubDeps): Promise<number> {
   for (;;) {
-    const line = await io.ask("proofcore › ");
+    const line = await io.ask(PROMPT);
     if (line === null) return 0;
     const action = parseHubLine(line);
     if (action.kind === "empty") continue;

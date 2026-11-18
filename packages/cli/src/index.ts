@@ -2,7 +2,7 @@
 import { spawn } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { stdin, stdout } from "node:process";
 import { createInterface } from "node:readline/promises";
 import {
@@ -168,6 +168,13 @@ const green = (f: GlobalFlags, t: string) => paint(f, "32", t);
 const red = (f: GlobalFlags, t: string) => paint(f, "31", t);
 const yellow = (f: GlobalFlags, t: string) => paint(f, "33", t);
 const cyan = (f: GlobalFlags, t: string) => paint(f, "36", t);
+
+// Built from a code point rather than written as a literal: a control character in a
+// regex literal is unreadable, and the only thing we are measuring is visible width.
+const ANSI_ESCAPE = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
+
+/** True while the hub owns the terminal: `/login` then must not open a second hub. */
+let insideHub = false;
 const dim = (f: GlobalFlags, t: string) => paint(f, "2", t);
 const bold = (f: GlobalFlags, t: string) => paint(f, "1", t);
 
@@ -239,9 +246,9 @@ async function main(argv: string[]): Promise<number> {
 
   switch (command) {
     case undefined:
-      // A bare invocation in a terminal opens the console; piped/CI invocations keep
-      // the deterministic help output they already had.
-      if (stdin.isTTY && !flags.json) return commandUi(flags, []);
+      // A bare invocation in a terminal opens the hub - one prompt, /help, no ceremony.
+      // Piped or CI invocations keep the deterministic help output they already had.
+      if (stdin.isTTY && !flags.json) return startHub(flags);
       printHelp(flags);
       return 0;
     case "--help":
@@ -1975,7 +1982,21 @@ function describeError(error: unknown): { message: string; code?: string; catego
   if (error instanceof ProofCoreError) {
     return { message: error.message, code: error.code, category: error.category };
   }
-  return { message: error instanceof Error ? error.message : String(error) };
+  if (error instanceof Error) {
+    // Node's fetch reports every network failure as "fetch failed" and hides the reason in
+    // `cause`. Printing only that sentence is useless: the cause is what tells you whether
+    // it is a DNS name, a certificate, a proxy or a refused connection.
+    const cause = (error as Error & { cause?: { code?: string; message?: string } }).cause;
+    if (error.message === "fetch failed" && cause) {
+      const detail = [cause.code, cause.message].filter(Boolean).join(" · ");
+      return {
+        message: `Could not reach the API (${detail || "network error"}). Check the network or set PROOFCORE_API_URL.`,
+        code: cause.code,
+      };
+    }
+    return { message: error.message };
+  }
+  return { message: String(error) };
 }
 
 function printBanner(flags: GlobalFlags): void {
@@ -2279,43 +2300,107 @@ function appUrl(path: string): string {
 /**
  * The hub: `proofcore` with no arguments.
  *
- * One readline for the whole session (a fresh interface per question is what garbled the
- * prompts), one prompt, and a `/help` that lists everything. Each slash command runs the
- * ordinary CLI command, so the output and the exit codes are the same ones.
+ * The shape every good CLI has: a banner that tells you who you are, one prompt, `/help`
+ * grouped by what you are trying to do, a spinner while the model works, and Ctrl+C that
+ * interrupts a turn instead of killing the session. Nothing here is decoration for its own
+ * sake — each line answers "where am I, and what can I type next".
  */
-let insideHub = false;
+
+/** Braille spinner: cheap, and it stops cleanly on a non-TTY (no frames at all). */
+const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+function startSpinner(flags: GlobalFlags, label: string): { stop: () => void } {
+  if (!stdout.isTTY || flags.json) return { stop: () => undefined };
+  let frame = 0;
+  const started = Date.now();
+  const timer = setInterval(() => {
+    const seconds = Math.max(1, Math.round((Date.now() - started) / 1000));
+    stdout.write(
+      `\r\u001b[2K  ${dim(flags, SPINNER_FRAMES[frame % SPINNER_FRAMES.length] ?? "⠋")} ${dim(flags, label)} ${dim(flags, `${seconds}s`)}`
+    );
+    frame += 1;
+  }, 90);
+  timer.unref?.();
+  return {
+    stop: () => {
+      clearInterval(timer);
+      stdout.write("\r\u001b[2K");
+    },
+  };
+}
+
+/** Rounded box, used for the banner and for the help header. */
+function box(flags: GlobalFlags, lines: string[], width = 58): string[] {
+  const top = `  ${dim(flags, `╭${"─".repeat(width)}╮`)}`;
+  const bottom = `  ${dim(flags, `╰${"─".repeat(width)}╯`)}`;
+  const body = lines.map((line) => {
+    const visible = line.replace(ANSI_ESCAPE, "").length;
+    return `  ${dim(flags, "│")} ${line}${" ".repeat(Math.max(0, width - visible - 1))}${dim(flags, "│")}`;
+  });
+  return [top, ...body, bottom];
+}
 
 async function startHub(flags: GlobalFlags): Promise<number> {
   insideHub = true;
   const session = await loadStoredSession().catch(() => null);
   const provider = await loadStoredProvider();
   const rl = createInterface({ input: stdin, output: stdout, terminal: stdin.isTTY });
+  const where = basename(flags.cwd);
 
   const hubHelp = () => {
-    out(flags, `\n${bold(flags, "PROOFCORE")} ${dim(flags, CLI_VERSION)}`);
-    out(flags, dim(flags, session ? `account ${session.email}` : "not signed in · /login"));
+    const groups: [string, string][] = [
+      ["Agent", "/agent — reads, edits and runs in this repository"],
+      ["Audits", "/test, /audit fail|clean <url>, /report, /modules"],
+      ["Code", "/tools, /index, /search, /map, /devtools, /debug, /svg"],
+      ["Account", "/whoami, /login, /logout, /projects, /billing"],
+      ["Session", "/help, /clear, /exit"],
+    ];
+    out(flags, "");
+    for (const [group, blurb] of groups) {
+      out(flags, `  ${bold(flags, group)} ${dim(flags, "·")} ${dim(flags, blurb)}`);
+      for (const entry of HUB_COMMANDS.filter((item) => item.group === group)) {
+        const left = `${entry.command} ${entry.args}`.trim();
+        out(flags, `    ${cyan(flags, left.padEnd(28))} ${dim(flags, entry.description)}`);
+      }
+      out(flags, "");
+    }
     out(
       flags,
-      dim(flags, provider.baseUrl ? `model ${provider.model}` : "no model · /agent --configure")
+      dim(flags, "  Anything without a slash goes to the agent. Ctrl+C interrupts a turn.")
     );
-    out(flags, "");
-    for (const entry of HUB_COMMANDS) {
-      const left = `${entry.command} ${entry.args}`.trim();
-      out(flags, `  ${left.padEnd(30)} ${dim(flags, entry.description)}`);
-    }
-    out(flags, "");
-    out(flags, dim(flags, "Anything without a slash goes to the coding agent."));
-    out(flags, dim(flags, "WORLD · FLOW · EXIT · FAIL · CLEAN — /test, /audit"));
     out(flags, "");
   };
 
   if (stdin.isTTY && !flags.json) {
-    out(flags, bold(flags, "\nPROOFCORE hub"));
-    out(flags, dim(flags, `"${"/help"}" for the commands, Ctrl+D to leave.\n`));
+    const accountLine = session
+      ? `${green(flags, "●")} ${session.email}`
+      : `${yellow(flags, "○")} ${dim(flags, "not signed in")} ${dim(flags, "· /login")}`;
+    const modelLine = provider.baseUrl
+      ? `${green(flags, "●")} ${provider.model} ${dim(flags, `· ${provider.apiKey ? keyFingerprint(provider.apiKey) : "no key"}`)}`
+      : `${yellow(flags, "○")} ${dim(flags, "no model")} ${dim(flags, "· /agent --configure")}`;
+    for (const line of box(
+      flags,
+      [
+        `${bold(flags, "PROOFCORE")} ${dim(flags, `hub ${CLI_VERSION}`)}`,
+        `${dim(flags, "software quality & reliability")}`,
+        "",
+        accountLine,
+        modelLine,
+        `${dim(flags, "workspace")} ${where}`,
+      ],
+      58
+    )) {
+      out(flags, line);
+    }
+    out(flags, "");
+    out(
+      flags,
+      `  ${dim(flags, "Type")} ${cyan(flags, "/help")} ${dim(flags, "for the commands, or just ask something.")}`
+    );
+    out(flags, dim(flags, "  Ctrl+C interrupts a turn; twice in a row leaves."));
+    out(flags, "");
   }
 
-  // `readline/promises`: question() rejects when the stream closes (Ctrl+D), which is the
-  // signal to leave the hub rather than to crash.
   const ask = async (prompt: string): Promise<string | null> => {
     try {
       return await rl.question(prompt);
@@ -2324,14 +2409,37 @@ async function startHub(flags: GlobalFlags): Promise<number> {
     }
   };
 
+  let interrupts = 0;
+  const onSigint = () => {
+    interrupts += 1;
+    if (interrupts >= 2) {
+      rl.close();
+      return;
+    }
+    stdout.write(`\r\u001b[2K  ${dim(flags, "interrupted · Ctrl+C again to leave")}\n`);
+    rl.write(null, { ctrl: true, name: "u" });
+  };
+  process.on("SIGINT", onSigint);
+
   try {
     return await runHub(
-      { ask, write: (text) => stdout.write(text) },
       {
-        dispatch: async (argv) => main(argv),
+        ask,
+        write: (text) => stdout.write(text),
+      },
+      {
+        dispatch: async (argv) => {
+          interrupts = 0;
+          return main(argv);
+        },
         agent: async (prompt) => {
-          const code = await commandAgent(flags, [prompt]);
-          return code;
+          interrupts = 0;
+          const spinner = startSpinner(flags, "thinking");
+          try {
+            return await commandAgent(flags, [prompt]);
+          } finally {
+            spinner.stop();
+          }
         },
         help: hubHelp,
         openWeb: (path) => openExternal(flags, appUrl(path)),
@@ -2342,6 +2450,7 @@ async function startHub(flags: GlobalFlags): Promise<number> {
       }
     );
   } finally {
+    process.off("SIGINT", onSigint);
     rl.close();
   }
 }
