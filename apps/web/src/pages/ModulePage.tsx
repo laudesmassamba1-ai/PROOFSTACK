@@ -245,9 +245,239 @@ score 61/100  ·  4 fail · 2 warn · 5 pass
   },
 };
 
+
+const CONTENT_FR: Record<ModuleName, ModuleContent> = {
+  world: {
+    name: "world",
+    tag: "Compatibilité mondiale",
+    headline: "Joindre chaque utilisateur, pas seulement la table ASCII",
+    lede: "WORLD génère des données synthétiques internationales, les soumet à votre produit et compare ce qui revient. Il distingue deux échecs que l'on confond d'habitude : refuser une valeur valide, et accepter une valeur invalide.",
+    checks: [
+      {
+        label: "Données d'identité",
+        detail:
+          "Noms accentués, noms composés, noms de 200 caractères, écritures non latines, séquences combinantes, noms RTL, contrôles bidi et usurpation par homoglyphes.",
+      },
+      {
+        label: "Numéros de téléphone",
+        detail:
+          "Validité par pays d'après les métadonnées libphonenumber, normalisation E.164, zéros nationaux, passage béninois 8→10 chiffres.",
+      },
+      {
+        label: "Adresses",
+        detail:
+          "Nombre de lignes par pays, codes postaux alphanumériques, et les pays sans code postal — l'exiger y est un défaut.",
+      },
+      {
+        label: "Monnaie",
+        detail:
+          "Exposants ISO 4217 (le XOF n'a pas de sous-unité, le JOD trois décimales), séparateurs locaux dont U+202F et chiffres arabo-indiens, perte de précision, valeurs au-delà de Number.MAX_SAFE_INTEGER.",
+      },
+      {
+        label: "Dates et heures",
+        detail:
+          "Formats d'entrée déclarés, dates impossibles au calendrier (30 février), années bissextiles, trous de passage à l'heure d'été, ambiguïtés de retour, instants corrects par fuseau.",
+      },
+      {
+        label: "Tri",
+        detail:
+          "Attentes de collation par locale, vérifiées contre la sortie ordonnée du produit quand il en expose une.",
+      },
+    ],
+    implemented: [
+      "8 profils de locales versionnés : en-US, en-GB, fr-FR, fr-BJ, fr-CG, ar-EG, ja-JP, pt-BR",
+      "Expansion des cas avec attentes accepter/rejeter et valeurs canoniques",
+      "Pilote HTTP (soumission + relecture) et pilote synthétique pour l'auto-test",
+      "Comparaison d'intégrité de stockage avec tolérances exacte / NFC / chiffres",
+    ],
+    pending: [
+      "Pilote de formulaires navigateur (Playwright) pour les apps sans endpoint d'écriture",
+      "Packs de profils au-delà des huit livrés",
+    ],
+    sample: `fr-BJ/identity/Sossou-14  FAILED  corrupted_transformation
+  expected  "Kòfí Sossou"
+  actual    "Kof? Sossou"
+  column    full_name  (utf8mb3 troncature à l'octet 5)
+  reproduce proofcore test --module world --only fr-BJ/identity/Sossou-14`,
+    command: "proofcore test --module world --profiles fr-BJ,ar-EG,ja-JP",
+  },
+  flow: {
+    name: "flow",
+    tag: "Fiabilité des transactions",
+    headline: "Prouver le chemin de l'argent, y compris ses pires jours",
+    lede: "FLOW déroule un parcours — panier, paiement, choix du mode, confirmation — puis l'attaque : refusé, annulé, expiré, dupliqué, retardé, hors-ordre et webhooks forgés. Il rapporte l'état que la transaction a réellement atteint, jamais celui vers lequel le navigateur a été redirigé.",
+    checks: [
+      {
+        label: "Parcours",
+        detail:
+          "Navigation, soumission de formulaires, sélection produit, panier, paiement, choix du mode, confirmation, annulation, remboursement.",
+      },
+      {
+        label: "Scénarios de paiement",
+        detail:
+          "Succès et refus sandbox, annulation, expiration, confirmation manquante, commande dupliquée, remboursement, état incohérent.",
+      },
+      {
+        label: "Durcissement des webhooks",
+        detail:
+          "Vérification de signature, âge de l'horodatage, livraison dupliquée, idempotence, ordre, charge utile invalide, comportement de retry.",
+      },
+      {
+        label: "Vérité d'état",
+        detail:
+          "Le statut vérifié par le fournisseur fait foi. Une redirection, un délai ou un paramètre d'URL n'active jamais rien.",
+      },
+    ],
+    implemented: [
+      "Contrat PaymentProvider indépendant du fournisseur",
+      "Fournisseur sandbox aux issues déterministes",
+      "Machines à états paiement et abonnement, transitions légales uniquement",
+    ],
+    pending: [
+      "Exécution des parcours Playwright dans le CLI",
+      "Adaptateur SasPay relié à de vraies identifiants (spécification vérifiée, aucune clé présente)",
+    ],
+    sample: `flow/webhook/duplicate  PASSED   idempotent: 2 livraisons, 1 changement de droit
+flow/webhook/forged     PASSED   signature invalide rejetée (401)
+flow/checkout/declined  FAILED   abonnement activé sur PENDING`,
+    command: "proofcore test --module flow --payment-mode sandbox",
+  },
+  exit: {
+    name: "exit",
+    tag: "Portabilité des données",
+    headline: "Un export est une promesse tant qu'il ne repasse pas par le retour",
+    lede: "EXIT lit un export comme un client : CSV, JSON, ou ZIP avec manifeste. Il valide le schéma, les relations, les encodages, la précision et l'intégrité des fichiers, puis réimporte les données et compare le résultat au jeu synthétique d'origine.",
+    checks: [
+      {
+        label: "Schéma",
+        detail:
+          "Champs manquants, types invalides, gestion du null, encodage, précision numérique, transformations de dates, identifiants, contraintes d'unicité.",
+      },
+      {
+        label: "Relations",
+        detail:
+          "Intégrité parent-enfant, références manquantes, doublons, orphelins, cohérence référentielle.",
+      },
+      {
+        label: "Intégrité des fichiers",
+        detail: "Présence, nombre, taille, empreintes SHA-256, références du manifeste.",
+      },
+      {
+        label: "Aller-retour",
+        detail:
+          "Original → export → réimport, avec diffs au niveau des champs pour les enregistrements manquants, valeurs modifiées, dates altérées, références cassées et pièces jointes perdues.",
+      },
+    ],
+    implemented: [
+      "Lecteur/rédacteur CSV RFC 4180 avec garde anti-injection de formules",
+      "Vérification de manifeste ZIP avec empreintes SHA-256",
+      "Comparateur aller-retour avec alignement par enregistrement",
+    ],
+    pending: [
+      "Connecteurs de jeux de données au-delà de HTTP et des fichiers locaux",
+      "Inférence de schéma depuis une base en ligne",
+    ],
+    sample: `exit/roundtrip/orders  FAILED   2 des 500 enregistrements diffèrent
+  order_118  total: 1234.56 -> 1234.5599999999999 (coercition flottant)
+  order_402  customer_id: "c_9" -> null (orphelin perdu par LEFT JOIN)`,
+    command: "proofcore test --module exit --formats json,csv,zip",
+  },
+  fail: {
+    name: "fail",
+    tag: "Audit sécurité et défauts",
+    headline: "Trouver les failles avant quelqu'un d'autre",
+    lede: "FAIL audite une URL déployée par HTTP réel — en-têtes de sécurité, drapeaux des cookies, contenu mixte, fuites serveur, erreurs bavardes. Chaque vérification enregistre ce qui a été réellement observé, puis un score et une liste ordonnée. Aucune invention : un en-tête absent est signalé absent.",
+    checks: [
+      {
+        label: "En-têtes de sécurité",
+        detail:
+          "Content-Security-Policy, Strict-Transport-Security, X-Frame-Options / frame-ancestors, Referrer-Policy, Permissions-Policy. Chaque en-tête absent est une constatation avec la raison qui compte.",
+      },
+      {
+        label: "Cookies",
+        detail:
+          "Drapeaux Secure et HttpOnly sur chaque Set-Cookie. Un cookie de session sans eux est volable par script ou dégradable.",
+      },
+      {
+        label: "Transport",
+        detail:
+          "Application de HTTPS et détection de contenu mixte : des sous-ressources http:// référencées depuis une page https cassent les garanties TLS.",
+      },
+      {
+        label: "Fuites",
+        detail:
+          "Bannières Server et X-Powered-By, traces de pile, dumps d'exceptions dans le corps de la réponse — les empreintes que les attaquants énumèrent d'abord.",
+      },
+    ],
+    implemented: [
+      "Requête HTTP réelle vers la cible, en-têtes et corps observés",
+      "Vérifications en-têtes, cookies, contenu mixte et divulgation d'erreurs avec PASS / WARN / FAIL",
+      "Score et constatations ordonnées, chacune avec l'observation et ce qui compte",
+      "Garde de locataire : l'URL doit appartenir à un projet de l'espace de travail",
+    ],
+    pending: [
+      "Vérifications plus profondes : flux d'authentification, limitation de débit, notation TLS",
+      "Analyse des bundles JavaScript pour les motifs dangereux",
+    ],
+    sample: `fail/csp           FAILED   absent   une Content-Security-Policy limite l'impact XSS
+fail/hsts           FAILED   absent   HSTS empêche la rétrogradation du protocole
+fail/cookie_secure  FAILED   Secure manquant   les cookies de session exigent Secure
+fail/server_banner  WARN     nginx/1.24.0     les bannières de version aident les attaquants
+score 61/100  ·  4 fail · 2 warn · 5 pass
+  reproduce proofcore audit fail https://app.example.com`,
+    command: "proofcore audit fail https://app.example.com",
+  },
+  clean: {
+    name: "clean",
+    tag: "Qualité UI · score /100",
+    headline: "Un score auquel on peut répondre, parce qu'on voit les vérifications",
+    lede: "CLEAN mesure une page comme un relecteur minutieux : viewport, langue, structure sémantique, ordre des titres, couverture alt, libellés de formulaires, poids. Rien de subjectif — chaque vérification montre ce qui a été observé et pourquoi cela compte, et le score 0–100 n'est que la somme.",
+    checks: [
+      {
+        label: "Bases du document",
+        detail:
+          "Meta viewport, attribut html lang, longueur du titre, meta description. Sans eux, le rendu mobile, la traduction, les favoris et le référencement se dégradent.",
+      },
+      {
+        label: "Accessibilité",
+        detail:
+          "Couverture alt de chaque image, libellés accessibles de chaque formulaire, niveaux de titres sans saut. Les trois vérifications que les lecteurs d'écran échouent d'abord.",
+      },
+      {
+        label: "Structure",
+        detail:
+          "Repères sémantiques (main, header, nav, footer, article) et nombre de styles en ligne — les deux signaux d'une page construite avec intention ou rafistolée à la hâte.",
+      },
+      {
+        label: "Poids et livraison",
+        detail:
+          "Taille du HTML contre un budget de 150 Ko, nombre de scripts, indices de cache. Les pages lourdes sont lentes, et les pages lentes perdent des utilisateurs.",
+      },
+    ],
+    implemented: [
+      "Vérifications DOM mesurées par HTTP réel — pas de captures, pas de suppositions",
+      "Calculs d'ordre des titres et de couverture alt avec détail PASS / WARN / FAIL",
+      "Un score 0–100 qui additionne les vérifications honnêtement",
+      "Garde de locataire : l'URL doit appartenir à un projet de l'espace de travail",
+    ],
+    pending: [
+      "Instantanés de régression visuelle entre versions",
+      "Budget de performance au-delà du poids (LCP, CLS via rendu réel)",
+    ],
+    sample: `clean/a11y/img_alt     PASSED   14/14 images avec alt
+  clean/a11y/form_labels FAILED   0/2 formulaires libellés   les inputs exigent un nom accessible
+  clean/doc/html_lang    PASSED   présent
+  clean/weight/html      WARN     188 KB sur un budget de 150 KB
+  score 84/100  ·  1 fail · 1 warn · 8 pass
+    reproduce proofcore audit clean https://app.example.com`,
+    command: "proofcore audit clean https://app.example.com",
+  },
+};
+
 export function ModulePage({ name }: { name: ModuleName }) {
-  const { t } = useI18n();
-  const content = CONTENT[name];
+  const { t, locale } = useI18n();
+  const fr = locale === "fr";
+  const content = (fr ? CONTENT_FR : CONTENT)[name];
   const label = name.toUpperCase();
 
   return (
@@ -272,7 +502,10 @@ export function ModulePage({ name }: { name: ModuleName }) {
       </Section>
 
       <Section tone="deeper">
-        <SectionHeading eyebrow="What it actually checks" title="Not a checklist of intentions" />
+        <SectionHeading
+          eyebrow={fr ? "Ce qui est réellement vérifié" : "What it actually checks"}
+          title={fr ? "Pas une liste d’intentions" : "Not a checklist of intentions"}
+        />
         <div className="mt-8 grid gap-4 md:grid-cols-2">
           {content.checks.map((check) => (
             <article key={check.label} className="brand-panel p-5">
@@ -287,7 +520,7 @@ export function ModulePage({ name }: { name: ModuleName }) {
         <div className="grid gap-8 lg:grid-cols-[1.1fr_1fr]">
           <figure className="brand-panel overflow-hidden">
             <figcaption className="border-b border-white/8 px-4 py-3 font-mono text-[0.74rem] text-white/48">
-              CLI output
+              {fr ? "Sortie CLI" : "CLI output"}
             </figcaption>
             <pre className="overflow-x-auto px-4 py-4 font-mono text-[0.74rem] leading-relaxed text-white/76">
               {content.sample}
@@ -296,7 +529,7 @@ export function ModulePage({ name }: { name: ModuleName }) {
 
           <div>
             <h2 className="text-[1.3rem] font-semibold tracking-tight">
-              Build status of this module
+              {fr ? "État de construction du module" : "Build status of this module"}
             </h2>
             <ul className="mt-5 space-y-3">
               {content.implemented.map((item) => (

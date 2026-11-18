@@ -40,8 +40,8 @@ import "../../styles/chat-browser.css";
 
 interface EffortLevel {
   id: "quick" | "balanced" | "deep" | "ultra";
-  label: string;
-  hint: string;
+  label: { fr: string; en: string };
+  hint: { fr: string; en: string };
   burn: string;
 }
 
@@ -71,13 +71,31 @@ interface ProfileState {
 }
 
 const EFFORTS: EffortLevel[] = [
-  { id: "quick", label: "Rapide", hint: "Réponse directe, 1 outil max", burn: "1×" },
-  { id: "balanced", label: "Équilibré", hint: "Données utiles, réponse focalisée", burn: "2×" },
-  { id: "deep", label: "Approfondi", hint: "Croise runs, findings et audits", burn: "4×" },
+  {
+    id: "quick",
+    label: { fr: "Rapide", en: "Quick" },
+    hint: { fr: "Réponse directe, 1 outil max", en: "Direct answer, 1 tool max" },
+    burn: "1×",
+  },
+  {
+    id: "balanced",
+    label: { fr: "Équilibré", en: "Balanced" },
+    hint: { fr: "Données utiles, réponse focalisée", en: "Useful data, focused answer" },
+    burn: "2×",
+  },
+  {
+    id: "deep",
+    label: { fr: "Approfondi", en: "Deep" },
+    hint: { fr: "Croise runs, findings et audits", en: "Cross-references runs, findings and audits" },
+    burn: "4×",
+  },
   {
     id: "ultra",
-    label: "Ultra",
-    hint: "Audit complet multi-sources, rapport structuré",
+    label: { fr: "Ultra", en: "Ultra" },
+    hint: {
+      fr: "Audit complet multi-sources, rapport structuré",
+      en: "Full multi-source audit, structured report",
+    },
     burn: "8×",
   },
 ];
@@ -89,13 +107,13 @@ const TOOL_ICONS: Record<string, typeof BadgeCheck> = {
 };
 
 /** Short notes only. The provider list itself is read from /api/v1/ai/providers. */
-const PROVIDER_HINTS: Record<string, string> = {
-  groq: "très rapide, gratuit",
-  openrouter: "tous les modèles",
-  cerebras: "le plus rapide",
-  ollama: "100 % local",
-  anthropic: "Claude",
-  google: "Gemini",
+const PROVIDER_HINTS: Record<string, { fr: string; en: string }> = {
+  groq: { fr: "très rapide, gratuit", en: "very fast, free tier" },
+  openrouter: { fr: "tous les modèles", en: "every model" },
+  cerebras: { fr: "le plus rapide", en: "the fastest" },
+  ollama: { fr: "100 % local", en: "100% local" },
+  anthropic: { fr: "Claude", en: "Claude" },
+  google: { fr: "Gemini", en: "Gemini" },
 };
 
 interface ProviderOption {
@@ -354,7 +372,7 @@ function EffortPicker({
         aria-haspopup="menu"
         onClick={() => setOpen((value) => !value)}
       >
-        {active.label} <span className="chat-effort-burn">· {active.burn}</span>
+        {active.label[fr ? "fr" : "en"]} <span className="chat-effort-burn">· {active.burn}</span>
         <ChevronDown
           size={12}
           style={{ transform: open ? "rotate(180deg)" : undefined, transition: "transform 140ms" }}
@@ -375,9 +393,9 @@ function EffortPicker({
             >
               <span className="min-w-0 flex-1">
                 <span className="chat-effort-name">
-                  {level.label} <span className="chat-effort-burn">· {level.burn}</span>
+                  {level.label[fr ? "fr" : "en"]} <span className="chat-effort-burn">· {level.burn}</span>
                 </span>
-                <span className="chat-effort-hint">{level.hint}</span>
+                <span className="chat-effort-hint">{level.hint[fr ? "fr" : "en"]}</span>
               </span>
             </button>
           ))}
@@ -649,15 +667,20 @@ export function AiChatPage(): React.ReactElement {
     scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
-  // Release the pin as soon as the reader scrolls up on purpose; surface the
-  // jump button once the newest answer is out of sight.
+  // Release the pin only when the reader scrolls UP on purpose: during the
+  // programmatic glide to the answer the distance is still large for a few
+  // frames, and reading that as "user scrolled up" would strand them mid-way.
+  const lastScrollTopRef = useRef(0);
   const onThreadScroll = useCallback(() => {
     const scroller = scrollRef.current;
     if (!scroller) return;
-    const distance = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
-    if (distance > 90) pinnedRef.current = false;
+    const top = scroller.scrollTop;
+    const movingUp = top < lastScrollTopRef.current - 2;
+    lastScrollTopRef.current = top;
+    const distance = scroller.scrollHeight - top - scroller.clientHeight;
+    if (movingUp) pinnedRef.current = false;
     if (distance < 40) pinnedRef.current = true;
-    setShowJump(distance > 420);
+    setShowJump(distance > 420 && !pinnedRef.current);
   }, []);
 
   const jumpToLatest = useCallback(() => {
@@ -688,6 +711,11 @@ export function AiChatPage(): React.ReactElement {
         trace: message.trace,
       }))
     );
+    // A freshly opened conversation reads newest-first: pin to the bottom.
+    pinnedRef.current = true;
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "auto" });
+    });
   }, []);
 
   const startNewChat = useCallback(() => {
@@ -1142,7 +1170,7 @@ export function AiChatPage(): React.ReactElement {
             {/* conversation */}
             {hasMessages && (
               <>
-                <div ref={scrollRef} className="chat-scroll">
+                <div ref={scrollRef} className="chat-scroll" onScroll={onThreadScroll}>
                   <div className="chat-thread">
                     {messages.map((message) =>
                       message.role === "user" ? (
@@ -1308,11 +1336,11 @@ export function AiChatPage(): React.ReactElement {
                           setTestResult(null);
                           setProfileError(null);
                         }}
-                        title={note ?? preset.label}
+                        title={note?.[fr ? "fr" : "en"] ?? preset.label}
                         className={`chat-provider ${active ? "is-active" : ""}`}
                       >
                         <span className="truncate">{preset.label}</span>
-                        {note && <span className="chat-provider-note">{note}</span>}
+                        {note && <span className="chat-provider-note">{note[fr ? "fr" : "en"]}</span>}
                       </button>
                     );
                   })}

@@ -17,6 +17,14 @@ import { postJson } from "../../lib/api.js";
 
 const SERVER_VIEWPORT = { width: 1280, height: 800 };
 
+/**
+ * Launching a Chromium and rendering a page takes ten to twenty seconds. The default API
+ * timeout is six, so the panel used to give up before the first image and look broken:
+ * every call here carries its own budget, sized to what the server actually does.
+ */
+const START_TIMEOUT_MS = 90_000;
+const ACTION_TIMEOUT_MS = 60_000;
+
 export interface BrowserState {
   sessionId: string;
   url: string;
@@ -48,10 +56,11 @@ export function BrowserPanel({
       setStatus("loading");
       setError(null);
       try {
-        const result = await postJson<BrowserState>("/api/v1/browser/session", {
-          workspaceId,
-          url,
-        });
+        const result = await postJson<BrowserState>(
+          "/api/v1/browser/session",
+          { workspaceId, url },
+          START_TIMEOUT_MS
+        );
         setState(result);
         setAddress(result.url);
         setStatus("idle");
@@ -69,10 +78,11 @@ export function BrowserPanel({
       setStatus("loading");
       setError(null);
       try {
-        const result = await postJson<BrowserState>("/api/v1/browser/action", {
-          sessionId: state.sessionId,
-          action,
-        });
+        const result = await postJson<BrowserState>(
+          "/api/v1/browser/action",
+          { sessionId: state.sessionId, action },
+          ACTION_TIMEOUT_MS
+        );
         setState(result);
         setAddress(result.url);
         setStatus("idle");
