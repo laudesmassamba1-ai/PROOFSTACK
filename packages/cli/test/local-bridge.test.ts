@@ -1,9 +1,10 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { type ServeHandle, serveLocal } from "../src/local-bridge.js";
+import { loadStoredSession } from "../src/ui.js";
 
 /**
  * The local bridge.
@@ -122,6 +123,90 @@ describe("local bridge security", () => {
       headers: { cookie: `pc_local=${"x".repeat(32)}` },
     });
     expect(response.status).toBe(401);
+  });
+});
+
+describe("local bridge native window", () => {
+  it("serves the built web app and protects HTML routes with the run cookie", async () => {
+    const web = await mkdtemp(join(tmpdir(), "proofcore-web-"));
+    await mkdir(join(web, "assets"), { recursive: true });
+    await writeFile(join(web, "index.html"), "<html>PROOFCORE</html>", "utf8");
+    await writeFile(join(web, "assets", "app.js"), "console.log('app')\n", "utf8");
+    try {
+      const { base, cookie, token } = await start({ webRoot: web });
+      const exchange = await fetch(`${base}/?t=${token}`, { redirect: "manual" });
+      expect(exchange.status).toBe(302);
+      expect(exchange.headers.get("location")).toBe("/app");
+
+      const app = await fetch(`${base}/app`, { headers: { cookie } });
+      expect(app.status).toBe(200);
+      expect(await app.text()).toContain("PROOFCORE");
+
+      const asset = await fetch(`${base}/assets/app.js`);
+      expect(asset.status).toBe(200);
+      expect(await asset.text()).toContain("console.log");
+
+      const agent = await fetch(`${base}/agent`, { headers: { cookie } });
+      expect(agent.status).toBe(200);
+      expect(await agent.text()).toContain("agent local");
+
+      const anonymous = await fetch(`${base}/app`);
+      expect(anonymous.status).toBe(401);
+    } finally {
+      await rm(web, { recursive: true, force: true });
+    }
+  });
+
+  it("proxies the site API and keeps the site cookie in the local session", async () => {
+    const web = await mkdtemp(join(tmpdir(), "proofcore-web-"));
+    await writeFile(join(web, "index.html"), "<html>PROOFCORE</html>", "utf8");
+    const cloud = createServer((request, response) => {
+      if (request.url === "/health") {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ status: "ok" }));
+        return;
+      }
+      if (request.url === "/api/auth/sign-in/email") {
+        response.writeHead(200, {
+          "content-type": "application/json",
+          "set-cookie": "ps_session=cloud-token; Path=/; HttpOnly; Secure; SameSite=None",
+        });
+        response.end(JSON.stringify({ user: { email: "a@b.test" } }));
+        return;
+      }
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ user: { email: "a@b.test" }, workspaces: [] }));
+    });
+    await new Promise<void>((resolvePromise) =>
+      cloud.listen(0, "127.0.0.1", () => resolvePromise())
+    );
+    const cloudUrl = `http://127.0.0.1:${(cloud.address() as { port: number }).port}`;
+    try {
+      const { base, cookie } = await start({ webRoot: web, cloudApiUrl: cloudUrl });
+      const health = await fetch(`${base}/health`);
+      expect(await health.json()).toEqual({ status: "ok" });
+
+      const login = await fetch(`${base}/api/auth/sign-in/email`, {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({ email: "a@b.test", password: "secret" }),
+      });
+      expect(login.status).toBe(200);
+      const setCookie = login.headers.get("set-cookie") ?? "";
+      expect(setCookie).toContain("ps_session=cloud-token");
+      expect(setCookie).not.toContain("Secure");
+
+      const saved = await loadStoredSession(cloudUrl);
+      expect(saved?.cookie).toBe("ps_session=cloud-token");
+      expect(saved?.email).toBe("a@b.test");
+
+      const session = await fetch(`${base}/api/auth/session`, { headers: { cookie } });
+      expect(session.status).toBe(200);
+      expect(await session.json()).toMatchObject({ user: { email: "a@b.test" } });
+    } finally {
+      cloud.close();
+      await rm(web, { recursive: true, force: true });
+    }
   });
 });
 

@@ -90,6 +90,9 @@ export function Auth({ mode }: { mode: Mode }) {
       setState("sent");
       // The session cookie is HttpOnly; re-read who the API says we are before routing.
       await session.refresh();
+      // When this page runs inside the native window, the local shell keeps a vault copy
+      // of the session. Copy the freshly issued cookie there before the window reloads.
+      await window.proofcoreDesktop?.sessionUpdated().catch(() => undefined);
       const next = params.get("next");
       navigate(next?.startsWith("/app") ? next : "/app", { replace: true });
     } catch (error) {

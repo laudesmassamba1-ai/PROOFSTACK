@@ -96,6 +96,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(async () => {
     try {
       await postJson("/api/auth/sign-out", {});
+      // In the native window the local shell owns a vault copy; the web cookie alone is
+      // not enough to sign this machine out. The bridge clears it, and ignores errors so
+      // signing out still works in a plain browser.
+      await window.proofcoreDesktop?.logout().catch(() => undefined);
     } finally {
       setUser(null);
       setWorkspaces([]);

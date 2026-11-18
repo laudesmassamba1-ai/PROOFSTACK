@@ -29,11 +29,13 @@ import {
   readFileSync,
   writeFileSync,
 } from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const require = createRequire(import.meta.url);
 const outDir = join(root, "artifacts", "bin");
 const work = join(tmpdir(), `proofcore-sea-${process.pid}`);
 
@@ -77,6 +79,20 @@ function run(command, args, options = {}) {
   return execFileSync(command, args, { stdio: "inherit", cwd: root, ...options });
 }
 
+/** Resolves a package's own bin entry, including on Windows where .cmd wrappers differ. */
+function packageBin(packageName, binName) {
+  let directory = dirname(require.resolve(packageName));
+  while (!existsSync(join(directory, "package.json"))) {
+    const parent = dirname(directory);
+    if (parent === directory) throw new Error(`package.json not found for ${packageName}`);
+    directory = parent;
+  }
+  const manifest = JSON.parse(readFileSync(join(directory, "package.json"), "utf8"));
+  const relative = typeof manifest.bin === "string" ? manifest.bin : manifest.bin?.[binName];
+  if (!relative) throw new Error(`${packageName} has no ${binName} binary`);
+  return join(directory, relative);
+}
+
 function hostTarget() {
   const platform = process.platform === "win32" ? "win" : process.platform;
   return `${platform}-${process.arch}`;
@@ -90,7 +106,7 @@ function step(message) {
 function bundle() {
   step("bundling the CLI");
   const output = join(work, "proofcore.cjs");
-  run(join(root, "node_modules/.bin/esbuild"), [
+  run(packageBin("esbuild", "esbuild"), [
     join(root, "packages/cli/src/index.ts"),
     "--bundle",
     "--platform=node",
@@ -179,7 +195,8 @@ async function buildTarget(target, blob) {
   const isMac = target.startsWith("darwin");
   if (isMac) run("codesign", ["--remove-signature", output]);
 
-  run(join(root, "node_modules/.bin/postject"), [
+  run(process.execPath, [
+    packageBin("postject", "postject"),
     output,
     "NODE_SEA_BLOB",
     blob,

@@ -42,7 +42,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 12.15.0
 
       - uses: actions/setup-node@v4
         with:
@@ -94,8 +94,72 @@ jobs:
             artifacts/installers/*
             artifacts/bin/*
 
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x64
+            artifact: "PROOFCORE-*"
+          - os: windows-latest
+            target: win-x64
+            artifact: "PROOFCORE-*"
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build the native package for this platform
+        run: pnpm app:dist:${{ matrix.target == 'win-x64' && 'win' || 'linux' }}
+
+      - name: Prove the packaged app starts and serves the embedded interface
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          APP="artifacts/desktop/linux-unpacked/proofcore"
+          test -x "$APP"
+          # The smoke gate exits before opening a window; the full window smoke belongs to
+          # the local test, not a headless release runner. This proves the package has its
+          # sidecar, web bundle, icons and launchable binary.
+          test -f artifacts/desktop/linux-unpacked/resources/web/index.html
+          test -x artifacts/desktop/linux-unpacked/resources/sidecar/proofcore-linux-x64
+          file artifacts/desktop/PROOFCORE-*.AppImage
+          dpkg-deb -I artifacts/desktop/PROOFCORE-*.deb >/dev/null
+
+      - name: Prove the packaged app has its Windows files
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $app = "artifacts/desktop/win-unpacked/PROOFCORE.exe"
+          if (-not (Test-Path $app)) { throw "missing $app" }
+          if (-not (Test-Path "artifacts/desktop/win-unpacked/resources/web/index.html")) { throw "missing embedded web" }
+          if (-not (Test-Path "artifacts/desktop/win-unpacked/resources/sidecar/proofcore-win-x64.exe")) { throw "missing sidecar" }
+          Get-ChildItem artifacts/desktop/PROOFCORE-*.exe | Format-Table Name,Length
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.target }}
+          path: |
+            artifacts/desktop/*.deb
+            artifacts/desktop/*.AppImage
+            artifacts/desktop/*.exe
+            artifacts/desktop/latest*.yml
+            artifacts/desktop/*.blockmap
+
   publish:
-    needs: installers
+    needs: [installers, desktop]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -136,15 +200,24 @@ jobs:
           body: |
             ## Install
 
-            **Windows** — download `proofcore-*-setup-win-x64.exe` and double-click it.
-            It installs for the current user, adds the command to your PATH, creates a Start
-            Menu entry, and prints the version it installed. No administrator rights.
+            **Windows desktop app** — download `PROOFCORE-*.exe` and double-click it.
+            It creates a Start Menu entry, a desktop shortcut and a native window with the
+            embedded product interface. No administrator rights.
 
-            **Linux** (Mint, Ubuntu, Debian) — either:
-            - `sudo dpkg -i proofcore_*_amd64.deb`
-            - or `chmod +x proofcore-*-installer-linux-x64.run && ./proofcore-*-installer-linux-x64.run`
+            **Linux desktop app** (Mint, Ubuntu, Debian) — either:
+            - `sudo dpkg -i PROOFCORE-*_amd64.deb`
+            - or `chmod +x PROOFCORE-*.AppImage && ./PROOFCORE-*.AppImage`
 
-            **macOS** — `chmod +x proofcore-*-installer-darwin-*.run && ./proofcore-*-installer-darwin-*.run`
+            The desktop app includes the local engine, the web interface and the icons.
+            The terminal installers below are separate and remain available for servers/CI.
+
+            **Windows CLI** — `proofcore-*-setup-win-x64.exe` installs the command for the
+            current user and adds it to PATH.
+
+            **Linux CLI** — `sudo dpkg -i proofcore_*_amd64.deb` or
+            `chmod +x proofcore-*-installer-linux-x64.run && ./proofcore-*-installer-linux-x64.run`.
+
+            **macOS CLI** — `chmod +x proofcore-*-installer-darwin-*.run && ./proofcore-*-installer-darwin-*.run`
 
             **Updates** — `proofcore update` checks the release manifest and shows what it
             would install; `proofcore update --yes` verifies the sha256 and replaces the

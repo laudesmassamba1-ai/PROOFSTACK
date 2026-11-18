@@ -50,3 +50,6 @@ artifacts/.work/
 # generated desktop assets and outputs
 apps/desktop/build/
 artifacts/desktop/
+
+# electron-builder sometimes leaves a Wine prefix when cross-building Windows
+.wine-test/

@@ -9,6 +9,8 @@ packages:
 # Only these four legitimately need a postinstall step (native binary linking).
 # Anything else that asks for a build script is a signal to review, not to approve.
 allowBuilds:
+  electron: true
+  electron-builder: true
   esbuild: true
   workerd: true
   sharp: true

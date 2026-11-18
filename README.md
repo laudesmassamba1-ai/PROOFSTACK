@@ -22,7 +22,7 @@ not implemented yet — see the status file.
 Implemented and tested: the shared engine and all three modules, the CLI with JSON/
 JUnit/HTML reports, the SaaS API (auth, workspaces, projects, run ingestion, API keys,
 billing, webhooks), the authenticated workspace and the terminal console. `pnpm test`
-runs 223 tests; `pnpm typecheck` and `pnpm build` pass. Biome still reports pre-existing
+runs 507 tests; `pnpm typecheck` and `pnpm build` pass. Biome still reports pre-existing
 diagnostics, so `pnpm lint` is not claimed as clean.
 
 The creator's read-only operations console lives at `/app/admin`: users, workspaces,
@@ -125,6 +125,47 @@ npm publish ./packages/cli/release --access public
 
 `pnpm proofcore` remains the in-repo command. `pnpm cli` from an unrelated application
 still resolves nothing; use the generated global binary instead.
+
+## Install the desktop app
+
+The native app is a packaged Electron window around the same React interface and the
+same local engine as the CLI. It is not a browser shortcut: the web bundle, the engine,
+the icons and the launch metadata travel inside the installer.
+
+```bash
+pnpm app:dist          # this machine (Linux builds .deb + AppImage, Windows builds NSIS .exe)
+```
+
+Local Linux artifacts:
+
+```text
+artifacts/desktop/PROOFCORE-0.3.0-amd64.deb
+artifacts/desktop/PROOFCORE-0.3.0-x86_64.AppImage
+```
+
+Install the `.deb` with `sudo dpkg -i`, or make the AppImage executable and run it. The
+Windows installer is one `.exe`; it creates the Start Menu entry, the desktop shortcut and
+an uninstaller for the current user. The AppImage is the single-file Linux build.
+
+What runs where:
+
+- The interface is the built `apps/web` application, served by the local engine on
+  `127.0.0.1` inside the window. It is the same UI as the site, not a copy.
+- The local engine is the same self-contained `proofcore` binary the CLI installers ship.
+  It executes the agent, audits, sandbox and index on this machine.
+- The site is used for the account check, projects, reports, billing and explicit sync.
+  The local engine proxies those API calls with the HttpOnly session cookie; JavaScript
+  never receives the cookie.
+- The session is kept in the OS vault when available (DPAPI, Keychain, libsecret/kwallet),
+  with a `0600` file fallback on Linux machines without a keyring. A confirmed session
+  keeps the local tools usable for seven offline days; a revoked session locks them.
+- Closing and reopening works from the icon. A second launch focuses the existing window.
+- The **PROOFCORE** menu opens the local agent console, runs local tests, opens the site,
+  checks `doctor`, signs out and checks for app/engine updates.
+
+The site is not a single cross-platform executable: no installer format can install both
+a Linux `.deb` and a Windows `.exe`. Each OS gets one package from the release workflow,
+and Linux additionally gets the portable AppImage.
 
 ## Terminal console
 

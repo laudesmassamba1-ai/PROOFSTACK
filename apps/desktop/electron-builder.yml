@@ -13,6 +13,7 @@ directories:
 files:
   - main.cjs
   - preload.cjs
+  - src/**/*.cjs
   - package.json
   - build/icon.png
 
@@ -22,7 +23,13 @@ extraResources:
   - from: ../../artifacts/bin
     to: sidecar
     filter:
-      - "proofcore-${os}-${arch}*"
+      - "proofcore-linux-${arch}*"
+      - "proofcore-win-${arch}*"
+      - "proofcore-darwin-${arch}*"
+  # The same React application the site serves. The local engine serves it from 127.0.0.1
+  # and proxies the site API, so the window has the product UI without being a browser.
+  - from: ../../apps/web/dist
+    to: web
 
 linux:
   executableName: proofcore
@@ -36,10 +43,9 @@ linux:
     PROOFCORE runs on this machine: the agent, the audits, the sandbox and the index are
     local. The account, projects, reports and sync go through the site.
   desktop:
-    entry:
-      Name: PROOFCORE
-      Comment: Software quality and reliability
-      StartupWMClass: PROOFCORE
+    Name: PROOFCORE
+    Comment: Software quality and reliability
+    StartupWMClass: PROOFCORE
 
 deb:
   packageName: proofcore

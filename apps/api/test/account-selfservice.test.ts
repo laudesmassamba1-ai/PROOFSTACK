@@ -174,17 +174,24 @@ describe("account deletion", () => {
 
   it("refuses while the person owns a workspace with other members", async () => {
     const cookie = await signUp(harness, "owner@example.com");
-    await signUp(harness, "colleague@example.com");
+    const colleagueCookie = await signUp(harness, "colleague@example.com");
     const session = (await (
       await harness.request("/api/auth/session", { headers: { cookie } })
     ).json()) as { workspaceId: string };
 
-    const invited = await harness.request(`/api/v1/workspaces/${session.workspaceId}/members`, {
+    // An invitation is not a membership: it only becomes one after the invitee accepts.
+    const invited = await harness.request(`/api/v1/workspaces/${session.workspaceId}/invitations`, {
       method: "POST",
       headers: { cookie },
       body: JSON.stringify({ email: "colleague@example.com", role: "member" }),
     });
     expect(invited.status).toBe(201);
+    const invitation = (await invited.json()) as { invitation: { id: string } };
+    const accepted = await harness.request(
+      `/api/account/invitations/${invitation.invitation.id}/accept`,
+      { method: "POST", headers: { cookie: colleagueCookie } }
+    );
+    expect(accepted.status).toBe(200);
 
     const blocked = await harness.request("/api/account", {
       method: "DELETE",

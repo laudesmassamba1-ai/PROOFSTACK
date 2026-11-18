@@ -1,6 +1,9 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
+import { extname, join, normalize, resolve, sep } from "node:path";
 import { ProofCoreError } from "@proofcore/core";
 import {
   type AgentProvider,
@@ -11,7 +14,7 @@ import {
   saveSession,
   sessionId,
 } from "./agent-runtime.js";
-import { loadStoredSession } from "./ui.js";
+import { clearStoredSession, DEFAULT_API_URL, loadStoredSession, saveStoredSession } from "./ui.js";
 
 /**
  * `proofcore serve` — the local agent, driven from a browser on this machine.
@@ -33,6 +36,10 @@ import { loadStoredSession } from "./ui.js";
 
 export interface ServeOptions {
   root: string;
+  /** Built web app to serve as the native window's interface. */
+  webRoot?: string;
+  /** The site API the window proxies, so its cookie never leaves this process. */
+  cloudApiUrl?: string;
   /**
    * Optional on purpose: a packaged app must open before a model is configured. Without a
    * provider the window still works - it explains what to set - instead of a dead screen.
@@ -57,8 +64,28 @@ export interface ServeHandle {
 }
 
 const MAX_BODY_BYTES = 256 * 1024;
+const MAX_PROXY_BODY_BYTES = 4 * 1024 * 1024;
 const COOKIE = "pc_local";
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
+const LOCAL_API_PATHS = new Set(["/api/state", "/api/approve", "/api/chat"]);
+
+const MIME_TYPES: Record<string, string> = {
+  ".css": "text/css; charset=utf-8",
+  ".html": "text/html; charset=utf-8",
+  ".ico": "image/x-icon",
+  ".jpeg": "image/jpeg",
+  ".jpg": "image/jpeg",
+  ".js": "text/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".map": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".webp": "image/webp",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+};
+
+const STATIC_FILE = /\.(?:css|html|ico|jpe?g|js|json|map|png|svg|webp|woff2?)$/i;
 
 function randomToken(): string {
   return randomBytes(24).toString("base64url");
@@ -69,6 +96,23 @@ function constantTimeEquals(a: string, b: string): boolean {
   const right = Buffer.from(b);
   if (left.length !== right.length) return false;
   return timingSafeEqual(left, right);
+}
+
+async function readBuffer(request: IncomingMessage, limit: number): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of request) {
+    size += (chunk as Buffer).length;
+    if (size > limit) {
+      throw new ProofCoreError({
+        message: "Request body too large.",
+        category: "VALIDATION",
+        code: "body_too_large",
+      });
+    }
+    chunks.push(chunk as Buffer);
+  }
+  return Buffer.concat(chunks);
 }
 
 async function readJson(request: IncomingMessage): Promise<Record<string, unknown>> {
@@ -113,6 +157,150 @@ function presentedToken(request: IncomingMessage): string | undefined {
   return undefined;
 }
 
+/** A file inside the built web app, or the SPA entry point for a client route. */
+function staticFile(root: string, pathname: string): { path: string; cache: string } | null {
+  const base = resolve(root);
+  const index = join(base, "index.html");
+  if (pathname === "/" || !extname(pathname)) {
+    return existsSync(index) ? { path: index, cache: "no-store" } : null;
+  }
+  const target = resolve(base, `.${normalize(pathname)}`);
+  if (target !== base && !target.startsWith(`${base}${sep}`)) return null;
+  if (!existsSync(target)) return null;
+  return { path: target, cache: "public, max-age=31536000, immutable" };
+}
+
+async function sendStatic(
+  request: IncomingMessage,
+  response: import("node:http").ServerResponse,
+  file: { path: string; cache: string }
+): Promise<void> {
+  try {
+    const body = await readFile(file.path);
+    response.writeHead(200, {
+      "content-type": MIME_TYPES[extname(file.path).toLowerCase()] ?? "application/octet-stream",
+      "cache-control": file.cache,
+      "x-content-type-options": "nosniff",
+    });
+    response.end(request.method === "HEAD" ? undefined : body);
+  } catch {
+    response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+    response.end("not found");
+  }
+}
+
+function sessionCookieFrom(headers: {
+  getSetCookie?: () => string[];
+  get(name: string): string | null;
+}) {
+  const all = headers.getSetCookie?.() ?? [];
+  const raw = all.find((value) => value.startsWith("ps_session=")) ?? headers.get("set-cookie");
+  if (!raw) return undefined;
+  const value = /(?:^|;\s*)ps_session=([^;]+)/.exec(raw)?.[1];
+  return value ? `ps_session=${value}` : undefined;
+}
+
+/** The cloud sets Secure/Domain for its own origin; the local loopback cannot use either. */
+function rewriteSetCookie(raw: string): string {
+  let cookie = raw
+    .replace(/;\s*Domain=[^;]*/gi, "")
+    .replace(/;\s*Secure/gi, "")
+    .replace(/;\s*SameSite=[^;]*/gi, "");
+  cookie += "; SameSite=Lax";
+  return cookie;
+}
+
+function browserSessionCookie(request: IncomingMessage): string | undefined {
+  const cookies = request.headers.cookie ?? "";
+  const value = /(?:^|;\s*)ps_session=([^;]+)/.exec(cookies)?.[1];
+  return value ? `ps_session=${value}` : undefined;
+}
+
+/**
+ * The site API, called server-side with the stored session. The window sees one origin:
+ * no CORS, no cookie in JavaScript, and the same endpoints the deployed web app uses.
+ */
+async function proxyCloud(
+  request: IncomingMessage,
+  response: import("node:http").ServerResponse,
+  url: URL,
+  apiUrl: string,
+  log: (line: string) => void
+): Promise<void> {
+  const target = new URL(`${url.pathname}${url.search}`, `${apiUrl.replace(/\/+$/, "")}/`);
+  const session = await loadStoredSession(apiUrl).catch(() => null);
+  const cookie = session?.cookie ?? browserSessionCookie(request);
+  const headers: Record<string, string> = { accept: "application/json" };
+  const contentType = request.headers["content-type"];
+  if (typeof contentType === "string") headers["content-type"] = contentType;
+  if (cookie) headers.cookie = cookie;
+  const authorization = request.headers.authorization;
+  if (typeof authorization === "string" && !cookie) headers.authorization = authorization;
+
+  let body: Buffer | undefined;
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    body = await readBuffer(request, MAX_PROXY_BODY_BYTES);
+  }
+
+  let upstream: Response;
+  try {
+    upstream = await fetch(target, {
+      method: request.method,
+      headers,
+      // `Buffer` is a Uint8Array at run time, but its generic type is not accepted by
+      // the global BodyInit definition: hand fetch a plain view of the same bytes.
+      ...(body && body.length > 0 ? { body: new Uint8Array(body) } : {}),
+      redirect: "manual",
+      signal: AbortSignal.timeout(120_000),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    log(`cloud unreachable: ${message}`);
+    response.writeHead(502, { "content-type": "application/json; charset=utf-8" });
+    response.end(
+      JSON.stringify({
+        error: {
+          code: "site_unreachable",
+          message: `The site is unreachable. Local tools still work; sign-in and sync need a connection. (${message})`,
+        },
+      })
+    );
+    return;
+  }
+
+  const responseBody = Buffer.from(await upstream.arrayBuffer());
+  const setCookies = upstream.headers.getSetCookie?.() ?? [];
+  const sessionCookie = sessionCookieFrom(upstream.headers);
+  if (sessionCookie) {
+    let email = session?.email ?? "unknown";
+    try {
+      const parsed = JSON.parse(responseBody.toString("utf8")) as { user?: { email?: string } };
+      if (parsed.user?.email) email = parsed.user.email;
+    } catch {
+      // The cookie is the authority; a non-JSON sign-in response is still a session.
+    }
+    await saveStoredSession({
+      apiUrl: apiUrl.replace(/\/+$/, ""),
+      cookie: sessionCookie,
+      email,
+      savedAt: new Date().toISOString(),
+    }).catch((error) => log(`could not store session: ${error?.message ?? error}`));
+  }
+  if (url.pathname === "/api/auth/sign-out") {
+    await clearStoredSession().catch(() => false);
+  }
+
+  const responseHeaders: Record<string, string | string[]> = {};
+  for (const name of ["content-type", "cache-control", "retry-after", "location"]) {
+    const value = upstream.headers.get(name);
+    if (value) responseHeaders[name] = value;
+  }
+  if (setCookies.length > 0) responseHeaders["set-cookie"] = setCookies.map(rewriteSetCookie);
+  responseHeaders["x-content-type-options"] = "nosniff";
+  response.writeHead(upstream.status, responseHeaders);
+  response.end(request.method === "HEAD" ? undefined : responseBody);
+}
+
 export async function serveLocal(options: ServeOptions): Promise<ServeHandle> {
   const token = randomToken();
   const log = options.log ?? (() => undefined);
@@ -137,6 +325,17 @@ export async function serveLocal(options: ServeOptions): Promise<ServeHandle> {
       }
     }
 
+    if (url.pathname === "/health" && options.webRoot) {
+      try {
+        await proxyCloud(request, response, url, options.cloudApiUrl ?? DEFAULT_API_URL, log);
+      } catch (error) {
+        log(`health proxy error: ${error instanceof Error ? error.message : String(error)}`);
+        response.writeHead(502, { "content-type": "application/json; charset=utf-8" });
+        response.end(JSON.stringify({ error: { code: "site_unreachable" } }));
+      }
+      return;
+    }
+
     if (url.pathname === "/health") {
       response.writeHead(200, { "content-type": "application/json" });
       response.end(JSON.stringify({ ok: true, service: "proofcore-local-agent" }));
@@ -146,11 +345,11 @@ export async function serveLocal(options: ServeOptions): Promise<ServeHandle> {
     // The token arrives once, in the query string, immediately after the terminal prints
     // the URL. It is exchanged for an HttpOnly cookie so it stops travelling in the address
     // bar, and so a script on the page cannot read it.
-    if (url.pathname === "/" && !presentedToken(request)) {
+    if ((url.pathname === "/" || url.pathname === "/agent") && !presentedToken(request)) {
       const supplied = url.searchParams.get("t") ?? "";
       if (TOKEN_PATTERN.test(supplied) && constantTimeEquals(supplied, token)) {
         response.writeHead(302, {
-          location: "/",
+          location: url.pathname === "/agent" ? "/agent" : options.webRoot ? "/app" : "/",
           "set-cookie": `${COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=86400`,
         });
         response.end();
@@ -159,6 +358,44 @@ export async function serveLocal(options: ServeOptions): Promise<ServeHandle> {
       response.writeHead(401, { "content-type": "text/plain; charset=utf-8" });
       response.end("Open the URL printed in the terminal (it carries the one-time token).");
       return;
+    }
+
+    // The agent page stays available beside the product UI: a native console for the tools
+    // that do not have a dashboard screen yet.
+    if (options.webRoot && !isApi && url.pathname === "/agent") {
+      if (!presentedToken(request)) {
+        response.writeHead(401, { "content-type": "text/plain; charset=utf-8" });
+        response.end("Open the URL printed in the terminal (it carries the one-time token).");
+        return;
+      }
+      response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      response.end(renderPage(options));
+      return;
+    }
+
+    // The native window's interface. The HTML routes are protected by the same per-run
+    // cookie as the local API; hashed assets are public only on loopback.
+    if (options.webRoot && !isApi && request.method !== "POST") {
+      if (url.pathname === "/") {
+        response.writeHead(302, { location: "/app" });
+        response.end();
+        return;
+      }
+      if (!STATIC_FILE.test(url.pathname) && !presentedToken(request)) {
+        response.writeHead(401, { "content-type": "text/plain; charset=utf-8" });
+        response.end("Open the URL printed in the terminal (it carries the one-time token).");
+        return;
+      }
+      const file = staticFile(options.webRoot, url.pathname);
+      if (file) {
+        await sendStatic(request, response, file);
+        return;
+      }
+      if (STATIC_FILE.test(url.pathname)) {
+        response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+        response.end("not found");
+        return;
+      }
     }
 
     if (isApi) {
@@ -304,6 +541,11 @@ export async function serveLocal(options: ServeOptions): Promise<ServeHandle> {
         }
         send("done", { syncError: syncError ?? null });
         response.end();
+        return;
+      }
+
+      if (isApi && options.webRoot && !LOCAL_API_PATHS.has(url.pathname)) {
+        await proxyCloud(request, response, url, options.cloudApiUrl ?? DEFAULT_API_URL, log);
         return;
       }
 

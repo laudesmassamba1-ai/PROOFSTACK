@@ -4,21 +4,29 @@
   "private": true,
   "description": "PROOFCORE desktop: the native window around the local engine",
   "main": "main.cjs",
+  "buildOrder": false,
   "author": "PROOFCORE <support@proofcore.dev>",
   "license": "UNLICENSED",
   "scripts": {
+    "build": "node scripts/check-syntax.mjs",
+    "typecheck": "node scripts/check-syntax.mjs",
     "icons": "node scripts/make-icons.mjs",
     "start": "electron .",
     "smoke": "PROOFCORE_SMOKE=1 xvfb-run -a electron . --no-sandbox",
-    "dist": "pnpm icons && electron-builder --linux deb AppImage",
-    "dist:linux": "pnpm icons && electron-builder --linux deb AppImage",
-    "dist:win": "pnpm icons && electron-builder --win",
+    "sidecar": "node ../../tooling/scripts/build-binary.mjs",
+    "sidecar:linux": "node ../../tooling/scripts/build-binary.mjs --target linux-x64",
+    "sidecar:win": "node ../../tooling/scripts/build-binary.mjs --target win-x64",
+    "dist": "pnpm sidecar && pnpm icons && electron-builder --linux deb AppImage",
+    "dist:linux": "pnpm sidecar:linux && pnpm icons && electron-builder --linux deb AppImage",
+    "dist:win": "pnpm sidecar:win && pnpm icons && electron-builder --win",
     "dist:mac": "pnpm icons && electron-builder --mac"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
   },
   "devDependencies": {
     "electron": "31.7.7",
-    "electron-builder": "25.1.8",
-    "electron-updater": "^6.8.11"
+    "electron-builder": "25.1.8"
   },
   "homepage": "https://proofstack-iota.vercel.app"
 }

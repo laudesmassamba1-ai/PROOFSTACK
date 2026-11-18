@@ -34,7 +34,9 @@
     "cli:installers": "node tooling/scripts/build-installers.mjs",
     "cli:installers:all": "node tooling/scripts/build-installers.mjs --all",
     "app:desktop": "pnpm --filter @proofcore/desktop start",
-    "app:dist": "pnpm --filter @proofcore/desktop dist"
+    "app:dist": "pnpm --filter @proofcore/web build && node tooling/scripts/package-desktop.mjs",
+    "app:dist:linux": "pnpm --filter @proofcore/web build && pnpm --filter @proofcore/desktop dist:linux",
+    "app:dist:win": "pnpm --filter @proofcore/web build && pnpm --filter @proofcore/desktop dist:win"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",

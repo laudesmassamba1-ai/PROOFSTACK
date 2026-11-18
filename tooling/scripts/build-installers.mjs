@@ -28,12 +28,14 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { desktopEntry, iconPng } from "../../packaging/assets.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const require = createRequire(import.meta.url);
 const binDir = join(root, "artifacts", "bin");
 const outDir = join(root, "artifacts", "installers");
 const cache = join(root, "artifacts", ".cache");
@@ -60,6 +62,20 @@ const TARGETS = {
 const say = (message) => process.stdout.write(`\u001b[2m▸\u001b[0m ${message}\n`);
 const run = (command, args, options = {}) =>
   execFileSync(command, args, { stdio: "inherit", cwd: root, ...options });
+
+/** The package's real bin path, not the POSIX-only node_modules/.bin symlink. */
+function packageBin(packageName, binName) {
+  let directory = dirname(require.resolve(packageName));
+  while (!existsSync(join(directory, "package.json"))) {
+    const parent = dirname(directory);
+    if (parent === directory) throw new Error(`package.json not found for ${packageName}`);
+    directory = parent;
+  }
+  const manifest = JSON.parse(readFileSync(join(directory, "package.json"), "utf8"));
+  const relative = typeof manifest.bin === "string" ? manifest.bin : manifest.bin?.[binName];
+  if (!relative) throw new Error(`${packageName} has no ${binName} binary`);
+  return join(directory, relative);
+}
 
 /** Newest modification time in the CLI sources and its build output. */
 function newestSourceMtime() {
@@ -114,7 +130,7 @@ function buildWindowsSetup(target) {
 
   say("bundling the installer script");
   const installerJs = join(work, "installer.cjs");
-  run(join(root, "node_modules/.bin/esbuild"), [
+  run(packageBin("esbuild", "esbuild"), [
     join(root, "packaging/installer-main.mjs"),
     "--bundle",
     "--platform=node",
@@ -143,7 +159,8 @@ function buildWindowsSetup(target) {
 
   const setup = join(outDir, `proofcore-${version}-setup-${target}.exe`);
   copyFileSync(runtime, setup);
-  run(join(root, "node_modules/.bin/postject"), [
+  run(process.execPath, [
+    packageBin("postject", "postject"),
     setup,
     "NODE_SEA_BLOB",
     blob,

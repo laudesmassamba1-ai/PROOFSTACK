@@ -21,6 +21,7 @@ uses the Ink & Object direction; this file records what is true and what remains
   the shell have FR/EN copy.
 - Bricolage Grotesque, Geist and JetBrains Mono are bundled locally; no runtime UI
   dependency was added.
+- Native desktop package: Electron window with the embedded web build, the same local engine as the CLI, a login window backed by the site API, an OS-vault session with a seven-day offline grace period, a loopback API proxy, desktop/Start Menu icons and app/engine update hooks. Linux produces `.deb` + AppImage; the release workflow produces the Windows NSIS `.exe`.
 - Marketing, docs, workspace and admin routes are code-split.
 
 ## Design records
@@ -39,7 +40,7 @@ uses the Ink & Object direction; this file records what is true and what remains
 ## Verification
 
 - `pnpm typecheck`: passes across the workspace.
-- `pnpm test`: 257 tests pass (20 files).
+- `pnpm test`: 507 tests pass (40 files).
 - `pnpm test:e2e`: 26 tests pass (desktop + mobile), including the HttpOnly session
   surviving a reload and no horizontal overflow on any dashboard page.
 - `pnpm --filter @proofcore/web build`: passes; route-level chunks replace the previous
@@ -47,6 +48,7 @@ uses the Ink & Object direction; this file records what is true and what remains
 - Visual QA: 42 route/viewport combinations from 1920×1080 to 375×812, zero horizontal
   overflow; screenshots generated with no console/page errors.
 - `pnpm lint`: clean across 256 files.
+- Packaged desktop smoke (Linux): the built `.deb` app starts its packaged sidecar, serves `resources/web`, redirects to `/app` and shows the site title. A Playwright Electron run signs in through a mock site API, then opens the main window at `/app` without the render-error fallback.
 
 ## Known gaps
 
@@ -69,6 +71,12 @@ The full, evidence-based list lives in `docs/AUDIT_2026-11.md`. The short versio
 - SasPay live path is untested without credentials; sandbox payments are tested.
 - Browser journeys for WORLD/FLOW remain HTTP/fixture based; no Playwright customer
   journey driver.
+- The Windows desktop installer is built by the release workflow and checked for its
+  packaged files, not launched on a Windows runner in this environment. It is unsigned,
+  so Windows SmartScreen may warn until a code-signing certificate is configured. macOS
+  packaging is configured but not part of the requested Windows/Linux matrix.
+- Desktop auto-update reads electron-builder's `latest*.yml` assets. It needs a published
+  GitHub release with those assets; it is not exercised by the local package build.
 - The security review items for shared registration limits behind a proxy, the
   per-isolate in-memory rate limiter, account-enumeration timing, PBKDF2 cost, single
   `WEB_ORIGIN` support and chunked webhook size limits remain open. They are backend

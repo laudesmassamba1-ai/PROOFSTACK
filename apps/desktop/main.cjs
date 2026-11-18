@@ -29,12 +29,14 @@ const { existsSync } = require("node:fs");
 const { createServer } = require("node:net");
 const { join } = require("node:path");
 const { homedir } = require("node:os");
-const { readFileSync } = require("node:fs");
+const { chmodSync, mkdirSync, readFileSync, writeFileSync } = require("node:fs");
 const { evaluateAccess, formatRemaining } = require("./src/access.cjs");
 const { createStore } = require("./src/store.cjs");
 const { loginPageHtml } = require("./src/login-page.cjs");
 
 const SMOKE = process.env.PROOFCORE_SMOKE === "1";
+const SITE_API =
+  process.env.PROOFCORE_API_URL ?? "https://proofcore-api.laudesmassamba1.workers.dev";
 
 /** One window, one sidecar: a second launch focuses the first instead of starting another. */
 if (!SMOKE && !app.requestSingleInstanceLock()) {
@@ -118,6 +120,14 @@ function sidecarCommand(port) {
   return null;
 }
 
+/** The built web app, packaged next to the sidecar. */
+function webRoot() {
+  const packaged = join(process.resourcesPath ?? "", "web");
+  if (existsSync(join(packaged, "index.html"))) return packaged;
+  const development = join(__dirname, "..", "..", "apps", "web", "dist");
+  return existsSync(join(development, "index.html")) ? development : null;
+}
+
 /** The working directory the agent should open: the user's project, not the app bundle. */
 function safeCwd() {
   const fromEnv = process.env.PROOFCORE_APP_CWD;
@@ -133,9 +143,17 @@ async function startSidecar() {
   }
   log(`starting ${command.file} ${command.args.join(" ")}`);
 
+  const interfaceRoot = webRoot();
+  if (interfaceRoot) log(`interface ${interfaceRoot}`);
   sidecar = spawn(command.file, command.args, {
     cwd: command.cwd,
-    env: { ...process.env, ...(command.env ?? {}), PROOFCORE_APP: "1" },
+    env: {
+      ...process.env,
+      ...(command.env ?? {}),
+      PROOFCORE_APP: "1",
+      PROOFCORE_API_URL: SITE_API,
+      ...(interfaceRoot ? { PROOFCORE_WEB_ROOT: interfaceRoot } : {}),
+    },
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
   });
@@ -177,15 +195,20 @@ async function startSidecar() {
   return { port: sidecarPort, url };
 }
 
-/** Where the CLI keeps its session, which is the same account this app uses. */
+/**
+ * Where the CLI keeps its session, which is the same account this app uses.
+ *
+ * This mirrors `sessionFilePath()` in `packages/cli/src/ui.ts` exactly. They used to differ
+ * on Windows (APPDATA here, ~/.config there) and when PROOFCORE_CONFIG_HOME was set, so a
+ * terminal login was invisible to the app.
+ */
 function cliSessionPath() {
   const home = homedir();
-  const base =
+  const root =
     process.env.PROOFCORE_CONFIG_HOME?.trim() ||
-    (process.platform === "win32"
-      ? join(process.env.APPDATA ?? join(home, "AppData", "Roaming"), "proofcore")
-      : join(home, ".config", "proofcore"));
-  return join(base, "session.json");
+    process.env.XDG_CONFIG_HOME?.trim() ||
+    join(home, ".config");
+  return join(root, "proofcore", "session.json");
 }
 
 function readCliSession() {
@@ -320,37 +343,72 @@ function showLoginWindow(state) {
   }
 }
 
-/** Runs the CLI login, then re-runs the gate. Resolves with the new state. */
-async function signIn() {
-  const command = sidecarCommand(sidecarPort || 7317);
-  if (!command) return { allowed: false, detail: "Le moteur local est introuvable dans ce build." };
-  await new Promise((resolve) => {
-    const child = spawn(command.file, ["login"], {
-      cwd: command.cwd,
-      env: { ...process.env, ...(command.env ?? {}) },
-      stdio: ["ignore", "pipe", "pipe"],
-      windowsHide: true,
+/** Writes the session in the format the CLI and its local proxy already read. */
+function saveCliSession(session) {
+  const path = cliSessionPath();
+  mkdirSync(join(path, ".."), { recursive: true, mode: 0o700 });
+  writeFileSync(path, `${JSON.stringify(session, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+  chmodSync(path, 0o600);
+}
+
+/**
+ * Signs in through the site API and keeps the resulting cookie in both stores: the vault
+ * for this app, and the CLI session file for the local engine that proxies the web UI.
+ */
+async function signIn(credentials = {}) {
+  const email = typeof credentials.email === "string" ? credentials.email.trim() : "";
+  const password = typeof credentials.password === "string" ? credentials.password : "";
+  if (!email || !password) {
+    return { allowed: false, detail: "Renseignez votre email et votre mot de passe." };
+  }
+  let response;
+  try {
+    response = await fetch(`${SITE_API.replace(/\/+$/, "")}/api/auth/sign-in/email`, {
+      method: "POST",
+      headers: { accept: "application/json", "content-type": "application/json" },
+      body: JSON.stringify({ email, password }),
+      signal: AbortSignal.timeout(20_000),
     });
-    let output = "";
-    child.stdout.on("data", (chunk) => {
-      output += chunk;
-    });
-    child.stderr.on("data", (chunk) => {
-      output += chunk;
-    });
-    child.on("close", () => {
-      log(`login: ${output.trim().split("\n").slice(-3).join(" | ")}`);
-      resolve();
-    });
-    child.on("error", resolve);
-  });
+  } catch (error) {
+    return {
+      allowed: false,
+      detail: `Le site est injoignable : ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+  const text = await response.text();
+  if (!response.ok) {
+    let detail = `Connexion refusée (HTTP ${response.status}).`;
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed?.error?.message) detail = parsed.error.message;
+    } catch {
+      // The status is enough when the site did not return its JSON envelope.
+    }
+    return { allowed: false, detail };
+  }
+  const rawCookie =
+    response.headers.getSetCookie?.()[0] ?? response.headers.get("set-cookie") ?? "";
+  const cookie = rawCookie.split(";")[0];
+  if (!cookie.startsWith("ps_session=")) {
+    return { allowed: false, detail: "Le site a accepté la connexion sans renvoyer de session." };
+  }
+  let account = email;
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed?.user?.email) account = parsed.user.email;
+  } catch {
+    // The cookie is what matters; the email is a display hint.
+  }
+  const session = { apiUrl: SITE_API, cookie, email: account, savedAt: new Date().toISOString() };
+  saveCliSession(session);
+  store?.save(session);
+  log(`signed in as ${account}`);
 
   const state = await gate();
   if (!state.allowed) return state;
-  if (loginWindow) {
-    loginWindow.close();
-    loginWindow = null;
-  }
+  // Open the real window before closing the sign-in one. The login window's `closed`
+  // handler quits the app when there is no main window yet; closing first made a successful
+  // sign-in exit the process before the sidecar had started.
   if (!mainWindow) {
     try {
       const { port, url } = await startSidecar();
@@ -360,6 +418,10 @@ async function signIn() {
       const message = error instanceof Error ? error.message : String(error);
       dialog.showErrorBox("PROOFCORE", message);
     }
+  }
+  if (loginWindow) {
+    loginWindow.close();
+    loginWindow = null;
   }
   return state;
 }
@@ -462,6 +524,8 @@ function buildMenu() {
         },
         { type: "separator" },
         { label: "Mettre à jour…", click: () => runUpdate() },
+        { label: "Ouvrir la console locale", click: () => openLocalAgent() },
+        { label: "Lancer les tests locaux", click: () => runLocalTests() },
         { label: "Vérifier les conflits (doctor)", click: () => runDoctor() },
         { type: "separator" },
         { role: process.platform === "darwin" ? "close" : "quit", label: "Quitter" },
@@ -506,20 +570,49 @@ function spawnSidecarOnce(command, args, done) {
   child.on("error", (error) => done(String(error)));
 }
 
-function runDoctor() {
-  spawnSidecarOnce("doctor", [], (text) => {
-    const window = new BrowserWindow({
-      width: 980,
-      height: 700,
-      backgroundColor: "#0b0d10",
-      title: "PROOFCORE · doctor",
-      parent: mainWindow ?? undefined,
-    });
-    const body = `<pre style="margin:0;padding:16px;font:12.5px/1.5 ui-monospace,monospace;color:#e8ecf1;background:#0b0d10;white-space:pre-wrap">${text
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")}</pre>`;
-    window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(body)}`);
+function openLocalAgent() {
+  if (!sidecarPort) return;
+  const window = new BrowserWindow({
+    width: 980,
+    height: 760,
+    backgroundColor: "#0b0d10",
+    title: "PROOFCORE · console locale",
+    icon: join(__dirname, "build", "icon.png"),
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
   });
+  window.loadURL(`http://127.0.0.1:${sidecarPort}/agent`);
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    if (!url.startsWith(`http://127.0.0.1:${sidecarPort}`)) shell.openExternal(url);
+    return { action: "deny" };
+  });
+}
+
+function showSidecarOutput(title, text) {
+  const window = new BrowserWindow({
+    width: 980,
+    height: 700,
+    backgroundColor: "#0b0d10",
+    title: `PROOFCORE · ${title}`,
+    parent: mainWindow ?? undefined,
+  });
+  const body = `<pre style="margin:0;padding:16px;font:12.5px/1.5 ui-monospace,monospace;color:#e8ecf1;background:#0b0d10;white-space:pre-wrap">${text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")}</pre>`;
+  window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(body)}`);
+}
+
+function runDoctor() {
+  spawnSidecarOnce("doctor", [], (text) => showSidecarOutput("doctor", text));
+}
+
+function runLocalTests() {
+  spawnSidecarOnce("test", ["--module", "world,flow,exit"], (text) =>
+    showSidecarOutput("tests locaux", text)
+  );
 }
 
 async function runUpdate() {
@@ -621,9 +714,28 @@ function createWindow(port, url) {
 
 /** Preferences that the window legitimately needs: where the engine listens, and versions. */
 ipcMain.handle("proofcore:state", () => accessState);
-ipcMain.handle("proofcore:login", () => signIn());
-ipcMain.handle("proofcore:logout", () => {
+ipcMain.handle("proofcore:login", (_event, credentials) => signIn(credentials));
+ipcMain.handle("proofcore:session-updated", async () => {
+  const fromCli = readCliSession();
+  if (fromCli) store.save(fromCli);
+  const session = store.load();
+  return session && !session.error ? { saved: true } : { saved: false };
+});
+ipcMain.handle("proofcore:logout", async () => {
   store?.clear();
+  const command = sidecarCommand(sidecarPort || 7317);
+  if (command) {
+    await new Promise((resolve) => {
+      const child = spawn(command.file, ["logout"], {
+        cwd: command.cwd,
+        env: { ...process.env, ...(command.env ?? {}) },
+        stdio: "ignore",
+        windowsHide: true,
+      });
+      child.on("close", resolve);
+      child.on("error", resolve);
+    });
+  }
   return { cleared: true };
 });
 ipcMain.handle("proofcore:open-external", (_event, url) => {

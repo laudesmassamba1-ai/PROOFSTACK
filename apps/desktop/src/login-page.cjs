@@ -50,26 +50,38 @@ p{margin:0 0 18px;color:var(--dim)}
 button{cursor:pointer;font:inherit;border-radius:10px;padding:10px 16px;border:1px solid var(--line);background:#1a2027;color:var(--fg)}
 button.primary{background:var(--acc);border-color:var(--acc);color:#06210f;font-weight:600}
 button:disabled{opacity:.55;cursor:progress}
-.row{display:flex;gap:10px;flex-wrap:wrap}
+label{display:block;margin:12px 0 0;color:var(--dim);font-size:12px}
+input{display:block;width:100%;margin-top:6px;border:1px solid var(--line);border-radius:9px;background:#0f1318;color:var(--fg);font:14px/1.4 ui-sans-serif,system-ui,sans-serif;padding:10px 11px}
+input:focus{outline:2px solid #2b4a37;border-color:var(--acc)}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
 </style></head><body>
 <main class="card">
   <div class="brand"><span class="dot"></span><b>PROOFCORE</b></div>
   <h1>${esc(reason.title)}</h1>
   <p>${esc(reason.body)}</p>
-  <div class="row">
-    <button class="primary" id="login">Se connecter</button>
-    <button id="site">Ouvrir le site</button>
-  </div>
+  <form id="login-form" autocomplete="on">
+    <label for="email">Email<input id="email" name="email" type="email" autocomplete="username" required></label>
+    <label for="password">Mot de passe<input id="password" name="password" type="password" autocomplete="current-password" required></label>
+    <div class="row">
+      <button class="primary" id="login" type="submit">Se connecter</button>
+      <button id="site" type="button">Ouvrir le site</button>
+    </div>
+  </form>
   <div class="status" id="status">${esc(state?.detail ?? "")}</div>
 </main>
 <script>
 const status = document.getElementById('status');
 const login = document.getElementById('login');
-login.addEventListener('click', async () => {
+const form = document.getElementById('login-form');
+form.addEventListener('submit', async (event) => {
+  event.preventDefault();
   login.disabled = true;
-  status.textContent = 'Un navigateur va s\\'ouvrir. Terminez la connexion, puis revenez ici.';
+  status.textContent = 'Connexion au site…';
   try {
-    const result = await window.proofcoreDesktop.login();
+    const result = await window.proofcoreDesktop.login({
+      email: document.getElementById('email').value,
+      password: document.getElementById('password').value
+    });
     status.textContent = result?.detail ?? '';
     if (result?.allowed) {
       status.textContent = 'Connecté. Ouverture de l\\'application…';

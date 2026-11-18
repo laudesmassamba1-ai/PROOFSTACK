@@ -2764,6 +2764,8 @@ async function commandServe(flags: GlobalFlags, args: string[]): Promise<number>
   }
 
   const port = Number(flagValue(args, "--port") ?? "7317");
+  const webRoot = process.env.PROOFCORE_WEB_ROOT?.trim();
+  const cloudApiUrl = process.env.PROOFCORE_API_URL?.trim() || DEFAULT_API_URL;
   const allowWrite = args.includes("--allow-write");
   const sync = !args.includes("--no-sync");
   const account = await loadStoredSession().catch(() => null);
@@ -2773,6 +2775,8 @@ async function commandServe(flags: GlobalFlags, args: string[]): Promise<number>
     handle = await serveLocal({
       root: flags.cwd,
       provider,
+      ...(webRoot ? { webRoot } : {}),
+      cloudApiUrl,
       port: Number.isFinite(port) ? port : 7317,
       allowWrite,
       sync,
