@@ -33,7 +33,11 @@ import { loadStoredSession } from "./ui.js";
 
 export interface ServeOptions {
   root: string;
-  provider: AgentProvider;
+  /**
+   * Optional on purpose: a packaged app must open before a model is configured. Without a
+   * provider the window still works - it explains what to set - instead of a dead screen.
+   */
+  provider?: AgentProvider;
   port?: number;
   /** Approve, refuse or ask. Defaults to asking in the terminal. */
   approve?: Approver;
@@ -189,7 +193,7 @@ export async function serveLocal(options: ServeOptions): Promise<ServeHandle> {
         response.end(
           JSON.stringify({
             root: options.root,
-            model: options.provider.model,
+            model: options.provider?.model ?? "non configuré",
             allowWrite: options.allowWrite === true,
             sync: options.sync === true,
             account: account ? { email: account.email, apiUrl: account.apiUrl } : null,
@@ -219,6 +223,25 @@ export async function serveLocal(options: ServeOptions): Promise<ServeHandle> {
           response.end(JSON.stringify({ error: "message_required" }));
           return;
         }
+        if (!options.provider) {
+          // The window is open, the engine runs, one thing is missing. Saying it in the
+          // conversation keeps the app usable: the user reads it where they were typing.
+          response.writeHead(200, {
+            "content-type": "text/event-stream; charset=utf-8",
+            "cache-control": "no-cache",
+          });
+          const explanation =
+            "Aucun modèle n'est configuré. Deux façons de le faire, une seule fois :\n\n" +
+            "1. Menu PROOFCORE → « Se connecter… », puis le compte fournit le modèle.\n" +
+            "2. proofcore agent --configure  (URL, modèle, clé — stockés en 0600 sur cette machine).\n\n" +
+            "Tout le reste tourne déjà ici : les audits, le bac à sable, l'index, les outils.";
+          const frame = (event: string, payload: unknown) =>
+            `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
+          response.write(frame("assistant_text", { text: explanation }));
+          response.write(frame("done", {}));
+          response.end();
+          return;
+        }
         const conversationKey =
           typeof body.conversationKey === "string" ? body.conversationKey : "default";
         let session = sessions.get(conversationKey);
@@ -234,7 +257,7 @@ export async function serveLocal(options: ServeOptions): Promise<ServeHandle> {
           session = new AgentSession(
             {
               root: options.root,
-              provider: options.provider,
+              provider: options.provider as AgentProvider,
               approve,
               ...(options.maxSteps ? { maxSteps: options.maxSteps } : {}),
               // Every event the loop produces is forwarded to the page as it happens, so a
@@ -270,7 +293,7 @@ export async function serveLocal(options: ServeOptions): Promise<ServeHandle> {
         stream = undefined;
 
         await saveSession(options.root, sessionId(options.root, conversationKey), result.messages, {
-          model: options.provider.model,
+          model: options.provider?.model ?? "non configuré",
           source: "local-bridge",
         });
 
@@ -429,7 +452,7 @@ button{cursor:pointer;border-radius:8px;border:1px solid var(--line);background:
 button.ok{border-color:var(--acc);color:var(--acc)}button.no{border-color:#ef4444;color:#ef4444}
 form{display:flex;gap:8px}textarea{flex:1;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit;resize:none;min-height:52px}
 </style></head><body>
-<header><b>PROOFCORE</b><span>agent local · ${escapeHtml(options.provider.model)}</span><span id="meta"></span></header>
+<header><b>PROOFCORE</b><span>agent local · ${escapeHtml(options.provider?.model ?? "aucun modèle configuré")}</span><span id="meta"></span></header>
 <main><div id="log"></div>
 <form id="f"><textarea id="q" placeholder="Demande quelque chose sur ce dépôt…" required></textarea><button class="ok">Envoyer</button></form>
 </main>

@@ -25,6 +25,7 @@ import {
   MessageActions,
   printConversation,
 } from "../../components/app/ChatMarkdown.js";
+import { LoadMore } from "../../components/app/LoadMore.js";
 import { AiMark } from "../../components/brand/AiMark.js";
 import { useI18n } from "../../i18n/index.js";
 import {
@@ -562,6 +563,8 @@ export function AiChatPage(): React.ReactElement {
   const fr = locale === "fr";
 
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [conversationTotal, setConversationTotal] = useState(0);
+  const [loadingMoreConversations, setLoadingMoreConversations] = useState(false);
   const [conversationFilter, setConversationFilter] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -621,11 +624,39 @@ export function AiChatPage(): React.ReactElement {
 
   useEffect(() => {
     if (!activeWorkspaceId) return;
-    fetch(`/api/v1/ai/conversations?workspaceId=${activeWorkspaceId}`, { credentials: "include" })
-      .then((response) => (response.ok ? response.json() : { items: [] }))
-      .then((data) => setConversations(data.items ?? []))
-      .catch(() => setConversations([]));
+    // The list is paged now: it used to stop at 50 rows with no way to reach an older
+    // conversation, and nothing in the UI said so.
+    fetch(`/api/v1/ai/conversations?workspaceId=${activeWorkspaceId}&limit=50`, {
+      credentials: "include",
+    })
+      .then((response) => (response.ok ? response.json() : { items: [], total: 0 }))
+      .then((data) => {
+        setConversations(data.items ?? []);
+        setConversationTotal(data.total ?? data.items?.length ?? 0);
+      })
+      .catch(() => {
+        setConversations([]);
+        setConversationTotal(0);
+      });
   }, [activeWorkspaceId]);
+
+  const loadMoreConversations = async () => {
+    if (!activeWorkspaceId || loadingMoreConversations) return;
+    setLoadingMoreConversations(true);
+    try {
+      const response = await fetch(
+        `/api/v1/ai/conversations?workspaceId=${activeWorkspaceId}&limit=50&offset=${conversations.length}`,
+        { credentials: "include" }
+      );
+      if (response.ok) {
+        const data = (await response.json()) as { items: ConversationSummary[]; total: number };
+        setConversations((items) => [...items, ...(data.items ?? [])]);
+        setConversationTotal(data.total ?? 0);
+      }
+    } finally {
+      setLoadingMoreConversations(false);
+    }
+  };
 
   useEffect(() => {
     fetch("/api/v1/ai/profile", { credentials: "include" })
@@ -734,6 +765,7 @@ export function AiChatPage(): React.ReactElement {
     async (id: string) => {
       await fetch(`/api/v1/ai/conversations/${id}`, { method: "DELETE", credentials: "include" });
       setConversations((items) => items.filter((item) => item.id !== id));
+      setConversationTotal((value) => Math.max(0, value - 1));
       if (activeId === id) startNewChat();
     },
     [activeId, startNewChat]
@@ -1073,6 +1105,19 @@ export function AiChatPage(): React.ReactElement {
               </button>
             </div>
           ))}
+          {/* Only offered when no local search is narrowing the list: otherwise "more"
+              would look like it applies to the filtered result. */}
+          {conversationFilter.trim() === "" ? (
+            <LoadMore
+              shown={conversations.length}
+              total={conversationTotal}
+              loading={loadingMoreConversations}
+              onLoad={() => void loadMoreConversations()}
+              fr={fr}
+              noun={fr ? "conversations" : "conversations"}
+              label={fr ? "Charger 50 de plus" : "Load 50 more"}
+            />
+          ) : null}
         </div>
 
         <div className="chat-sidebar-foot">

@@ -13,6 +13,7 @@ import {
 } from "../http/dto.js";
 import { HttpError } from "../http/errors.js";
 import { readBody, requireUser, requireWorkspace } from "../http/guards.js";
+import { pageBody, readPage } from "../http/pagination.js";
 import type { AppEnv, Services } from "../http/services.js";
 import { isValidWebhookUrl, WEBHOOK_EVENTS } from "../outbound.js";
 
@@ -344,11 +345,18 @@ export function workspaceRoutes(services: Services): Hono<AppEnv> {
   /** Recent runs across every project, for the module views. */
   app.get("/runs", async (c) => {
     const { workspace } = await requireWorkspace(c, services, c.req.query("workspaceId"));
-    const limit = Math.min(100, Math.max(1, Number(c.req.query("limit") ?? 25) || 25));
-    const runs = await services.store.recentRuns(workspace.id, limit);
-    return c.json({
-      items: runs.map((run) => ({ ...runSummaryDto(run), projectName: run.projectName })),
-    });
+    const page = readPage(c);
+    const [runs, total] = await Promise.all([
+      services.store.recentRuns(workspace.id, page.limit, page.offset),
+      services.store.countWorkspaceRuns(workspace.id),
+    ]);
+    return c.json(
+      pageBody(
+        runs.map((run) => ({ ...runSummaryDto(run), projectName: run.projectName })),
+        total,
+        page
+      )
+    );
   });
 
   /** Findings across the workspace, filtered by module when asked. */
@@ -356,30 +364,42 @@ export function workspaceRoutes(services: Services): Hono<AppEnv> {
     const { workspace } = await requireWorkspace(c, services, c.req.query("workspaceId"));
     const raw = c.req.query("module");
     const module = raw === "world" || raw === "flow" || raw === "exit" ? raw : undefined;
-    const findings = await services.store.workspaceFindings(workspace.id, module, 100);
-    return c.json({ items: findings });
+    const page = readPage(c);
+    const [findings, total] = await Promise.all([
+      services.store.workspaceFindings(workspace.id, module, page.limit, page.offset),
+      services.store.countWorkspaceFindings(workspace.id, module),
+    ]);
+    return c.json(pageBody(findings, total, page));
   });
 
   app.get("/projects/:projectId/runs", async (c) => {
     const { workspace } = await requireWorkspace(c, services, c.req.query("workspaceId"));
     const project = await services.store.getProject(workspace.id, c.req.param("projectId"));
     if (!project) throw new HttpError(404, "project_not_found", "Project not found.");
-    const limit = Math.min(100, Math.max(1, Number(c.req.query("limit") ?? 25) || 25));
-    const runs = await services.store.listRuns(workspace.id, project.id, limit);
-    return c.json({ items: runs.map((run) => runSummaryDto(run)) });
+    const page = readPage(c);
+    const [runs, total] = await Promise.all([
+      services.store.listRuns(workspace.id, project.id, page.limit, page.offset),
+      services.store.countRuns(workspace.id, project.id),
+    ]);
+    return c.json(
+      pageBody(
+        runs.map((run) => runSummaryDto(run)),
+        total,
+        page
+      )
+    );
   });
 
   app.get("/projects/:projectId/findings", async (c) => {
     const { workspace } = await requireWorkspace(c, services, c.req.query("workspaceId"));
     const project = await services.store.getProject(workspace.id, c.req.param("projectId"));
     if (!project) throw new HttpError(404, "project_not_found", "Project not found.");
-    const limit = Math.min(100, Math.max(1, Number(c.req.query("limit") ?? 25) || 25));
-    const offset = Math.max(0, Number(c.req.query("offset") ?? 0) || 0);
+    const page = readPage(c);
     const [items, total] = await Promise.all([
-      services.store.listFindings(workspace.id, project.id, limit, offset),
+      services.store.listFindings(workspace.id, project.id, page.limit, page.offset),
       services.store.countFindings(workspace.id, project.id),
     ]);
-    return c.json({ items, total, limit, offset });
+    return c.json(pageBody(items, total, page));
   });
 
   /** The stored run payload, exactly as the engine produced it. */

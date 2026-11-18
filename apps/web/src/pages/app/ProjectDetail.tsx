@@ -1,12 +1,14 @@
-import { ArrowLeft, ChevronDown, FileJson, KeyRound, Loader2, Trash2 } from "lucide-react";
+import { ArrowLeft, FileJson, KeyRound, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
+import { LoadMore } from "../../components/app/LoadMore.js";
 import { Card, Empty, ErrorState, Loading, StatusBadge } from "../../components/app/ui.js";
 import { useI18n } from "../../i18n/index.js";
 import { PageHeader } from "../../layouts/AppLayout.js";
 import { API_BASE, type ApiError, apiFetch } from "../../lib/api.js";
 import { duration, formatDate, relativeTime } from "../../lib/format.js";
 import { useSession } from "../../lib/session.js";
+import { usePagedList } from "../../lib/usePagedList.js";
 
 interface Project {
   id: string;
@@ -43,12 +45,23 @@ export function ProjectDetail() {
   const fr = locale === "fr";
   const navigate = useNavigate();
   const [project, setProject] = useState<Project | null>(null);
-  const [runs, setRuns] = useState<Run[]>([]);
-  const [findings, setFindings] = useState<Finding[]>([]);
-  const [findingsTotal, setFindingsTotal] = useState(0);
-  const [findingsLoadingMore, setFindingsLoadingMore] = useState(false);
   const [expandedFinding, setExpandedFinding] = useState<string | null>(null);
   const [error, setError] = useState<ApiError | Error | null>(null);
+
+  // Both lists are paged by the same hook, so "load more", the counter and the failure
+  // behaviour cannot drift between the runs table and the findings table.
+  const runsUrl = useCallback(
+    ({ limit, offset }: { limit: number; offset: number }) =>
+      `/api/v1/projects/${projectId}/runs?workspaceId=${workspaceId}&limit=${limit}&offset=${offset}`,
+    [projectId, workspaceId]
+  );
+  const findingsUrl = useCallback(
+    ({ limit, offset }: { limit: number; offset: number }) =>
+      `/api/v1/projects/${projectId}/findings?workspaceId=${workspaceId}&limit=${limit}&offset=${offset}`,
+    [projectId, workspaceId]
+  );
+  const runs = usePagedList<Run>({ url: runsUrl, uniqueBy: (run) => run.id });
+  const findings = usePagedList<Finding>({ url: findingsUrl, uniqueBy: (finding) => finding.id });
   const [token, setToken] = useState<string | null>(null);
   const [keyError, setKeyError] = useState<ApiError | Error | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -58,38 +71,15 @@ export function ProjectDetail() {
     if (!workspaceId || !projectId) return;
     setError(null);
     try {
-      const [projectBody, runBody, findingBody] = await Promise.all([
-        apiFetch<{ project: Project }>(`/api/v1/projects/${projectId}?workspaceId=${workspaceId}`),
-        apiFetch<{ items: Run[] }>(`/api/v1/projects/${projectId}/runs?workspaceId=${workspaceId}`),
-        apiFetch<{ items: Finding[]; total: number }>(
-          `/api/v1/projects/${projectId}/findings?workspaceId=${workspaceId}&limit=25`
-        ),
-      ]);
-      setProject(projectBody.project);
-      setRuns(runBody.items);
-      setFindings(findingBody.items);
-      setFindingsTotal(findingBody.total);
-    } catch (caught) {
-      setError(caught as ApiError);
-    }
-  }, [projectId, workspaceId]);
-
-  const loadMoreFindings = useCallback(async () => {
-    if (!workspaceId || !projectId || findingsLoadingMore) return;
-    setFindingsLoadingMore(true);
-    setError(null);
-    try {
-      const body = await apiFetch<{ items: Finding[]; total: number }>(
-        `/api/v1/projects/${projectId}/findings?workspaceId=${workspaceId}&limit=25&offset=${findings.length}`
+      const body = await apiFetch<{ project: Project }>(
+        `/api/v1/projects/${projectId}?workspaceId=${workspaceId}`
       );
-      setFindings((items) => [...items, ...body.items]);
-      setFindingsTotal(body.total);
+      setProject(body.project);
     } catch (caught) {
       setError(caught as ApiError);
-    } finally {
-      setFindingsLoadingMore(false);
     }
-  }, [workspaceId, projectId, findings.length, findingsLoadingMore]);
+    await Promise.all([runs.reload(), findings.reload()]);
+  }, [projectId, workspaceId, runs.reload, findings.reload]);
 
   useEffect(() => {
     void load();
@@ -218,7 +208,7 @@ export default config;`;
               : "Stored from CLI/CI uploads, one per run id."
           }
         >
-          {runs.length === 0 ? (
+          {runs.items.length === 0 ? (
             <Empty
               title={fr ? "Aucun run" : "No run yet"}
               body={
@@ -240,7 +230,7 @@ export default config;`;
                   </tr>
                 </thead>
                 <tbody>
-                  {runs.map((run) => (
+                  {runs.items.map((run) => (
                     <tr key={run.id}>
                       <td>
                         <StatusBadge status={run.status} />
@@ -264,6 +254,15 @@ export default config;`;
               </table>
             </div>
           )}
+          <LoadMore
+            shown={runs.items.length}
+            total={runs.total}
+            loading={runs.loadingMore}
+            onLoad={() => void runs.loadMore()}
+            fr={fr}
+            noun={fr ? "exécutions" : "runs"}
+            label={fr ? "Charger 25 de plus" : "Load 25 more"}
+          />
         </Card>
 
         <div className="space-y-4">
@@ -337,7 +336,7 @@ export default config;`;
         }
         className="mt-4"
       >
-        {findings.length === 0 ? (
+        {findings.items.length === 0 ? (
           <Empty
             title={fr ? "Aucun constat" : "No finding"}
             body={
@@ -359,7 +358,7 @@ export default config;`;
                 </tr>
               </thead>
               <tbody>
-                {findings.map((finding) => (
+                {findings.items.map((finding) => (
                   <tr key={finding.id} className="align-top">
                     <td className="font-medium">
                       <button
@@ -418,28 +417,15 @@ export default config;`;
             </table>
           </div>
         )}
-        {findings.length < findingsTotal ? (
-          <div className="flex items-center gap-3 border-t border-line px-5 py-3">
-            <p className="text-xs text-muted">
-              {fr
-                ? `${findings.length} affichés sur ${findingsTotal} constats.`
-                : `${findings.length} of ${findingsTotal} findings shown.`}
-            </p>
-            <button
-              type="button"
-              className="app-btn"
-              onClick={() => void loadMoreFindings()}
-              disabled={findingsLoadingMore}
-            >
-              {findingsLoadingMore ? (
-                <Loader2 size={13} className="animate-spin" aria-hidden />
-              ) : (
-                <ChevronDown size={13} aria-hidden />
-              )}
-              {fr ? "Charger 25 de plus" : "Load 25 more"}
-            </button>
-          </div>
-        ) : null}
+        <LoadMore
+          shown={findings.items.length}
+          total={findings.total}
+          loading={findings.loadingMore}
+          onLoad={() => void findings.loadMore()}
+          fr={fr}
+          noun={fr ? "constats" : "findings"}
+          label={fr ? "Charger 25 de plus" : "Load 25 more"}
+        />
       </Card>
 
       <Card title="CLI" className="mt-4">

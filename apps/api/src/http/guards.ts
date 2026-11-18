@@ -1,7 +1,6 @@
 import type { Context } from "hono";
 import type { ZodType } from "zod";
 import { hashToken, readCookie, SESSION_COOKIE } from "../auth.js";
-import { originAllowed } from "../env.js";
 import type { Role, UserRecord, WorkspaceRecord } from "../store/app-store.js";
 import { HttpError } from "./errors.js";
 import type { AppEnv, Services } from "./services.js";
@@ -99,24 +98,4 @@ export async function readBody<T>(c: Context<AppEnv>, schema: ZodType<T>): Promi
     });
   }
   return parsed.data;
-}
-
-/**
- * Cross-origin protection for cookie-authenticated writes.
- *
- * Browsers always send `Origin` on a cross-site POST. A state-changing request that
- * carries an Origin other than this deployment's web app is rejected before routing.
- * Requests without an Origin are CLI/machine traffic authenticated by bearer token.
- */
-export function assertSameOrigin(c: Context<AppEnv>, services: Services): void {
-  const origin = c.req.header("origin");
-  if (!origin) return;
-  if (!originAllowed(services.config.webOrigins, origin)) {
-    throw new HttpError(
-      403,
-      "cross_origin_denied",
-      `This origin is not allowed to call the API: ${origin}. Add it to WEB_ORIGIN to allow it.`,
-      { origin }
-    );
-  }
 }

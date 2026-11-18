@@ -73,6 +73,55 @@ function newToken(): string {
   return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+/**
+ * A password prompt is a place to guess a password.
+ *
+ * `POST /account/password` and `DELETE /account` both verify the current password, so a
+ * stolen session cookie was enough to grind a password there with no limit at all: the
+ * sign-in lockout never saw it. The budget is per account and per action, so a failed
+ * deletion attempt does not lock the password form, and a correct password clears it.
+ */
+const PASSWORD_GUARD_MAX = 5;
+const PASSWORD_GUARD_WINDOW_MS = 15 * 60_000;
+
+function passwordScope(userId: string, action: "password" | "delete"): string {
+  return `account:${action}:${userId}`;
+}
+
+async function assertPasswordBudget(
+  services: Services,
+  userId: string,
+  action: "password" | "delete"
+): Promise<void> {
+  const since = new Date(services.clock().getTime() - PASSWORD_GUARD_WINDOW_MS);
+  const used = await services.store.countAuthAttempts(passwordScope(userId, action), since);
+  if (used >= PASSWORD_GUARD_MAX) {
+    const minutes = Math.ceil(PASSWORD_GUARD_WINDOW_MS / 60_000);
+    throw new HttpError(
+      429,
+      "too_many_attempts",
+      `Too many wrong passwords. This action is paused for ${minutes} minutes.`,
+      { retryAfterSeconds: minutes * 60 }
+    );
+  }
+}
+
+async function notePasswordFailure(
+  services: Services,
+  userId: string,
+  action: "password" | "delete"
+): Promise<void> {
+  await services.store.recordAuthAttempt(passwordScope(userId, action));
+}
+
+async function clearPasswordBudget(
+  services: Services,
+  userId: string,
+  action: "password" | "delete"
+): Promise<void> {
+  await services.store.clearAuthAttempts(passwordScope(userId, action));
+}
+
 export function accountRoutes(services: Services): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
   const forgotLimiter = new RateLimiter(5, 15 * 60_000);
@@ -360,9 +409,12 @@ export function accountRoutes(services: Services): Hono<AppEnv> {
   app.post("/password", async (c) => {
     const user = await requireUser(c, services);
     const body = await readBody(c, changePasswordSchema);
+    await assertPasswordBudget(services, user.id, "password");
     if (!(await verifyPassword(body.currentPassword, user.passwordHash))) {
+      await notePasswordFailure(services, user.id, "password");
       throw new HttpError(403, "invalid_password", "The current password is incorrect.");
     }
+    await clearPasswordBudget(services, user.id, "password");
     if (body.currentPassword === body.newPassword) {
       throw new HttpError(
         400,
@@ -396,9 +448,12 @@ export function accountRoutes(services: Services): Hono<AppEnv> {
   app.delete("/", async (c) => {
     const user = await requireUser(c, services);
     const body = await readBody(c, deleteAccountSchema);
+    await assertPasswordBudget(services, user.id, "delete");
     if (!(await verifyPassword(body.password, user.passwordHash))) {
+      await notePasswordFailure(services, user.id, "delete");
       throw new HttpError(403, "invalid_password", "The password is incorrect.");
     }
+    await clearPasswordBudget(services, user.id, "delete");
 
     const workspaces = await services.store.listWorkspaces(user.id);
     const owned = workspaces.filter((workspace) => workspace.role === "owner");

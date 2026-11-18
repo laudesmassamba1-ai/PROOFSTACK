@@ -1,0 +1,128 @@
+name: desktop
+
+# Builds the native app: one installer per platform.
+#
+# electron-builder is the free packaging service used here - NSIS on Windows, dmg on macOS,
+# deb and AppImage on Linux - and GitHub Releases is where they are published. Each job
+# *launches the app it just built* with PROOFCORE_SMOKE=1, which starts the bundled engine,
+# loads the window and prints SMOKE_OK before exiting. An installer that has never been run
+# is not a tested installer.
+
+on:
+  push:
+    tags: ["app-v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x64
+            builder: --linux
+          - os: windows-latest
+            target: win-x64
+            builder: --win
+          - os: macos-14
+            target: darwin-arm64
+            builder: --mac
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build the engine the app carries
+        run: |
+          node tooling/scripts/build-binary.mjs --target ${{ matrix.target }}
+
+      - name: Build the app and its installer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Building a dmg/windows installer needs no signing for a first release; the
+          # variable only keeps electron-builder from trying to notarise with no credentials.
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          pnpm --filter @proofcore/desktop icons
+          pnpm --filter @proofcore/desktop exec electron-builder ${{ matrix.builder }} --publish never
+
+      - name: Launch it, on Linux
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          APP=$(ls artifacts/desktop/linux-unpacked/PROOFCORE || ls artifacts/desktop/linux-unpacked/*)
+          xvfb-run -a env PROOFCORE_SMOKE=1 "$APP" --no-sandbox | tee smoke.log
+          grep -q SMOKE_OK smoke.log
+
+      - name: Launch it, on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $app = Get-ChildItem artifacts/desktop/win-unpacked/PROOFCORE.exe
+          $env:PROOFCORE_SMOKE = "1"
+          $output = & $app.FullName --no-sandbox 2>&1 | Out-String
+          Write-Host $output
+          if ($output -notmatch "SMOKE_OK") { throw "the packaged app did not load its window" }
+
+      - name: Launch it, on macOS
+        if: runner.os == 'macOS'
+        run: |
+          set -euo pipefail
+          APP=$(ls -d artifacts/desktop/mac*/*.app | head -1)
+          BIN="$APP/Contents/MacOS/PROOFCORE"
+          PROOFCORE_SMOKE=1 "$BIN" | tee smoke.log
+          grep -q SMOKE_OK smoke.log
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.target }}
+          path: |
+            artifacts/desktop/*.deb
+            artifacts/desktop/*.AppImage
+            artifacts/desktop/*.exe
+            artifacts/desktop/*.dmg
+            artifacts/desktop/*.blockmap
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          body: |
+            ## The application
+
+            **Windows** - `PROOFCORE-Setup-*.exe`, then launch PROOFCORE from the Start Menu
+            or the desktop.
+
+            **Linux** (Mint, Ubuntu, Debian) - `PROOFCORE-*.deb`:
+            `sudo apt install ./PROOFCORE-*.deb`, or the AppImage: `chmod +x` then run.
+
+            **macOS** - `PROOFCORE-*.dmg`.
+
+            The window loads a local engine: agent, audits, sandbox, index all run on your
+            machine. The network is used for the account, projects, reports and sync only.
+            Without a model configured the app still opens and says what to set; the menu
+            holds "Se connecter", "Mettre à jour" and the conflict check.

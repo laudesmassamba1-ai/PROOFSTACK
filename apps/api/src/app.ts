@@ -91,8 +91,18 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
     await next();
   });
 
-  // Cookie-authenticated writes must come from the configured web origin.
-  app.use("/api/v1/*", async (c, next) => {
+  // Cookie-authenticated writes must come from a configured web origin.
+  //
+  // Mounted on `/api/*` and not just `/api/v1/*`: the account routes (password change,
+  // session revocation, account deletion) and the auth routes are cookie-authenticated
+  // writes too, and they sat outside the guard. `/api/webhooks/*` is excluded on purpose —
+  // those calls come from a payment provider, carry no Origin, and are authenticated by
+  // signature instead.
+  app.use("/api/*", async (c, next) => {
+    if (c.req.path.startsWith("/api/webhooks")) {
+      await next();
+      return;
+    }
     if (c.req.method !== "GET" && c.req.method !== "HEAD" && c.req.method !== "OPTIONS") {
       const origin = c.req.header("origin");
       if (origin && !originAllowed(config.webOrigins, origin)) {

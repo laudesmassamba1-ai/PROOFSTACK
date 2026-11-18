@@ -46,3 +46,7 @@ artifacts/bin/
 artifacts/installers/
 artifacts/.cache/
 artifacts/.work/
+
+# generated desktop assets and outputs
+apps/desktop/build/
+artifacts/desktop/

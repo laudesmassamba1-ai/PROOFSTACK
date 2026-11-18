@@ -858,13 +858,17 @@ export class AppStore {
 
   async listAiConversations(
     userId: string,
-    workspaceId: string
+    workspaceId: string,
+    limit = 50,
+    offset = 0
   ): Promise<{ id: string; title: string; effort: string; updatedAt: string }[]> {
     const rows = await this.db
       .prepare(
-        "SELECT id, title, effort, updated_at FROM ai_conversations WHERE user_id = ? AND workspace_id = ? ORDER BY updated_at DESC LIMIT 50"
+        `SELECT id, title, effort, updated_at FROM ai_conversations
+         WHERE user_id = ? AND workspace_id = ?
+         ORDER BY updated_at DESC LIMIT ? OFFSET ?`
       )
-      .bind(userId, workspaceId)
+      .bind(userId, workspaceId, limit, offset)
       .all<Row>();
     return rows.map((row) => ({
       id: str(row, "id"),
@@ -872,6 +876,16 @@ export class AppStore {
       effort: str(row, "effort"),
       updatedAt: str(row, "updated_at"),
     }));
+  }
+
+  async countAiConversations(userId: string, workspaceId: string): Promise<number> {
+    const row = await this.db
+      .prepare(
+        "SELECT COUNT(*) AS count FROM ai_conversations WHERE user_id = ? AND workspace_id = ?"
+      )
+      .bind(userId, workspaceId)
+      .first<Row>();
+    return row ? num(row, "count") : 0;
   }
 
   async getAiConversation(userId: string, id: string): Promise<AiConversationRecord | null> {
@@ -1452,33 +1466,55 @@ export class AppStore {
     return { runId, reportId };
   }
 
-  async listRuns(workspaceId: string, projectId: string, limit = 25): Promise<RunRecord[]> {
+  async listRuns(
+    workspaceId: string,
+    projectId: string,
+    limit = 25,
+    offset = 0
+  ): Promise<RunRecord[]> {
     const rows = await this.db
       .prepare(
         `SELECT r.*, rp.id AS report_id FROM test_runs r
          LEFT JOIN reports rp ON rp.run_id = r.id
          WHERE r.workspace_id = ? AND r.project_id = ?
-         ORDER BY r.started_at DESC LIMIT ?`
+         ORDER BY r.started_at DESC LIMIT ? OFFSET ?`
       )
-      .bind(workspaceId, projectId, limit)
+      .bind(workspaceId, projectId, limit, offset)
       .all<Row>();
     return rows.map(mapRun);
   }
 
+  async countRuns(workspaceId: string, projectId: string): Promise<number> {
+    const row = await this.db
+      .prepare("SELECT COUNT(*) AS count FROM test_runs WHERE workspace_id = ? AND project_id = ?")
+      .bind(workspaceId, projectId)
+      .first<Row>();
+    return row ? num(row, "count") : 0;
+  }
+
   async recentRuns(
     workspaceId: string,
-    limit = 10
+    limit = 10,
+    offset = 0
   ): Promise<(RunRecord & { projectName: string })[]> {
     const rows = await this.db
       .prepare(
         `SELECT r.*, p.name AS project_name, rp.id AS report_id FROM test_runs r
          JOIN projects p ON p.id = r.project_id
          LEFT JOIN reports rp ON rp.run_id = r.id
-         WHERE r.workspace_id = ? ORDER BY r.started_at DESC LIMIT ?`
+         WHERE r.workspace_id = ? ORDER BY r.started_at DESC LIMIT ? OFFSET ?`
       )
-      .bind(workspaceId, limit)
+      .bind(workspaceId, limit, offset)
       .all<Row>();
     return rows.map((row) => ({ ...mapRun(row), projectName: str(row, "project_name") }));
+  }
+
+  async countWorkspaceRuns(workspaceId: string): Promise<number> {
+    const row = await this.db
+      .prepare("SELECT COUNT(*) AS count FROM test_runs WHERE workspace_id = ?")
+      .bind(workspaceId)
+      .first<Row>();
+    return row ? num(row, "count") : 0;
   }
 
   async getReportPayload(workspaceId: string, reportId: string): Promise<TestRun | null> {
@@ -1530,16 +1566,27 @@ export class AppStore {
   async workspaceFindings(
     workspaceId: string,
     module?: ModuleId,
-    limit = 100
+    limit = 100,
+    offset = 0
   ): Promise<FindingRecord[]> {
     const rows = await this.db
       .prepare(
         `SELECT * FROM findings WHERE workspace_id = ? AND (? IS NULL OR module = ?)
-         ORDER BY detected_at DESC LIMIT ?`
+         ORDER BY detected_at DESC LIMIT ? OFFSET ?`
       )
-      .bind(workspaceId, module ?? null, module ?? null, limit)
+      .bind(workspaceId, module ?? null, module ?? null, limit, offset)
       .all<Row>();
     return rows.map(mapFinding);
+  }
+
+  async countWorkspaceFindings(workspaceId: string, module?: ModuleId): Promise<number> {
+    const row = await this.db
+      .prepare(
+        "SELECT COUNT(*) AS count FROM findings WHERE workspace_id = ? AND (? IS NULL OR module = ?)"
+      )
+      .bind(workspaceId, module ?? null, module ?? null)
+      .first<Row>();
+    return row ? num(row, "count") : 0;
   }
 
   /** Aggregated evolution data: runs per day, severity mix, module pass rates. */

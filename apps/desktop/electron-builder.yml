@@ -1,0 +1,67 @@
+appId: dev.proofcore.desktop
+productName: PROOFCORE
+copyright: PROOFCORE
+# The npm name is scoped, which is not a file name: name the artifacts after the product.
+artifactName: PROOFCORE-${version}-${arch}.${ext}
+
+directories:
+  output: ../../artifacts/desktop
+  buildResources: build
+
+# Only what the window needs. The engine travels in extraResources as the same binary the
+# CLI installers ship, so "the app" and "the command" cannot be different programs.
+files:
+  - main.cjs
+  - preload.cjs
+  - package.json
+  - build/icon.png
+
+# The engine: the same binary the CLI installers ship. One entry, filtered per platform so a
+# Linux build does not carry the Windows executable and vice versa.
+extraResources:
+  - from: ../../artifacts/bin
+    to: sidecar
+    filter:
+      - "proofcore-${os}-${arch}*"
+
+linux:
+  executableName: proofcore
+  target:
+    - deb
+    - AppImage
+  category: Development
+  icon: build/icons
+  synopsis: Software quality and reliability
+  description: >
+    PROOFCORE runs on this machine: the agent, the audits, the sandbox and the index are
+    local. The account, projects, reports and sync go through the site.
+  desktop:
+    entry:
+      Name: PROOFCORE
+      Comment: Software quality and reliability
+      StartupWMClass: PROOFCORE
+
+deb:
+  packageName: proofcore
+  category: devel
+
+win:
+  target: nsis
+  icon: build/icon.ico
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: PROOFCORE
+
+mac:
+  target: dmg
+  category: public.app-category.developer-tools
+
+publish:
+  provider: github
+  owner: laudesmassamba1-ai
+  repo: PROOFSTACK

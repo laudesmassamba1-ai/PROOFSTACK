@@ -42,23 +42,6 @@ function roleLabel(role: string, fr: boolean): string {
   return labels ? labels[fr ? "fr" : "en"] : role;
 }
 
-/** The API returns English messages; known codes get a French rendering. */
-function errorText(error: unknown, fr: boolean): string {
-  const code = (error as ApiError | undefined)?.code;
-  if (fr && code) {
-    const frByCode: Record<string, string> = {
-      user_not_found: "Aucun compte PROOFCORE n'utilise cet email.",
-      already_member: "Cette personne fait déjà partie de l'espace.",
-      last_owner: "Un espace garde toujours au moins un propriétaire.",
-      workspace_limit_reached: "Limite d'espaces atteinte pour votre plan.",
-      forbidden: "Action réservée au propriétaire ou aux administrateurs.",
-    };
-    const frMessage = frByCode[code];
-    if (frMessage) return frMessage;
-  }
-  return (error as Error | undefined)?.message ?? String(error);
-}
-
 export function WorkspacePage(): React.ReactElement {
   const { locale } = useI18n();
   const fr = locale === "fr";
@@ -146,8 +129,9 @@ export function WorkspacePage(): React.ReactElement {
     if (workspace.id === session.workspaceId || switchingTo) return;
     setSwitchingTo(workspace.id);
     try {
+      // No timer: `load` depends on `session.workspaceId`, so the effect reloads the
+      // detail as soon as the new id lands. The delay used to reload twice.
       session.setWorkspaceId(workspace.id);
-      window.setTimeout(() => void load(), 250);
     } finally {
       setSwitchingTo(null);
     }
@@ -620,7 +604,7 @@ export function WorkspacePage(): React.ReactElement {
       {error ? (
         <div className="mt-4">
           <ErrorState
-            error={{ ...(error as ApiError), message: errorText(error, fr) } as ApiError}
+            error={error}
             onRetry={() => {
               setError(null);
               void load();

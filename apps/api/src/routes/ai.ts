@@ -11,6 +11,7 @@ import {
 import { browsePage, describeBrowsedPage } from "../browser-render.js";
 import { clientAddress, HttpError, RateLimiter } from "../http/errors.js";
 import { readBody, requireWorkspace } from "../http/guards.js";
+import { pageBody, readPage } from "../http/pagination.js";
 import type { AppEnv, Services } from "../http/services.js";
 
 /**
@@ -734,8 +735,14 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
   app.get("/conversations", async (c) => {
     const user = c.get("user");
     const workspaceId = c.req.query("workspaceId") ?? "";
-    const conversations = await services.store.listAiConversations(user.id, workspaceId);
-    return c.json({ items: conversations });
+    const page = readPage(c);
+    // Previously capped at 50 with no way to page: a person with a long history simply
+    // could not reach an older conversation. The response now carries the total.
+    const [conversations, total] = await Promise.all([
+      services.store.listAiConversations(user.id, workspaceId, page.limit, page.offset),
+      services.store.countAiConversations(user.id, workspaceId),
+    ]);
+    return c.json(pageBody(conversations, total, page));
   });
 
   app.get("/conversations/:id", async (c) => {

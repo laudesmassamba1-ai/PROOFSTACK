@@ -112,6 +112,33 @@ browser engine. If no Chromium is installed it opens the default browser and say
 than showing a blank frame. `proofcore app --print-url` gives the URL, `--json` gives
 `{ url, appMode }`.
 
+## The desktop application (native window)
+
+`apps/desktop` is an Electron shell around the same local engine:
+
+- the **sidecar** is the identical `proofcore` binary (extraResources `sidecar/proofcore`), so
+  the app and the command cannot be different programs;
+- the main process picks a free loopback port, starts `proofcore serve` there, reads the
+  one-time URL it prints, and loads it in the window - the per-run token is required on every
+  request, so the URL is the only way in and the cookie it sets keeps the window authorised;
+- the page runs locally: agent, tools, audits, sandbox, index. The network is used for the
+  account, projects, reports and sync;
+- menu: Se connecter, Mon compte, Ouvrir le site, Mettre à jour, doctor;
+- external links and payment/login pages open in the user's browser, never inside the window;
+- one instance, sidecar killed on quit (taskkill on Windows), and the engine starts even with
+  no model configured - the window explains what to set instead of refusing to open.
+
+Build:
+
+```bash
+pnpm cli:binary --target linux-x64          # the sidecar
+pnpm app:dist                               # deb + AppImage
+```
+
+`artifacts/desktop/PROOFCORE-0.3.0-amd64.deb` installs `/opt/PROOFCORE` (window + sidecar),
+a `proofcore` launcher, the menu entry and the icon. Windows/macOS builds run in CI: the same
+`electron-builder.yml` produces NSIS and dmg there.
+
 ## Updates
 
 Every install knows how to update itself:

@@ -32,7 +32,9 @@
     "cli:binary": "node tooling/scripts/build-binary.mjs",
     "cli:binary:all": "node tooling/scripts/build-binary.mjs --all",
     "cli:installers": "node tooling/scripts/build-installers.mjs",
-    "cli:installers:all": "node tooling/scripts/build-installers.mjs --all"
+    "cli:installers:all": "node tooling/scripts/build-installers.mjs --all",
+    "app:desktop": "pnpm --filter @proofcore/desktop start",
+    "app:dist": "pnpm --filter @proofcore/desktop dist"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",
@@ -42,5 +44,17 @@
     "postject": "1.0.0-alpha.6",
     "typescript": "5.9.3",
     "vitest": "3.2.4"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "electron-builder",
+      "esbuild",
+      "playwright"
+    ]
   }
 }

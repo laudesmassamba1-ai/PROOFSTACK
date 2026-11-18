@@ -2741,7 +2741,9 @@ async function startHub(flags: GlobalFlags): Promise<number> {
  * page), and each finished turn is pushed to the signed-in account so the web app shows it.
  */
 async function commandServe(flags: GlobalFlags, args: string[]): Promise<number> {
-  let provider: AgentProvider;
+  // A missing model must not stop the window from opening: an app that refuses to start
+  // before it is configured cannot be the place where you configure it.
+  let provider: AgentProvider | undefined;
   try {
     provider = await resolveProvider({
       ...(flagValue(args, "--model") ? { model: flagValue(args, "--model") as string } : {}),
@@ -2750,8 +2752,15 @@ async function commandServe(flags: GlobalFlags, args: string[]): Promise<number>
         : {}),
     });
   } catch (error) {
-    err(flags, red(flags, describeError(error).message));
-    return 2;
+    provider = undefined;
+    out(flags, `${yellow(flags, "warn")} ${describeError(error).message}`);
+    out(
+      flags,
+      dim(
+        flags,
+        "  the page stays usable; configure the model from the menu or `proofcore agent --configure`"
+      )
+    );
   }
 
   const port = Number(flagValue(args, "--port") ?? "7317");
@@ -2792,7 +2801,7 @@ async function commandServe(flags: GlobalFlags, args: string[]): Promise<number>
     out(flags, `\n${bold(flags, "PROOFCORE local agent")}`);
     out(flags, `  ${dim(flags, "open")} ${handle.url}`);
     out(flags, `  ${dim(flags, "root")} ${flags.cwd}`);
-    out(flags, `  ${dim(flags, "model")} ${provider.model}`);
+    out(flags, `  ${dim(flags, "model")} ${provider?.model ?? yellow(flags, "none configured")}`);
     out(
       flags,
       `  ${dim(flags, "sync")} ${sync ? (account ? `account ${account.email}` : yellow(flags, "not signed in — run proofcore login")) : "off"}`

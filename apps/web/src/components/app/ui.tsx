@@ -2,6 +2,7 @@ import { CircleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { useI18n } from "../../i18n/index.js";
 import type { ApiError } from "../../lib/api.js";
+import { errorText } from "../../lib/errorText.js";
 import { TesterScene, type TesterVariant } from "./Testers.js";
 
 /**
@@ -115,17 +116,28 @@ export function Loading({ label = "Loading…" }: { label?: string }) {
   );
 }
 
+/**
+ * The single place an API failure becomes a sentence.
+ *
+ * The API speaks English (CLI, logs, webhook debugging all read those messages), while
+ * this interface is bilingual. Translating per page is how "The current password is
+ * incorrect." ended up in the middle of a French settings screen: some pages did it, most
+ * did not. `errorText` maps the stable `code`, and anything unmapped keeps the API's own
+ * wording rather than inventing a vaguer local one.
+ */
 export function ErrorState({ error, onRetry }: { error: ApiError | Error; onRetry?: () => void }) {
+  const { locale } = useI18n();
+  const fr = locale === "fr";
   const isApi = "code" in error;
   return (
     <div role="alert" className="app-card flex items-start gap-3 border-danger/40 px-5 py-4">
-      <CircleAlert size={17} className="mt-0.5 shrink-0 text-danger" />
+      <CircleAlert size={17} className="mt-0.5 shrink-0 text-danger" aria-hidden />
       <div className="min-w-0">
-        <p className="text-sm font-medium">{error.message}</p>
+        <p className="text-sm font-medium">{errorText(error, fr)}</p>
         {isApi ? <p className="mt-1 text-xs text-muted">Code: {(error as ApiError).code}</p> : null}
         {onRetry ? (
           <button type="button" className="app-btn mt-3" onClick={onRetry}>
-            Retry
+            {fr ? "Réessayer" : "Retry"}
           </button>
         ) : null}
       </div>

@@ -1,0 +1,23 @@
+{
+  "name": "@proofcore/desktop",
+  "version": "0.3.0",
+  "private": true,
+  "description": "PROOFCORE desktop: the native window around the local engine",
+  "main": "main.cjs",
+  "author": "PROOFCORE <support@proofcore.dev>",
+  "license": "UNLICENSED",
+  "scripts": {
+    "icons": "node scripts/make-icons.mjs",
+    "start": "electron .",
+    "smoke": "PROOFCORE_SMOKE=1 xvfb-run -a electron . --no-sandbox",
+    "dist": "pnpm icons && electron-builder --linux deb AppImage",
+    "dist:linux": "pnpm icons && electron-builder --linux deb AppImage",
+    "dist:win": "pnpm icons && electron-builder --win",
+    "dist:mac": "pnpm icons && electron-builder --mac"
+  },
+  "devDependencies": {
+    "electron": "31.7.7",
+    "electron-builder": "25.1.8"
+  },
+  "homepage": "https://proofstack-iota.vercel.app"
+}
