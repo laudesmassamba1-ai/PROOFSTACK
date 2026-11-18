@@ -19,7 +19,17 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const noEmit = process.argv.includes("--noEmit");
 const GROUPS = ["packages", "packages/modules", "packages/adapters", "apps"];
 
+/**
+ * Apps that are not plain-`tsc` packages opt out of the topological pass with
+ * `"buildOrder": false` — but they must still be built, after their dependencies.
+ * They used to be skipped entirely, which silently produced a stale `dist/`: the
+ * source was correct, the bundle was hours old, and nothing failed.
+ */
+
 /** @typedef {{ name: string, dir: string, deps: string[] }} Node */
+
+/** Packages built with their own script after the topological pass. */
+const deferred = [];
 
 async function collect() {
   /** @type {Map<string, Node>} */
@@ -42,8 +52,11 @@ async function collect() {
         continue;
       }
       if (!pkg.name || pkg.privateBuild === false) continue;
-      // Apps that are not plain-tsc packages (web) opt out with "buildOrder": false
-      if (pkg.buildOrder === false) continue;
+      if (pkg.buildOrder === false) {
+        // Built last, with their own script, once every dependency emitted its .d.ts.
+        deferred.push({ name: pkg.name, dir });
+        continue;
+      }
       const deps = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }).filter((d) =>
         d.startsWith("@proofcore/")
       );
@@ -83,6 +96,21 @@ function run(dir, args) {
   });
 }
 
+/** Runs a package's own `build` script (vite, for the web app). */
+function runScript(dir) {
+  return new Promise((res, rej) => {
+    const child = spawn("pnpm", ["run", "build"], {
+      cwd: dir,
+      stdio: "inherit",
+      env: process.env,
+      shell: process.platform === "win32",
+    });
+    child.on("exit", (code) =>
+      code === 0 ? res() : rej(new Error(`build script failed in ${dir} (exit ${code})`))
+    );
+  });
+}
+
 const nodes = await collect();
 if (nodes.size === 0) {
   console.error("build.mjs: no packages discovered — check pnpm-workspace.yaml");
@@ -107,5 +135,12 @@ for (const [i, level] of levels.entries()) {
       );
     })
   );
+}
+if (!noEmit && deferred.length > 0) {
+  console.log(`\n── apps (own build script): ${deferred.map((entry) => entry.name).join(", ")}`);
+  for (const entry of deferred) {
+    await runScript(entry.dir);
+    console.log(`   ok  ${entry.name}`);
+  }
 }
 console.log(`\n✔ ${noEmit ? "typecheck" : "build"} complete`);
