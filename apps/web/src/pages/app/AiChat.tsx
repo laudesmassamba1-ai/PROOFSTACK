@@ -211,6 +211,29 @@ const MCP_RECIPES = [
   },
 ];
 
+/**
+ * Reads the API error envelope.
+ *
+ * The server answers `{ error: { code, message, details } }`. Rendering `data.message`
+ * produced a useless generic string and `data.error` produced "[object Object]" — which
+ * is exactly why a refused key looked like a silent failure.
+ */
+async function readApiError(response: Response, fallback: string): Promise<string> {
+  const payload = (await response.json().catch(() => null)) as {
+    error?: { message?: string; code?: string } | string;
+    message?: string;
+  } | null;
+  if (payload) {
+    if (typeof payload.error === "string" && payload.error) return payload.error;
+    if (payload.error && typeof payload.error === "object" && payload.error.message) {
+      const code = payload.error.code ? ` (${payload.error.code})` : "";
+      return `${payload.error.message}${code}`;
+    }
+    if (payload.message) return payload.message;
+  }
+  return `${fallback} (HTTP ${response.status})`;
+}
+
 function uid(): string {
   return `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -273,6 +296,13 @@ export function AiChatPage(): React.ReactElement {
   const [modelDraft, setModelDraft] = useState("gpt-4o-mini");
   const [keyDraft, setKeyDraft] = useState("");
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{
+    ok: boolean;
+    message: string;
+    latencyMs?: number;
+    models?: string[];
+  } | null>(null);
+  const [testing, setTesting] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [mcpOpen, setMcpOpen] = useState(false);
   const [mcpTab, setMcpTab] = useState(MCP_RECIPES[0]?.id ?? "claude-code");
@@ -351,6 +381,48 @@ export function AiChatPage(): React.ReactElement {
     [activeId, startNewChat]
   );
 
+  const testConnection = useCallback(async () => {
+    setTesting(true);
+    setTestResult(null);
+    setProfileError(null);
+    try {
+      const response = await fetch("/api/v1/ai/profile/test", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          baseUrl: baseUrlDraft,
+          model: modelDraft,
+          ...(keyDraft ? { apiKey: keyDraft } : {}),
+        }),
+      });
+      if (!response.ok) {
+        setTestResult({ ok: false, message: await readApiError(response, "Test refused") });
+        return;
+      }
+      const data = (await response.json()) as {
+        ok: boolean;
+        message: string;
+        latencyMs?: number;
+        models?: string[];
+        modelAvailable?: boolean;
+      };
+      setTestResult({
+        ok: data.ok,
+        message: data.message,
+        ...(data.latencyMs !== undefined ? { latencyMs: data.latencyMs } : {}),
+        ...(data.models ? { models: data.models } : {}),
+      });
+    } catch (error) {
+      setTestResult({
+        ok: false,
+        message: error instanceof Error ? error.message : "Network error",
+      });
+    } finally {
+      setTesting(false);
+    }
+  }, [baseUrlDraft, modelDraft, keyDraft]);
+
   const saveProfile = useCallback(async () => {
     setProfileSaving(true);
     setProfileError(null);
@@ -366,8 +438,9 @@ export function AiChatPage(): React.ReactElement {
         }),
       });
       if (!response.ok) {
-        const data = (await response.json().catch(() => ({}))) as { message?: string };
-        setProfileError(data.message ?? (fr ? "Échec de l'enregistrement." : "Save failed."));
+        setProfileError(
+          await readApiError(response, fr ? "Enregistrement refusé" : "Save refused")
+        );
         return;
       }
       const data = (await response.json()) as ProfileState & { configured: true };
@@ -416,18 +489,13 @@ export function AiChatPage(): React.ReactElement {
         error?: string;
       };
       if (!response.ok) {
+        const message = await readApiError(
+          response,
+          fr ? "La demande a échoué" : "The request failed"
+        );
         setMessages((items) =>
           items.map((item) =>
-            item.id === pendingId
-              ? {
-                  ...item,
-                  content: "",
-                  error:
-                    data.message ??
-                    data.error ??
-                    (fr ? "La demande a échoué." : "The request failed."),
-                }
-              : item
+            item.id === pendingId ? { ...item, content: "", error: message } : item
           )
         );
         return;
@@ -743,7 +811,7 @@ export function AiChatPage(): React.ReactElement {
               {/* provider presets: one click fills URL + model */}
               <div>
                 <p className="text-xs font-medium">{fr ? "Fournisseur" : "Provider"}</p>
-                <div className="mt-1.5 grid max-h-44 grid-cols-2 gap-1.5 overflow-y-auto pr-1 sm:grid-cols-2">
+                <div className="mt-1.5 grid grid-cols-2 gap-1.5">
                   {PROVIDER_PRESETS.map((preset) => {
                     const active = baseUrlDraft === preset.baseUrl;
                     return (
@@ -829,8 +897,41 @@ export function AiChatPage(): React.ReactElement {
                 />
               </label>
             </div>
-            {profileError && <p className="mt-3 text-xs text-destructive">{profileError}</p>}
-            <div className="mt-5 flex items-center justify-between">
+            {profileError && (
+              <p className="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs leading-relaxed text-destructive">
+                {profileError}
+              </p>
+            )}
+            {testResult && (
+              <div
+                className={`mt-3 rounded-lg border px-3 py-2 text-xs leading-relaxed ${
+                  testResult.ok
+                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                    : "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                }`}
+              >
+                <p className="font-medium">
+                  {testResult.ok ? "✓ " : "× "}
+                  {testResult.message}
+                  {testResult.latencyMs !== undefined ? ` · ${testResult.latencyMs} ms` : ""}
+                </p>
+                {testResult.models && testResult.models.length > 0 && (
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {testResult.models.slice(0, 10).map((model) => (
+                      <button
+                        key={model}
+                        type="button"
+                        onClick={() => setModelDraft(model)}
+                        className="rounded-md border border-border/60 bg-surface-1 px-1.5 py-0.5 font-mono text-[10px] text-foreground/75 transition hover:border-primary/50 hover:text-foreground"
+                      >
+                        {model}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            <div className="mt-5 flex items-center justify-between gap-2">
               {profile?.configured ? (
                 <button
                   type="button"
@@ -846,14 +947,30 @@ export function AiChatPage(): React.ReactElement {
               ) : (
                 <span />
               )}
-              <button
-                type="button"
-                onClick={() => void saveProfile()}
-                disabled={profileSaving}
-                className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition hover:brightness-110 disabled:opacity-50"
-              >
-                {profileSaving ? (fr ? "Enregistrement…" : "Saving…") : fr ? "Enregistrer" : "Save"}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void testConnection()}
+                  disabled={testing || (!keyDraft && !profile?.configured)}
+                  className="rounded-xl border border-border/70 px-3 py-2 text-xs font-medium transition hover:border-primary/50 disabled:opacity-40"
+                >
+                  {testing ? (fr ? "Test en cours…" : "Testing…") : fr ? "Tester" : "Test"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void saveProfile()}
+                  disabled={profileSaving}
+                  className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition hover:brightness-110 disabled:opacity-50"
+                >
+                  {profileSaving
+                    ? fr
+                      ? "Enregistrement…"
+                      : "Saving…"
+                    : fr
+                      ? "Enregistrer"
+                      : "Save"}
+                </button>
+              </div>
             </div>
           </div>
           {/* MCP connect: use PROOFCORE tools inside any coding agent */}

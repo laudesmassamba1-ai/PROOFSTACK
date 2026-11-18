@@ -67,6 +67,8 @@
   --text-secondary: var(--ink-soft);
   --border: var(--rule);
   --primary: var(--ink);
+  /* Text drawn on top of a primary-filled surface. */
+  --on-primary: var(--paper-raised);
   --accent: #0e8f75;
   --success: #177a54;
   --warning: #8a5a00;
@@ -87,6 +89,7 @@
   --text-secondary: #b8b3a8;
   --border: rgba(243, 240, 232, 0.14);
   --primary: var(--paper);
+  --on-primary: #0a0a0b;
   --accent: #63d6a2;
   --success: #63d6a2;
   --warning: #e9b45a;
@@ -120,6 +123,22 @@
   --color-brand-violet: var(--brand-violet);
   --color-brand-pink: var(--brand-pink);
   --color-brand-orange: var(--brand-orange);
+
+  /* Aliases.
+     Components are written against these names; without them Tailwind emits nothing
+     and the element renders transparent — a modal with no surface, a border with no
+     colour. Keeping the alias layer means one vocabulary across the whole app. */
+  --color-foreground: var(--text-primary);
+  --color-muted-foreground: var(--text-secondary);
+  --color-surface-1: var(--surface);
+  --color-surface-2: var(--surface-alt);
+  --color-card: var(--surface);
+  --color-popover: var(--surface);
+  --color-border: var(--border);
+  --color-input: var(--border);
+  --color-ring: var(--accent);
+  --color-destructive: var(--danger);
+  --color-primary-foreground: var(--on-primary);
 
   --radius-panel: var(--radius-lg);
 }
@@ -174,28 +193,40 @@ p {
   margin: 0;
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
-}
+/*
+ * Base resets live in @layer base.
+ *
+ * Tailwind's utilities are emitted inside `@layer utilities`, and an unlayered rule
+ * always beats a layered one regardless of specificity. With `button { color: inherit }`
+ * left unlayered, every `text-*` utility on a button was silently ignored: the label
+ * rendered in the inherited colour, i.e. invisible on a dark primary background.
+ * Declaring the resets in the base layer restores the intended order:
+ * base < components < utilities.
+ */
+@layer base {
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
 
-button {
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
-}
+  button {
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
 
-:focus-visible {
-  outline: 2px solid var(--brand-mint);
-  outline-offset: 3px;
-  border-radius: 4px;
-}
+  :focus-visible {
+    outline: 2px solid var(--brand-mint);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
 
-code,
-pre,
-.mono {
-  font-family: var(--font-mono);
-  font-feature-settings: "zero" 1;
+  code,
+  pre,
+  .mono {
+    font-family: var(--font-mono);
+    font-feature-settings: "zero" 1;
+  }
 }
 
 /* ---------- brand surfaces ---------- */

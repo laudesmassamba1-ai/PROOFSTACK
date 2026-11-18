@@ -82,6 +82,29 @@ const profileSchema = z
   })
   .strict();
 
+const profileTestSchema = z
+  .object({
+    baseUrl: z.string().url().max(300),
+    model: z.string().min(1).max(120),
+    apiKey: z.string().min(8).max(300).optional(),
+  })
+  .strict();
+
+/** Turns a provider status into something a customer can act on. */
+function explainProviderError(status: number, body: string): string {
+  const detail = body.replace(/\s+/g, " ").slice(0, 200);
+  if (status === 401 || status === 403) {
+    return `The provider rejected this key (HTTP ${status}). Check that the key is complete, active, and has the right scope. ${detail}`;
+  }
+  if (status === 404) {
+    return `HTTP 404: the base URL is wrong. It must end before /chat/completions, e.g. https://api.groq.com/openai/v1. ${detail}`;
+  }
+  if (status === 429) {
+    return `HTTP 429: the provider is rate-limiting this key. ${detail}`;
+  }
+  return `The provider answered HTTP ${status}. ${detail}`;
+}
+
 interface UpstreamToolCall {
   id: string;
   name: string;
@@ -251,10 +274,15 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
         "This deployment cannot store AI keys securely yet (AI_KEYS_SECRET is not set)."
       );
     }
-    const fingerprint = await keyFingerprint(body.apiKey ?? "");
+    const existing = await services.store.getAiProfile(user.id);
+    // Rotating only the model must not rewrite the fingerprint of a key that did not
+    // change: the fingerprint is how the UI proves which key is loaded.
+    const fingerprint = body.apiKey
+      ? await keyFingerprint(body.apiKey)
+      : (existing?.keyFingerprint ?? "");
     const encrypted = body.apiKey
       ? await encryptApiKey(services.config, body.apiKey)
-      : ((await services.store.getAiProfile(user.id))?.apiKeyEncrypted ?? "");
+      : (existing?.apiKeyEncrypted ?? "");
     if (!encrypted) throw new HttpError(400, "api_key_required", "An API key is required.");
     const record = await services.store.saveAiProfile({
       userId: user.id,
@@ -276,6 +304,83 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
     const user = c.get("user");
     await services.store.deleteAiProfile(user.id);
     return c.json({ configured: false as const });
+  });
+
+  /**
+   * Provider connection test.
+   *
+   * This exists because "the key does not work" is unanswerable without asking the
+   * provider. It calls the real `GET {baseUrl}/models` with the key — the body may
+   * carry a candidate key (testing before saving) or fall back to the stored one —
+   * and returns the provider's own status and error text.
+   */
+  app.post("/profile/test", async (c) => {
+    const user = c.get("user");
+    const body = await readBody(c, profileTestSchema);
+    let apiKey = body.apiKey ?? "";
+    if (!apiKey) {
+      const stored = await services.store.getAiProfile(user.id);
+      if (!stored) {
+        throw new HttpError(400, "no_key", "Save a key first, or paste one to test.");
+      }
+      if (!hasEncryptionSecret(services.config)) {
+        throw new HttpError(503, "key_storage_unavailable", "The stored key cannot be read.");
+      }
+      apiKey = await decryptApiKey(services.config, stored.apiKeyEncrypted);
+    }
+
+    const baseUrl = body.baseUrl.replace(/\/+$/, "");
+    const started = Date.now();
+    let response: Response;
+    try {
+      response = await fetch(`${baseUrl}/models`, {
+        headers: { authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch (error) {
+      return c.json({
+        ok: false,
+        status: 0,
+        latencyMs: Date.now() - started,
+        message:
+          error instanceof Error && error.name === "TimeoutError"
+            ? "The provider did not answer within 15 seconds."
+            : `Network error: ${error instanceof Error ? error.message : "unreachable"}`,
+      });
+    }
+
+    const latencyMs = Date.now() - started;
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      return c.json({
+        ok: false,
+        status: response.status,
+        latencyMs,
+        message: explainProviderError(response.status, text),
+      });
+    }
+
+    let models: string[] = [];
+    try {
+      const payload = (await response.json()) as { data?: { id?: string }[] };
+      models = (payload.data ?? [])
+        .map((entry) => entry.id)
+        .filter((id): id is string => typeof id === "string")
+        .slice(0, 40);
+    } catch {
+      models = [];
+    }
+    const modelAvailable = models.length === 0 || models.includes(body.model);
+    return c.json({
+      ok: true,
+      status: response.status,
+      latencyMs,
+      models,
+      modelAvailable,
+      message: modelAvailable
+        ? `Connected. ${models.length} model(s) available.`
+        : `Connected, but "${body.model}" is not in this account's model list.`,
+    });
   });
 
   // ------------------------------------------------------- conversations

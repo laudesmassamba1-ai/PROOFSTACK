@@ -6,7 +6,7 @@
 export const workspaceEn = {
   "ws.nav.overview": "Overview",
   "ws.nav.projects": "Projects",
-  "ws.nav.engines": "Engines",
+  "ws.nav.engines": "Modules",
   "ws.nav.cli": "CLI",
   "ws.nav.ai": "AI",
   "ws.nav.billing": "Billing",
@@ -197,7 +197,7 @@ export const workspaceEn = {
   "ws.cli.noRun.body":
     "The projects exist, but the CLI has not uploaded a run. Create a scoped token, run the checks, then sync.",
   "ws.cli.what.1": "Runs on your machine or CI — not in the browser or the API.",
-  "ws.cli.what.2": "One engine, one report schema, three modules.",
+  "ws.cli.what.2": "One engine, one report schema, five modules.",
   "ws.cli.what.3": "The cloud stores results you explicitly sync; no silent upload.",
   "ws.cli.what.4": "Every failed finding includes a reproducible command.",
   "ws.cli.copied": "Copied.",
@@ -359,7 +359,7 @@ export type WorkspaceKey = keyof typeof workspaceEn;
 export const workspaceFr: Record<WorkspaceKey, string> = {
   "ws.nav.overview": "Vue d'ensemble",
   "ws.nav.projects": "Projets",
-  "ws.nav.engines": "Moteurs",
+  "ws.nav.engines": "Modules",
   "ws.nav.cli": "CLI",
   "ws.nav.ai": "IA",
   "ws.nav.billing": "Facturation",

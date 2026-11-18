@@ -498,7 +498,7 @@ export function AppLayout() {
 
         <footer className="app-footer">
           <span>PROOFCORE / {workspace?.name ?? "workspace"}</span>
-          <span>LOCAL EXECUTION / CLOUD EVIDENCE</span>
+          <span>WORLD · FLOW · EXIT · FAIL · CLEAN</span>
         </footer>
       </div>
 
