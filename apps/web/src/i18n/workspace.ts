@@ -215,7 +215,7 @@ export const workspaceEn = {
   "ai.connect": "Connect my AI",
   "ai.settings": "AI settings",
   "ai.keyPrivacy":
-    "Your API key stays in this browser (localStorage) and is forwarded to your provider per request. PROOFCORE stores nothing.",
+    "Your API key is encrypted (AES-256-GCM) on our servers and never returned to the browser. Conversations are saved to your workspace history.",
   "ai.baseUrl": "Provider base URL (OpenAI-compatible)",
   "ai.model": "Model",
   "ai.apiKey": "API key",
@@ -249,9 +249,6 @@ export const workspaceEn = {
   "wh.never": "never",
   "wh.delete": "Remove",
   "wh.createdNotice": "Webhook created. The secret is shown once — copy it now.",
-  "wh.n8n.title": "What is n8n for?",
-  "wh.n8n.body":
-    "n8n is a workflow tool you can self-host. PROOFCORE notifies it after verified outcomes (payments, runs) so your automations react — alerts in chat, tickets, CI hooks — without ever deciding anything itself. Your own webhooks above do the same for your systems; n8n is simply a ready-made receiver with a visual editor.",
   "admin.title": "Operations",
   "admin.description":
     "Users, workspaces, payments, runs and webhook delivery for this deployment.",
@@ -572,7 +569,7 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
   "ai.connect": "Connecter mon IA",
   "ai.settings": "Réglages IA",
   "ai.keyPrivacy":
-    "Votre clé API reste dans ce navigateur (localStorage) et est transmise à votre fournisseur à chaque requête. PROOFCORE ne stocke rien.",
+    "Votre clé API est chiffrée (AES-256-GCM) côté serveur et n'est jamais renvoyée au navigateur. Les conversations sont enregistrées dans l'historique de votre espace.",
   "ai.baseUrl": "URL de base du fournisseur (compatible OpenAI)",
   "ai.model": "Modèle",
   "ai.apiKey": "Clé API",
@@ -606,9 +603,6 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
   "wh.never": "jamais",
   "wh.delete": "Retirer",
   "wh.createdNotice": "Webhook créé. Le secret s'affiche une seule fois — copiez-le maintenant.",
-  "wh.n8n.title": "À quoi sert n8n ?",
-  "wh.n8n.body":
-    "n8n est un outil de flux d'automatisation auto-hébergeable. PROOFCORE le notifie après des résultats vérifiés (paiements, exécutions) pour que vos automatisations réagissent — alertes chat, tickets, hooks CI — sans rien décider elle-même. Vos webhooks ci-dessus font la même chose pour vos systèmes ; n8n en est simplement un récepteur prêt à l'emploi avec un éditeur visuel.",
   "admin.title": "Opérations",
   "admin.description":
     "Utilisateurs, espaces de travail, paiements, exécutions et diffusion des webhooks de ce déploiement.",

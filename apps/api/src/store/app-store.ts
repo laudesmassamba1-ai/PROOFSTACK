@@ -62,6 +62,26 @@ export interface DeviceGrantRecord {
   ip: string | null;
 }
 
+export interface AiConversationRecord {
+  id: string;
+  userId: string;
+  workspaceId: string;
+  title: string;
+  effort: string;
+  messages: unknown[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AiProfileRecord {
+  userId: string;
+  providerBaseUrl: string;
+  providerModel: string;
+  apiKeyEncrypted: string;
+  keyFingerprint: string;
+  updatedAt: string;
+}
+
 export interface WorkspaceWebhookRecord {
   id: string;
   workspaceId: string;
@@ -417,6 +437,138 @@ export class AppStore {
 
   async deleteExpiredDeviceGrants(now = this.clock()): Promise<void> {
     await this.db.prepare("DELETE FROM device_grants WHERE expires_at <= ?").bind(iso(now)).run();
+  }
+
+  // ---------------------------------------------------------- ai experience
+
+  async saveAiConversation(input: {
+    id: string;
+    userId: string;
+    workspaceId: string;
+    title: string;
+    effort: string;
+    messages: unknown[];
+  }): Promise<AiConversationRecord> {
+    const now = iso(this.clock());
+    await this.db
+      .prepare(
+        `INSERT INTO ai_conversations (id, user_id, workspace_id, title, effort, messages, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET title = excluded.title, effort = excluded.effort,
+           messages = excluded.messages, updated_at = excluded.updated_at`
+      )
+      .bind(
+        input.id,
+        input.userId,
+        input.workspaceId,
+        input.title,
+        input.effort,
+        json(input.messages),
+        now,
+        now
+      )
+      .run();
+    const row = await this.db
+      .prepare("SELECT * FROM ai_conversations WHERE id = ?")
+      .bind(input.id)
+      .first<Row>();
+    if (!row) {
+      throw new ProofCoreError({
+        message: "ai conversation vanished after upsert",
+        category: "ASSERTION",
+        code: "ai_conversation_missing",
+      });
+    }
+    return mapAiConversation(row);
+  }
+
+  async listAiConversations(
+    userId: string,
+    workspaceId: string
+  ): Promise<{ id: string; title: string; effort: string; updatedAt: string }[]> {
+    const rows = await this.db
+      .prepare(
+        "SELECT id, title, effort, updated_at FROM ai_conversations WHERE user_id = ? AND workspace_id = ? ORDER BY updated_at DESC LIMIT 50"
+      )
+      .bind(userId, workspaceId)
+      .all<Row>();
+    return rows.map((row) => ({
+      id: str(row, "id"),
+      title: str(row, "title"),
+      effort: str(row, "effort"),
+      updatedAt: str(row, "updated_at"),
+    }));
+  }
+
+  async getAiConversation(userId: string, id: string): Promise<AiConversationRecord | null> {
+    const row = await this.db
+      .prepare("SELECT * FROM ai_conversations WHERE user_id = ? AND id = ?")
+      .bind(userId, id)
+      .first<Row>();
+    return row ? mapAiConversation(row) : null;
+  }
+
+  async deleteAiConversation(userId: string, id: string): Promise<boolean> {
+    const result = await this.db
+      .prepare("DELETE FROM ai_conversations WHERE user_id = ? AND id = ?")
+      .bind(userId, id)
+      .run();
+    return result.changes > 0;
+  }
+
+  async saveAiProfile(input: {
+    userId: string;
+    providerBaseUrl: string;
+    providerModel: string;
+    apiKeyEncrypted: string;
+    keyFingerprint: string;
+  }): Promise<AiProfileRecord> {
+    const now = iso(this.clock());
+    await this.db
+      .prepare(
+        `INSERT INTO ai_profiles (user_id, provider_base_url, provider_model, api_key_encrypted, key_fingerprint, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(user_id) DO UPDATE SET provider_base_url = excluded.provider_base_url,
+           provider_model = excluded.provider_model, api_key_encrypted = excluded.api_key_encrypted,
+           key_fingerprint = excluded.key_fingerprint, updated_at = excluded.updated_at`
+      )
+      .bind(
+        input.userId,
+        input.providerBaseUrl,
+        input.providerModel,
+        input.apiKeyEncrypted,
+        input.keyFingerprint,
+        now
+      )
+      .run();
+    return {
+      userId: input.userId,
+      providerBaseUrl: input.providerBaseUrl,
+      providerModel: input.providerModel,
+      apiKeyEncrypted: input.apiKeyEncrypted,
+      keyFingerprint: input.keyFingerprint,
+      updatedAt: now,
+    };
+  }
+
+  async getAiProfile(userId: string): Promise<AiProfileRecord | null> {
+    const row = await this.db
+      .prepare("SELECT * FROM ai_profiles WHERE user_id = ?")
+      .bind(userId)
+      .first<Row>();
+    if (!row) return null;
+    return {
+      userId: str(row, "user_id"),
+      providerBaseUrl: str(row, "provider_base_url"),
+      providerModel: str(row, "provider_model"),
+      apiKeyEncrypted: str(row, "api_key_encrypted"),
+      keyFingerprint: str(row, "key_fingerprint"),
+      updatedAt: str(row, "updated_at"),
+    };
+  }
+
+  async deleteAiProfile(userId: string): Promise<void> {
+    await this.db.prepare("DELETE FROM ai_profiles WHERE user_id = ?").bind(userId).run();
   }
 
   // ------------------------------------------------------ outbound webhooks
@@ -907,6 +1059,89 @@ export class AppStore {
     return rows.map(mapFinding);
   }
 
+  /** Aggregated evolution data: runs per day, severity mix, module pass rates. */
+  async workspaceInsights(
+    workspaceId: string,
+    days = 30
+  ): Promise<{
+    runsPerDay: { day: string; total: number; passed: number; failed: number }[];
+    severityCounts: { severity: string; count: number }[];
+    moduleTotals: {
+      module: string;
+      passed: number;
+      failed: number;
+      warnings: number;
+      total: number;
+    }[];
+    since: string;
+  }> {
+    const since = new Date(this.clock().getTime() - days * 86_400_000).toISOString();
+    const runRows = await this.db
+      .prepare(
+        `SELECT started_at, status, totals FROM test_runs
+         WHERE workspace_id = ? AND started_at >= ? ORDER BY started_at ASC LIMIT 1000`
+      )
+      .bind(workspaceId, since)
+      .all<Row>();
+    const byDay = new Map<string, { total: number; passed: number; failed: number }>();
+    for (const row of runRows) {
+      const day = str(row, "started_at").slice(0, 10);
+      const entry = byDay.get(day) ?? { total: 0, passed: 0, failed: 0 };
+      entry.total += 1;
+      const parsed = parseJson<Record<string, { passed?: number; failed?: number }>>(
+        str(row, "totals"),
+        {}
+      );
+      for (const totals of Object.values(parsed)) {
+        entry.passed += totals.passed ?? 0;
+        entry.failed += totals.failed ?? 0;
+      }
+      byDay.set(day, entry);
+    }
+
+    const severityRows = await this.db
+      .prepare(
+        `SELECT severity, COUNT(*) AS n FROM findings
+         WHERE workspace_id = ? AND status = 'FAILED' AND detected_at >= ?
+         GROUP BY severity`
+      )
+      .bind(workspaceId, since)
+      .all<Row>();
+    const severityCounts = severityRows.map((row) => ({
+      severity: str(row, "severity"),
+      count: num(row, "n"),
+    }));
+
+    const moduleRows = await this.db
+      .prepare(`SELECT totals FROM test_runs WHERE workspace_id = ? AND started_at >= ? LIMIT 1000`)
+      .bind(workspaceId, since)
+      .all<Row>();
+    const moduleMap = new Map<
+      string,
+      { passed: number; failed: number; warnings: number; total: number }
+    >();
+    for (const row of moduleRows) {
+      const parsed = parseJson<
+        Record<string, { passed?: number; failed?: number; warnings?: number; total?: number }>
+      >(str(row, "totals"), {});
+      for (const [moduleName, totals] of Object.entries(parsed)) {
+        const entry = moduleMap.get(moduleName) ?? { passed: 0, failed: 0, warnings: 0, total: 0 };
+        entry.passed += totals.passed ?? 0;
+        entry.failed += totals.failed ?? 0;
+        entry.warnings += totals.warnings ?? 0;
+        entry.total += totals.total ?? 0;
+        moduleMap.set(moduleName, entry);
+      }
+    }
+
+    return {
+      runsPerDay: [...byDay.entries()].map(([day, entry]) => ({ day, ...entry })),
+      severityCounts,
+      moduleTotals: [...moduleMap.entries()].map(([module, entry]) => ({ module, ...entry })),
+      since,
+    };
+  }
+
   async listFindings(
     workspaceId: string,
     projectId: string,
@@ -1070,6 +1305,19 @@ function mapUser(row: Row): UserRecord {
     passwordHash: str(row, "password_hash"),
     createdAt: str(row, "created_at"),
     emailVerifiedAt: nullableStr(row, "email_verified_at"),
+  };
+}
+
+function mapAiConversation(row: Row): AiConversationRecord {
+  return {
+    id: str(row, "id"),
+    userId: str(row, "user_id"),
+    workspaceId: str(row, "workspace_id"),
+    title: str(row, "title"),
+    effort: str(row, "effort"),
+    messages: parseJson<unknown[]>(str(row, "messages"), []),
+    createdAt: str(row, "created_at"),
+    updatedAt: str(row, "updated_at"),
   };
 }
 

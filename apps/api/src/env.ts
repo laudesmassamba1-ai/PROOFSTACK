@@ -26,6 +26,8 @@ export interface AppConfig {
   /** Optional n8n webhook for verified payment events; never payment authority. */
   n8nWebhookUrl: string | undefined;
   n8nWebhookSecret: string | undefined;
+  /** Master key for encrypting stored AI provider keys (AES-256-GCM, base64 or hex, >= 32 bytes). */
+  aiKeysSecret: string | undefined;
 }
 
 export type Env = Record<string, string | undefined>;
@@ -51,6 +53,7 @@ export function readConfig(env: Env): AppConfig {
     adminEmails: parseAdminEmails(env.ADMIN_EMAILS),
     n8nWebhookUrl: env.N8N_WEBHOOK_URL,
     n8nWebhookSecret: env.N8N_WEBHOOK_SECRET,
+    aiKeysSecret: env.AI_KEYS_SECRET,
   };
 }
 

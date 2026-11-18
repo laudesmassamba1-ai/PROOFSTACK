@@ -1,6 +1,7 @@
 import { ArrowRight, FolderPlus, Terminal } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
+import { ModulePassRates, RunsTrend, SeverityBreakdown } from "../../components/app/Insights.js";
 import { ModuleObject } from "../../components/app/ModuleObjects.js";
 import { Empty, ErrorState, Loading, StatusBadge } from "../../components/app/ui.js";
 import { EnhancedCard } from "../../components/common/EnhancedCard.js";
@@ -8,6 +9,18 @@ import { useI18n } from "../../i18n/index.js";
 import { type ApiError, apiFetch } from "../../lib/api.js";
 import { duration, formatDate, relativeTime } from "../../lib/format.js";
 import { useSession } from "../../lib/session.js";
+
+interface Insights {
+  runsPerDay: { day: string; total: number; passed: number; failed: number }[];
+  severityCounts: { severity: string; count: number }[];
+  moduleTotals: {
+    module: string;
+    passed: number;
+    failed: number;
+    warnings: number;
+    total: number;
+  }[];
+}
 
 interface Overview {
   workspace: { id: string; name: string; myRole: string };
@@ -74,6 +87,7 @@ export function Overview() {
   const { locale, t } = useI18n();
   const fr = locale === "fr";
   const [data, setData] = useState<Overview | null>(null);
+  const [insights, setInsights] = useState<Insights | null>(null);
   const [error, setError] = useState<ApiError | Error | null>(null);
 
   const load = useCallback(async () => {
@@ -81,6 +95,7 @@ export function Overview() {
     setError(null);
     try {
       setData(await apiFetch<Overview>(`/api/v1/overview?workspaceId=${workspaceId}`));
+      setInsights(await apiFetch<Insights>(`/api/v1/insights?workspaceId=${workspaceId}&days=14`));
     } catch (caught) {
       setError(caught as ApiError);
     }
@@ -241,6 +256,73 @@ export function Overview() {
               </Link>
             );
           })}
+        </div>
+      </section>
+
+      <section className="app-section" aria-labelledby="insights-title">
+        <div className="app-section-head">
+          <p className="app-eyebrow">03 / {fr ? "Évolution" : "Evolution"}</p>
+          <h2 id="insights-title" className="app-section-title">
+            {fr ? "14 derniers jours" : "Last 14 days"}
+          </h2>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="app-workbench lg:col-span-2">
+            <header className="app-workbench-head">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">
+                  {fr ? "Vérifications par jour" : "Checks per day"}
+                </p>
+              </div>
+              <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-sm bg-emerald-500/70" />
+                  {fr ? "réussis" : "passed"}
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-sm bg-rose-500/80" />
+                  {fr ? "échoués" : "failed"}
+                </span>
+              </div>
+            </header>
+            {insights ? (
+              <RunsTrend runs={insights.runsPerDay} locale={locale} />
+            ) : (
+              <p className="p-4 text-xs text-muted-foreground">…</p>
+            )}
+          </div>
+          <div className="app-workbench">
+            <header className="app-workbench-head">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">
+                  {fr ? "Gravité des échecs" : "Failure severity"}
+                </p>
+              </div>
+            </header>
+            <div className="p-4">
+              {insights ? (
+                <SeverityBreakdown counts={insights.severityCounts} locale={locale} />
+              ) : (
+                <p className="text-xs text-muted-foreground">…</p>
+              )}
+            </div>
+          </div>
+          <div className="app-workbench lg:col-span-3">
+            <header className="app-workbench-head">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">
+                  {fr ? "Taux de réussite par module" : "Pass rate per module"}
+                </p>
+              </div>
+            </header>
+            <div className="p-4">
+              {insights ? (
+                <ModulePassRates modules={insights.moduleTotals} />
+              ) : (
+                <p className="text-xs text-muted-foreground">…</p>
+              )}
+            </div>
+          </div>
         </div>
       </section>
 

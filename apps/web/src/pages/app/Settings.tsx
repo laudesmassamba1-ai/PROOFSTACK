@@ -1,4 +1,4 @@
-import { Globe, KeyRound, Moon, Sun, Trash2, Webhook } from "lucide-react";
+import { KeyRound, Moon, Sun, Trash2, Webhook } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Cannot, Card, Empty, ErrorState, Loading } from "../../components/app/ui.js";
 import { useI18n } from "../../i18n/index.js";
@@ -569,15 +569,6 @@ export function Settings() {
                 ) : null}
               </>
             )}
-          </Card>
-
-          <Card className="mt-4" title={t("wh.n8n.title")} description={t("wh.n8n.body")} enhanced>
-            <div className="flex items-center gap-3 px-5 py-4 text-sm">
-              <Globe size={16} className="shrink-0 text-muted" />
-              <code className="app-mono text-xs text-muted">
-                automation/n8n · docker compose up -d → http://localhost:5678
-              </code>
-            </div>
           </Card>
         </>
       ) : null}

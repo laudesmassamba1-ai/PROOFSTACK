@@ -266,6 +266,15 @@ export function workspaceRoutes(services: Services): Hono<AppEnv> {
     return c.html(html);
   });
 
+  // -------------------------------------------------------------- insights
+
+  app.get("/insights", async (c) => {
+    const { workspace } = await requireWorkspace(c, services, c.req.query("workspaceId"));
+    const days = Math.min(90, Math.max(7, Number(c.req.query("days") ?? "30") || 30));
+    const insights = await services.store.workspaceInsights(workspace.id, days);
+    return c.json({ workspaceId: workspace.id, days, ...insights });
+  });
+
   // -------------------------------------------------------------- overview
 
   app.get("/overview", async (c) => {

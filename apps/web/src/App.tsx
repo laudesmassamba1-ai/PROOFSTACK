@@ -41,7 +41,7 @@ const Settings = lazy(() =>
   import("./pages/app/Settings.js").then((m) => ({ default: m.Settings }))
 );
 const Admin = lazy(() => import("./pages/app/Admin.js").then((m) => ({ default: m.Admin })));
-const AiChat = lazy(() => import("./pages/app/AiChat.js").then((m) => ({ default: m.AiChat })));
+const AiChat = lazy(() => import("./pages/app/AiChat.js").then((m) => ({ default: m.AiChatPage })));
 
 function RouteFallback() {
   return (
