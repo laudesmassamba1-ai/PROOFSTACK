@@ -141,3 +141,18 @@ Conséquences de conception :
 - **Erreurs utiles** : une clé refusée remonte `ai_key_rejected` avec le statut et le
   message du fournisseur ; un modèle retiré remonte `ai_model_not_found` ; une coupure
   de passerelle est expliquée comme telle (et non plus « HTTP 502 »).
+
+### Le modèle du compte dans la CLI et l’app desktop
+
+Le modèle enregistré dans l’espace `/app/ai` n’a pas à être reconnecté à la main :
+
+1. `proofcore login` lit `GET /api/v1/ai/profile` avec la session du compte ;
+2. il écrit un fournisseur local qui pointe vers `/api/v1/ai/relay` et reprend le modèle,
+   le type de fournisseur et son libellé ;
+3. `proofcore agent` et le moteur local de l’app desktop (`proofcore serve`) rafraîchissent
+   ce profil au démarrage.
+
+La clé du fournisseur **ne quitte jamais le serveur**. Le relais déchiffre la clé stockée
+côté site uniquement pour l’appel amont, et refuse de laisser le client choisir un autre
+modèle ou fournisseur. `proofcore agent --configure` reste disponible pour un modèle
+local (Ollama, par exemple) qui n’est pas enregistré sur le compte.

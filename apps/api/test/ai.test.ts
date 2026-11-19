@@ -241,6 +241,69 @@ describe("ai profile", () => {
   });
 });
 
+describe("account relay for the local agent", () => {
+  it("uses the saved key and model without ever returning the key", async () => {
+    const { request, signUp } = harness;
+    const { cookie } = await signUp("ai-relay@example.com");
+    const put = await request("/api/v1/ai/profile", {
+      method: "PUT",
+      cookie,
+      body: JSON.stringify({
+        providerId: "custom",
+        baseUrl: upstreamBase,
+        model: "test-model",
+        apiKey: "sk-relay-secret-9876",
+      }),
+    });
+    expect(put.status).toBe(200);
+
+    upstreamState.respond = () => ({
+      status: 200,
+      body: { choices: [{ message: { role: "assistant", content: "relayed answer" } }] },
+    });
+    const response = await request("/api/v1/ai/relay/chat/completions", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({
+        // The client tries another model; the server must use the saved one.
+        model: "attacker-model",
+        messages: [{ role: "user", content: "hello" }],
+      }),
+    });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      choices: { message: { content: string } }[];
+    };
+    expect(body.choices[0]?.message.content).toBe("relayed answer");
+    expect(JSON.stringify(body)).not.toContain("sk-relay-secret-9876");
+
+    const call = upstreamState.calls.find((entry) => entry.method === "POST");
+    expect(call?.headers.authorization).toBe("Bearer sk-relay-secret-9876");
+    expect(JSON.parse(call?.body ?? "{}").model).toBe("test-model");
+  });
+
+  it("refuses a relay without an account session", async () => {
+    const response = await harness.request("/api/v1/ai/relay/chat/completions", {
+      method: "POST",
+      body: JSON.stringify({ messages: [] }),
+    });
+    expect(response.status).toBe(401);
+  });
+
+  it("requires a saved profile instead of inventing a provider", async () => {
+    const { request, signUp } = harness;
+    const { cookie } = await signUp("ai-relay-empty@example.com");
+    const response = await request("/api/v1/ai/relay/chat/completions", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({ messages: [] }),
+    });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("ai_not_configured");
+  });
+});
+
 describe("anthropic wire format", () => {
   it("posts to /messages with x-api-key, a top-level system prompt and input_schema tools", async () => {
     const { request, signUp } = harness;

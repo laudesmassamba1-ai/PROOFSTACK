@@ -211,6 +211,31 @@ describe("local bridge native window", () => {
 });
 
 describe("local bridge turns", () => {
+  it("picks up the account model without restarting the engine", async () => {
+    // The app can open before the site profile exists (or sync once while the API is
+    // briefly unavailable). The next state read and turn must try the account again.
+    const { base, cookie } = await start({
+      provider: undefined,
+      refreshProvider: async () => ({
+        provider: { baseUrl: modelUrl, model: "model-connected-on-site", apiKey: "k" },
+      }),
+    });
+
+    const state = await fetch(`${base}/api/state`, { headers: { cookie } });
+    expect(await state.json()).toMatchObject({ model: "model-connected-on-site" });
+
+    replies = [modelReply()];
+    const response = await fetch(`${base}/api/chat`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ message: "hello" }),
+    });
+    const body = await response.text();
+    expect(body).toContain('"model":"model-connected-on-site"');
+    expect(body).toContain("finished");
+    expect(body).not.toContain("Aucun modèle");
+  });
+
   it("streams the tool call and the answer over SSE", async () => {
     const { base, cookie } = await start();
     replies = [modelReply({ name: "read_file", args: { path: "read-me.txt" } }), modelReply()];

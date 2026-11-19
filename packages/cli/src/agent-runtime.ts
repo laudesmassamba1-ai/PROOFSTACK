@@ -27,12 +27,26 @@ import { handleMcpToolCall, mcpToolDescriptors } from "./mcp-server.js";
 export const MUTATING_TOOLS = new Set([
   "write_file",
   "apply_patch",
+  "edit_file",
+  "delete_path",
+  "move_path",
+  "copy_path",
+  "make_directory",
   "run_command",
+  "run_shell",
   "run_sandboxed",
   "run_tests",
+  "http_request",
   "generate_svg",
   "debug_script",
   "git_commit",
+  "git_branch",
+  "git_stage",
+  "git_unstage",
+  "browser_interact",
+  "browser_eval",
+  "browser_pdf",
+  "browser_cookies",
   "build_semantic_index",
 ]);
 
@@ -42,6 +56,17 @@ export interface AgentProvider {
   apiKey: string;
   /** `anthropic` speaks /messages; anything else speaks an OpenAI-compatible API. */
   kind?: "openai" | "anthropic" | string;
+  /**
+   * Account-managed model: the request goes through the site's relay, which holds the
+   * encrypted provider key. The local file then contains no model key at all.
+   */
+  relay?: boolean;
+  /** Session cookie for the relay. Stored with mode 0600 beside the CLI session. */
+  sessionCookie?: string;
+  source?: "account" | "local";
+  accountApiUrl?: string;
+  providerId?: string;
+  providerLabel?: string;
 }
 
 export function proofcoreHome(): string {
@@ -59,9 +84,11 @@ export function providerFilePath(): string {
 /**
  * The model configuration, stored by the owner only.
  *
- * The account session is a separate file managed by `proofcore login`; this one holds the
- * API key the user pastes locally. It never leaves the machine: the web profile cannot
- * return its key, by design, so the CLI cannot read it from there either.
+ * There are two shapes:
+ * - a local provider (`source` absent/`local`), with the key the user pasted;
+ * - an account provider (`relay: true`), which carries no key and sends requests through
+ *   the site using the stored session. `proofcore login` writes the second shape from the
+ *   profile saved on the account, so the CLI never asks for a key that already exists.
  */
 export async function saveStoredProvider(provider: AgentProvider): Promise<string> {
   const path = providerFilePath();
@@ -104,16 +131,39 @@ export function keyFingerprint(key: string): string {
  */
 export async function resolveProvider(override?: Partial<AgentProvider>): Promise<AgentProvider> {
   const stored = await loadStoredProvider();
+  // An empty variable is not a value. Shells commonly export `KEY=` to clear a secret,
+  // and treating that as an override made a perfectly synced account model look missing.
+  const envBase = process.env.PROOFCORE_AI_BASE_URL?.trim() || undefined;
+  const envModel = process.env.PROOFCORE_AI_MODEL?.trim() || undefined;
+  const envKey = process.env.PROOFCORE_AI_KEY?.trim() || undefined;
+  const overrideBase = override?.baseUrl?.trim() || undefined;
+  const overrideModel = override?.model?.trim() || undefined;
+  const overrideKey = override?.apiKey?.trim() || undefined;
+  // An explicit base URL means the caller is switching away from the account relay (a
+  // local provider, an environment override). It must not inherit the relay cookie.
+  const explicitBase = overrideBase ?? envBase;
+  const relay = override?.relay ?? (explicitBase ? false : stored.relay);
   const provider: AgentProvider = {
-    baseUrl: override?.baseUrl ?? process.env.PROOFCORE_AI_BASE_URL ?? stored.baseUrl ?? "",
-    model: override?.model ?? process.env.PROOFCORE_AI_MODEL ?? stored.model ?? "",
-    apiKey: override?.apiKey ?? process.env.PROOFCORE_AI_KEY ?? stored.apiKey ?? "",
+    baseUrl: overrideBase ?? envBase ?? stored.baseUrl ?? "",
+    model: overrideModel ?? envModel ?? stored.model ?? "",
+    apiKey: overrideKey ?? envKey ?? stored.apiKey ?? "",
     kind: override?.kind ?? process.env.PROOFCORE_AI_KIND ?? stored.kind,
+    ...(relay
+      ? {
+          relay: true,
+          sessionCookie: override?.sessionCookie ?? stored.sessionCookie,
+          ...(stored.source ? { source: stored.source } : {}),
+          ...(stored.accountApiUrl ? { accountApiUrl: stored.accountApiUrl } : {}),
+          ...(stored.providerId ? { providerId: stored.providerId } : {}),
+          ...(stored.providerLabel ? { providerLabel: stored.providerLabel } : {}),
+        }
+      : {}),
   };
   const missing = [
     !provider.baseUrl && "PROOFCORE_AI_BASE_URL",
     !provider.model && "PROOFCORE_AI_MODEL",
-    !provider.apiKey && "PROOFCORE_AI_KEY",
+    !provider.relay && !provider.apiKey && "PROOFCORE_AI_KEY",
+    provider.relay && !provider.sessionCookie && "session (run `proofcore login` again)",
   ].filter(Boolean);
   if (missing.length > 0) {
     throw new ProofCoreError({
@@ -123,6 +173,90 @@ export async function resolveProvider(override?: Partial<AgentProvider>): Promis
     });
   }
   return provider;
+}
+
+export interface AccountAiSession {
+  apiUrl: string;
+  cookie: string;
+}
+
+export interface AccountAiSync {
+  configured: boolean;
+  model?: string;
+  providerLabel?: string;
+  reason?: string;
+}
+
+/**
+ * Pulls the AI model saved on the site into the local agent configuration.
+ *
+ * The provider key is deliberately never returned by the profile endpoint. The local
+ * provider therefore points at `/api/v1/ai/relay` and authenticates with the account
+ * session: the site decrypts its own key only for the upstream call. The model, provider
+ * kind and label are copied locally so the CLI can report what it will use without an
+ * extra round-trip.
+ */
+export async function syncAccountAi(session: AccountAiSession): Promise<AccountAiSync> {
+  const apiUrl = session.apiUrl.replace(/\/+$/, "");
+  let response: Response;
+  try {
+    response = await fetch(`${apiUrl}/api/v1/ai/profile`, {
+      headers: { accept: "application/json", cookie: session.cookie, "cache-control": "no-store" },
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (error) {
+    return {
+      configured: false,
+      reason: `site unreachable: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+  if (response.status === 401) return { configured: false, reason: "session expired" };
+  if (!response.ok) return { configured: false, reason: `HTTP ${response.status}` };
+
+  let profile: {
+    configured?: boolean;
+    reason?: string;
+    providerId?: string;
+    providerKind?: string;
+    providerLabel?: string;
+    model?: string;
+  };
+  try {
+    profile = (await response.json()) as typeof profile;
+  } catch {
+    return { configured: false, reason: "invalid profile response" };
+  }
+
+  if (profile.configured !== true) {
+    // Do not erase a local provider merely because this account has none. Only a profile
+    // this function wrote itself is removed when the site says it was disconnected.
+    const current = await loadStoredProvider();
+    if (current.source === "account" && current.accountApiUrl === apiUrl) {
+      await clearStoredProvider();
+    }
+    return { configured: false, reason: profile.reason ?? "no model on this account" };
+  }
+  if (typeof profile.model !== "string" || profile.model.length === 0) {
+    return { configured: false, reason: "the account profile has no model" };
+  }
+
+  await saveStoredProvider({
+    baseUrl: `${apiUrl}/api/v1/ai/relay`,
+    model: profile.model,
+    apiKey: "",
+    ...(profile.providerKind ? { kind: profile.providerKind } : {}),
+    relay: true,
+    sessionCookie: session.cookie,
+    source: "account",
+    accountApiUrl: apiUrl,
+    ...(profile.providerId ? { providerId: profile.providerId } : {}),
+    ...(profile.providerLabel ? { providerLabel: profile.providerLabel } : {}),
+  });
+  return {
+    configured: true,
+    model: profile.model,
+    ...(profile.providerLabel ? { providerLabel: profile.providerLabel } : {}),
+  };
 }
 
 export interface ChatMessage {
@@ -183,12 +317,12 @@ export async function callChatModel(
     : `${provider.baseUrl.replace(/\/+$/, "")}/chat/completions`;
 
   const headers: Record<string, string> = { "content-type": "application/json" };
-  if (isAnthropic) {
-    headers["x-api-key"] = provider.apiKey;
-    headers["anthropic-version"] = "2023-06-01";
-  } else {
-    headers.authorization = `Bearer ${provider.apiKey}`;
+  if (provider.sessionCookie) headers.cookie = provider.sessionCookie;
+  if (provider.apiKey) {
+    if (isAnthropic) headers["x-api-key"] = provider.apiKey;
+    else headers.authorization = `Bearer ${provider.apiKey}`;
   }
+  if (isAnthropic) headers["anthropic-version"] = "2023-06-01";
 
   const body = isAnthropic
     ? {
@@ -404,6 +538,11 @@ export class AgentSession {
     this.options.approve = approver;
   }
 
+  /** Replaces the model of a live session after the account profile changed. */
+  setProvider(provider: AgentProvider): void {
+    this.options.provider = provider;
+  }
+
   get history(): ChatMessage[] {
     return [...this.messages];
   }
@@ -511,6 +650,14 @@ async function previewOf(
     if (tool === "apply_patch") {
       const result = (await handleMcpToolCall(
         "apply_patch",
+        { ...args, apply: false },
+        { cwd: root }
+      )) as { diff?: string };
+      return result?.diff;
+    }
+    if (tool === "edit_file") {
+      const result = (await handleMcpToolCall(
+        "edit_file",
         { ...args, apply: false },
         { cwd: root }
       )) as { diff?: string };

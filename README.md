@@ -14,16 +14,16 @@ dashboard:
 
 The product is a monorepo: checks execute on the developer's machine or in CI against
 an HTTP target and synthetic fixtures, while the SaaS layer stores accounts, projects,
-reports, usage and billing. Browser (Playwright) automation of customer journeys is
-not implemented yet — see the status file.
+reports, usage and billing. The assistant drives a real Chromium over the DevTools
+Protocol and runs a real terminal; customer browser journeys inside WORLD and FLOW
+are not implemented yet — see the status file.
 
 ## Status
 
 Implemented and tested: the shared engine and all three modules, the CLI with JSON/
 JUnit/HTML reports, the SaaS API (auth, workspaces, projects, run ingestion, API keys,
 billing, webhooks), the authenticated workspace and the terminal console. `pnpm test`
-runs 507 tests; `pnpm typecheck` and `pnpm build` pass. Biome still reports pre-existing
-diagnostics, so `pnpm lint` is not claimed as clean.
+runs 516 tests; `pnpm lint`, `pnpm typecheck` and `pnpm build` pass.
 
 The creator's read-only operations console lives at `/app/admin`: users, workspaces,
 subscriptions, payments, runs and webhook delivery. It is gated by the API's
@@ -110,6 +110,8 @@ Then open a terminal in the application you want to test and run it there:
 cd /path/to/your/app   # replace with a real, existing directory
 proofcore init
 proofcore doctor
+proofcore modules          # local wiring, with the command for each module
+proofcore flow             # run FLOW locally (also world / exit)
 proofcore test --module world,flow,exit
 ```
 
@@ -130,7 +132,9 @@ still resolves nothing; use the generated global binary instead.
 
 The native app is a packaged Electron window around the same React interface and the
 same local engine as the CLI. It is not a browser shortcut: the web bundle, the engine,
-the icons and the launch metadata travel inside the installer.
+the icons and the launch metadata travel inside the installer. The window has no native
+menu bar: local tools, updates and the code agent live in the interface, and the last
+synced workspace stays readable while the site is unreachable.
 
 ```bash
 pnpm app:dist          # this machine (Linux builds .deb + AppImage, Windows builds NSIS .exe)
@@ -153,15 +157,22 @@ What runs where:
   `127.0.0.1` inside the window. It is the same UI as the site, not a copy.
 - The local engine is the same self-contained `proofcore` binary the CLI installers ship.
   It executes the agent, audits, sandbox and index on this machine.
-- The site is used for the account check, projects, reports, billing and explicit sync.
-  The local engine proxies those API calls with the HttpOnly session cookie; JavaScript
-  never receives the cookie.
+- The site is used for the account check, projects, reports, billing, AI model and explicit
+  sync. The local engine proxies those API calls with the HttpOnly session cookie;
+  JavaScript never receives the cookie. The AI model saved on the account is picked up at
+  sign-in and at engine startup, so the same model works in the window without asking for
+  its key again. The key stays on the server; local calls go through the authenticated
+  relay.
 - The session is kept in the OS vault when available (DPAPI, Keychain, libsecret/kwallet),
   with a `0600` file fallback on Linux machines without a keyring. A confirmed session
   keeps the local tools usable for seven offline days; a revoked session locks them.
 - Closing and reopening works from the icon. A second launch focuses the existing window.
-- The **PROOFCORE** menu opens the local agent console, runs local tests, opens the site,
-  checks `doctor`, signs out and checks for app/engine updates.
+- The in-app **Moteur / Engine** panel opens the local code agent, runs local tests, opens
+  the site, checks `doctor`, reports app-update state and installs engine updates. The
+  native OS menu bar is not used.
+- The Agent route streams tool calls and file previews in the workspace shell. Writing
+  tools stop for an explicit approval unless the engine was started with `--yes`; a small
+  context panel shows the repository, model, account and write policy.
 
 The site is not a single cross-platform executable: no installer format can install both
 a Linux `.deb` and a Windows `.exe`. Each OS gets one package from the release workflow,

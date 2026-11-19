@@ -10,62 +10,26 @@ import {
   Timer,
   Unplug,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { useI18n } from "../../i18n/index.js";
-import { usePrefersReducedMotion } from "../../lib/theme.js";
 
 /**
- * Reference B translated into product language: white modular tiles floating over a
- * blue→violet→pink→orange field, deep-blue line icons, small auxiliary chips, layered
- * depth. Built with CSS transforms and gradients only — no WebGL, no 3D library, no
- * bitmap export, so it costs nothing on modest hardware.
+ * The module wall: white tiles over a blue→violet→pink→orange field, line icons and small
+ * auxiliary chips. Deliberately static — a pointer-following tilt moved the text people
+ * were reading, so the composition carries the depth and the content stays still.
  */
 export function ModuleShowcase() {
   const { t } = useI18n();
-  const reduced = usePrefersReducedMotion();
-  const ref = useRef<HTMLDivElement | null>(null);
-  const [tilt, setTilt] = useState({ x: 0, y: 0 });
-
-  useEffect(() => {
-    if (reduced) return;
-    const node = ref.current;
-    if (!node) return;
-    const onMove = (event: PointerEvent): void => {
-      const rect = node.getBoundingClientRect();
-      const nx = (event.clientX - rect.left) / rect.width - 0.5;
-      const ny = (event.clientY - rect.top) / rect.height - 0.5;
-      setTilt({ x: Math.max(-1, Math.min(1, nx * 2)), y: Math.max(-1, Math.min(1, ny * 2)) });
-    };
-    const onLeave = (): void => setTilt({ x: 0, y: 0 });
-    node.addEventListener("pointermove", onMove);
-    node.addEventListener("pointerleave", onLeave);
-    return () => {
-      node.removeEventListener("pointermove", onMove);
-      node.removeEventListener("pointerleave", onLeave);
-    };
-  }, [reduced]);
-
-  const depth = (factor: number): string =>
-    `translate3d(${tilt.x * factor * 10}px, ${tilt.y * factor * 8}px, ${factor * 30}px)`;
 
   return (
-    <div
-      ref={ref}
-      className="spectrum-field relative overflow-hidden rounded-[28px] px-5 py-12 sm:px-8 lg:py-16"
-      style={{ perspective: "1400px" }}
-    >
-      <div
-        className="relative mx-auto grid max-w-[1050px] gap-5"
-        style={{ transformStyle: "preserve-3d" }}
-      >
+    <div className="spectrum-field relative overflow-hidden rounded-[28px] px-5 py-12 sm:px-8 lg:py-16">
+      <div className="relative mx-auto grid max-w-[1050px] gap-5">
         <div className="grid gap-5 md:grid-cols-3">
           <Tile
             title={t("modules.world.name")}
             subtitle={t("modules.world.tag")}
             body={t("question.world")}
             icon={<Globe2 size={26} className="tile-ink" />}
-            style={{ transform: depth(1.2) }}
             to="/world"
             openLabel={t("modules.open")}
           />
@@ -74,7 +38,6 @@ export function ModuleShowcase() {
             subtitle={t("modules.flow.tag")}
             body={t("question.flow")}
             icon={<Route size={26} className="tile-ink" />}
-            style={{ transform: depth(0.6) }}
             to="/flow"
             openLabel={t("modules.open")}
             chip={t("mkt.engine.core")}
@@ -84,7 +47,6 @@ export function ModuleShowcase() {
             subtitle={t("modules.exit.tag")}
             body={t("question.exit")}
             icon={<Unplug size={26} className="tile-ink" />}
-            style={{ transform: depth(1.5) }}
             to="/exit"
             openLabel={t("modules.open")}
           />
@@ -97,7 +59,6 @@ export function ModuleShowcase() {
             subtitle={t("modules.fail.tag")}
             body={t("question.fail")}
             icon={<ShieldAlert size={26} className="tile-ink" />}
-            style={{ transform: depth(1) }}
             to="/fail"
             openLabel={t("modules.open")}
           />
@@ -106,11 +67,10 @@ export function ModuleShowcase() {
             subtitle={t("modules.clean.tag")}
             body={t("question.clean")}
             icon={<BadgeCheck size={26} className="tile-ink" />}
-            style={{ transform: depth(1.6) }}
             to="/clean"
             openLabel={t("modules.open")}
           />
-          <div className="tile p-5" style={{ transform: depth(0.35) }}>
+          <div className="tile p-5">
             <div className="flex items-start gap-4">
               <span className="tile-chip flex size-11 shrink-0 items-center justify-center">
                 <Boxes size={20} className="tile-ink" />
@@ -139,25 +99,21 @@ export function ModuleShowcase() {
             icon={<FileBarChart2 size={18} className="tile-ink" />}
             label={t("mkt.tile.reports")}
             note={t("mkt.tile.reports.note")}
-            style={{ transform: depth(1.8) }}
           />
           <MiniTile
             icon={<BadgeCheck size={18} className="tile-ink" />}
             label={t("mkt.tile.validation")}
             note={t("mkt.tile.validation.note")}
-            style={{ transform: depth(2.2) }}
           />
           <MiniTile
             icon={<Plug size={18} className="tile-ink" />}
             label={t("mkt.tile.integrations")}
             note={t("mkt.tile.integrations.note")}
-            style={{ transform: depth(1.4) }}
           />
           <MiniTile
             icon={<Timer size={18} className="tile-ink" />}
             label={t("mkt.tile.automation")}
             note={t("mkt.tile.automation.note")}
-            style={{ transform: depth(2) }}
           />
         </div>
       </div>

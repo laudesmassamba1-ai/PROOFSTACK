@@ -1,6 +1,6 @@
 {
   "name": "@proofcore/cli",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "license": "MPL-2.0",
@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@proofcore/adapter-ai": "workspace:*",
+    "@proofcore/adapter-browser": "workspace:*",
     "@proofcore/adapter-reporting": "workspace:*",
     "@proofcore/config": "workspace:*",
     "@proofcore/contracts": "workspace:*",

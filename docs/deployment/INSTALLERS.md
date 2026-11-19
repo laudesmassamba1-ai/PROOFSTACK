@@ -73,9 +73,9 @@ proofcore login     # once: opens the browser, stores the session at 0600
 proofcore           # full-screen hub
 ```
 
-In the hub: `/help` lists everything, `Tab` completes a command, `↑`/`↓` walk the history,
-`PgUp`/`PgDn` scroll the transcript, `Ctrl+C` interrupts a turn (twice leaves), `Ctrl+D`
-leaves.
+In the hub: `/help` lists everything, `/history` shows the commands of the session, `Tab`
+completes a command, `↑`/`↓` walk the history, `PgUp`/`PgDn` scroll the transcript, `Ctrl+C`
+interrupts a turn (twice leaves), `Ctrl+D` leaves.
 
 Ignoring the menus entirely also works — anything without a leading slash is a prompt for
 the agent.
@@ -121,9 +121,19 @@ than showing a blank frame. `proofcore app --print-url` gives the URL, `--json` 
 - the main process picks a free loopback port, starts `proofcore serve` there, reads the
   one-time URL it prints, and loads it in the window - the per-run token is required on every
   request, so the URL is the only way in and the cookie it sets keeps the window authorised;
+- that cookie is scoped to `127.0.0.1`, not to the port. The app removes the previous run's
+  cookie before loading the new URL; otherwise Electron restores a token that no longer
+  matches the sidecar and every request answers `401`;
 - the page runs locally: agent, tools, audits, sandbox, index. The network is used for the
   account, projects, reports and sync;
-- menu: Se connecter, Mon compte, Ouvrir le site, Mettre à jour, doctor;
+- a local splash covers the account check and sidecar startup. The sign-in window has a native
+  frame so it can always be moved and closed; once signed in, the workspace uses its own
+  compact 1180x800 title bar (minimum 820x600);
+- account routes inside the window do not render the marketing navigation or footer: they
+  use a desktop title bar instead, and the workspace switches to its compact menu below
+  1180px;
+- the native menu is gone; the "Moteur" panel owns the local engine, site, update and doctor
+  actions, while the account menu owns settings, billing and sign-out;
 - external links and payment/login pages open in the user's browser, never inside the window;
 - one instance, sidecar killed on quit (taskkill on Windows), and the engine starts even with
   no model configured - the window explains what to set instead of refusing to open.
@@ -135,13 +145,23 @@ pnpm cli:binary --target linux-x64          # the sidecar
 pnpm app:dist                               # deb + AppImage
 ```
 
-`artifacts/desktop/PROOFCORE-0.3.0-amd64.deb` installs `/opt/PROOFCORE` (window + sidecar),
-a `proofcore` launcher, the menu entry and the icon. Windows/macOS builds run in CI: the same
-`electron-builder.yml` produces NSIS and dmg there.
+`artifacts/desktop/PROOFCORE-0.4.0-amd64.deb` installs `/opt/PROOFCORE` (window + sidecar),
+a `proofcore` launcher, the menu entry and the icon. Desktop packages are built for Linux
+(`.deb`, `.AppImage`) and Windows (NSIS) in CI; macOS ships the CLI installer only, because
+the desktop matrix has no macOS runner.
 
 ## Updates
 
-Every install knows how to update itself:
+The **desktop application** uses `electron-updater`. A published GitHub release must contain
+`latest-linux.yml` / `latest.yml`; the `.github/workflows/release.yml` job builds both desktop
+targets, verifies that the Linux manifest exists, and attaches it with the packages. The app
+checks at startup, downloads in the background, installs on quit, and the Settings → “Ce
+poste” card exposes a manual check. An AppImage replaces itself in place; a `.deb` is owned
+by the system package manager, so the card reports that state and links to the release page
+instead of showing a failed check. The version in `apps/desktop/package.json` must be higher
+than the installed one before tagging a release.
+
+The **CLI** knows how to update itself:
 
 ```bash
 proofcore update            # asks the release manifest; shows what it would do
@@ -150,7 +170,7 @@ proofcore update --check    # same as `update`, for scripts
 proofcore update --json     # { current, latest, available, install, error }
 ```
 
-The hub header shows `↑ 0.3.0 · /update` when a release is newer, and `proofcore --version`
+The hub header shows `↑ 0.4.0 · /update` when a release is newer, and `proofcore --version`
 adds one grey line on stderr (never on stdout, so a script parsing the version is unaffected).
 
 Four rules make this safe rather than convenient:
@@ -188,13 +208,12 @@ warn session permissions 644
      fix: chmod 600 ~/.config/proofcore/session.json
 ok   executable          ~/.local/share/proofcore/bin
 ok   docker              Docker version 27.0.0
-skip browser             Playwright browsers missing
-     fix: npx playwright install chromium  (needed by `proofcore devtools`)
+ok   browser             /usr/bin/google-chrome (system)
 warn disk                0.4 GB free
 ```
 
 It covers the conflicts that actually happen: two lockfiles, a runtime outside the project's
-`engines.node`, a Playwright runner and driver at different versions, two copies of React
+`engines.node`, a Playwright runner and driver at different versions in your own project, two copies of React
 ("invalid hook call"), an unwritable config directory, a session file other users can read,
 an install whose folder is read-only (self-update will refuse there), no Docker (so
 `proofcore exec` refuses rather than running unisolated), and a terminal without colour.

@@ -3,7 +3,7 @@
  *
  * Two processes, on purpose:
  *
- * - this one (Electron) draws the window, owns the menus and the lifecycle;
+ * - this one (Electron) draws the window, owns the lifecycle and the native actions;
  * - the sidecar (the same `proofcore` binary people install from the CLI) does all the
  *   work: reading the repository, running the agent, the audits, the sandbox, the index.
  *
@@ -16,6 +16,7 @@
 const {
   app,
   BrowserWindow,
+  WebContentsView,
   Menu,
   dialog,
   shell,
@@ -23,16 +24,20 @@ const {
   nativeTheme,
   safeStorage,
   net,
+  screen,
+  session,
 } = require("electron");
 const { spawn, spawnSync } = require("node:child_process");
 const { existsSync } = require("node:fs");
 const { createServer } = require("node:net");
 const { join } = require("node:path");
-const { homedir } = require("node:os");
+const { cpus, homedir, totalmem } = require("node:os");
 const { chmodSync, mkdirSync, readFileSync, writeFileSync } = require("node:fs");
-const { evaluateAccess, formatRemaining } = require("./src/access.cjs");
+const { evaluateAccess } = require("./src/access.cjs");
 const { createStore } = require("./src/store.cjs");
 const { loginPageHtml } = require("./src/login-page.cjs");
+const { splashPageHtml } = require("./src/splash-page.cjs");
+const { createBrowserHost } = require("./src/browser.cjs");
 
 const SMOKE = process.env.PROOFCORE_SMOKE === "1";
 const SITE_API =
@@ -45,6 +50,7 @@ if (!SMOKE && !app.requestSingleInstanceLock()) {
 
 let mainWindow = null;
 let loginWindow = null;
+let splashWindow = null;
 let accessState = null;
 let store = null;
 let sidecar = null;
@@ -55,11 +61,91 @@ const sidecarUrlReady = new Promise((resolve) => {
   resolveSidecarUrl = resolve;
 });
 const sidecarLog = [];
+let appUpdater = null;
+let updateState = { status: "idle", version: null, percent: 0, message: null };
+
+/**
+ * The Chromium view used by the in-app browser. It is registered once, at startup, so the
+ * interface can open a page before any window exists without racing the IPC channel.
+ */
+const browserHost = createBrowserHost({
+  app,
+  WebContentsView,
+  shell,
+  session,
+  getWindow: () => mainWindow,
+  send: (channel, payload) => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
+  },
+});
+browserHost.register(ipcMain);
+
+function broadcastUpdate() {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) window.webContents.send("proofcore:update", updateState);
+  }
+}
+
+function setUpdateState(next) {
+  updateState = { ...updateState, ...next };
+  broadcastUpdate();
+}
 
 function log(line) {
   sidecarLog.push(line);
   if (sidecarLog.length > 400) sidecarLog.shift();
   if (!app.isPackaged || SMOKE) process.stdout.write(`[sidecar] ${line}\n`);
+}
+
+/** A small local window between double-click and the first real screen. */
+function showSplash() {
+  if (SMOKE || splashWindow) return;
+  const window = new BrowserWindow({
+    width: 430,
+    height: 260,
+    resizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    frame: false,
+    show: false,
+    center: true,
+    skipTaskbar: true,
+    backgroundColor: "#0b0d10",
+    title: "PROOFCORE",
+  });
+  splashWindow = window;
+  window.setMenuBarVisibility(false);
+  window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(splashPageHtml())}`);
+  window.once("ready-to-show", () => {
+    if (!window.isDestroyed()) window.show();
+  });
+  window.on("closed", () => {
+    if (splashWindow === window) splashWindow = null;
+  });
+}
+
+function closeSplash() {
+  const window = splashWindow;
+  splashWindow = null;
+  if (window && !window.isDestroyed()) window.destroy();
+}
+
+/** Smoke runs are short-lived; stop the sidecar before exiting or the next build gets ETXTBSY. */
+function exitSmoke(code) {
+  closeSplash();
+  // The sidecar's exit handler must not open the "engine stopped" dialog during a test.
+  app.isQuitting = true;
+  if (!sidecar || sidecar.killed || sidecar.exitCode !== null) {
+    app.exit(code);
+    return;
+  }
+  const finish = () => app.exit(code);
+  const timer = setTimeout(finish, 1500);
+  sidecar.once("exit", () => {
+    clearTimeout(timer);
+    finish();
+  });
+  sidecar.kill();
 }
 
 /** A free port on the loopback interface, chosen by the OS rather than guessed. */
@@ -316,13 +402,19 @@ function showLoginWindow(state) {
     return;
   }
   loginWindow = new BrowserWindow({
-    width: 580,
-    height: 520,
+    width: 600,
+    height: 620,
     resizable: false,
     maximizable: false,
+    // This window can appear before the local engine exists, so it cannot use the app's
+    // custom controls. A native frame is the only title bar that is guaranteed to work
+    // here: it can always be moved and closed, even when the network is down.
+    frame: true,
+    center: true,
     backgroundColor: "#0b0d10",
     title: "PROOFCORE · connexion",
     icon: join(__dirname, "build", "icon.png"),
+    autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -330,7 +422,11 @@ function showLoginWindow(state) {
       sandbox: true,
     },
   });
+  loginWindow.setMenuBarVisibility(false);
   loginWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(loginPageHtml(state))}`);
+  // Create this window before destroying the splash. Otherwise there is an instant with
+  // zero windows, and `window-all-closed` quits the app before sign-in can even appear.
+  closeSplash();
   loginWindow.on("closed", () => {
     loginWindow = null;
     // Closing the sign-in window without signing in leaves the app closed rather than open
@@ -339,7 +435,7 @@ function showLoginWindow(state) {
   });
   if (SMOKE) {
     process.stdout.write(`SMOKE_LOCKED reason=${state.reason}\n`);
-    setTimeout(() => app.exit(0), 200);
+    setTimeout(() => exitSmoke(0), 200);
   }
 }
 
@@ -412,8 +508,7 @@ async function signIn(credentials = {}) {
   if (!mainWindow) {
     try {
       const { port, url } = await startSidecar();
-      buildMenu();
-      createWindow(port, url);
+      await createWindow(port, url);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       dialog.showErrorBox("PROOFCORE", message);
@@ -437,6 +532,16 @@ async function signIn(credentials = {}) {
  */
 function setupAppUpdates() {
   if (!app.isPackaged || SMOKE || process.env.PROOFCORE_NO_UPDATE === "1") return;
+  // electron-updater can replace an AppImage in place; a .deb is owned by the system package
+  // manager. Pretending otherwise produced a permanent "check failed" on deb installs, so
+  // the state says what is true and the interface offers the download page instead.
+  if (process.platform === "linux" && !process.env.APPIMAGE) {
+    setUpdateState({
+      status: "manual",
+      message: "Cette installation (.deb) se met à jour depuis la page des versions.",
+    });
+    return;
+  }
   let autoUpdater;
   try {
     ({ autoUpdater } = require("electron-updater"));
@@ -444,222 +549,87 @@ function setupAppUpdates() {
     log("app updater not installed in this build: engine updates only");
     return;
   }
+  appUpdater = autoUpdater;
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
-  autoUpdater.on("update-available", (info) =>
-    log(`app update ${info.version} disponible, téléchargement`)
+  autoUpdater.on("checking-for-update", () => setUpdateState({ status: "checking" }));
+  autoUpdater.on("update-available", (info) => {
+    log(`app update ${info.version} disponible, téléchargement`);
+    setUpdateState({ status: "available", version: info.version, percent: 0 });
+  });
+  autoUpdater.on("update-not-available", () => setUpdateState({ status: "current" }));
+  autoUpdater.on("download-progress", (progress) =>
+    setUpdateState({
+      status: "downloading",
+      percent: Math.round(progress.percent ?? 0),
+    })
   );
   autoUpdater.on("update-downloaded", (info) => {
     log(`app update ${info.version} prête`);
-    if (!mainWindow) return;
-    dialog
-      .showMessageBox(mainWindow, {
-        message: `PROOFCORE ${info.version} est prête`,
-        detail: "Elle s'installera à la fermeture, ou maintenant si vous préférez.",
-        buttons: ["Installer maintenant", "Plus tard"],
-        defaultId: 0,
-        cancelId: 1,
-      })
-      .then((answer) => {
-        if (answer.response === 0) autoUpdater.quitAndInstall();
-      })
-      .catch(() => undefined);
+    // No native prompt: the Engine panel owns the update state, and the install
+    // happens on quit unless the user asks for it now.
+    setUpdateState({ status: "ready", version: info.version, percent: 100 });
   });
-  autoUpdater.on("error", (error) => log(`app update: ${error?.message ?? error}`));
+  autoUpdater.on("error", (error) => {
+    log(`app update: ${error?.message ?? error}`);
+    setUpdateState({ status: "error", message: error?.message ?? String(error) });
+  });
   autoUpdater
     .checkForUpdates()
     .catch((error) => log(`app update check: ${error?.message ?? error}`));
 }
 
-function buildMenu() {
-  const account = () =>
-    spawnSidecarOnce("whoami", [], (text) => {
-      dialog.showMessageBox(mainWindow, {
-        message: text || "Aucun compte connecté.",
-        buttons: ["Fermer"],
-      });
-    });
-
-  const template = [
-    ...(process.platform === "darwin" ? [{ role: "appMenu" }] : []),
-    {
-      label: "PROOFCORE",
-      submenu: [
-        { label: "À propos", click: () => showAbout() },
-        { type: "separator" },
-        {
-          label: "Se connecter…",
-          click: () =>
-            spawnSidecarOnce("login", [], (text) => {
-              if (text) dialog.showMessageBox(mainWindow, { message: text, buttons: ["Fermer"] });
-              if (mainWindow) mainWindow.webContents.reload();
-            }),
-        },
-        { label: "Mon compte", click: () => account() },
-        { type: "separator" },
-        {
-          label: accessState?.account
-            ? `Session : ${accessState.account} (${formatRemaining((accessState.expiresAt ?? 0) - Date.now())})`
-            : "Session : non connecté",
-          enabled: false,
-        },
-        ...(accessState?.status === "offline"
-          ? [{ label: "Hors ligne : outils locaux disponibles", enabled: false }]
-          : []),
-        { type: "separator" },
-        {
-          label: "Se déconnecter",
-          click: async () => {
-            store?.clear();
-            await dialog.showMessageBox(mainWindow ?? loginWindow, {
-              message: "Session supprimée sur cette machine.",
-              detail: "Relancez PROOFCORE pour vous reconnecter.",
-              buttons: ["Fermer"],
-            });
-          },
-        },
-        {
-          label: "Ouvrir le site",
-          click: () => shell.openExternal("https://proofstack-iota.vercel.app"),
-        },
-        { type: "separator" },
-        { label: "Mettre à jour…", click: () => runUpdate() },
-        { label: "Ouvrir la console locale", click: () => openLocalAgent() },
-        { label: "Lancer les tests locaux", click: () => runLocalTests() },
-        { label: "Vérifier les conflits (doctor)", click: () => runDoctor() },
-        { type: "separator" },
-        { role: process.platform === "darwin" ? "close" : "quit", label: "Quitter" },
-      ],
-    },
-    { role: "editMenu" },
-    {
-      label: "Affichage",
-      submenu: [
-        { role: "reload", label: "Recharger" },
-        { role: "toggleDevTools", label: "Outils de développement" },
-        { type: "separator" },
-        { role: "resetZoom" },
-        { role: "zoomIn" },
-        { role: "zoomOut" },
-        { type: "separator" },
-        { role: "togglefullscreen" },
-      ],
-    },
-    { role: "windowMenu" },
-  ];
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
-}
-
-/** Runs one sidecar command and reports its stdout; used by the menu, not by the UI. */
-function spawnSidecarOnce(command, args, done) {
+/** Runs one sidecar command and reports its stdout; the UI renders the result. */
+function runSidecar(command, args = []) {
   const resolved = sidecarCommand(sidecarPort || 7317);
-  if (!resolved) return done("Le moteur local est introuvable dans ce build.");
-  const child = spawn(resolved.file, [...(resolved.env ? [] : [])].concat([command, ...args]), {
-    cwd: resolved.cwd,
-    env: { ...process.env, ...(resolved.env ?? {}) },
-    windowsHide: true,
-  });
-  let output = "";
-  child.stdout.on("data", (chunk) => {
-    output += chunk;
-  });
-  child.stderr.on("data", (chunk) => {
-    output += chunk;
-  });
-  child.on("close", () => done(output.trim()));
-  child.on("error", (error) => done(String(error)));
-}
-
-function openLocalAgent() {
-  if (!sidecarPort) return;
-  const window = new BrowserWindow({
-    width: 980,
-    height: 760,
-    backgroundColor: "#0b0d10",
-    title: "PROOFCORE · console locale",
-    icon: join(__dirname, "build", "icon.png"),
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-    },
-  });
-  window.loadURL(`http://127.0.0.1:${sidecarPort}/agent`);
-  window.webContents.setWindowOpenHandler(({ url }) => {
-    if (!url.startsWith(`http://127.0.0.1:${sidecarPort}`)) shell.openExternal(url);
-    return { action: "deny" };
-  });
-}
-
-function showSidecarOutput(title, text) {
-  const window = new BrowserWindow({
-    width: 980,
-    height: 700,
-    backgroundColor: "#0b0d10",
-    title: `PROOFCORE · ${title}`,
-    parent: mainWindow ?? undefined,
-  });
-  const body = `<pre style="margin:0;padding:16px;font:12.5px/1.5 ui-monospace,monospace;color:#e8ecf1;background:#0b0d10;white-space:pre-wrap">${text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")}</pre>`;
-  window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(body)}`);
-}
-
-function runDoctor() {
-  spawnSidecarOnce("doctor", [], (text) => showSidecarOutput("doctor", text));
-}
-
-function runLocalTests() {
-  spawnSidecarOnce("test", ["--module", "world,flow,exit"], (text) =>
-    showSidecarOutput("tests locaux", text)
-  );
-}
-
-async function runUpdate() {
-  // The sidecar owns the update: it knows this platform, verifies the checksum and swaps the
-  // binary. The window only reports what happened.
-  const answer = await dialog.showMessageBox(mainWindow, {
-    type: "question",
-    message: "Vérifier les mises à jour ?",
-    detail:
-      "Le moteur local lit le manifeste de la dernière version et remplace son binaire s'il y en a une.",
-    buttons: ["Vérifier", "Annuler"],
-    defaultId: 0,
-    cancelId: 1,
-  });
-  if (answer.response !== 0) return;
-  spawnSidecarOnce("update", ["--yes"], (text) => {
-    dialog.showMessageBox(mainWindow, {
-      message: "Mise à jour",
-      detail: text || "Aucune sortie.",
-      buttons: ["Fermer"],
+  if (!resolved) return Promise.resolve("Le moteur local est introuvable dans ce build.");
+  return new Promise((resolve) => {
+    const child = spawn(resolved.file, [command, ...args], {
+      cwd: resolved.cwd,
+      env: { ...process.env, ...(resolved.env ?? {}) },
+      windowsHide: true,
     });
+    let output = "";
+    child.stdout.on("data", (chunk) => {
+      output += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      output += chunk;
+    });
+    child.on("close", (code) => {
+      resolve(output.trim() || `Commande terminée (code ${code ?? 0}).`);
+    });
+    child.on("error", (error) => resolve(String(error)));
   });
 }
 
-function showAbout() {
-  const version = app.getVersion();
-  dialog.showMessageBox(mainWindow, {
-    message: `PROOFCORE ${version}`,
-    detail: [
-      "Le moteur tourne sur cette machine : agent, audits, bac à sable, index.",
-      "Le compte, les projets, les rapports et la synchronisation passent par le site.",
-      `Electron ${process.versions.electron} · Chromium ${process.versions.chrome} · Node ${process.versions.node}`,
-    ].join("\n"),
-    buttons: ["Fermer"],
-  });
+function aboutText() {
+  return [
+    `PROOFCORE ${app.getVersion()}`,
+    "Le moteur tourne sur cette machine : agent, audits, bac à sable, index.",
+    "Le compte, les projets, les rapports et la synchronisation passent par le site.",
+    `Electron ${process.versions.electron} · Chromium ${process.versions.chrome} · Node ${process.versions.node}`,
+  ].join("\n");
 }
 
-function createWindow(port, url) {
+async function createWindow(port, url) {
+  // A fixed 1180x800 is larger than the work area of a 1366x768 laptop. Size to the
+  // screen instead of spilling past the taskbar, while keeping a usable minimum.
+  const workArea = screen.getPrimaryDisplay().workAreaSize;
+  const width = Math.max(820, Math.min(1180, workArea.width - 64));
+  const height = Math.max(600, Math.min(800, workArea.height - 64));
   mainWindow = new BrowserWindow({
-    width: 1360,
-    height: 900,
-    minWidth: 960,
-    minHeight: 640,
-    backgroundColor: "#0b0d10",
+    width,
+    height,
+    minWidth: 820,
+    minHeight: 600,
+    backgroundColor: "#f3f0e8",
     show: false,
+    center: true,
+    frame: false,
     title: "PROOFCORE",
     icon: join(__dirname, "build", "icon.png"),
+    autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -669,7 +639,11 @@ function createWindow(port, url) {
     },
   });
 
-  mainWindow.once("ready-to-show", () => mainWindow.show());
+  mainWindow.setMenuBarVisibility(false);
+  mainWindow.once("ready-to-show", () => {
+    closeSplash();
+    mainWindow.show();
+  });
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
@@ -689,6 +663,15 @@ function createWindow(port, url) {
     }
   });
 
+  // The local engine listens on a fresh port at every launch. The per-run cookie is
+  // scoped to 127.0.0.1 and *not* to the port, so Electron happily restores the token
+  // from the previous run; that token no longer matches the new sidecar and every API
+  // call answers 401. Drop only our cookie before navigating, then let the one-time URL
+  // set the current token.
+  for (const origin of ["http://127.0.0.1/", "http://localhost/"]) {
+    await mainWindow.webContents.session.cookies.remove(origin, "pc_local").catch(() => undefined);
+  }
+
   mainWindow.loadURL(url);
 
   mainWindow.webContents.on("did-finish-load", () => {
@@ -696,13 +679,14 @@ function createWindow(port, url) {
       process.stdout.write(
         `SMOKE_OK title=${mainWindow.getTitle()} url=${mainWindow.webContents.getURL()}\n`
       );
-      setTimeout(() => app.exit(0), 300);
+      setTimeout(() => exitSmoke(0), 300);
     }
   });
   mainWindow.webContents.on("did-fail-load", (_event, code, description) => {
+    closeSplash();
     if (SMOKE) {
       process.stderr.write(`SMOKE_FAIL ${code} ${description}\n`);
-      app.exit(1);
+      exitSmoke(1);
     } else {
       dialog.showErrorBox(
         "PROOFCORE",
@@ -745,12 +729,94 @@ ipcMain.handle("proofcore:open-external", (_event, url) => {
   return true;
 });
 
-ipcMain.handle("proofcore:info", () => ({
-  port: sidecarPort,
-  version: app.getVersion(),
-  platform: process.platform,
-  arch: process.arch,
-}));
+ipcMain.handle("proofcore:window", (_event, action) => {
+  if (!mainWindow) return false;
+  switch (action) {
+    case "minimize":
+      mainWindow.minimize();
+      return true;
+    case "maximize":
+      if (mainWindow.isMaximized()) mainWindow.unmaximize();
+      else mainWindow.maximize();
+      return true;
+    case "close":
+      mainWindow.close();
+      return true;
+    default:
+      return false;
+  }
+});
+
+ipcMain.handle("proofcore:update-state", () => updateState);
+ipcMain.handle("proofcore:info", () => {
+  const cores = cpus();
+  return {
+    port: sidecarPort,
+    version: app.getVersion(),
+    platform: process.platform,
+    arch: process.arch,
+    cpu: cores[0]?.model?.trim() || null,
+    cores: cores.length,
+    memoryGb: Math.round((totalmem() / 1024 ** 3) * 10) / 10,
+    electron: process.versions.electron,
+    packaged: app.isPackaged,
+    root: safeCwd(),
+  };
+});
+
+/**
+ * Native actions requested by the embedded UI. The UI is the only menu: this handler
+ * returns text instead of opening dialogs, so results stay inside the product's design.
+ */
+ipcMain.handle("proofcore:action", async (_event, action) => {
+  if (typeof action !== "string") return { ok: false, output: "Action invalide." };
+  switch (action) {
+    case "open-agent":
+      if (!mainWindow) return { ok: false, output: "La fenêtre n'est pas prête." };
+      mainWindow.show();
+      mainWindow.focus();
+      mainWindow.webContents.send("proofcore:navigate", "/app/ai/local");
+      return { ok: true, output: "Console locale ouverte." };
+    case "tests":
+      return { ok: true, output: await runSidecar("test", ["--module", "world,flow,exit"]) };
+    case "doctor":
+      return { ok: true, output: await runSidecar("doctor") };
+    case "update":
+      return { ok: true, output: await runSidecar("update", ["--yes"]) };
+    case "check-app-update":
+      if (!appUpdater) {
+        return {
+          ok: false,
+          output:
+            "Cette build ne contient pas le vérificateur de mise à jour. Installez une version publiée.",
+        };
+      }
+      void appUpdater
+        .checkForUpdates()
+        .catch((error) => log(`app update check: ${error?.message ?? error}`));
+      return { ok: true, output: "Recherche d'une mise à jour de l'application…" };
+    case "install-update":
+      if (!appUpdater) return { ok: false, output: "Aucune mise à jour de l'application prête." };
+      setImmediate(() => appUpdater.quitAndInstall());
+      return { ok: true, output: "Installation de la mise à jour…" };
+    case "about":
+      return { ok: true, output: aboutText() };
+    case "open-site":
+      await shell.openExternal("https://proofstack-iota.vercel.app");
+      return { ok: true, output: "Site ouvert dans le navigateur." };
+    case "open-releases":
+      await shell.openExternal("https://github.com/laudesmassamba1-ai/PROOFSTACK/releases/latest");
+      return { ok: true, output: "Versions ouvertes dans le navigateur." };
+    case "reload":
+      mainWindow?.reload();
+      return { ok: true, output: "Interface rechargée." };
+    case "quit":
+      app.quit();
+      return { ok: true, output: "Fermeture…" };
+    default:
+      return { ok: false, output: `Action inconnue : ${action}` };
+  }
+});
 
 app.on("second-instance", () => {
   if (mainWindow) {
@@ -760,29 +826,32 @@ app.on("second-instance", () => {
 });
 
 app.whenReady().then(async () => {
-  nativeTheme.themeSource = "dark";
+  // No native menu bar. The product UI owns every action (see the Engine panel),
+  // so the window must not open with an OS menu that breaks the site's identity.
+  Menu.setApplicationMenu(null);
+  nativeTheme.themeSource = "light";
+  showSplash();
   try {
     const state = await gate();
     if (!state.allowed) {
-      buildMenu();
       showLoginWindow(state);
       return;
     }
     const { port, url } = await startSidecar();
-    buildMenu();
-    createWindow(port, url);
+    await createWindow(port, url);
     setupAppUpdates();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (SMOKE) {
       process.stderr.write(`SMOKE_FAIL ${message}\n${sidecarLog.join("\n")}\n`);
-      app.exit(1);
+      exitSmoke(1);
       return;
     }
     dialog.showErrorBox(
       "PROOFCORE n'a pas pu démarrer",
       `${message}\n\n${sidecarLog.slice(-12).join("\n") || "Aucun journal du moteur local."}`
     );
+    closeSplash();
     app.quit();
   }
 });
@@ -793,12 +862,14 @@ app.on("window-all-closed", () => {
 
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0 && sidecarPort) {
-    createWindow(sidecarPort, sidecarUrl ?? `http://127.0.0.1:${sidecarPort}/`);
+    void createWindow(sidecarPort, sidecarUrl ?? `http://127.0.0.1:${sidecarPort}/`);
   }
 });
 
 app.on("before-quit", () => {
   app.isQuitting = true;
+  browserHost.destroy();
+  closeSplash();
   if (sidecar && !sidecar.killed) {
     sidecar.kill();
     // On Windows children do not always die with their parent; taskkill is the reliable way.

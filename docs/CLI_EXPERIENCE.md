@@ -24,6 +24,10 @@ proofcore init                      Create proofcore.config.ts in this directory
 proofcore doctor                    Check the runtime, config and module wiring
 proofcore validate                  Validate the configuration and exit
 proofcore test [modules]            Run the enabled modules (WORLD/FLOW/EXIT)
+proofcore world | flow | exit       Run one core module locally
+proofcore module <id> [args]        Run one core module or an audit
+proofcore modules                   Show local wiring and the run command per module
+proofcore fail|clean <url>          Run an audit module locally
 proofcore report [text|json|junit|html]   Render the last run
 proofcore projects                  List projects (session required)
 proofcore sync                      Push the last run to the API (project token)
@@ -35,6 +39,11 @@ proofcore ui                        Full-screen terminal console
 
 Exit codes are part of the contract: `0` pass, `1` product defect found,
 `2` harness/environment error (never a defect), `3` cancelled by the user.
+
+Modules run in the current repository. In the interactive hub, `/modules` lists
+the local wiring and `/world`, `/flow`, `/module exit`, `/fail <url>` and
+`/clean <url>` dispatch the same commands; `/exit` still leaves the hub. None of
+these module commands opens the website.
 
 ## Authentication
 

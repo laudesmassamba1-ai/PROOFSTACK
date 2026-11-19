@@ -1,5 +1,7 @@
 import { readFile, stat, writeFile } from "node:fs/promises";
+import { arch, cpus, homedir, hostname, platform, release, totalmem } from "node:os";
 import { join, resolve } from "node:path";
+import { browsers } from "@proofcore/adapter-browser";
 import { renderReport } from "@proofcore/adapter-reporting";
 import { type LoadedConfig, loadConfig } from "@proofcore/config";
 import type { ModuleId, ReportFormat, TestRun } from "@proofcore/contracts";
@@ -15,11 +17,29 @@ import {
   semanticSearch,
 } from "./agent-extra-tools.js";
 import {
+  browserClose,
+  browserCookies,
+  browserEval,
+  browserGoto,
+  browserInteract,
+  browserOpen,
+  browserPages,
+  browserPdf,
+  browserScreenshot,
+  browserSnapshot,
+  webFetch,
+} from "./browser-tools.js";
+import {
   applyPatch,
+  gitBlame,
+  gitBranch,
   gitCommit,
   gitDiff,
   gitLog,
+  gitShow,
+  gitStage,
   gitStatus,
+  gitUnstage,
   listFiles,
   mapArchitecture,
   readFileSlice,
@@ -28,8 +48,19 @@ import {
   type ToolContext,
   writeFileWithDiff,
 } from "./code-tools.js";
+import {
+  copyPath,
+  deletePath,
+  editFile,
+  listDirectory,
+  makeDirectory,
+  movePath,
+  pathInfo,
+} from "./fs-tools.js";
+import { httpRequest } from "./net-tools.js";
 import { assembleProviders, blockingSafetyWarnings } from "./providers.js";
 import { runInSandbox } from "./sandbox.js";
+import { runShell } from "./shell-tools.js";
 
 /**
  * PROOFCORE's MCP server: `proofcore mcp`.
@@ -257,6 +288,114 @@ export function mcpToolDescriptors(): McpToolDescriptor[] {
       },
       annotations: { readOnlyHint: false, destructiveHint: true },
     },
+    {
+      name: "edit_file",
+      description:
+        "Replace an exact string in a file. Without apply:true it writes nothing and returns the diff. Refuses an ambiguous match unless replaceAll is explicit, and never guesses where an edit belongs.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          path: { type: "string" },
+          oldString: {
+            type: "string",
+            description: "Exact text to replace, including indentation.",
+          },
+          newString: { type: "string" },
+          replaceAll: { type: "boolean" },
+          apply: { type: "boolean", description: "Actually write. Default false (diff only)." },
+        },
+        required: ["path", "oldString", "newString"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true },
+    },
+    {
+      name: "delete_path",
+      description:
+        "Delete a file or directory, listing every entry that would disappear. A non-empty directory needs recursive:true; without apply:true nothing is deleted. Refuses the workspace root and .git.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          path: { type: "string" },
+          recursive: { type: "boolean" },
+          apply: { type: "boolean", description: "Actually delete. Default false (preview)." },
+        },
+        required: ["path"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true },
+    },
+    {
+      name: "move_path",
+      description:
+        "Rename or move a file or directory. Shows the move first; requires apply:true. Refuses an existing destination unless overwrite:true.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          from: { type: "string" },
+          to: { type: "string" },
+          overwrite: { type: "boolean" },
+          apply: { type: "boolean" },
+        },
+        required: ["from", "to"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true },
+    },
+    {
+      name: "copy_path",
+      description:
+        "Copy a file or directory recursively. Shows the copy first; requires apply:true. Refuses an existing destination unless overwrite:true.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          from: { type: "string" },
+          to: { type: "string" },
+          overwrite: { type: "boolean" },
+          apply: { type: "boolean" },
+        },
+        required: ["from", "to"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true },
+    },
+    {
+      name: "make_directory",
+      description: "Create a directory and its parents. Idempotent.",
+      inputSchema: {
+        type: "object",
+        properties: { path: { type: "string" } },
+        required: ["path"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false },
+    },
+    {
+      name: "path_info",
+      description:
+        "Facts about a path: type, size, modification time, line count and SHA-256 for files. Read-only.",
+      inputSchema: {
+        type: "object",
+        properties: { path: { type: "string" } },
+        required: ["path"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: true },
+    },
+    {
+      name: "list_directory",
+      description:
+        "Every entry directly under a directory, with type and size. Narrower and faster than list_files when the exact folder is known. Read-only.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          path: { type: "string" },
+          limit: { type: "integer", minimum: 1, maximum: 2000 },
+        },
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: true },
+    },
 
     // ------------------------------------------------------------- runtime
     {
@@ -269,6 +408,29 @@ export function mcpToolDescriptors(): McpToolDescriptor[] {
           command: { type: "string" },
           args: { type: "array", items: { type: "string" } },
           cwd: { type: "string" },
+          timeoutMs: { type: "integer", minimum: 1000, maximum: 600000 },
+        },
+        required: ["command"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+    },
+
+    {
+      name: "run_shell",
+      description:
+        "Run a shell command line through the platform's shell: pipelines, &&, variables, project scripts. Unlike run_command it is not allowlisted; it can do anything the user can. Use it when the allowlist is too narrow.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          command: {
+            type: "string",
+            description: "The command line, e.g. `pnpm lint && pnpm typecheck`.",
+          },
+          cwd: {
+            type: "string",
+            description: "Working directory, relative to the workspace root.",
+          },
           timeoutMs: { type: "integer", minimum: 1000, maximum: 600000 },
         },
         required: ["command"],
@@ -295,6 +457,47 @@ export function mcpToolDescriptors(): McpToolDescriptor[] {
         additionalProperties: false,
       },
       annotations: { readOnlyHint: false },
+    },
+
+    {
+      name: "http_request",
+      description:
+        "Make an HTTP request from this machine and return status, headers and body. Reaches localhost on purpose: check a local server, test a webhook, read an API or an OpenAPI file. Any method, any headers, JSON or raw body.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          method: {
+            type: "string",
+            enum: ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"],
+          },
+          url: { type: "string" },
+          headers: { type: "object", additionalProperties: { type: "string" } },
+          body: { type: "string" },
+          json: { description: "A JSON body; sets content-type when absent." },
+          timeoutMs: { type: "integer", minimum: 1000, maximum: 120000 },
+          maxBytes: { type: "integer", minimum: 1000, maximum: 20000000 },
+          redirect: { type: "string", enum: ["follow", "manual", "error"] },
+        },
+        required: ["url"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false, openWorldHint: true },
+    },
+    {
+      name: "web_fetch",
+      description:
+        "Read a URL without a browser: the server's response as text, Markdown, headings and links. Fast and honest — it does not execute JavaScript; use browser_open when the page needs it.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          url: { type: "string" },
+          maxChars: { type: "integer", minimum: 500, maximum: 200000 },
+          headers: { type: "object", additionalProperties: { type: "string" } },
+        },
+        required: ["url"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: true, openWorldHint: true },
     },
 
     // ------------------------------------------------- code intelligence
@@ -339,6 +542,224 @@ export function mcpToolDescriptors(): McpToolDescriptor[] {
     },
 
     // ------------------------------------------------------- browser surface
+    {
+      name: "browser_open",
+      description:
+        "Open a page in a real Chromium (the machine's own browser, driven over the DevTools Protocol). Returns the page id and a snapshot: visible text, headings, links and every interactive control with a stable ref. Use the refs with browser_interact.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          url: { type: "string", description: "Address to open; https:// is added when missing." },
+          width: { type: "integer", minimum: 200, maximum: 3840 },
+          height: { type: "integer", minimum: 200, maximum: 2400 },
+          includeText: {
+            type: "boolean",
+            description: "Include the page's visible text. Default true.",
+          },
+          waitMs: { type: "integer", minimum: 0, maximum: 30000 },
+          executablePath: {
+            type: "string",
+            description: "Pin a Chromium binary instead of discovering one.",
+          },
+        },
+        required: ["url"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false, openWorldHint: true },
+    },
+    {
+      name: "browser_goto",
+      description:
+        "Navigate an open page: a new URL, back, forward or reload. Returns the resulting state (url, title, HTTP status, history availability).",
+      inputSchema: {
+        type: "object",
+        properties: {
+          page: {
+            type: "string",
+            description: "Page id from browser_open; optional with a single page.",
+          },
+          url: { type: "string" },
+          back: { type: "boolean" },
+          forward: { type: "boolean" },
+          reload: { type: "boolean" },
+        },
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false, openWorldHint: true },
+    },
+    {
+      name: "browser_snapshot",
+      description:
+        "What the page currently shows: text, headings, links, interactive controls with refs, scroll position, alerts, console messages and failed requests. Refs are re-issued here; always snapshot after the page changes.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          page: { type: "string" },
+          text: { type: "boolean", description: "Include visible text. Default true." },
+          maxElements: { type: "integer", minimum: 1, maximum: 600 },
+          includeHidden: {
+            type: "boolean",
+            description: "Include hidden controls (menus, dialogs).",
+          },
+        },
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    {
+      name: "browser_interact",
+      description:
+        "Act on the page as a person would: click a ref/selector/point, type, press a key, scroll, hover, select options, check a box, set a value, upload files, or wait for a condition. Actions are real input events, so JavaScript frameworks see them.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          page: { type: "string" },
+          action: {
+            type: "string",
+            enum: [
+              "click",
+              "type",
+              "press",
+              "scroll",
+              "hover",
+              "select",
+              "check",
+              "uncheck",
+              "set_value",
+              "upload",
+              "wait",
+              "focus",
+            ],
+          },
+          ref: { type: "string", description: "Ref from browser_snapshot, e.g. e12." },
+          selector: { type: "string", description: "CSS selector, used when no ref is given." },
+          x: { type: "integer" },
+          y: { type: "integer" },
+          text: { type: "string", description: "Text for type, or text to wait for." },
+          key: { type: "string", description: "Key for press, e.g. Enter, Tab, Control+a." },
+          value: { type: "string", description: "Value for set_value or select." },
+          values: {
+            type: "array",
+            items: { type: "string" },
+            description: "Option values for select.",
+          },
+          files: {
+            type: "array",
+            items: { type: "string" },
+            description: "Files to upload, relative to the workspace.",
+          },
+          clear: { type: "boolean", description: "Clear the field before typing." },
+          submit: { type: "boolean", description: "Press Enter after typing." },
+          expression: {
+            type: "string",
+            description: "Boolean expression to poll when action is wait.",
+          },
+          dy: { type: "integer" },
+          dx: { type: "integer" },
+          timeoutMs: { type: "integer", minimum: 100, maximum: 120000 },
+          button: { type: "string", enum: ["left", "right", "middle"] },
+          clickCount: { type: "integer", minimum: 1, maximum: 3 },
+        },
+        required: ["action"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+    },
+    {
+      name: "browser_eval",
+      description:
+        "Evaluate JavaScript in the page and return its value. The escape hatch for what the named actions do not cover; the expression runs with the page's own origin and can change the page.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          page: { type: "string" },
+          expression: { type: "string" },
+        },
+        required: ["expression"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+    },
+    {
+      name: "browser_screenshot",
+      description:
+        "Save a PNG/JPEG of the page, viewport or full page, and return its path. The image is written to disk, not inlined: a base64 screenshot would spend the turn's context on pixels.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          page: { type: "string" },
+          path: {
+            type: "string",
+            description: "Output path, relative to the workspace. Default: .proofcore/browser/.",
+          },
+          fullPage: { type: "boolean" },
+          format: { type: "string", enum: ["png", "jpeg"] },
+        },
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false },
+    },
+    {
+      name: "browser_pdf",
+      description: "Print the current page to a PDF and return its path.",
+      inputSchema: {
+        type: "object",
+        properties: { page: { type: "string" }, path: { type: "string" } },
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false },
+    },
+    {
+      name: "browser_cookies",
+      description:
+        "Read, set or clear the browser profile's cookies. Use it to carry a real session into a page, or to sign the engine out.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          page: { type: "string" },
+          action: { type: "string", enum: ["get", "set", "clear"] },
+          cookies: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                name: { type: "string" },
+                value: { type: "string" },
+                domain: { type: "string" },
+                url: { type: "string" },
+                path: { type: "string" },
+                secure: { type: "boolean" },
+                httpOnly: { type: "boolean" },
+                sameSite: { type: "string", enum: ["Strict", "Lax", "None"] },
+                expires: { type: "number" },
+              },
+              required: ["name", "value"],
+              additionalProperties: false,
+            },
+          },
+        },
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false },
+    },
+    {
+      name: "browser_pages",
+      description:
+        "Open browser pages and the engine's state: whether a Chromium was found, which binary, and what is open. Read-only.",
+      inputSchema: { type: "object", properties: {}, additionalProperties: false },
+      annotations: { readOnlyHint: true },
+    },
+    {
+      name: "browser_close",
+      description:
+        "Close one page, or every page. The browser process stays warm briefly, then exits.",
+      inputSchema: {
+        type: "object",
+        properties: { page: { type: "string" }, all: { type: "boolean" } },
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false },
+    },
     {
       name: "inspect_page",
       description:
@@ -454,7 +875,86 @@ export function mcpToolDescriptors(): McpToolDescriptor[] {
       },
       annotations: { readOnlyHint: false, destructiveHint: true },
     },
+    {
+      name: "git_branch",
+      description: "List branches, or create and switch to one. Read-only when listing.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          action: { type: "string", enum: ["list", "create", "switch"] },
+          name: { type: "string" },
+        },
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false },
+    },
+    {
+      name: "git_show",
+      description: "A commit's message, stats and diff (optionally for one path). Read-only.",
+      inputSchema: {
+        type: "object",
+        properties: { ref: { type: "string" }, path: { type: "string" } },
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: true },
+    },
+    {
+      name: "git_blame",
+      description: "Line attribution for a file, optionally for a line range. Read-only.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          path: { type: "string" },
+          startLine: { type: "integer", minimum: 1 },
+          endLine: { type: "integer", minimum: 1 },
+        },
+        required: ["path"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: true },
+    },
+    {
+      name: "git_stage",
+      description: "Stage explicit paths. Staging everything is refused.",
+      inputSchema: {
+        type: "object",
+        properties: { paths: { type: "array", items: { type: "string" }, minItems: 1 } },
+        required: ["paths"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false },
+    },
+    {
+      name: "git_unstage",
+      description: "Unstage explicit paths, keeping the working-tree change.",
+      inputSchema: {
+        type: "object",
+        properties: { paths: { type: "array", items: { type: "string" }, minItems: 1 } },
+        required: ["paths"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false },
+    },
+    {
+      name: "system_info",
+      description:
+        "The machine this agent runs on: platform, architecture, versions, CPU, memory, workspace root, available browser. Read-only.",
+      inputSchema: { type: "object", properties: {}, additionalProperties: false },
+      annotations: { readOnlyHint: true },
+    },
   ];
+}
+
+interface CookieInput {
+  name: string;
+  value: string;
+  domain?: string;
+  url?: string;
+  path?: string;
+  secure?: boolean;
+  httpOnly?: boolean;
+  sameSite?: "Strict" | "Lax" | "None";
+  expires?: number;
 }
 
 /** One tool invocation, returning JSON-safe data or throwing a typed error. */
@@ -515,12 +1015,79 @@ export async function handleMcpToolCall(
         patch: String(args.patch ?? ""),
         ...(args.apply === true ? { apply: true } : {}),
       });
+    case "edit_file":
+      return editFile(toolContext(context.cwd), {
+        path: String(args.path ?? ""),
+        oldString: String(args.oldString ?? ""),
+        newString: String(args.newString ?? ""),
+        ...(args.replaceAll === true ? { replaceAll: true } : {}),
+        ...(args.apply === true ? { apply: true } : {}),
+      });
+    case "delete_path":
+      return deletePath(toolContext(context.cwd), {
+        path: String(args.path ?? ""),
+        ...(args.recursive === true ? { recursive: true } : {}),
+        ...(args.apply === true ? { apply: true } : {}),
+      });
+    case "move_path":
+      return movePath(toolContext(context.cwd), {
+        from: String(args.from ?? ""),
+        to: String(args.to ?? ""),
+        ...(args.overwrite === true ? { overwrite: true } : {}),
+        ...(args.apply === true ? { apply: true } : {}),
+      });
+    case "copy_path":
+      return copyPath(toolContext(context.cwd), {
+        from: String(args.from ?? ""),
+        to: String(args.to ?? ""),
+        ...(args.overwrite === true ? { overwrite: true } : {}),
+        ...(args.apply === true ? { apply: true } : {}),
+      });
+    case "make_directory":
+      return makeDirectory(toolContext(context.cwd), { path: String(args.path ?? "") });
+    case "path_info":
+      return pathInfo(toolContext(context.cwd), { path: String(args.path ?? "") });
+    case "list_directory":
+      return listDirectory(toolContext(context.cwd), {
+        ...(typeof args.path === "string" ? { path: args.path } : {}),
+        ...(typeof args.limit === "number" ? { limit: args.limit } : {}),
+      });
     case "run_command":
       return runCommand(toolContext(context.cwd), {
         command: String(args.command ?? ""),
         args: Array.isArray(args.args) ? args.args.map(String) : [],
         ...(typeof args.cwd === "string" ? { cwd: args.cwd } : {}),
         ...(typeof args.timeoutMs === "number" ? { timeoutMs: args.timeoutMs } : {}),
+      });
+    case "run_shell":
+      return runShell({
+        command: String(args.command ?? ""),
+        cwd: context.cwd,
+        ...(typeof args.cwd === "string" ? { cwd: resolve(context.cwd, args.cwd) } : {}),
+        ...(typeof args.timeoutMs === "number" ? { timeoutMs: args.timeoutMs } : {}),
+      });
+    case "http_request":
+      return httpRequest({
+        url: String(args.url ?? ""),
+        ...(typeof args.method === "string" ? { method: args.method } : {}),
+        ...(args.headers && typeof args.headers === "object"
+          ? { headers: args.headers as Record<string, string> }
+          : {}),
+        ...(typeof args.body === "string" ? { body: args.body } : {}),
+        ...(args.json !== undefined ? { json: args.json } : {}),
+        ...(typeof args.timeoutMs === "number" ? { timeoutMs: args.timeoutMs } : {}),
+        ...(typeof args.maxBytes === "number" ? { maxBytes: args.maxBytes } : {}),
+        ...(args.redirect === "follow" || args.redirect === "manual" || args.redirect === "error"
+          ? { redirect: args.redirect }
+          : {}),
+      });
+    case "web_fetch":
+      return webFetch(toolContext(context.cwd), {
+        url: String(args.url ?? ""),
+        ...(typeof args.maxChars === "number" ? { maxChars: args.maxChars } : {}),
+        ...(args.headers && typeof args.headers === "object"
+          ? { headers: args.headers as Record<string, string> }
+          : {}),
       });
     case "run_sandboxed":
       return runInSandbox(context.cwd, {
@@ -544,6 +1111,93 @@ export async function handleMcpToolCall(
         line: Number(args.line ?? 1),
         ...(typeof args.column === "number" ? { column: args.column } : {}),
         ...(typeof args.maxCompletions === "number" ? { maxCompletions: args.maxCompletions } : {}),
+      });
+    case "browser_open":
+      return browserOpen(toolContext(context.cwd), {
+        ...(typeof args.url === "string" ? { url: args.url } : {}),
+        ...(typeof args.width === "number" ? { width: args.width } : {}),
+        ...(typeof args.height === "number" ? { height: args.height } : {}),
+        ...(args.includeText === false ? { includeText: false } : {}),
+        ...(typeof args.waitMs === "number" ? { waitMs: args.waitMs } : {}),
+        ...(typeof args.executablePath === "string" ? { executablePath: args.executablePath } : {}),
+      });
+    case "browser_goto":
+      return browserGoto(toolContext(context.cwd), {
+        ...(typeof args.page === "string" ? { page: args.page } : {}),
+        ...(typeof args.url === "string" ? { url: args.url } : {}),
+        ...(args.back === true ? { back: true } : {}),
+        ...(args.forward === true ? { forward: true } : {}),
+        ...(args.reload === true ? { reload: true } : {}),
+      });
+    case "browser_snapshot":
+      return browserSnapshot(toolContext(context.cwd), {
+        ...(typeof args.page === "string" ? { page: args.page } : {}),
+        ...(args.text === false ? { text: false } : {}),
+        ...(typeof args.maxElements === "number" ? { maxElements: args.maxElements } : {}),
+        ...(args.includeHidden === true ? { includeHidden: true } : {}),
+      });
+    case "browser_interact":
+      return browserInteract(toolContext(context.cwd), {
+        ...(typeof args.page === "string" ? { page: args.page } : {}),
+        action: String(args.action ?? "") as Parameters<typeof browserInteract>[1]["action"],
+        ...(typeof args.ref === "string" ? { ref: args.ref } : {}),
+        ...(typeof args.selector === "string" ? { selector: args.selector } : {}),
+        ...(typeof args.x === "number" ? { x: args.x } : {}),
+        ...(typeof args.y === "number" ? { y: args.y } : {}),
+        ...(typeof args.text === "string" ? { text: args.text } : {}),
+        ...(typeof args.key === "string" ? { key: args.key } : {}),
+        ...(typeof args.value === "string" ? { value: args.value } : {}),
+        ...(Array.isArray(args.values) ? { values: args.values.map(String) } : {}),
+        ...(Array.isArray(args.files) ? { files: args.files.map(String) } : {}),
+        ...(args.clear === true ? { clear: true } : {}),
+        ...(args.submit === true ? { submit: true } : {}),
+        ...(typeof args.expression === "string" ? { expression: args.expression } : {}),
+        ...(typeof args.dy === "number" ? { dy: args.dy } : {}),
+        ...(typeof args.dx === "number" ? { dx: args.dx } : {}),
+        ...(typeof args.timeoutMs === "number" ? { timeoutMs: args.timeoutMs } : {}),
+        ...(args.button === "left" || args.button === "right" || args.button === "middle"
+          ? { button: args.button }
+          : {}),
+        ...(typeof args.clickCount === "number" ? { clickCount: args.clickCount } : {}),
+      });
+    case "browser_eval":
+      return browserEval(toolContext(context.cwd), {
+        ...(typeof args.page === "string" ? { page: args.page } : {}),
+        expression: String(args.expression ?? ""),
+      });
+    case "browser_screenshot":
+      return browserScreenshot(toolContext(context.cwd), {
+        ...(typeof args.page === "string" ? { page: args.page } : {}),
+        ...(typeof args.path === "string" ? { path: args.path } : {}),
+        ...(args.fullPage === true ? { fullPage: true } : {}),
+        ...(args.format === "png" || args.format === "jpeg" ? { format: args.format } : {}),
+      });
+    case "browser_pdf":
+      return browserPdf(toolContext(context.cwd), {
+        ...(typeof args.page === "string" ? { page: args.page } : {}),
+        ...(typeof args.path === "string" ? { path: args.path } : {}),
+      });
+    case "browser_cookies":
+      return browserCookies(toolContext(context.cwd), {
+        ...(typeof args.page === "string" ? { page: args.page } : {}),
+        ...(args.action === "get" || args.action === "set" || args.action === "clear"
+          ? { action: args.action }
+          : {}),
+        ...(Array.isArray(args.cookies)
+          ? {
+              cookies: (args.cookies as CookieInput[]).filter(
+                (cookie) =>
+                  cookie && typeof cookie.name === "string" && typeof cookie.value === "string"
+              ),
+            }
+          : {}),
+      });
+    case "browser_pages":
+      return browserPages(toolContext(context.cwd));
+    case "browser_close":
+      return browserClose(toolContext(context.cwd), {
+        ...(typeof args.page === "string" ? { page: args.page } : {}),
+        ...(args.all === true ? { all: true } : {}),
       });
     case "inspect_page":
       return inspectPage({
@@ -600,6 +1254,34 @@ export async function handleMcpToolCall(
         ...(typeof args.branch === "string" ? { branch: args.branch } : {}),
         ...(args.apply === true ? { apply: true } : {}),
       });
+    case "git_branch":
+      return gitBranch(toolContext(context.cwd), {
+        ...(args.action === "list" || args.action === "create" || args.action === "switch"
+          ? { action: args.action }
+          : {}),
+        ...(typeof args.name === "string" ? { name: args.name } : {}),
+      });
+    case "git_show":
+      return gitShow(toolContext(context.cwd), {
+        ...(typeof args.ref === "string" ? { ref: args.ref } : {}),
+        ...(typeof args.path === "string" ? { path: args.path } : {}),
+      });
+    case "git_blame":
+      return gitBlame(toolContext(context.cwd), {
+        path: String(args.path ?? ""),
+        ...(typeof args.startLine === "number" ? { startLine: args.startLine } : {}),
+        ...(typeof args.endLine === "number" ? { endLine: args.endLine } : {}),
+      });
+    case "git_stage":
+      return gitStage(toolContext(context.cwd), {
+        paths: Array.isArray(args.paths) ? args.paths.map(String) : [],
+      });
+    case "git_unstage":
+      return gitUnstage(toolContext(context.cwd), {
+        paths: Array.isArray(args.paths) ? args.paths.map(String) : [],
+      });
+    case "system_info":
+      return systemInfo(context.cwd);
     default:
       throw new ProofCoreError({
         message: `Unknown tool: ${name}`,
@@ -648,6 +1330,25 @@ function toolContext(cwd: string): ToolContext {
 
 async function loadConfigFor(cwd: string): Promise<LoadedConfig> {
   return loadConfig({ cwd, skipValidation: true });
+}
+
+/** What machine the agent is on: facts, not a description of the product. */
+function systemInfo(cwd: string): Record<string, unknown> {
+  const cores = cpus();
+  return {
+    platform: platform(),
+    release: release(),
+    arch: arch(),
+    hostname: hostname(),
+    node: process.versions.node,
+    cpu: cores[0]?.model?.trim() ?? null,
+    cores: cores.length,
+    memoryGb: Math.round((totalmem() / 1024 ** 3) * 10) / 10,
+    shell: process.env.SHELL ?? process.env.COMSPEC ?? null,
+    cwd,
+    home: homedir(),
+    browser: browsers.status(),
+  };
 }
 
 async function projectSummary(cwd: string): Promise<unknown> {

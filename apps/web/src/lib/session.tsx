@@ -1,5 +1,13 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { apiFetch, postJson } from "./api.js";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { ApiError, apiFetch, clearApiCache, postJson } from "./api.js";
 
 /**
  * Session state for the dashboard.
@@ -44,6 +52,8 @@ interface SessionState {
   emailVerification: "not_configured" | null;
   /** Navigation hint only: the admin API re-checks the allowlist server-side. */
   isAdmin: boolean;
+  /** The last read came from the local cache because the API could not be reached. */
+  offline: boolean;
 }
 
 const SessionContext = createContext<SessionState | null>(null);
@@ -56,6 +66,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [workspaceId, setWorkspaceIdState] = useState<string | null>(null);
   const [emailVerification, setEmailVerification] = useState<"not_configured" | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [offline, setOffline] = useState(false);
+  const statusRef = useRef<SessionState["status"]>("loading");
+  statusRef.current = status;
 
   const apply = useCallback((payload: SessionPayload) => {
     setUser(payload.user);
@@ -79,13 +92,32 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     try {
       const payload = await apiFetch<SessionPayload>("/api/auth/session");
       apply(payload);
-    } catch {
+    } catch (error) {
+      // An expired cookie is a signed-out session, not a server outage. Treating
+      // 401 as unreachable was leaving the window stuck on an offline screen.
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        apply({ user: null });
+        return;
+      }
       setStatus((current) => (current === "ready" ? current : "unreachable"));
     }
   }, [apply]);
 
   useEffect(() => {
     void refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    const onConnection = (event: Event) => {
+      const detail = (event as CustomEvent<{ online?: boolean }>).detail;
+      const online = detail?.online !== false;
+      setOffline(!online);
+      // Coming back online is a reason to re-read a session we never resolved, not
+      // a reason to reload the whole window and lose the current panel.
+      if (online && statusRef.current === "unreachable") void refresh();
+    };
+    window.addEventListener("proofcore:connection", onConnection);
+    return () => window.removeEventListener("proofcore:connection", onConnection);
   }, [refresh]);
 
   const setWorkspaceId = useCallback((id: string) => {
@@ -101,10 +133,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       // signing out still works in a plain browser.
       await window.proofcoreDesktop?.logout().catch(() => undefined);
     } finally {
+      clearApiCache();
       setUser(null);
       setWorkspaces([]);
       setWorkspaceIdState(null);
       setIsAdmin(false);
+      setOffline(false);
       setStatus("signed_out");
     }
   }, []);
@@ -120,6 +154,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       signOut,
       emailVerification,
       isAdmin,
+      offline,
     }),
     [
       status,
@@ -131,6 +166,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       signOut,
       emailVerification,
       isAdmin,
+      offline,
     ]
   );
 

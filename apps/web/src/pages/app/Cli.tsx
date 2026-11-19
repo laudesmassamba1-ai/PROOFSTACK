@@ -1,4 +1,4 @@
-import { ArrowRight, Check, Copy, ExternalLink, KeyRound, Terminal } from "lucide-react";
+import { ArrowRight, Bot, Check, Copy, ExternalLink, KeyRound, Terminal } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { Card, Empty, ErrorState, Loading, StatusBadge } from "../../components/app/ui.js";
@@ -88,9 +88,16 @@ export function Cli() {
         title={t("ws.cli.title")}
         description={t("ws.cli.description")}
         actions={
-          <Link to="/docs" className="app-btn">
-            <Terminal size={14} /> {t("ws.cli.docs")}
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            {window.proofcoreDesktop ? (
+              <Link to="/app/ai/local" className="app-btn app-btn-primary">
+                <Bot size={14} /> {t("ws.cli.docs.agent")}
+              </Link>
+            ) : null}
+            <Link to="/app/cli/docs" className="app-btn">
+              <Terminal size={14} /> {t("ws.cli.docs")}
+            </Link>
+          </div>
         }
       />
 

@@ -40,6 +40,7 @@ import {
   type AgentProvider,
   AgentSession,
   type Approver,
+  clearStoredProvider,
   keyFingerprint,
   loadSession,
   loadStoredProvider,
@@ -47,6 +48,7 @@ import {
   saveSession,
   saveStoredProvider,
   sessionId,
+  syncAccountAi,
 } from "./agent-runtime.js";
 import {
   parseAuditTarget,
@@ -225,6 +227,13 @@ async function main(argv: string[]): Promise<number> {
     "doctor",
     "validate",
     "test",
+    "module",
+    "modules",
+    "world",
+    "flow",
+    "exit",
+    "fail",
+    "clean",
     "report",
     "projects",
     "ui",
@@ -301,6 +310,17 @@ async function main(argv: string[]): Promise<number> {
       return commandValidate(flags);
     case "test":
       return commandTest(flags, args);
+    case "module":
+      return commandModule(flags, args);
+    case "modules":
+      return commandModules(flags, args);
+    case "world":
+    case "flow":
+    case "exit":
+      return commandModule(flags, [command, ...args]);
+    case "fail":
+    case "clean":
+      return commandModule(flags, [command, ...args]);
     case "report":
       return commandReport(flags, args);
     case "projects":
@@ -806,6 +826,132 @@ function resolveProfileIds(ids: string[]) {
   return ids.map((id) => byId.get(id)).filter((def) => def !== undefined);
 }
 
+/**
+ * `proofcore modules` — the local module board.
+ *
+ * This used to be a web link to `/app/modules`, a route that did not exist. The CLI is
+ * where the modules run, so it lists their local wiring and the exact command to run each
+ * one. No browser, no invented dashboard.
+ */
+async function commandModules(flags: GlobalFlags, _args: string[] = []): Promise<number> {
+  let loaded: LoadedConfig | null = null;
+  let loadError = "";
+  try {
+    loaded = await loadConfig({ cwd: flags.cwd, skipValidation: true });
+  } catch (error) {
+    loadError = describeError(error).message;
+  }
+
+  const core = ["world", "flow", "exit"] as const;
+  const rows = core.map((id) => {
+    if (!loaded) {
+      return {
+        id,
+        enabled: false,
+        ready: false,
+        detail: "no configuration loaded",
+        command: `proofcore ${id}`,
+      };
+    }
+    const enabled = loaded.config.enabledModules.includes(id);
+    const status = moduleStatus(id, loaded.config);
+    return {
+      id,
+      enabled,
+      ready: status.ok,
+      detail: status.detail,
+      command: `proofcore ${id}`,
+    };
+  });
+
+  if (flags.json) {
+    stdout.write(
+      `${stableStringify(
+        {
+          ok: Boolean(loaded),
+          config: loaded?.path ?? null,
+          error: loadError || null,
+          modules: rows,
+          audits: [
+            { id: "fail", command: "proofcore fail <url>", ready: true },
+            { id: "clean", command: "proofcore clean <url>", ready: true },
+          ],
+        },
+        2
+      )}\n`
+    );
+    return loaded ? 0 : 2;
+  }
+
+  out(flags, `${bold(flags, "PROOFCORE")} ${dim(flags, "modules")}`);
+  if (!loaded) {
+    out(flags, yellow(flags, `No configuration: ${loadError || "proofcore.config.ts is missing"}`));
+    out(flags, "Start with `proofcore init`, then wire a module target.");
+    out(flags, "");
+    out(flags, "The commands are still available: proofcore world · flow · exit");
+    return 2;
+  }
+
+  out(flags, dim(flags, `${loaded.config.project.name} · ${loaded.config.project.baseUrl}`));
+  out(flags, "");
+  out(
+    flags,
+    `  ${dim(flags, "MODULE".padEnd(8))} ${dim(flags, "STATE".padEnd(13))} ${dim(flags, "RUN")}`
+  );
+  for (const row of rows) {
+    const enabled = loaded.config.enabledModules.includes(row.id);
+    const status = !enabled ? "disabled" : row.ready ? "ready" : "needs setup";
+    const mark =
+      row.ready && enabled ? green(flags, status.padEnd(13)) : yellow(flags, status.padEnd(13));
+    out(flags, `  ${row.id.toUpperCase().padEnd(8)} ${mark} ${cyan(flags, row.command)}`);
+    const detail = !enabled ? "not enabled in proofcore.config.ts" : row.ready ? "" : row.detail;
+    if (detail) out(flags, dim(flags, `           ${detail}`));
+  }
+  out(flags, "");
+  out(
+    flags,
+    `  ${dim(flags, "FAIL".padEnd(8))} ${yellow(flags, "on demand".padEnd(13))} ${cyan(flags, "proofcore fail <url>")}`
+  );
+  out(
+    flags,
+    `  ${dim(flags, "CLEAN".padEnd(8))} ${yellow(flags, "on demand".padEnd(13))} ${cyan(flags, "proofcore clean <url>")}`
+  );
+  out(flags, "");
+  out(
+    flags,
+    dim(flags, "Run one module with `proofcore world`, `proofcore flow` or `proofcore exit`.")
+  );
+  out(flags, dim(flags, "In the hub: /world, /flow, /module exit. /exit leaves the hub."));
+  return 0;
+}
+
+/** Runs one module by name; fail/clean delegate to the existing audit command. */
+async function commandModule(flags: GlobalFlags, args: string[]): Promise<number> {
+  const id = (args[0] ?? "").toLowerCase();
+  const rest = args.slice(1);
+  if (!id || id === "--help" || id === "-h") {
+    if (!id) return commandModules(flags, rest);
+    out(flags, "Usage: proofcore module world|flow|exit [test options]");
+    out(flags, "       proofcore module fail|clean <url>");
+    return 0;
+  }
+  if (id === "world" || id === "flow" || id === "exit") {
+    return commandTest(flags, ["--module", id, ...rest]);
+  }
+  if (id === "fail" || id === "clean") {
+    if (!rest[0]) {
+      err(flags, red(flags, `Usage: proofcore ${id} <url>`));
+      return 64;
+    }
+    return commandAudit(flags, [id, ...rest]);
+  }
+  err(
+    flags,
+    red(flags, `Unknown module "${args[0] ?? ""}". Available: world, flow, exit, fail, clean.`)
+  );
+  return 64;
+}
+
 function readFlowTarget(config: LoadedConfig["config"]): {
   checkoutUrl?: string;
   orderUrlTemplate?: string;
@@ -1277,6 +1423,11 @@ async function commandAuth(
 ): Promise<number> {
   if (command === "logout") {
     const removed = await clearStoredSession();
+    // A provider synced from the account carries that account's relay cookie. Leaving it
+    // behind would make the next run look configured and then fail with a 401; a local
+    // provider configured by the user is kept.
+    const provider = await loadStoredProvider();
+    if (provider.relay || provider.source === "account") await clearStoredProvider();
     out(
       flags,
       removed
@@ -2421,6 +2572,12 @@ async function commandAgent(flags: GlobalFlags, args: string[]): Promise<number>
     .join(" ")
     .trim();
 
+  // A model saved in the web account is the default for this CLI. Logging in already
+  // writes it, but refreshing here also repairs an expired relay cookie or a profile
+  // changed after the last login.
+  const account = await loadStoredSession().catch(() => null);
+  if (account) await syncAccountAi(account).catch(() => undefined);
+
   let provider: AgentProvider;
   try {
     provider = await resolveProvider({
@@ -2573,7 +2730,13 @@ async function startHub(flags: GlobalFlags): Promise<number> {
     const provider = await loadStoredProvider();
     identity.account = session ? session.email : "not signed in · /login";
     identity.model = provider.baseUrl
-      ? `${provider.model}${provider.apiKey ? ` · ${keyFingerprint(provider.apiKey)}` : ""}`
+      ? `${provider.model}${
+          provider.relay
+            ? " · account"
+            : provider.apiKey
+              ? ` · ${keyFingerprint(provider.apiKey)}`
+              : ""
+        }`
       : "no model · /agent --configure";
   };
   await refreshIdentity();
@@ -2598,7 +2761,8 @@ async function startHub(flags: GlobalFlags): Promise<number> {
     const lines: string[] = [""];
     const groups: [string, string][] = [
       ["Agent", "/agent — reads, edits and runs in this repository"],
-      ["Audits", "/test, /audit fail|clean <url>, /report, /modules"],
+      ["Modules", "/modules — the local board; /world, /flow and /module exit run here"],
+      ["Audits", "/test, /audit fail|clean <url>, /report"],
       ["Code", "/tools, /index, /search, /map, /devtools, /debug, /svg"],
       ["Account", "/whoami, /login, /logout, /projects, /billing, /update"],
       ["Session", "/help, /clear, /exit"],
@@ -2656,6 +2820,7 @@ async function startHub(flags: GlobalFlags): Promise<number> {
       provider.baseUrl
         ? `${green(flags, "●")} ${provider.model} ${dim(flags, `· ${provider.apiKey ? keyFingerprint(provider.apiKey) : "no key"}`)}`
         : `${yellow(flags, "○")} ${dim(flags, "no model")} ${dim(flags, "· /agent --configure")}`,
+      `${dim(flags, "modules")} ${dim(flags, "WORLD · FLOW · EXIT · /modules")}`,
       "",
     ];
     process.stdout.write(`${[box(flags, banner, 58).join("\n"), ""].join("\n")}\n`);
@@ -2705,6 +2870,7 @@ async function startHub(flags: GlobalFlags): Promise<number> {
       `${dim(flags, `workspace ${where}`)}`,
       `${dim(flags, `account ${identity.account}`)}`,
       `${dim(flags, `model ${identity.model}`)}`,
+      `${dim(flags, "modules WORLD · FLOW · EXIT · /modules")}`,
     ],
     58
   )) {
@@ -2741,24 +2907,39 @@ async function startHub(flags: GlobalFlags): Promise<number> {
  * page), and each finished turn is pushed to the signed-in account so the web app shows it.
  */
 async function commandServe(flags: GlobalFlags, args: string[]): Promise<number> {
+  const modelOverride = flagValue(args, "--model");
+  const baseUrlOverride = flagValue(args, "--base-url");
+
+  /**
+   * Reads the account profile and resolves the local provider. `serveLocal` calls this
+   * before every turn too: connecting the provider on the site after the window opened
+   * must work without restarting the app, and the provider key stays on the site.
+   */
+  const refreshProvider = async (): Promise<{ provider?: AgentProvider; reason?: string }> => {
+    const account = await loadStoredSession().catch(() => null);
+    if (account) await syncAccountAi(account).catch(() => undefined);
+    try {
+      const provider = await resolveProvider({
+        ...(modelOverride ? { model: modelOverride } : {}),
+        ...(baseUrlOverride ? { baseUrl: baseUrlOverride } : {}),
+      });
+      return { provider };
+    } catch (error) {
+      return { reason: describeError(error).message };
+    }
+  };
+
   // A missing model must not stop the window from opening: an app that refuses to start
   // before it is configured cannot be the place where you configure it.
-  let provider: AgentProvider | undefined;
-  try {
-    provider = await resolveProvider({
-      ...(flagValue(args, "--model") ? { model: flagValue(args, "--model") as string } : {}),
-      ...(flagValue(args, "--base-url")
-        ? { baseUrl: flagValue(args, "--base-url") as string }
-        : {}),
-    });
-  } catch (error) {
-    provider = undefined;
-    out(flags, `${yellow(flags, "warn")} ${describeError(error).message}`);
+  const initial = await refreshProvider();
+  const provider = initial.provider;
+  if (!provider) {
+    out(flags, `${yellow(flags, "warn")} ${initial.reason ?? "Aucun modèle n'est configuré."}`);
     out(
       flags,
       dim(
         flags,
-        "  the page stays usable; configure the model from the menu or `proofcore agent --configure`"
+        "  la page reste utilisable ; connectez le modèle sur le site ou lancez `proofcore agent --configure`"
       )
     );
   }
@@ -2768,13 +2949,13 @@ async function commandServe(flags: GlobalFlags, args: string[]): Promise<number>
   const cloudApiUrl = process.env.PROOFCORE_API_URL?.trim() || DEFAULT_API_URL;
   const allowWrite = args.includes("--allow-write");
   const sync = !args.includes("--no-sync");
-  const account = await loadStoredSession().catch(() => null);
 
   let handle: ServeHandle;
   try {
     handle = await serveLocal({
       root: flags.cwd,
       provider,
+      refreshProvider,
       ...(webRoot ? { webRoot } : {}),
       cloudApiUrl,
       port: Number.isFinite(port) ? port : 7317,
@@ -2802,13 +2983,14 @@ async function commandServe(flags: GlobalFlags, args: string[]): Promise<number>
   if (flags.json) {
     stdout.write(`${JSON.stringify({ url: handle.url, port: handle.port, sync })}\n`);
   } else {
+    const signedIn = await loadStoredSession().catch(() => null);
     out(flags, `\n${bold(flags, "PROOFCORE local agent")}`);
     out(flags, `  ${dim(flags, "open")} ${handle.url}`);
     out(flags, `  ${dim(flags, "root")} ${flags.cwd}`);
     out(flags, `  ${dim(flags, "model")} ${provider?.model ?? yellow(flags, "none configured")}`);
     out(
       flags,
-      `  ${dim(flags, "sync")} ${sync ? (account ? `account ${account.email}` : yellow(flags, "not signed in — run proofcore login")) : "off"}`
+      `  ${dim(flags, "sync")} ${sync ? (signedIn ? `account ${signedIn.email}` : yellow(flags, "not signed in — run proofcore login")) : "off"}`
     );
     out(
       flags,
@@ -2961,7 +3143,8 @@ async function commandWhoami(flags: GlobalFlags): Promise<number> {
             ? {
                 baseUrl: provider.baseUrl,
                 model: provider.model,
-                key: keyFingerprint(provider.apiKey ?? ""),
+                auth: provider.relay ? "account" : keyFingerprint(provider.apiKey ?? ""),
+                ...(provider.providerLabel ? { provider: provider.providerLabel } : {}),
               }
             : null,
         },
@@ -2984,7 +3167,10 @@ async function commandWhoami(flags: GlobalFlags): Promise<number> {
   if (provider.baseUrl) {
     out(
       flags,
-      `  model     ${provider.model} ${dim(flags, `· ${provider.baseUrl} · ${keyFingerprint(provider.apiKey ?? "")}`)}`
+      `  model     ${provider.model} ${dim(
+        flags,
+        `· ${provider.providerLabel ?? provider.baseUrl} · ${provider.relay ? "account" : keyFingerprint(provider.apiKey ?? "")}`
+      )}`
     );
   } else {
     out(
@@ -3013,21 +3199,34 @@ async function commandAgentTools(
   try {
     if (command === "tools") {
       const rows: [string, string, string][] = [
-        ["list_files / read_file / search_code", "codebase", "MCP"],
+        ["list_files / list_directory / read_file / search_code", "codebase", "MCP"],
         ["map_architecture", "dependency graph (Mermaid)", "MCP · proofcore map"],
-        ["write_file / apply_patch", "edits with mandatory diff", "MCP"],
-        ["run_command", "allowlisted commands, no shell", "MCP"],
-        ["git_status / diff / log / commit", "version control", "MCP"],
+        ["write_file / edit_file / apply_patch", "edits with mandatory diff", "MCP"],
+        ["delete_path / move_path / copy_path / make_directory", "file operations", "MCP"],
+        ["path_info", "stat, size, timestamps", "MCP"],
+        ["run_command / run_shell", "allowlisted or full shell", "MCP"],
+        ["http_request / web_fetch", "request and read a URL", "MCP"],
+        [
+          "git_status / diff / log / commit / branch / show / blame / stage",
+          "version control",
+          "MCP",
+        ],
         [
           "build_semantic_index / semantic_search",
           "concept search",
           "MCP · proofcore index|search",
         ],
         ["complete_code", "inline completion (model or index)", "MCP"],
+        [
+          "browser_open / goto / snapshot / interact / eval / screenshot / pdf / cookies / pages / close",
+          "own Chromium over CDP",
+          "MCP",
+        ],
         ["inspect_page", "console, network, DOM, a11y, screenshot", "MCP · proofcore devtools"],
         ["analyze_image", "vision on a screenshot/mockup", "MCP"],
         ["generate_svg", "deterministic icons and placeholders", "MCP · proofcore svg"],
         ["debug_script", "breakpoints and real scopes", "MCP · proofcore debug"],
+        ["system_info", "OS, CPU, memory, paths", "MCP"],
       ];
       if (flags.json) {
         stdout.write(
@@ -3183,6 +3382,10 @@ function printHelp(flags: GlobalFlags): void {
   w("  doctor                   Check the runtime, config and module wiring");
   w("  validate                 Validate the configuration and exit");
   w("  test                     Run the enabled modules");
+  w("  world | flow | exit      Run one core module locally in this repository");
+  w("  module <id> [args]       Run world, flow, exit or an audit module");
+  w("  modules                  Show local module wiring and run commands");
+  w("  fail | clean <url>       Run one audit module locally");
   w("  report [json|junit|html|text]   Render the last run");
   w("  projects                 List projects");
   w(

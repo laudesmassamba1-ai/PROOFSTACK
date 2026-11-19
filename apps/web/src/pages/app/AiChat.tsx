@@ -1330,6 +1330,7 @@ export function AiChatPage(): React.ReactElement {
               workspaceId={activeWorkspaceId}
               {...(browserUrl ? { initialUrl: browserUrl } : {})}
               fr={fr}
+              hidden={settingsOpen}
               onClose={() => setBrowserOpen(false)}
             />
           )}
@@ -1363,8 +1364,8 @@ export function AiChatPage(): React.ReactElement {
             </div>
             <p className="mt-2 text-xs leading-relaxed text-muted">
               {fr
-                ? "Votre clé est chiffrée (AES-256-GCM) côté serveur et n'est jamais renvoyée au navigateur. Vous pouvez la remplacer ou la supprimer à tout moment."
-                : "Your key is encrypted (AES-256-GCM) server-side and never returned to the browser. Replace or delete it anytime."}
+                ? "Votre clé reste privée. Vous pouvez la remplacer ou la supprimer à tout moment."
+                : "Your key stays private. Replace or delete it at any time."}
             </p>
             <div className="mt-4 space-y-3">
               {/* Step 1 — which provider. The model is never asked for: the server reads

@@ -70,7 +70,10 @@ const COMMAND_ALLOWLIST = new Set([
   "pnpm",
   "npx",
   "bun",
+  "bunx",
   "deno",
+  "uv",
+  "poetry",
   "python",
   "python3",
   "pip",
@@ -82,6 +85,12 @@ const COMMAND_ALLOWLIST = new Set([
   "java",
   "mvn",
   "gradle",
+  "dotnet",
+  "php",
+  "composer",
+  "ruby",
+  "bundle",
+  "swift",
   "git",
   "tsc",
   "vitest",
@@ -145,7 +154,7 @@ function fail(code: string, message: string, details?: Record<string, unknown>):
  * yet would fail for a legitimate file creation, and an escaping symlink is a repository
  * problem the operator must see, not something to resolve silently.
  */
-function confine(root: string, candidate: string): string {
+export function confine(root: string, candidate: string): string {
   const rootResolved = resolve(root);
   const target = resolve(rootResolved, candidate);
   if (target !== rootResolved && !target.startsWith(rootResolved + sep)) {
@@ -734,6 +743,66 @@ export async function gitCommit(
   if (add.exitCode !== 0) return { ...add, applied: false };
   const commit = await git(context, ["commit", "-m", input.message]);
   return { ...commit, applied: commit.exitCode === 0 };
+}
+
+/** Branch listing, creation and switching, with the branch name validated. */
+export async function gitBranch(
+  context: ToolContext,
+  input: { action?: "list" | "create" | "switch"; name?: string } = {}
+): Promise<GitResult> {
+  const action = input.action ?? "list";
+  if (action === "list") return git(context, ["branch", "--all", "--no-color"]);
+  const name = input.name?.trim();
+  // A branch name becomes an argument to git, not a shell word, but a leading `-` would
+  // still be parsed as an option. Reject anything that is not a normal ref name.
+  if (!name || !/^[A-Za-z0-9._/-]+$/.test(name) || name.startsWith("-")) {
+    fail("invalid_branch", "A valid branch name is required (letters, digits, . _ / -).");
+  }
+  return action === "create"
+    ? git(context, ["checkout", "-B", name])
+    : git(context, ["switch", name]);
+}
+
+export function gitShow(
+  context: ToolContext,
+  input: { ref?: string; path?: string } = {}
+): Promise<GitResult> {
+  const ref = input.ref?.trim() || "HEAD";
+  const args = ["show", "--no-color", "--stat", ref];
+  if (input.path) args.push("--", input.path);
+  return git(context, args);
+}
+
+/** Line attribution for one file, or a range of it. */
+export async function gitBlame(
+  context: ToolContext,
+  input: { path: string; startLine?: number; endLine?: number }
+): Promise<GitResult> {
+  confine(context.root, input.path);
+  const args = ["blame", "--no-color"];
+  if (input.startLine !== undefined) {
+    const end = input.endLine ?? input.startLine;
+    args.push("-L", `${Math.max(1, input.startLine)},${Math.max(1, end)}`);
+  }
+  args.push("--", input.path);
+  return git(context, args);
+}
+
+/** Stages explicit paths. `git add -A` stays impossible, for the reason in gitCommit. */
+export function gitStage(context: ToolContext, input: { paths: string[] }): Promise<GitResult> {
+  if (!Array.isArray(input.paths) || input.paths.length === 0) {
+    fail("paths_required", "List the files to stage; staging everything is refused.");
+  }
+  for (const path of input.paths) confine(context.root, path);
+  return git(context, ["add", "--", ...input.paths]);
+}
+
+export function gitUnstage(context: ToolContext, input: { paths: string[] }): Promise<GitResult> {
+  if (!Array.isArray(input.paths) || input.paths.length === 0) {
+    fail("paths_required", "List the files to unstage.");
+  }
+  for (const path of input.paths) confine(context.root, path);
+  return git(context, ["restore", "--staged", "--", ...input.paths]);
 }
 
 // ------------------------------------------------------------- architecture

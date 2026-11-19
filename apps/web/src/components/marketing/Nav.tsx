@@ -13,6 +13,7 @@ const LINKS = [
   { to: "/clean", key: "modules.clean.name" as const },
   { to: "/platform", key: "nav.platform" as const },
   { to: "/pricing", key: "nav.pricing" as const },
+  { to: "/download", key: "nav.download" as const },
   { to: "/docs", key: "nav.docs" as const },
 ];
 

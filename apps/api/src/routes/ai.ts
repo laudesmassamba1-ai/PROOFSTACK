@@ -1,5 +1,5 @@
 import { ProofCoreError, shortId, stableStringify } from "@proofcore/core";
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import { z } from "zod";
 import { decryptApiKey, encryptApiKey, hasEncryptionSecret, keyFingerprint } from "../ai-crypto.js";
 import {
@@ -114,6 +114,9 @@ const connectSchema = z
   .strict();
 
 const profileTestSchema = connectSchema;
+
+/** The local agent sends the provider request body through the account relay. */
+const relayBodySchema = z.record(z.string(), z.unknown());
 
 /**
  * Turns a `providerId` into a wire definition.
@@ -529,6 +532,89 @@ function systemPrompt(workspaceName: string, effort: Effort): string {
 export function aiRoutes(services: Services): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
   const limiter = new RateLimiter(services.config.aiRateLimitPerHour, 60 * 60_000);
+
+  /**
+   * The local agent's model calls.
+   *
+   * This is intentionally a relay, not a "download the key" endpoint. The provider key
+   * stays encrypted on the server; the CLI authenticates with its account session and
+   * gets exactly the chat response. A compromised terminal can spend the account's
+   * quota, but cannot copy the key to another machine or into a repository.
+   */
+  async function relayToProvider(c: Context<AppEnv>, expected: "openai" | "anthropic") {
+    const user = c.get("user");
+    if (!user) throw new HttpError(401, "not_authenticated", "Sign in to continue.");
+    const profile = await services.store.getAiProfile(user.id);
+    if (!profile) {
+      throw new HttpError(
+        400,
+        "ai_not_configured",
+        "No AI model is saved on this account. Connect it in the AI page first."
+      );
+    }
+    const actual = profile.providerKind === "anthropic" ? "anthropic" : "openai";
+    if (actual !== expected) {
+      throw new HttpError(
+        400,
+        "relay_kind_mismatch",
+        `This account uses an ${actual} model; call the matching relay endpoint.`
+      );
+    }
+    if (!hasEncryptionSecret(services.config)) {
+      throw new HttpError(503, "key_storage_unavailable", "The stored AI key cannot be read.");
+    }
+
+    const address = clientAddress({ get: (name) => c.req.header(name) });
+    const limited = limiter.check(`relay|${address}|${user.id}`);
+    if (!limited.allowed) {
+      c.header("Retry-After", String(limited.retryAfterSeconds));
+      throw new HttpError(429, "ai_rate_limited", "Too many model calls. Wait a moment.", {
+        retryAfterSeconds: limited.retryAfterSeconds,
+      });
+    }
+
+    const body = await readBody(c, relayBodySchema);
+    const apiKey = await decryptApiKey(services.config, profile.apiKeyEncrypted);
+    const baseUrl = profile.providerBaseUrl.replace(/\/+$/, "");
+    const target = `${baseUrl}${expected === "anthropic" ? "/messages" : "/chat/completions"}`;
+    // The client cannot choose another model or provider: the saved profile is the
+    // authority, exactly like the in-app assistant.
+    const payload = { ...body, model: profile.providerModel };
+    const headers: Record<string, string> = { "content-type": "application/json" };
+    if (expected === "anthropic") {
+      headers["x-api-key"] = apiKey;
+      headers["anthropic-version"] = "2023-06-01";
+    } else {
+      headers.authorization = `Bearer ${apiKey}`;
+    }
+
+    let upstream: Response;
+    try {
+      upstream = await fetch(target, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(90_000),
+      });
+    } catch (error) {
+      throw new HttpError(
+        502,
+        "ai_unreachable",
+        `Le fournisseur IA est injoignable : ${error instanceof Error ? error.message : "erreur réseau"}`
+      );
+    }
+    const text = await upstream.text();
+    return new Response(text, {
+      status: upstream.status,
+      headers: {
+        "content-type": upstream.headers.get("content-type") ?? "application/json",
+        "cache-control": "no-store",
+      },
+    });
+  }
+
+  app.post("/relay/chat/completions", (c) => relayToProvider(c, "openai"));
+  app.post("/relay/messages", (c) => relayToProvider(c, "anthropic"));
 
   // ------------------------------------------------------------- profile
 

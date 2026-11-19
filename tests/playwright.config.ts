@@ -48,7 +48,7 @@ export default defineConfig({
   webServer: [
     {
       command: `node --experimental-sqlite --import tsx/esm src/node.ts`,
-      cwd: "../api",
+      cwd: "../apps/api",
       port: API_PORT,
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
@@ -62,7 +62,7 @@ export default defineConfig({
     },
     {
       command: `npx vite --host localhost --port ${WEB_PORT} --strictPort`,
-      cwd: "../web",
+      cwd: "../apps/web",
       port: WEB_PORT,
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,

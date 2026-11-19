@@ -67,8 +67,11 @@ export function Home() {
               {t("hero.lede")}
             </p>
             <div className="mt-9 flex flex-wrap items-center gap-3">
-              <Link to="/signup" className="btn btn-primary">
-                {t("hero.cta.primary")} <ArrowRight size={16} />
+              <Link to="/download" className="btn btn-primary">
+                {t("hero.cta.download")} <ArrowRight size={16} />
+              </Link>
+              <Link to="/signup" className="btn btn-ghost">
+                {t("hero.cta.primary")}
               </Link>
               <Link to="/platform" className="btn btn-ghost">
                 {t("hero.cta.explore")}

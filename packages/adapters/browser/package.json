@@ -1,0 +1,27 @@
+{
+  "name": "@proofcore/adapter-browser",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MPL-2.0",
+  "description": "PROOFCORE's own browser engine: discovers a Chromium already on the machine and drives it over the DevTools Protocol. No automation framework, no rendering service, no browser download.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@proofcore/core": "workspace:*"
+  }
+}

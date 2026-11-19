@@ -3,6 +3,25 @@ import { TesterScene } from "../components/app/Testers.js";
 import { useI18n } from "../i18n/index.js";
 import { Section } from "../layouts/BrandLayout.js";
 
+export function AppNotFound() {
+  const { t } = useI18n();
+  return (
+    <div className="app-page">
+      <p className="app-eyebrow">404 / PROOFCORE</p>
+      <h1 className="app-display mt-3 text-[clamp(2rem,5vw,3.4rem)]">{t("notfound.title")}</h1>
+      <p className="mt-3 max-w-[560px] text-sm leading-relaxed text-muted">{t("notfound.body")}</p>
+      <div className="mt-6 flex flex-wrap gap-2">
+        <Link to="/app" className="app-btn app-btn-primary">
+          {t("notfound.cta")}
+        </Link>
+        <Link to="/app/cli/docs" className="app-btn">
+          CLI / guide
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export function NotFound() {
   const { t } = useI18n();
   return (

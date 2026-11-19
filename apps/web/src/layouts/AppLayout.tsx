@@ -1,8 +1,8 @@
 import {
   BadgeCheck,
-  Box,
   Boxes,
   ChevronDown,
+  CloudOff,
   Command,
   CreditCard,
   FolderKanban,
@@ -11,6 +11,7 @@ import {
   LogOut,
   Menu,
   PackageOpen,
+  RotateCw,
   Route as RouteIcon,
   Search,
   Settings as SettingsIcon,
@@ -22,6 +23,8 @@ import {
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 
+import { DesktopTools } from "../components/app/DesktopTools.js";
+import { WindowControls } from "../components/app/WindowControls.js";
 import { AiMark } from "../components/brand/AiMark.js";
 import { Mark } from "../components/brand/Logo.js";
 import { useI18n } from "../i18n/index.js";
@@ -64,28 +67,6 @@ export function AppLayout() {
   const paletteInputRef = useRef<HTMLInputElement>(null);
   const mobileRef = useRef<HTMLDivElement>(null);
   const accountRef = useRef<HTMLDivElement>(null);
-
-  // Non-destructive 3D toggle (UI test)
-  const [threeDEnabled, setThreeDEnabled] = useState<boolean>((): boolean => {
-    try {
-      const v = window.localStorage?.getItem("proofcore_3d_enabled");
-      return v === "true";
-    } catch {
-      // ignore
-    }
-    return false;
-  });
-
-  const toggleThreeD = () => {
-    const next = !threeDEnabled;
-    setThreeDEnabled(next);
-    try {
-      window.localStorage?.setItem("proofcore_3d_enabled", next ? "true" : "false");
-    } catch {}
-    if (typeof document !== "undefined") {
-      document.body.dataset.enhanced3d = next ? "true" : "";
-    }
-  };
 
   useEffect(() => {
     // Read through a local so `noUncheckedIndexedAccess` is satisfied honestly: an empty
@@ -134,6 +115,14 @@ export function AppLayout() {
   }, [location.pathname]);
 
   useEffect(() => {
+    const bridge = window.proofcoreDesktop;
+    if (!bridge) return;
+    return bridge.onNavigate((path) => {
+      if (path.startsWith("/app/")) navigate(path);
+    });
+  }, [navigate]);
+
+  useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
@@ -142,6 +131,20 @@ export function AppLayout() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // The title bar is a native drag region: double-clicking it toggles maximize. Listening
+  // at document level keeps the header a static element for accessibility linters and
+  // covers both the normal shell and the offline shell.
+  useEffect(() => {
+    const onDoubleClick = (event: globalThis.MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target?.closest(".app-topbar")) return;
+      if (target.closest("button, a, select, input, label")) return;
+      void window.proofcoreDesktop?.window("maximize");
+    };
+    document.addEventListener("dblclick", onDoubleClick);
+    return () => document.removeEventListener("dblclick", onDoubleClick);
   }, []);
 
   useEffect(() => {
@@ -223,6 +226,9 @@ export function AppLayout() {
       [t("ws.nav.billing"), "/app/billing", <CreditCard key="billing" size={15} />],
       [t("ws.nav.settings"), "/app/settings", <SettingsIcon key="settings" size={15} />],
     ];
+    if (window.proofcoreDesktop) {
+      list.splice(9, 0, ["Terminal", "/app/terminal", <Terminal key="terminal" size={15} />]);
+    }
     if (session.isAdmin) {
       list.push([t("ws.nav.operations"), "/app/admin", <ShieldCheck key="admin" size={15} />]);
     }
@@ -262,6 +268,7 @@ export function AppLayout() {
   if (session.status === "loading") {
     return (
       <div className="app-shell app-centered-shell">
+        <WindowControls floating />
         <div className="app-frame app-loading-frame">
           <div className="app-loader" role="status" aria-live="polite" aria-label={t("ws.loading")}>
             <span className="sr-only">{t("ws.loading")}</span>
@@ -276,20 +283,75 @@ export function AppLayout() {
     return <Navigate to={`/signin?next=${encodeURIComponent(location.pathname)}`} replace />;
   }
 
+  // The local agent does not need the site: when the session cannot be resolved,
+  // this route still runs against the engine on loopback instead of hiding behind
+  // the offline screen. It is reachable from that screen's local console action.
+  if (
+    session.status === "unreachable" &&
+    location.pathname.startsWith("/app/ai/local") &&
+    window.proofcoreDesktop
+  ) {
+    return (
+      <div className="app-shell">
+        <div className="app-frame">
+          <header className="app-topbar">
+            <NavLink to="/app" className="app-brand-lockup" aria-label="PROOFCORE workspace">
+              <Mark size={34} variant="onLight" />
+              <span className="wordmark app-brand-word">ROOFCORE</span>
+              <span className="app-beta">{t("ws.shell.beta")}</span>
+            </NavLink>
+            <div className="app-top-actions">
+              <span className="app-offline-chip">
+                <CloudOff size={13} /> {t("ws.offline.banner")}
+              </span>
+              <button
+                type="button"
+                className="app-btn app-btn-sm"
+                onClick={() => void session.refresh()}
+              >
+                <RotateCw size={13} /> {t("ws.offline.retry")}
+              </button>
+              <WindowControls />
+            </div>
+          </header>
+          <main id="main" className="app-main">
+            <Outlet />
+          </main>
+        </div>
+      </div>
+    );
+  }
+
   if (session.status === "unreachable") {
     return (
       <div className="app-shell app-centered-shell">
+        <WindowControls floating />
         <div className="app-frame app-service-frame">
-          <p className="app-eyebrow">PROOFCORE / 503</p>
+          <div className="app-service-mark" aria-hidden>
+            <CloudOff size={34} strokeWidth={1.35} />
+          </div>
+          <p className="app-eyebrow">PROOFCORE / OFFLINE</p>
           <h1 className="app-display app-service-title">{t("ws.service.title")}</h1>
           <p className="app-support">{t("ws.service.body")}</p>
-          <button
-            type="button"
-            className="app-btn app-btn-primary mt-6"
-            onClick={() => void session.refresh()}
-          >
-            {t("ws.service.retry")}
-          </button>
+          <div className="app-service-actions">
+            <button
+              type="button"
+              className="app-btn app-btn-primary"
+              onClick={() => void session.refresh()}
+            >
+              <RotateCw size={14} /> {t("ws.service.retry")}
+            </button>
+            {window.proofcoreDesktop ? (
+              <button
+                type="button"
+                className="app-btn"
+                onClick={() => void window.proofcoreDesktop?.action("open-agent")}
+              >
+                {t("ws.service.openLocal")}
+              </button>
+            ) : null}
+          </div>
+          <p className="app-service-note">{t("ws.service.note")}</p>
           {import.meta.env.DEV ? (
             <details className="app-service-details">
               <summary>{t("ws.service.diagnostic")}</summary>
@@ -310,7 +372,7 @@ export function AppLayout() {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? "")
     .join("");
-  const enginesActive = location.pathname.startsWith("/app/modules/");
+  const enginesActive = location.pathname.startsWith("/app/modules");
 
   return (
     <div className="app-shell">
@@ -363,6 +425,9 @@ export function AppLayout() {
                       {icon} {label}
                     </NavLink>
                   ))}
+                  <NavLink to="/app/modules" end className="app-nav-popover-link" role="menuitem">
+                    {locale === "fr" ? "Vue d’ensemble" : "Overview"}
+                  </NavLink>
                 </div>
               ) : null}
             </div>
@@ -371,9 +436,6 @@ export function AppLayout() {
             </NavLink>
             <NavLink to="/app/ai" className="app-toplink">
               {t("ws.nav.ai")}
-            </NavLink>
-            <NavLink to="/app/billing" className="app-toplink">
-              {t("ws.nav.billing")}
             </NavLink>
           </nav>
 
@@ -435,20 +497,7 @@ export function AppLayout() {
               <kbd>⌘K</kbd>
             </button>
 
-            <button
-              type="button"
-              className={`app-btn app-btn-3d ${threeDEnabled ? "is-on" : ""}`}
-              aria-label={t("ws.shell.enable3d")}
-              onClick={toggleThreeD}
-              aria-pressed={threeDEnabled}
-              title={
-                locale === "fr"
-                  ? "Relief 3D des cartes au survol"
-                  : "3D tilt on cards, pointer-driven"
-              }
-            >
-              <Box size={14} /> 3D
-            </button>
+            <DesktopTools />
 
             <div className="app-account-wrap" ref={accountRef}>
               <button
@@ -512,10 +561,23 @@ export function AppLayout() {
             >
               <Menu size={19} />
             </button>
+            <WindowControls />
           </div>
         </header>
 
-        <main id="main" className="app-main">
+        {session.offline ? (
+          <div className="app-offline-banner" role="status" aria-live="polite">
+            <CloudOff size={15} aria-hidden />
+            <span>
+              <strong>{t("ws.offline.banner")}</strong> {t("ws.offline.bannerBody")}
+            </span>
+            <button type="button" onClick={() => void session.refresh()}>
+              <RotateCw size={13} /> {t("ws.offline.retry")}
+            </button>
+          </div>
+        ) : null}
+
+        <main id="main" className="app-main" key={location.pathname}>
           <Outlet />
         </main>
 

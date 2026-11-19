@@ -2,7 +2,6 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
-import { createRequire } from "node:module";
 import { dirname, join, resolve, sep } from "node:path";
 import { ProofCoreError } from "@proofcore/core";
 import type { ToolContext } from "./code-tools.js";
@@ -16,9 +15,10 @@ import type { ToolContext } from "./code-tools.js";
  * - **Semantic search** is a local TF-IDF index. It needs no key, produces a ranked list
  *   that can be checked against the file, and never calls a model to pretend relevance.
  *   Provider embeddings are accepted as an upgrade path, not as a requirement.
- * - **Devtools / preview** drive a real Chromium through Playwright: console messages,
- *   network requests, DOM and accessibility come from the page, not from a guess. If
- *   Playwright is missing, the tool says so instead of returning an empty report.
+ * - **Devtools / preview** drive a real Chromium over the DevTools Protocol: console
+ *   messages, network requests, DOM and accessibility come from the page, not from a
+ *   guess. If no Chromium is installed, the tool says so instead of returning an empty
+ *   report.
  * - **Completion** sends the surrounding context to the configured provider. Without a
  *   key it falls back to a symbol-based completion built from the real index.
  * - **Image analysis** sends the image to a vision-capable model and refuses when the
@@ -298,176 +298,93 @@ export interface DevtoolsReport {
   screenshot?: string;
 }
 
-interface PlaywrightLike {
-  chromium: {
-    launch: (options?: Record<string, unknown>) => Promise<{
-      newPage: (options?: Record<string, unknown>) => Promise<Record<string, unknown>>;
-      close: () => Promise<void>;
-    }>;
-  };
-}
-
-/**
- * Drives a real browser to inspect a page.
- *
- * Playwright is an optional peer: the published CLI must stay installable without a
- * 200 MB browser download. When it is absent the tool returns an explicit instruction
- * rather than an empty report that would look like "no errors found".
- */
-/**
- * Loads Playwright as an optional peer.
- *
- * It is resolved from the project being inspected, not from the CLI's own tree: pnpm
- * does not hoist a dependency into a package that does not declare it, so a bare
- * `import("playwright")` fails precisely where the user installed it.
- */
-async function loadPlaywright(root: string): Promise<PlaywrightLike> {
-  // `@playwright/test` ships the same `chromium` object and is what most projects
-  // already install for end-to-end tests; `playwright` is the standalone package.
-  const candidates = ["playwright", "@playwright/test"];
-  const attempts: (() => Promise<unknown>)[] = [];
-  for (const name of candidates) {
-    attempts.push(() => import(name));
-    attempts.push(() => {
-      const requireFromProject = createRequire(join(root, "package.json"));
-      return import(`file://${requireFromProject.resolve(name)}`);
-    });
+const DOM_COUNTS_EXPRESSION = `(() => {
+  const counts = {};
+  for (const tag of ["main","header","footer","nav","h1","h2","img","form","a","button"]) {
+    counts[tag] = document.querySelectorAll(tag).length;
   }
-  for (const attempt of attempts) {
-    try {
-      const resolved = await attempt();
-      const candidate = resolved as { chromium?: unknown; default?: { chromium?: unknown } };
-      if (candidate.chromium || candidate.default?.chromium) {
-        return (candidate.chromium ? candidate : candidate.default) as PlaywrightLike;
-      }
-    } catch {
-      // Try the next resolution strategy.
+  const landmarks = ["main","header","footer","nav"].filter((tag) => document.querySelectorAll(tag).length > 0);
+  return { counts, landmarks };
+})()`;
+
+const ACCESSIBILITY_EXPRESSION = `(() => {
+  const findings = [];
+  for (const img of Array.from(document.querySelectorAll("img"))) {
+    if (!img.getAttribute("alt")) findings.push("img without alt: " + (img.getAttribute("src") || "").slice(0, 60));
+  }
+  for (const input of Array.from(document.querySelectorAll("input,select,textarea"))) {
+    const id = input.getAttribute("id");
+    const labelled = id ? document.querySelector('label[for="' + CSS.escape(id) + '"]') : null;
+    if (!labelled && !input.getAttribute("aria-label") && !input.getAttribute("placeholder")) {
+      findings.push("unlabelled field: " + input.tagName.toLowerCase());
     }
   }
-  throw new ProofCoreError({
-    message:
-      "Playwright is not installed in this project. Run `npm i -D playwright && npx playwright install chromium` to enable the browser tools.",
-    category: "CONFIGURATION",
-    code: "playwright_missing",
-  });
-}
+  if (document.querySelectorAll("h1").length === 0) findings.push("no h1");
+  return findings;
+})()`;
 
+/**
+ * Opens a page in a real Chromium and reports what actually happened.
+ *
+ * This is the audit view of the browser tools: one navigation, then console messages, page
+ * errors, every response status, DOM landmarks, and the accessibility findings that are
+ * decidable from the DOM. It runs on PROOFCORE's own engine — a Chromium already installed
+ * on the machine — so it needs neither Playwright nor a rendering service.
+ */
 export async function inspectPage(
   input: { url: string; screenshotPath?: string; viewport?: { width: number; height: number } },
   options: { timeoutMs?: number; root?: string } = {}
 ): Promise<DevtoolsReport> {
-  const playwright = await loadPlaywright(options.root ?? process.cwd());
-
+  const { browsers } = await import("@proofcore/adapter-browser");
   const viewport = input.viewport ?? { width: 1280, height: 800 };
-  const browser = await playwright.chromium.launch({ args: ["--no-sandbox"] });
-  const console_: { type: string; text: string }[] = [];
-  const network: { url: string; status: number; method: string; type: string }[] = [];
-  const errors: { message: string; source?: string }[] = [];
-
+  const opened = await browsers.open({
+    url: input.url,
+    width: viewport.width,
+    height: viewport.height,
+  });
   try {
-    const page = await browser.newPage({ viewport });
-    const p = page as unknown as {
-      on: (event: string, handler: (payload: unknown) => void) => void;
-      goto: (
-        url: string,
-        options?: Record<string, unknown>
-      ) => Promise<{ status: () => number } | null>;
-      url: () => string;
-      title: () => Promise<string>;
-      evaluate: <T>(fn: () => T) => Promise<T>;
-      screenshot: (options: Record<string, unknown>) => Promise<Buffer>;
-    };
-
-    p.on("console", (payload) => {
-      const message = payload as { type: () => string; text: () => string };
-      console_.push({ type: message.type(), text: message.text().slice(0, 500) });
+    await opened.page.waitFor({
+      expression: "document.readyState === 'complete'",
+      timeoutMs: options.timeoutMs ?? 30_000,
     });
-    p.on("pageerror", (payload) => {
-      const error = payload as Error;
-      errors.push({
-        message: error.message,
-        ...(error.stack ? { source: error.stack.split("\n")[1]?.trim() } : {}),
-      });
-    });
-    p.on("response", (payload) => {
-      const response = payload as {
-        url: () => string;
-        status: () => number;
-        request: () => { method: () => string; resourceType: () => string };
-      };
-      network.push({
-        url: response.url().slice(0, 300),
-        status: response.status(),
-        method: response.request().method(),
-        type: response.request().resourceType(),
-      });
-    });
-
-    const response = await p.goto(input.url, {
-      waitUntil: "networkidle",
-      timeout: options.timeoutMs ?? 30_000,
-    });
-    const title = await p.title();
-    const dom = await p.evaluate(() => {
-      const counts: Record<string, number> = {};
-      for (const tag of [
-        "main",
-        "header",
-        "footer",
-        "nav",
-        "h1",
-        "h2",
-        "img",
-        "form",
-        "a",
-        "button",
-      ]) {
-        counts[tag] = document.querySelectorAll(tag).length;
-      }
-      const landmarks = ["main", "header", "footer", "nav"].filter(
-        (tag) => document.querySelectorAll(tag).length > 0
-      );
-      return { counts, landmarks };
-    });
-
-    // Accessibility checks that are decidable from the DOM, not a scored audit.
-    const a11y = await p.evaluate(() => {
-      const findings: string[] = [];
-      for (const img of Array.from(document.querySelectorAll("img"))) {
-        if (!img.getAttribute("alt"))
-          findings.push(`img without alt: ${img.getAttribute("src")?.slice(0, 60)}`);
-      }
-      for (const input of Array.from(document.querySelectorAll("input,select,textarea"))) {
-        const id = input.getAttribute("id");
-        const labelled = id ? document.querySelector(`label[for="${CSS.escape(id)}"]`) : null;
-        if (!labelled && !input.getAttribute("aria-label") && !input.getAttribute("placeholder")) {
-          findings.push(`unlabelled field: ${input.tagName.toLowerCase()}`);
-        }
-      }
-      if (document.querySelectorAll("h1").length === 0) findings.push("no h1");
-      return findings;
-    });
+    const state = await opened.page.state();
+    const dom = await opened.page
+      .evaluateScript(DOM_COUNTS_EXPRESSION)
+      .then((value) => value as { counts: Record<string, number>; landmarks: string[] });
+    const a11y = await opened.page
+      .evaluateScript(ACCESSIBILITY_EXPRESSION)
+      .then((value) => value as string[])
+      .catch(() => []);
 
     let screenshotPath: string | undefined;
     if (input.screenshotPath) {
-      const buffer = await p.screenshot({ path: input.screenshotPath, fullPage: true });
-      screenshotPath = buffer ? input.screenshotPath : undefined;
+      const { mkdir, writeFile } = await import("node:fs/promises");
+      const absolute = resolve(options.root ?? process.cwd(), input.screenshotPath);
+      await mkdir(dirname(absolute), { recursive: true });
+      const shot = await opened.page.screenshot({ fullPage: true });
+      await writeFile(absolute, shot.data);
+      screenshotPath = input.screenshotPath;
     }
 
     return {
       url: input.url,
-      finalUrl: p.url(),
-      status: response ? response.status() : null,
-      title,
-      console: console_.slice(0, 100),
-      network: network.slice(0, 200),
+      finalUrl: state.url,
+      status: state.status,
+      title: state.title,
+      console: opened.page.console.slice(-100),
+      network: opened.page.network.slice(-200).map((entry) => ({
+        url: entry.url,
+        status: entry.status,
+        method: entry.method,
+        type: entry.type,
+      })),
       dom: { counts: dom.counts, landmarks: dom.landmarks },
       accessibility: { violationsLike: a11y.slice(0, 40) },
-      errors: errors.slice(0, 20),
+      errors: opened.page.pageErrors.slice(-20),
       ...(screenshotPath ? { screenshot: screenshotPath } : {}),
     };
   } finally {
-    await browser.close();
+    await browsers.close(opened.id);
   }
 }
 

@@ -1,9 +1,9 @@
 /**
  * The single place the browser is allowed to talk to the product API.
  *
- * There is no fallback fake: when the API is unreachable the UI says so and sends
- * nothing. A marketing site that pretends to create accounts is worse than one that
- * admits the backend is not running yet.
+ * There is no fallback fake: reads may be served from the last real GET response
+ * while the API is down, but mutations are never simulated. The UI says the data is
+ * cached and keeps server-only actions disabled until the connection returns.
  *
  * Session authentication is an HttpOnly cookie, so every dashboard call uses
  * `credentials: "include"` and never stores a token in JavaScript.
@@ -16,6 +16,54 @@
 export const API_BASE: string =
   (import.meta.env?.VITE_API_URL as string | undefined)?.replace(/\/+$/, "") ??
   (import.meta.env.DEV ? "http://localhost:8787" : "");
+
+const CACHE_PREFIX = "proofcore.api-cache.v1:";
+const CACHE_MAX_BYTES = 1_500_000;
+
+/** Keys are scoped by API origin so a local/staging response never masquerades as prod. */
+function cacheKey(path: string): string {
+  return `${CACHE_PREFIX}${API_BASE}${path}`;
+}
+
+function notifyConnection(online: boolean, detail?: string): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent("proofcore:connection", { detail: { online, ...(detail ? { detail } : {}) } })
+  );
+}
+
+/** The last successful GET body, so the shell can still be navigated during an outage. */
+function readCached<T>(path: string): T | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(cacheKey(path));
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCached(path: string, text: string): void {
+  if (typeof window === "undefined" || text.length > CACHE_MAX_BYTES) return;
+  try {
+    window.localStorage.setItem(cacheKey(path), text);
+  } catch {
+    // Quota, private mode, or a disabled storage: the online path still works.
+  }
+}
+
+/** Removes account data from the machine when the user signs out. */
+export function clearApiCache(): void {
+  if (typeof window === "undefined") return;
+  try {
+    for (let index = window.localStorage.length - 1; index >= 0; index -= 1) {
+      const key = window.localStorage.key(index);
+      if (key?.startsWith(CACHE_PREFIX)) window.localStorage.removeItem(key);
+    }
+  } catch {
+    // Nothing to clear when storage is unavailable.
+  }
+}
 
 export type Probe = { status: "checking" | "reachable" | "unreachable"; detail?: string };
 
@@ -79,9 +127,30 @@ export async function apiFetch<T>(
         parsed?.error?.details
       );
     }
+    if ((init.method ?? "GET") === "GET") writeCached(path, text);
+    notifyConnection(true);
     return (text.length === 0 ? ({} as T) : JSON.parse(text)) as T;
   } catch (error) {
-    if (error instanceof ApiError) throw error;
+    if (error instanceof ApiError) {
+      // A 5xx is an outage, not a refused input. Serve the last real answer so the
+      // workspace remains navigable; 4xx responses must still reach the caller.
+      if ((init.method ?? "GET") === "GET" && error.status >= 500) {
+        const cached = readCached<T>(path);
+        if (cached !== null) {
+          notifyConnection(false, error.message);
+          return cached;
+        }
+      }
+      throw error;
+    }
+    if ((init.method ?? "GET") === "GET") {
+      const cached = readCached<T>(path);
+      if (cached !== null) {
+        notifyConnection(false, error instanceof Error ? error.message : String(error));
+        return cached;
+      }
+    }
+    notifyConnection(false, error instanceof Error ? error.message : String(error));
     throw new ApiError(error instanceof Error ? error.message : String(error), 0, "network_error");
   } finally {
     clearTimeout(timer);
@@ -89,6 +158,7 @@ export async function apiFetch<T>(
 }
 
 export async function postJson<T>(path: string, payload: unknown, timeoutMs = 6000): Promise<T> {
+  // Mutations are never served from the cache: a failed write must be visible.
   return apiFetch<T>(path, { method: "POST", body: payload, timeoutMs });
 }
 

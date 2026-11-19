@@ -3,6 +3,25 @@ import { Section, SectionHeading } from "../layouts/BrandLayout.js";
 
 const RELEASES = [
   {
+    tag: "v0.4.0",
+    date: "2026-11-19",
+    title: "One assistant, a real browser and a terminal",
+    added: [
+      "A Chromium browser inside the application: native page rendering, tabs, address bar, find, zoom and developer tools — no rendering service, no downloaded second engine",
+      "Browser tools for the assistant: open, snapshot, click, type, key, scroll, select, upload, evaluate, screenshot, PDF and cookies, all over the DevTools Protocol",
+      "An integrated terminal with a real PTY on Linux and macOS, streamed to the interface and running the user's own shell",
+      "A wider assistant toolbox: exact-string edits, file and directory operations, HTTP requests, page reading, shell commands, Git branch/show/blame/stage and system facts",
+      "One AI section: the local console now lives inside the assistant instead of a second navigation entry",
+      "Automatic desktop updates from GitHub releases: AppImage updates in place, .deb installs link to the release page",
+      "3D pointer tilt removed from cards and marketing tiles so text no longer moves while it is read",
+    ],
+    known: [
+      "Desktop installers are built for Linux and Windows; macOS remains CLI-only",
+      "On Windows the terminal runs in line mode: a PTY is a POSIX facility, and shipping one would mean a native module per Electron ABI",
+      "The world and flow modules still drive HTTP targets; browser journeys are an assistant tool, not a module yet",
+    ],
+  },
+  {
     tag: "v0.1.0",
     date: "2026-11-16",
     title: "Foundation",

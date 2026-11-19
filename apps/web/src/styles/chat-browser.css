@@ -87,6 +87,90 @@
     border-left: 1px solid var(--border);
     background: var(--surface-1);
   }
+  /* ---------- tabs (native browser) ---------- */
+  .pc-browser-tabs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 6px 0;
+    overflow-x: auto;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+    scrollbar-width: thin;
+  }
+  .pc-browser-tab {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    max-width: 200px;
+    border: 1px solid transparent;
+    border-bottom: 0;
+    border-radius: 8px 8px 0 0;
+    background: var(--surface-1);
+  }
+  .pc-browser-tab.is-active {
+    border-color: var(--border);
+    background: var(--background);
+  }
+  .pc-browser-tab-main {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    padding: 6px 4px 6px 9px;
+    border: 0;
+    background: transparent;
+    color: var(--muted-foreground);
+    font: inherit;
+    font-size: 11.5px;
+    cursor: pointer;
+  }
+  .pc-browser-tab.is-active .pc-browser-tab-main {
+    color: var(--foreground);
+  }
+  .pc-browser-tab-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pc-browser-tab-close {
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    margin-right: 4px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--muted-foreground);
+    cursor: pointer;
+  }
+  .pc-browser-tab-close:hover {
+    background: var(--surface-2);
+    color: var(--foreground);
+  }
+  .pc-browser-new-tab,
+  .pc-browser-panel-close {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted-foreground);
+    cursor: pointer;
+  }
+  .pc-browser-new-tab:hover,
+  .pc-browser-panel-close:hover {
+    background: var(--surface-1);
+    color: var(--foreground);
+  }
+  .pc-browser-panel-close {
+    margin-left: auto;
+    margin-bottom: 4px;
+  }
   .pc-browser-bar {
     display: flex;
     align-items: center;
@@ -155,6 +239,62 @@
       transform: rotate(360deg);
     }
   }
+  .pc-browser-scheme {
+    flex: none;
+    color: var(--muted-foreground);
+  }
+  .pc-browser-find {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-2);
+    font-size: 12px;
+  }
+  .pc-browser-find input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: var(--foreground);
+    font: inherit;
+    font-size: 12px;
+    outline: none;
+  }
+  .pc-browser-find-count {
+    flex: none;
+    color: var(--muted-foreground);
+    font-variant-numeric: tabular-nums;
+  }
+  .pc-browser-zoom {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    flex: none;
+  }
+  .pc-browser-zoom button {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--surface-2);
+    color: var(--muted-foreground);
+    cursor: pointer;
+  }
+  .pc-browser-zoom button:hover {
+    color: var(--foreground);
+  }
+  .pc-browser-zoom span {
+    min-width: 34px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .pc-browser-devtools {
+    margin-left: 4px;
+  }
   .pc-browser-live {
     display: inline-flex;
     align-items: center;
@@ -174,6 +314,14 @@
     color: #f87171;
     border-bottom: 1px solid var(--border);
     background: color-mix(in oklab, #f87171 8%, transparent);
+  }
+  .pc-browser-native-viewport {
+    /* Nothing is rendered here by the page: the native Chromium view is laid exactly on
+       top of this box, so it must stay empty, opaque and free of padding. */
+    position: relative;
+    overflow: hidden;
+    background: var(--surface-1);
+    display: block;
   }
   .pc-browser-viewport {
     flex: 1;
@@ -274,4 +422,10 @@
 
 .pc-browser-error button:hover {
   background: var(--danger-050, #fef3f2);
+}
+
+.pc-browser-error.is-notice {
+  color: var(--foreground);
+  background: var(--surface-2);
+  border-bottom-color: var(--border);
 }

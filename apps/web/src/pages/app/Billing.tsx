@@ -613,8 +613,7 @@ export function Billing() {
                     {fr
                       ? ((
                           {
-                            developer:
-                              "Toute la profondeur des modules, la synchronisation cloud depuis le CLI et des rapports étendus.",
+                            developer: "Toute la profondeur des modules et des rapports étendus.",
                             studio:
                               "Collaboration d'équipe, configurations partagées et intégrations CI.",
                             agency:

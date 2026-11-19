@@ -12,7 +12,7 @@ architectural decision:
 | Work                                                              | Runs on                   | Why                                                                      |
 | ----------------------------------------------------------------- | ------------------------- | ------------------------------------------------------------------------ |
 | Accounts, workspaces, projects, reports, usage, billing, webhooks | `apps/api`                | small, cacheable, request/response workloads                             |
-| WORLD fixtures, FLOW journeys, EXIT exports, Playwright sessions  | customer CLI / CI         | browser sessions need minutes, a real browser and the customer's network |
+| WORLD fixtures, FLOW journeys, EXIT exports, browser sessions     | customer CLI / CI         | browser sessions need minutes, a real browser and the customer's network |
 | Marketing site and dashboard                                      | `apps/web` (static build) | no server-side rendering requirement; deployable to any static host      |
 
 The CLI uploads **metadata and findings** to the API, not traces or videos. Large

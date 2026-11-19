@@ -1,4 +1,4 @@
-import { Boxes, GitBranch, Layers, ShieldCheck } from "lucide-react";
+import { Boxes, GitBranch, Layers, Monitor, ShieldCheck, Terminal, Wrench } from "lucide-react";
 import { Link } from "react-router";
 import { ModuleShowcase } from "../components/marketing/ModuleShowcase.js";
 import { useI18n } from "../i18n/index.js";
@@ -39,6 +39,40 @@ export function Product() {
         />
         <div className="mt-10">
           <ModuleShowcase />
+        </div>
+      </Section>
+
+      <Section>
+        <SectionHeading
+          eyebrow="The assistant"
+          title="It works on the machine, not on a screenshot of it"
+          lede="The assistant opens a real browser, reads the page it rendered, acts on it and keeps the session. A terminal runs the shell itself. The tools that change files show the change before they make it."
+        />
+        <div className="mt-9 grid gap-5 md:grid-cols-3">
+          <article className="brand-panel p-6">
+            <Monitor size={20} className="text-brand-mint" />
+            <h3 className="mt-4 text-[1rem] font-semibold">A browser, embedded</h3>
+            <p className="mt-2 text-[0.88rem] leading-relaxed text-white/54">
+              Chromium already on the machine, with tabs, cookies, keyboard, zoom and find. The
+              assistant clicks and types through the same page you see.
+            </p>
+          </article>
+          <article className="brand-panel p-6">
+            <Terminal size={20} className="text-brand-mint" />
+            <h3 className="mt-4 text-[1rem] font-semibold">A terminal, integrated</h3>
+            <p className="mt-2 text-[0.88rem] leading-relaxed text-white/54">
+              Your own shell, in the application, with colours, prompts and full-screen programs.
+              The session survives navigation.
+            </p>
+          </article>
+          <article className="brand-panel p-6">
+            <Wrench size={20} className="text-brand-mint" />
+            <h3 className="mt-4 text-[1rem] font-semibold">Tools that can finish the job</h3>
+            <p className="mt-2 text-[0.88rem] leading-relaxed text-white/54">
+              Read, search, edit, move, delete, run, fetch, audit and commit — with an exact diff
+              before every write.
+            </p>
+          </article>
         </div>
       </Section>
 

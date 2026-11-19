@@ -269,7 +269,8 @@ export class HubTui {
   }
 
   private get transcriptHeight(): number {
-    return Math.max(3, this.rows - this.deps.header().length - 3 - this.menuRows);
+    // header + rule, transcript, rule, prompt, key hint; the menu takes its own rows.
+    return Math.max(3, this.rows - this.deps.header().length - 5 - this.menuRows);
   }
 
   /** Runs the loop until `/exit`, Ctrl+D or end of input. */
@@ -302,7 +303,9 @@ export class HubTui {
     stdin.on("end", onEnd);
 
     this.push(
-      this.deps.dim("  /help for the commands, Tab completes, ↑↓ history, Ctrl+C interrupts.")
+      this.deps.dim(
+        "  /help commands · /modules list and run WORLD · FLOW · EXIT · Tab completes · Ctrl+C interrupts."
+      )
     );
     this.render();
 
@@ -517,6 +520,19 @@ export class HubTui {
       this.render();
       return;
     }
+    if (action.kind === "history") {
+      this.push(this.deps.bold("  History (this session)"));
+      if (this.history.length === 0) {
+        this.push(this.deps.dim("  Nothing yet. Type a command or a prompt."));
+      } else {
+        const first = Math.max(0, this.history.length - 20);
+        for (const [index, line] of this.history.slice(first).entries()) {
+          this.push(this.deps.dim(`  ${String(first + index + 1).padStart(2, "0")}  ${line}`));
+        }
+      }
+      this.render();
+      return;
+    }
     void this.execute(action);
   }
 
@@ -588,6 +604,12 @@ export class HubTui {
     out.push(rule);
     const prompt = `${this.deps.accent("❯")} ${this.buffer}`;
     out.push(this.fit(prompt, columns));
+    out.push(
+      this.fit(
+        this.deps.dim("  ↑ history  ·  /help commands  ·  Tab completes  ·  PgUp/PgDn scroll"),
+        columns
+      )
+    );
 
     const menu = this.menu;
     if (menu.length) {

@@ -14,12 +14,13 @@ export type HubAction =
   | { kind: "empty" }
   | { kind: "exit" }
   | { kind: "help" }
+  | { kind: "history" }
   | { kind: "dispatch"; argv: string[] }
   | { kind: "agent"; prompt: string }
   | { kind: "unknown"; command: string };
 
 /** Slash commands, mapped to the CLI argv they run. `args` is for `/help` only. */
-export type HubGroup = "Agent" | "Audits" | "Code" | "Account" | "Session";
+export type HubGroup = "Agent" | "Modules" | "Audits" | "Code" | "Account" | "Session";
 
 export const HUB_COMMANDS: {
   command: string;
@@ -28,6 +29,7 @@ export const HUB_COMMANDS: {
   group: HubGroup;
 }[] = [
   { group: "Session", command: "/help", args: "", description: "this list" },
+  { group: "Session", command: "/history", args: "", description: "commands from this session" },
   {
     group: "Account",
     command: "/update",
@@ -56,9 +58,45 @@ export const HUB_COMMANDS: {
     description: "projects in the signed-in workspace",
   },
   {
+    group: "Modules",
+    command: "/modules",
+    args: "",
+    description: "list the five modules, wiring and commands",
+  },
+  {
+    group: "Modules",
+    command: "/world",
+    args: "[--only WORLD]",
+    description: "run WORLD locally in this repository",
+  },
+  {
+    group: "Modules",
+    command: "/flow",
+    args: "[--only FLOW]",
+    description: "run FLOW locally in this repository",
+  },
+  {
+    group: "Modules",
+    command: "/module",
+    args: "world|flow|exit [args]",
+    description: "run one core module locally",
+  },
+  {
+    group: "Modules",
+    command: "/fail",
+    args: "<url>",
+    description: "run the FAIL security audit locally",
+  },
+  {
+    group: "Modules",
+    command: "/clean",
+    args: "<url>",
+    description: "run the CLEAN interface audit locally",
+  },
+  {
     group: "Audits",
     command: "/test",
-    args: "[--only WORLD]",
+    args: "[--module flow] [--only id]",
     description: "run WORLD · FLOW · EXIT",
   },
   {
@@ -96,12 +134,6 @@ export const HUB_COMMANDS: {
   },
   { group: "Code", command: "/svg", args: "<name>", description: "deterministic icon" },
   { group: "Account", command: "/billing", args: "", description: "plan, seats and usage" },
-  {
-    group: "Audits",
-    command: "/modules",
-    args: "",
-    description: "WORLD · FLOW · EXIT · FAIL · CLEAN",
-  },
   { group: "Session", command: "/clear", args: "", description: "clear the screen" },
   { group: "Session", command: "/exit", args: "", description: "leave the hub" },
 ];
@@ -109,18 +141,24 @@ export const HUB_COMMANDS: {
 /** `/billing` is a web page, not an API read: the hub opens it instead of guessing. */
 const WEB_ONLY: Record<string, string> = {
   "/billing": "/app/billing",
-  "/modules": "/app/modules",
 };
 
 const ALIASES: Record<string, string[]> = {
   "/help": [],
   "/?": [],
+  "/history": [],
   "/whoami": ["whoami"],
   "/agent": ["agent"],
   "/serve": ["serve"],
   "/login": ["login"],
   "/logout": ["logout"],
   "/projects": ["projects"],
+  "/modules": ["modules"],
+  "/module": ["module"],
+  "/world": ["test", "--module", "world"],
+  "/flow": ["test", "--module", "flow"],
+  "/fail": ["fail"],
+  "/clean": ["clean"],
   "/test": ["test"],
   "/audit": ["audit"],
   "/report": ["report"],
@@ -162,6 +200,7 @@ export function parseHubLine(rawLine: string): HubAction {
     return { kind: "exit" };
   }
   if (line === "?") return { kind: "help" };
+  if (line === "/history") return { kind: "history" };
   if (!line.startsWith("/")) {
     // Anything that is not a command is a request for the agent, which is what a person
     // typing a sentence into a coding CLI expects.
@@ -208,6 +247,11 @@ export async function runHub(io: HubIo, deps: HubDeps): Promise<number> {
     if (action.kind === "exit") return 0;
     if (action.kind === "help") {
       deps.help();
+      continue;
+    }
+    if (action.kind === "history") {
+      // The transcript belongs to the full-screen TUI; a pipe has no screen to show it on.
+      io.write("Command history is available in the full-screen hub with ↑/↓.\n");
       continue;
     }
     if (action.kind === "unknown") {

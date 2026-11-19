@@ -14,6 +14,7 @@ import {
   saveSession,
   sessionId,
 } from "./agent-runtime.js";
+import { TerminalHub } from "./terminal.js";
 import { clearStoredSession, DEFAULT_API_URL, loadStoredSession, saveStoredSession } from "./ui.js";
 
 /**
@@ -34,6 +35,12 @@ import { clearStoredSession, DEFAULT_API_URL, loadStoredSession, saveStoredSessi
  * checked against the server's own, and writes still gated by the same approval rule.
  */
 
+export interface ProviderRefresh {
+  provider?: AgentProvider;
+  /** Why no provider is available. Shown instead of silently pretending there is one. */
+  reason?: string;
+}
+
 export interface ServeOptions {
   root: string;
   /** Built web app to serve as the native window's interface. */
@@ -45,6 +52,11 @@ export interface ServeOptions {
    * provider the window still works - it explains what to set - instead of a dead screen.
    */
   provider?: AgentProvider;
+  /**
+   * Re-reads the model saved on the account before a turn. Without this, an app opened
+   * before the site profile existed would keep asking for a key until it was restarted.
+   */
+  refreshProvider?: () => Promise<ProviderRefresh>;
   port?: number;
   /** Approve, refuse or ask. Defaults to asking in the terminal. */
   approve?: Approver;
@@ -67,7 +79,16 @@ const MAX_BODY_BYTES = 256 * 1024;
 const MAX_PROXY_BODY_BYTES = 4 * 1024 * 1024;
 const COOKIE = "pc_local";
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
-const LOCAL_API_PATHS = new Set(["/api/state", "/api/approve", "/api/chat"]);
+const LOCAL_API_PATHS = new Set([
+  "/api/state",
+  "/api/approve",
+  "/api/chat",
+  "/api/terminal/start",
+  "/api/terminal/stream",
+  "/api/terminal/input",
+  "/api/terminal/resize",
+  "/api/terminal/kill",
+]);
 
 const MIME_TYPES: Record<string, string> = {
   ".css": "text/css; charset=utf-8",
@@ -306,8 +327,28 @@ export async function serveLocal(options: ServeOptions): Promise<ServeHandle> {
   const log = options.log ?? (() => undefined);
   const sessions = new Map<string, AgentSession>();
   const approvals = new Map<string, (allow: boolean) => void>();
+  const terminals = new TerminalHub({ log });
   // The active SSE writer, set for the duration of one /api/chat request.
   let stream: ((event: { type: string; payload: unknown }) => void) | undefined;
+  let activeProvider = options.provider;
+  let providerReason: string | undefined;
+
+  /**
+   * The model is account state, not process state. Reading it again before each turn means
+   * connecting or changing a provider on the site takes effect in the open app, instead of
+   * only after a restart. A failed refresh keeps the last working provider.
+   */
+  const refreshProvider = async (): Promise<AgentProvider | undefined> => {
+    if (!options.refreshProvider) return activeProvider;
+    try {
+      const next = await options.refreshProvider();
+      activeProvider = next.provider;
+      providerReason = next.provider ? undefined : next.reason;
+    } catch (error) {
+      providerReason = error instanceof Error ? error.message : String(error);
+    }
+    return activeProvider;
+  };
 
   const server: Server = createServer(async (request, response) => {
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
@@ -426,11 +467,13 @@ export async function serveLocal(options: ServeOptions): Promise<ServeHandle> {
 
       if (request.method === "GET" && url.pathname === "/api/state") {
         const account = await loadStoredSession().catch(() => null);
+        const provider = await refreshProvider();
         response.writeHead(200, { "content-type": "application/json" });
         response.end(
           JSON.stringify({
             root: options.root,
-            model: options.provider?.model ?? "non configuré",
+            model: provider?.model ?? "non configuré",
+            modelReason: providerReason ?? null,
             allowWrite: options.allowWrite === true,
             sync: options.sync === true,
             account: account ? { email: account.email, apiUrl: account.apiUrl } : null,
@@ -460,7 +503,10 @@ export async function serveLocal(options: ServeOptions): Promise<ServeHandle> {
           response.end(JSON.stringify({ error: "message_required" }));
           return;
         }
-        if (!options.provider) {
+        // The profile may have been connected on the site after this app opened. Ask the
+        // account again before deciding that no model exists.
+        const provider = await refreshProvider();
+        if (!provider) {
           // The window is open, the engine runs, one thing is missing. Saying it in the
           // conversation keeps the app usable: the user reads it where they were typing.
           response.writeHead(200, {
@@ -468,10 +514,11 @@ export async function serveLocal(options: ServeOptions): Promise<ServeHandle> {
             "cache-control": "no-cache",
           });
           const explanation =
-            "Aucun modèle n'est configuré. Deux façons de le faire, une seule fois :\n\n" +
-            "1. Menu PROOFCORE → « Se connecter… », puis le compte fournit le modèle.\n" +
-            "2. proofcore agent --configure  (URL, modèle, clé — stockés en 0600 sur cette machine).\n\n" +
-            "Tout le reste tourne déjà ici : les audits, le bac à sable, l'index, les outils.";
+            "Aucun modèle n'est encore configuré.\n\n" +
+            (providerReason
+              ? `Le profil du compte n'a pas pu être lu (${providerReason}).\n\n`
+              : "") +
+            "Connectez un modèle dans les réglages IA de votre compte, puis relancez le message.";
           const frame = (event: string, payload: unknown) =>
             `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
           response.write(frame("assistant_text", { text: explanation }));
@@ -494,7 +541,7 @@ export async function serveLocal(options: ServeOptions): Promise<ServeHandle> {
           session = new AgentSession(
             {
               root: options.root,
-              provider: options.provider as AgentProvider,
+              provider,
               approve,
               ...(options.maxSteps ? { maxSteps: options.maxSteps } : {}),
               // Every event the loop produces is forwarded to the page as it happens, so a
@@ -506,6 +553,10 @@ export async function serveLocal(options: ServeOptions): Promise<ServeHandle> {
             history ?? []
           );
           sessions.set(conversationKey, session);
+        } else {
+          // The cached session must follow a model changed on the site, otherwise the
+          // next turn would still call the old provider.
+          session.setProvider(provider);
         }
         const active = session;
 
@@ -525,12 +576,15 @@ export async function serveLocal(options: ServeOptions): Promise<ServeHandle> {
           else if (event.type === "tool_result") send("tool_result", event.payload);
           else if (event.type === "tool_refused") send("tool_refused", event.payload);
         };
+        // Tell the page which model answered, including when it was just re-synced from
+        // the account; otherwise the header would keep saying "non configuré".
+        send("provider", { model: provider.model, providerLabel: provider.providerLabel ?? null });
 
         const result = await runWithApproval({ session: active, message, send, approvals });
         stream = undefined;
 
         await saveSession(options.root, sessionId(options.root, conversationKey), result.messages, {
-          model: options.provider?.model ?? "non configuré",
+          model: provider.model,
           source: "local-bridge",
         });
 
@@ -541,6 +595,52 @@ export async function serveLocal(options: ServeOptions): Promise<ServeHandle> {
         }
         send("done", { syncError: syncError ?? null });
         response.end();
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/terminal/start") {
+        const body = await readJson(request);
+        const info = terminals.start({
+          cwd: options.root,
+          ...(typeof body.cols === "number" ? { cols: body.cols } : {}),
+          ...(typeof body.rows === "number" ? { rows: body.rows } : {}),
+          replace: body.replace === true,
+        });
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify(info));
+        return;
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/terminal/stream") {
+        const id = url.searchParams.get("session") ?? "";
+        terminals.attach(id, response);
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/terminal/input") {
+        const body = await readJson(request);
+        const id = String(body.session ?? "");
+        const data = Buffer.from(String(body.data ?? ""), "base64");
+        terminals.write(id, data);
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ ok: true }));
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/terminal/resize") {
+        const body = await readJson(request);
+        const id = String(body.session ?? "");
+        const info = terminals.resize(id, Number(body.cols ?? 0), Number(body.rows ?? 0));
+        response.writeHead(info ? 200 : 404, { "content-type": "application/json" });
+        response.end(JSON.stringify(info ?? { error: "terminal_not_found" }));
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/terminal/kill") {
+        const body = await readJson(request);
+        const killed = terminals.kill(String(body.session ?? ""));
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ killed }));
         return;
       }
 
@@ -575,6 +675,7 @@ export async function serveLocal(options: ServeOptions): Promise<ServeHandle> {
     token,
     close: () =>
       new Promise<void>((resolvePromise) => {
+        terminals.dispose();
         server.closeAllConnections?.();
         server.close(() => resolvePromise());
       }),

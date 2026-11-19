@@ -1,6 +1,6 @@
 {
   "name": "@proofcore/desktop",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "PROOFCORE desktop: the native window around the local engine",
   "main": "main.cjs",
@@ -16,10 +16,10 @@
     "sidecar": "node ../../tooling/scripts/build-binary.mjs",
     "sidecar:linux": "node ../../tooling/scripts/build-binary.mjs --target linux-x64",
     "sidecar:win": "node ../../tooling/scripts/build-binary.mjs --target win-x64",
-    "dist": "pnpm sidecar && pnpm icons && electron-builder --linux deb AppImage",
-    "dist:linux": "pnpm sidecar:linux && pnpm icons && electron-builder --linux deb AppImage",
-    "dist:win": "pnpm sidecar:win && pnpm icons && electron-builder --win",
-    "dist:mac": "pnpm icons && electron-builder --mac"
+    "dist": "pnpm sidecar && pnpm icons && electron-builder --linux deb AppImage --publish never",
+    "dist:linux": "pnpm sidecar:linux && pnpm icons && electron-builder --linux deb AppImage --publish never",
+    "dist:win": "pnpm sidecar:win && pnpm icons && electron-builder --win --publish never",
+    "dist:mac": "pnpm icons && electron-builder --mac --publish never"
   },
   "dependencies": {
     "electron-updater": "^6.8.11"

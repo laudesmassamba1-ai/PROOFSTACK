@@ -1,5 +1,6 @@
-import { KeyRound, Moon, Sun, Trash2, Webhook } from "lucide-react";
+import { CreditCard, KeyRound, Moon, RefreshCw, Sun, Trash2, Webhook } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router";
 import { Cannot, Card, Empty, ErrorState, Loading } from "../../components/app/ui.js";
 import { useI18n } from "../../i18n/index.js";
 import { PageHeader } from "../../layouts/AppLayout.js";
@@ -35,6 +36,17 @@ interface WebhookEntry {
   lastStatusAt: string | null;
   lastError: string | null;
 }
+
+interface BillingStatus {
+  planName: string;
+  planKey: string;
+  state: string;
+  entitled: boolean;
+  currentPeriodEnd: string | null;
+  renewalDueAt: string | null;
+}
+
+type DesktopInfo = Awaited<ReturnType<NonNullable<Window["proofcoreDesktop"]>["info"]>>;
 
 /** "Chrome · Linux" is enough context to recognise a device; the full UA is noise. */
 function describeUserAgent(userAgent: string | null, fr: boolean): string {
@@ -100,6 +112,11 @@ export function Settings() {
   const [deletePassword, setDeletePassword] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deletingAccount, setDeletingAccount] = useState(false);
+  const [billing, setBilling] = useState<BillingStatus | null>(null);
+  const [billingError, setBillingError] = useState(false);
+  const [machine, setMachine] = useState<DesktopInfo | null>(null);
+  const [update, setUpdate] = useState<UpdateState | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
 
   /**
    * Account self-service. Every call here is destructive or security-relevant, so each
@@ -234,6 +251,65 @@ export function Settings() {
     void load();
   }, [load]);
 
+  // Billing is a separate read on purpose: an unavailable subscription status must not
+  // blank the whole settings page. The card then says it could not verify instead.
+  useEffect(() => {
+    if (!session.workspaceId) {
+      setBilling(null);
+      return;
+    }
+    let alive = true;
+    setBillingError(false);
+    apiFetch<{ subscription: BillingStatus }>(`/api/v1/billing?workspaceId=${session.workspaceId}`)
+      .then((body) => {
+        if (alive) setBilling(body.subscription);
+      })
+      .catch(() => {
+        if (alive) setBillingError(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [session.workspaceId]);
+
+  // The native shell owns this machine's facts. Reading them through the bridge keeps
+  // the page free of Node access and makes the section disappear on the website.
+  useEffect(() => {
+    const bridge = window.proofcoreDesktop;
+    if (!bridge) return;
+    let alive = true;
+    void bridge
+      .info()
+      .then((info) => {
+        if (alive) setMachine(info);
+      })
+      .catch(() => undefined);
+    void bridge
+      .updateState()
+      .then((state) => {
+        if (alive) setUpdate(state);
+      })
+      .catch(() => undefined);
+    const off = bridge.onUpdate((state) => {
+      if (alive) setUpdate(state);
+    });
+    return () => {
+      alive = false;
+      off();
+    };
+  }, []);
+
+  const checkForUpdate = async () => {
+    const bridge = window.proofcoreDesktop;
+    if (!bridge || checkingUpdate) return;
+    setCheckingUpdate(true);
+    try {
+      await bridge.action("check-app-update");
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
+
   const revoke = async (id: string) => {
     if (!session.workspaceId) return;
     setBusy(true);
@@ -312,6 +388,28 @@ export function Settings() {
     fr
       ? ({ owner: "propriétaire", admin: "administrateur", member: "membre" }[role] ?? role)
       : role;
+  const platformLabel = machine
+    ? ({ linux: "Linux", win32: "Windows", darwin: "macOS" }[machine.platform] ?? machine.platform)
+    : "";
+  const subscriptionLabel = billing
+    ? billing.entitled
+      ? fr
+        ? "Abonnement actif"
+        : "Subscription active"
+      : billing.state === "NONE"
+        ? fr
+          ? "Offre gratuite"
+          : "Free plan"
+        : fr
+          ? "Abonnement inactif"
+          : "Subscription inactive"
+    : billingError
+      ? fr
+        ? "Statut indisponible"
+        : "Status unavailable"
+      : fr
+        ? "Vérification…"
+        : "Checking…";
 
   return (
     <>
@@ -325,6 +423,138 @@ export function Settings() {
           {notice}
         </p>
       ) : null}
+
+      <div className="mb-4 grid gap-4 xl:grid-cols-2">
+        <Card
+          className="self-start"
+          title={fr ? "Abonnement" : "Subscription"}
+          description={
+            fr
+              ? "Vérifié depuis la facturation du site. Un accès payant n’est activé qu’après confirmation du prestataire."
+              : "Verified from the site billing state. Paid access is only enabled after the provider confirms it."
+          }
+          enhanced
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+            <div>
+              <p className="text-sm font-medium">
+                {billing ? billing.planName : fr ? "Lecture du plan…" : "Reading plan…"}
+              </p>
+              <p className="mt-1 text-xs text-muted">
+                {subscriptionLabel}
+                {billing?.state && billing.state !== "NONE" ? ` · ${billing.state}` : ""}
+                {billing?.currentPeriodEnd
+                  ? fr
+                    ? ` · jusqu’au ${formatDay(billing.currentPeriodEnd)}`
+                    : ` · through ${formatDay(billing.currentPeriodEnd)}`
+                  : ""}
+              </p>
+            </div>
+            <Link to="/app/billing" className="app-btn">
+              <CreditCard size={14} /> {fr ? "Gérer" : "Manage"}
+            </Link>
+          </div>
+        </Card>
+
+        {window.proofcoreDesktop ? (
+          <Card title={fr ? "Ce poste" : "This machine"}>
+            {machine ? (
+              <div className="px-5 py-4">
+                <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
+                  <div>
+                    <dt className="text-muted">{fr ? "Système" : "System"}</dt>
+                    <dd className="mt-0.5">
+                      {platformLabel} · {machine.arch}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted">{fr ? "Processeur" : "Processor"}</dt>
+                    <dd className="mt-0.5 truncate" title={machine.cpu ?? undefined}>
+                      {machine.cpu ?? "—"} · {machine.cores} {fr ? "cœurs" : "cores"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted">{fr ? "Mémoire" : "Memory"}</dt>
+                    <dd className="mt-0.5">{machine.memoryGb} GB</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted">{fr ? "Moteur" : "Engine"}</dt>
+                    <dd className="mt-0.5">
+                      v{machine.version} · Electron {machine.electron}
+                    </dd>
+                  </div>
+                  <div className="col-span-2">
+                    <dt className="text-muted">{fr ? "Dossier ouvert" : "Opened folder"}</dt>
+                    <dd className="mt-0.5 truncate app-mono text-[0.68rem]" title={machine.root}>
+                      {machine.root}
+                    </dd>
+                  </div>
+                </dl>
+                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-3">
+                  <span className="text-xs text-muted">
+                    {update?.status === "ready"
+                      ? fr
+                        ? `Version ${update.version ?? ""} prête`
+                        : `Version ${update.version ?? ""} ready`
+                      : update?.status === "available" || update?.status === "downloading"
+                        ? fr
+                          ? `Téléchargement ${update.percent} %`
+                          : `Downloading ${update.percent}%`
+                        : update?.status === "current"
+                          ? fr
+                            ? "Application à jour"
+                            : "App up to date"
+                          : update?.status === "manual"
+                            ? fr
+                              ? "Mise à jour depuis le site"
+                              : "Update from the releases page"
+                            : update?.status === "error"
+                              ? fr
+                                ? "Vérification impossible"
+                                : "Check failed"
+                              : fr
+                                ? "Mise à jour automatique"
+                                : "Automatic updates"}
+                  </span>
+                  <button
+                    type="button"
+                    className="app-btn ml-auto"
+                    onClick={() => void checkForUpdate()}
+                    disabled={
+                      checkingUpdate || update?.status === "ready" || update?.status === "manual"
+                    }
+                  >
+                    <RefreshCw size={13} className={checkingUpdate ? "app-spin" : ""} />
+                    {fr ? "Vérifier" : "Check"}
+                  </button>
+                  {update?.status === "ready" ? (
+                    <button
+                      type="button"
+                      className="app-btn app-btn-primary"
+                      onClick={() => void window.proofcoreDesktop?.action("install-update")}
+                    >
+                      {fr ? "Installer" : "Install"}
+                    </button>
+                  ) : null}
+                  {update?.status === "manual" ? (
+                    <button
+                      type="button"
+                      className="app-btn app-btn-primary"
+                      onClick={() => void window.proofcoreDesktop?.action("open-releases")}
+                    >
+                      {fr ? "Télécharger" : "Download"}
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            ) : (
+              <p className="px-5 py-4 text-xs text-muted">
+                {fr ? "Lecture de la machine…" : "Reading this machine…"}
+              </p>
+            )}
+          </Card>
+        ) : null}
+      </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Card title={fr ? "Compte" : "Account"} enhanced>

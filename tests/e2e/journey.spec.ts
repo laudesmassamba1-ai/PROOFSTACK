@@ -211,6 +211,23 @@ test.describe("dashboard", () => {
     await expect(page.getByText(/receipt|reçu/i).first()).toBeVisible();
   });
 
+  test("CLI documentation stays inside the app shell", async ({ page }) => {
+    await signUp(page, uniqueEmail("cli-docs"));
+    await page.goto("/app/cli");
+    await page.getByRole("link", { name: /CLI documentation/i }).click();
+    await expect(page).toHaveURL(/\/app\/cli\/docs$/);
+    await expect(page.getByRole("heading", { level: 1 })).toContainText(/ENGINE|MOTEUR/i);
+    // The marketing navigation must not replace the workspace shell.
+    await expect(page.getByRole("link", { name: /^Sign in$|^Se connecter$/i })).toHaveCount(0);
+  });
+
+  test("an unknown app route gets the app 404, not the marketing page", async ({ page }) => {
+    await signUp(page, uniqueEmail("app-404"));
+    await page.goto("/app/this-route-does-not-exist");
+    await expect(page.getByText("404 / PROOFCORE")).toBeVisible();
+    await expect(page.getByRole("link", { name: /CLI \/ guide/i })).toBeVisible();
+  });
+
   test("settings exposes appearance and language", async ({ page }) => {
     await signUp(page, uniqueEmail("settings"));
     await page.goto("/app/settings");

@@ -5,6 +5,7 @@ import { Link, useNavigate, useSearchParams } from "react-router";
 import { z } from "zod";
 import { useI18n } from "../i18n/index.js";
 import { API_BASE, type Probe, postJson, probeApi } from "../lib/api.js";
+import { errorText } from "../lib/errorText.js";
 import { useSession } from "../lib/session.js";
 
 type Mode = "in" | "up";
@@ -15,7 +16,7 @@ type Mode = "in" | "up";
  * truth: no mock session, no "demo user", no silently disabled button.
  */
 export function Auth({ mode }: { mode: Mode }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const session = useSession();
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -97,12 +98,12 @@ export function Auth({ mode }: { mode: Mode }) {
       navigate(next?.startsWith("/app") ? next : "/app", { replace: true });
     } catch (error) {
       setState("failed");
-      setMessage(error instanceof Error ? error.message : String(error));
+      setMessage(errorText(error, locale === "fr"));
     }
   };
 
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-6rem)] max-w-[520px] flex-col justify-center px-5 py-10">
+    <div className="auth-page mx-auto flex min-h-[calc(100vh-6rem)] max-w-[520px] flex-col justify-center px-5 py-10">
       <h1 className="text-[1.6rem] tracking-tight">
         {mode === "in" ? t("auth.signin.title") : t("auth.signup.title")}
       </h1>
@@ -232,7 +233,9 @@ export function Auth({ mode }: { mode: Mode }) {
           {probe.status === "checking"
             ? t("auth.checking")
             : probe.status === "reachable"
-              ? t("auth.reachable")
+              ? mode === "up"
+                ? t("auth.reachable.up")
+                : t("auth.reachable.in")
               : t("auth.noBackend")}
           {import.meta.env.DEV && probe.status === "unreachable" ? (
             <code className="mt-1 block text-[0.7rem] opacity-65">

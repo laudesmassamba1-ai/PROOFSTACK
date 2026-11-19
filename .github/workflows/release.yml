@@ -135,6 +135,10 @@ jobs:
           # sidecar, web bundle, icons and launchable binary.
           test -f artifacts/desktop/linux-unpacked/resources/web/index.html
           test -x artifacts/desktop/linux-unpacked/resources/sidecar/proofcore-linux-x64
+          # electron-updater reads this file from the release; without it the app can
+          # download an installer but never find out that a new version exists.
+          test -s artifacts/desktop/latest-linux.yml
+          grep -q "version:" artifacts/desktop/latest-linux.yml
           file artifacts/desktop/PROOFCORE-*.AppImage
           dpkg-deb -I artifacts/desktop/PROOFCORE-*.deb >/dev/null
 

@@ -81,7 +81,7 @@ proofcore agent "..." --json                # one JSON object, exit code 0/2/3
 | Git status / diff / log / commit (explicit paths)      | shipped                                                 |
 | Concept search over a local TF-IDF index               | shipped                                                 |
 | Inline completion (model, or real symbols as fallback) | shipped                                                 |
-| Browser console / network / DOM / a11y / screenshot    | shipped, needs Playwright                               |
+| Browser console / network / DOM / a11y / screenshot    | shipped, own Chromium over CDP (no external driver)     |
 | Vision on a screenshot                                 | shipped, needs a vision-capable model                   |
 | Deterministic SVG assets                               | shipped                                                 |
 | Breakpoints and real scopes over CDP                   | shipped                                                 |
@@ -91,9 +91,15 @@ proofcore agent "..." --json                # one JSON object, exit code 0/2/3
 
 ## Limits worth knowing
 
-- **The key is local.** `proofcore agent --configure` writes `~/.config/proofcore/provider.json`
-  in mode `0600`. The web profile cannot return its key by design, so the CLI cannot read
-  it from there — configure the model once, locally.
+- **The account model arrives with login.** `proofcore login` reads the AI profile saved on
+  the site and points the local provider at the authenticated `/api/v1/ai/relay`; the
+  provider key stays encrypted on the server. The desktop sidecar refreshes that profile at
+  startup and before each turn, so a model connected or changed on the site takes effect in
+  the open app without another key prompt or a restart.
+- **A fully local model is still possible**: `proofcore agent --configure` writes
+  `~/.config/proofcore/provider.json` in mode `0600` for providers such as Ollama. That
+  local configuration is left alone when the account has no model; an account model
+  replaces it on the next login.
 - **The account session is separate**: `~/.config/proofcore/session.json`, written by
   `proofcore login`. `proofcore whoami` shows both and reports honestly when one is
   missing.

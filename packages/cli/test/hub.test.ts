@@ -40,6 +40,10 @@ describe("parseHubLine", () => {
     for (const line of ["/help", "/?", "?"]) expect(parseHubLine(line)).toEqual({ kind: "help" });
   });
 
+  it("opens the session history locally", () => {
+    expect(parseHubLine("/history")).toEqual({ kind: "history" });
+  });
+
   it("maps a slash command to the real CLI argv", () => {
     expect(parseHubLine("/test --only WORLD")).toEqual({
       kind: "dispatch",
@@ -63,10 +67,27 @@ describe("parseHubLine", () => {
     expect(parseHubLine("/WHOAMI")).toEqual({ kind: "dispatch", argv: ["whoami"] });
   });
 
-  it("routes page-only commands to the browser", () => {
+  it("only routes the billing page to the browser", () => {
     expect(hubWebPath("/billing")).toBe("/app/billing");
-    expect(hubWebPath("/modules")).toBe("/app/modules");
+    // Modules are local commands; sending them to a missing web route was the bug.
+    expect(hubWebPath("/modules")).toBeUndefined();
     expect(hubWebPath("/test")).toBeUndefined();
+  });
+
+  it("maps module shortcuts to local runs, not to the site", () => {
+    expect(parseHubLine("/world")).toEqual({
+      kind: "dispatch",
+      argv: ["test", "--module", "world"],
+    });
+    expect(parseHubLine("/flow --only FLOW-1")).toEqual({
+      kind: "dispatch",
+      argv: ["test", "--module", "flow", "--only", "FLOW-1"],
+    });
+    expect(parseHubLine("/module exit")).toEqual({
+      kind: "dispatch",
+      argv: ["module", "exit"],
+    });
+    expect(parseHubLine("/modules")).toEqual({ kind: "dispatch", argv: ["modules"] });
   });
 });
 
@@ -77,7 +98,12 @@ describe("command list", () => {
       "/help",
       "/agent",
       "/serve",
+      "/history",
       "/test",
+      "/modules",
+      "/world",
+      "/flow",
+      "/module",
       "/audit",
       "/billing",
       "/logout",
@@ -90,6 +116,7 @@ describe("command list", () => {
       const routable =
         action.kind === "dispatch" ||
         action.kind === "help" ||
+        action.kind === "history" ||
         action.kind === "exit" ||
         hubWebPath(name);
       expect(Boolean(routable)).toBe(true);

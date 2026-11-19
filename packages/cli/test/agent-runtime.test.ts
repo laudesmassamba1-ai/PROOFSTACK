@@ -161,6 +161,57 @@ describe("provider resolution", () => {
     expect(provider.baseUrl).toBe("https://env.example/v1");
     expect(provider.model).toBe("env-model");
   });
+
+  it("treats an exported empty variable as unset instead of hiding the stored model", async () => {
+    await saveStoredProvider({
+      baseUrl: "https://stored.example/v1",
+      model: "stored-model",
+      apiKey: "stored-key",
+    });
+    process.env.PROOFCORE_AI_BASE_URL = "";
+    process.env.PROOFCORE_AI_MODEL = "";
+    process.env.PROOFCORE_AI_KEY = "";
+    const provider = await resolveProvider();
+    expect(provider.baseUrl).toBe("https://stored.example/v1");
+    expect(provider.model).toBe("stored-model");
+  });
+
+  it("keeps the relay cookie and account metadata from a synced profile", async () => {
+    await saveStoredProvider({
+      baseUrl: "https://site.example/api/v1/ai/relay",
+      model: "account-model",
+      apiKey: "",
+      relay: true,
+      sessionCookie: "ps_session=account-cookie",
+      source: "account",
+      accountApiUrl: "https://site.example",
+      providerLabel: "Groq",
+    });
+    const provider = await resolveProvider();
+    expect(provider).toMatchObject({
+      relay: true,
+      sessionCookie: "ps_session=account-cookie",
+      source: "account",
+      providerLabel: "Groq",
+    });
+  });
+
+  it("does not carry the relay cookie to an explicit local provider", async () => {
+    await saveStoredProvider({
+      baseUrl: "https://site.example/api/v1/ai/relay",
+      model: "account-model",
+      apiKey: "",
+      relay: true,
+      sessionCookie: "ps_session=account-cookie",
+    });
+    const provider = await resolveProvider({
+      baseUrl: "http://localhost:11434/v1",
+      model: "local",
+      apiKey: "local-key",
+    });
+    expect(provider.relay).toBeUndefined();
+    expect(provider.sessionCookie).toBeUndefined();
+  });
 });
 
 describe("agent loop", () => {

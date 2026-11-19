@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { stdin, stdout } from "node:process";
 import { createInterface } from "node:readline/promises";
+import { syncAccountAi } from "./agent-runtime.js";
 
 /**
  * The PROOFCORE terminal console.
@@ -406,9 +407,17 @@ export async function loginInteractive(input: {
   if (password.length === 0) throw new Error("A password is required.");
   const session = await signIn(apiUrl, email, password);
   await saveStoredSession(session);
+  const ai = await syncAccountAi(session);
   stdout.write(
     `\nSigned in as ${session.email}.\nSession stored at ${sessionFilePath()} (mode 0600).\n`
   );
+  if (ai.configured) {
+    stdout.write(
+      `Model from the account: ${ai.model}${ai.providerLabel ? ` (${ai.providerLabel})` : ""}.\n`
+    );
+  } else if (ai.reason && ai.reason !== "no model on this account") {
+    stdout.write(`Account model not synced: ${ai.reason}.\n`);
+  }
   return session;
 }
 
@@ -596,9 +605,17 @@ export async function loginDevice(input: {
         savedAt: new Date().toISOString(),
       };
       await saveStoredSession(session);
+      const ai = await syncAccountAi(session);
       input.print("");
       input.print(email ? `Signed in as ${email}.` : "Signed in.");
       input.print(`Session stored at ${sessionFilePath()} (mode 0600).`);
+      if (ai.configured) {
+        input.print(
+          `Model from the account: ${ai.model}${ai.providerLabel ? ` (${ai.providerLabel})` : ""}.`
+        );
+      } else if (ai.reason && ai.reason !== "no model on this account") {
+        input.print(`Account model not synced: ${ai.reason}.`);
+      }
       return session;
     }
 

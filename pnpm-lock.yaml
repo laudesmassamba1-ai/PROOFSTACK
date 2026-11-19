@@ -273,6 +273,12 @@ importers:
       '@proofcore/module-world':
         specifier: workspace:*
         version: link:../../packages/modules/world
+      '@xterm/addon-fit':
+        specifier: 0.10.0
+        version: 0.10.0(@xterm/xterm@5.5.0)
+      '@xterm/xterm':
+        specifier: 5.5.0
+        version: 5.5.0
       lucide-react:
         specifier: 1.73.0
         version: 1.73.0(@types/react@19.3.0)(react@19.3.1)
@@ -323,6 +329,12 @@ importers:
         specifier: workspace:*
         version: link:../../core
 
+  packages/adapters/browser:
+    dependencies:
+      '@proofcore/core':
+        specifier: workspace:*
+        version: link:../../core
+
   packages/adapters/payments:
     dependencies:
       '@proofcore/contracts':
@@ -358,6 +370,9 @@ importers:
       '@proofcore/adapter-ai':
         specifier: workspace:*
         version: link:../adapters/ai
+      '@proofcore/adapter-browser':
+        specifier: workspace:*
+        version: link:../adapters/browser
       '@proofcore/adapter-reporting':
         specifier: workspace:*
         version: link:../adapters/reporting
@@ -1839,6 +1854,14 @@ packages:
   '@xmldom/xmldom@0.9.12':
     resolution: {integrity: sha512-5AXjrcMClTryPe9LgZrygpB1lj7s0S9E0+W+AHaVKAVyHanafK86iPSvG5xHVSp/jC+VH1UXu0TAEmY279xH7A==}
     engines: {node: '>=14.6'}
+
+  '@xterm/addon-fit@0.10.0':
+    resolution: {integrity: sha512-UFYkDm4HUahf2lnEyHvio51TNGiLK66mqP2JoATy7hRZeXaGMRDr00JiSF7m63vR5WKATF605yEggJKsw0JpMQ==}
+    peerDependencies:
+      '@xterm/xterm': ^5.0.0
+
+  '@xterm/xterm@5.5.0':
+    resolution: {integrity: sha512-hqJHYaQb5OptNunnyAnkHyM8aCjZ1MEIDTQu1iIbbTD/xops91NB5yq1ZK/dC2JDbVWtF23zUtl9JE2NqwT87A==}
 
   abbrev@1.1.1:
     resolution: {integrity: sha512-nne9/IiQ/hzIhY6pdDnbBtz7DjPTKrY00P/zvPSm5pOFkl6xuGrGnXn/VtTNNfNtAfZ9/1RtehkszU9qcTii0Q==}
@@ -4625,6 +4648,12 @@ snapshots:
       tinyrainbow: 2.0.0
 
   '@xmldom/xmldom@0.9.12': {}
+
+  '@xterm/addon-fit@0.10.0(@xterm/xterm@5.5.0)':
+    dependencies:
+      '@xterm/xterm': 5.5.0
+
+  '@xterm/xterm@5.5.0': {}
 
   abbrev@1.1.1: {}
 

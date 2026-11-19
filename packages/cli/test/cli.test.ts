@@ -81,6 +81,38 @@ describe("CLI", () => {
     expect(second.stderr).toContain("already exists");
   });
 
+  it("runs FLOW locally instead of opening a browser", async () => {
+    const dir = await project();
+    await cli(["init", "--yes", "Flow test"], dir);
+    const result = await cli(["flow", "--no-report", "--json"], dir);
+    // A freshly initialized project has no target: skipped is not a pass.
+    expect(result.code).toBe(2);
+    const report = JSON.parse(result.stdout) as { moduleRuns: { module: string }[] };
+    expect(report.moduleRuns[0]?.module).toBe("flow");
+    expect(result.stderr).not.toContain("opened");
+  });
+
+  it("runs EXIT through the module command", async () => {
+    const dir = await project();
+    await cli(["init", "--yes", "Exit test"], dir);
+    const result = await cli(["module", "exit", "--no-report", "--json"], dir);
+    expect(result.code).toBe(2);
+    const report = JSON.parse(result.stdout) as { moduleRuns: { module: string }[] };
+    expect(report.moduleRuns[0]?.module).toBe("exit");
+  });
+
+  it("lists modules locally and says how to run them", async () => {
+    const dir = await project();
+    await cli(["init", "--yes", "Modules test"], dir);
+    const result = await cli(["modules"], dir);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("WORLD");
+    expect(result.stdout).toContain("FLOW");
+    expect(result.stdout).toContain("proofcore flow");
+    expect(result.stdout).toContain("In the hub: /world, /flow");
+    expect(result.stdout).not.toContain("Opened /app/modules");
+  });
+
   it("doctor exits 0 for a fresh project and names the unwired modules", async () => {
     const dir = await project();
     await cli(["init", "--yes", "Doctor test"], dir);

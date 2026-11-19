@@ -33,6 +33,8 @@ export function errorText(error: unknown, fr: boolean): string {
   const minutes = retryMinutes(candidate?.details);
 
   switch (code) {
+    case "invalid_credentials":
+      return "E-mail ou mot de passe incorrect.";
     case "invalid_password":
       return "Le mot de passe est incorrect.";
     case "password_unchanged":

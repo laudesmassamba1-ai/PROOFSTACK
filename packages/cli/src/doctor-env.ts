@@ -8,7 +8,7 @@
  *
  * Two families:
  *
- * - **machine**: platform, Node, disk, terminal, git, Docker, Playwright's browsers;
+ * - **machine**: platform, Node, disk, terminal, git, Docker, an installed Chromium;
  * - **permissions**: whether this user can write the config directory, whether the session
  *   file is private, whether the executable's folder is writable (which decides if the
  *   self-update can work at all).
@@ -18,6 +18,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
+import { findChromium } from "@proofcore/adapter-browser";
 
 export type CheckStatus = "ok" | "warn" | "fail" | "skip";
 
@@ -49,15 +50,6 @@ export function configDirectory(): string {
   return join(homedir(), ".config", "proofcore");
 }
 
-/** Where Playwright keeps its browsers, which is not where people expect it. */
-export function playwrightCache(): string {
-  if (process.platform === "darwin") return join(homedir(), "Library", "Caches", "ms-playwright");
-  if (process.platform === "win32") {
-    return join(process.env.LOCALAPPDATA ?? join(homedir(), "AppData", "Local"), "ms-playwright");
-  }
-  return join(homedir(), ".cache", "ms-playwright");
-}
-
 export function fileMode(path: string): number | null {
   try {
     return statSync(path).mode & 0o777;
@@ -73,7 +65,8 @@ export interface MachineFacts {
   isGitRepo: boolean;
   gitVersion: string | null;
   dockerVersion: string | null;
-  playwrightInstalled: boolean;
+  browserPath: string | null;
+  browserSource: string | null;
   configDir: string;
   configWritable: boolean | null;
   sessionMode: number | null;
@@ -169,13 +162,17 @@ export function evaluate(facts: MachineFacts): Check[] {
   );
 
   checks.push(
-    facts.playwrightInstalled
-      ? { name: "browser", status: "ok", detail: "Playwright browsers installed" }
+    facts.browserPath
+      ? {
+          name: "browser",
+          status: "ok",
+          detail: `${facts.browserPath}${facts.browserSource ? ` (${facts.browserSource})` : ""}`,
+        }
       : {
           name: "browser",
           status: "skip",
-          detail: "Playwright browsers missing",
-          fix: "npx playwright install chromium  (needed by `proofcore devtools`)",
+          detail: "no Chromium found",
+          fix: "Install Chrome, Chromium, Edge or Brave, or set PROOFCORE_CHROMIUM=/path/to/chrome.",
         }
   );
 
@@ -217,6 +214,7 @@ export async function inspectMachine(options: { cwd: string }): Promise<MachineF
     configWritable = false;
   }
 
+  const lookup = findChromium();
   const executableDir = process.execPath ? join(process.execPath, "..") : options.cwd;
   let executableDirWritable: boolean | null = null;
   try {
@@ -245,7 +243,8 @@ export async function inspectMachine(options: { cwd: string }): Promise<MachineF
     isGitRepo: existsSync(join(options.cwd, ".git")),
     gitVersion: commandVersion("git", ["--version"]),
     dockerVersion: commandVersion("docker", ["--version"]),
-    playwrightInstalled: existsSync(playwrightCache()),
+    browserPath: lookup?.executable ?? null,
+    browserSource: lookup?.source ?? null,
     configDir,
     configWritable,
     sessionMode: fileMode(join(configDir, "session.json")),

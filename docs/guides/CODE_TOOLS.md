@@ -25,18 +25,43 @@ habituel, sans attendre une interface web.
 
 ## Ce qui est livré
 
-| Outil MCP                                                                      | Ce qu'il fait                                                                | Lecture seule |
-| ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- | ------------- |
-| `list_files`                                                                   | arborescence du projet, `node_modules`/`dist`/build exclus                   | oui           |
-| `read_file`                                                                    | lecture paginée **avec numéros de ligne**                                    | oui           |
-| `search_code`                                                                  | recherche littérale ou regex (vrai parcours de fichiers)                     | oui           |
-| `map_architecture`                                                             | graphe d'imports réel → diagramme Mermaid                                    | oui           |
-| `write_file`                                                                   | écrit un fichier — **renvoie un diff et n'écrit rien** sans `apply:true`     | non           |
-| `apply_patch`                                                                  | applique un diff unifié, refuse si le contexte ne correspond pas             | non           |
-| `run_command`                                                                  | exécute une commande allowlistée, sans shell, avec délai et sortie plafonnée | non           |
-| `git_status` / `git_diff` / `git_log`                                          | état, diff, historique                                                       | oui           |
-| `git_commit`                                                                   | branche + commit de fichiers **explicites** (`git add -A` refusé)            | non           |
-| `project_summary` / `doctor` / `validate_config` / `run_tests` / `last_report` | surface PROOFCORE existante                                                  | mixte         |
+| Outil MCP                                                                                                         | Ce qu'il fait                                                                | Lecture seule |
+| ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------- |
+| `list_files`                                                                                                      | arborescence du projet, `node_modules`/`dist`/build exclus                   | oui           |
+| `read_file`                                                                                                       | lecture paginée **avec numéros de ligne**                                    | oui           |
+| `search_code`                                                                                                     | recherche littérale ou regex (vrai parcours de fichiers)                     | oui           |
+| `map_architecture`                                                                                                | graphe d'imports réel → diagramme Mermaid                                    | oui           |
+| `write_file`                                                                                                      | écrit un fichier — **renvoie un diff et n'écrit rien** sans `apply:true`     | non           |
+| `apply_patch`                                                                                                     | applique un diff unifié, refuse si le contexte ne correspond pas             | non           |
+| `run_command`                                                                                                     | exécute une commande allowlistée, sans shell, avec délai et sortie plafonnée | non           |
+| `git_status` / `git_diff` / `git_log`                                                                             | état, diff, historique                                                       | oui           |
+| `git_commit`                                                                                                      | branche + commit de fichiers **explicites** (`git add -A` refusé)            | non           |
+| `git_branch` / `git_show` / `git_blame` / `git_stage` / `git_unstage`                                             | branches, objets, attribution, index                                         | mixte         |
+| `edit_file`                                                                                                       | remplacement exact de texte, une ou toutes les occurrences                   | non           |
+| `delete_path` / `move_path` / `copy_path` / `make_directory` / `path_info`                                        | opérations de fichiers, chemins confinés au workspace                        | non           |
+| `list_directory`                                                                                                  | un niveau, types et tailles                                                  | oui           |
+| `run_shell`                                                                                                       | shell complet, pour ce qu'une allowlist ne couvre pas                        | non           |
+| `http_request` / `web_fetch`                                                                                      | requête HTTP et extraction lisible d'une page                                | non / oui     |
+| `system_info`                                                                                                     | OS, architecture, CPU, mémoire, chemins                                      | oui           |
+| `browser_open` / `goto` / `snapshot` / `interact` / `eval` / `screenshot` / `pdf` / `cookies` / `pages` / `close` | navigateur réel sur Chromium, via CDP                                        | mixte         |
+| `project_summary` / `doctor` / `validate_config` / `run_tests` / `last_report`                                    | surface PROOFCORE existante                                                  | mixte         |
+
+## Navigateur intégré
+
+Le navigateur n'emprunte ni Playwright ni service de rendu : `@proofcore/adapter-browser`
+trouve un Chromium déjà installé (Chrome, Chromium, Edge, Brave sur Linux, macOS et
+Windows), le lance avec un profil temporaire, et parle le DevTools Protocol sur un
+WebSocket local. La même implémentation sert l'interface desktop (un `WebContentsView`
+Electron) et les outils de l'assistant.
+
+Un snapshot émet des références (`data-pc-ref`) vers les éléments visibles ; les actions
+`click`, `type`, `key`, `scroll`, `select` et `upload` produisent de vrais événements
+d'entrée sur ces références. Les références sont réémises à chaque snapshot, donc une page
+qui change ne laisse pas l'assistant agir sur un élément disparu.
+
+Limites assumées : un seul Chromium à la fois par processus, pas de gestion de profils
+multi-utilisateurs, et aucune émulation mobile avancée. `browser_screenshot` et
+`browser_pdf` renvoient un fichier dans le workspace, pas une image dans le contexte.
 
 En ligne de commande, le graphe est aussi disponible seul :
 

@@ -24,6 +24,7 @@ export function Footer() {
             { to: "/fail", label: "FAIL" },
             { to: "/clean", label: "CLEAN" },
             { to: "/pricing", label: t("nav.pricing") },
+            { to: "/download", label: t("nav.download") },
           ]}
         />
         <FooterColumn
