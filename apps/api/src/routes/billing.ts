@@ -85,6 +85,19 @@ export function billingRoutes(services: Services): Hono<AppEnv> {
     }
 
     const capability = services.provider.getCapabilities();
+
+    // A production deployment without SasPay credentials falls back to the sandbox
+    // provider. Starting a real checkout there would produce a pending intent nobody can
+    // pay for, so it says so instead — and the settle endpoint below refuses to adjudicate
+    // it (see `allowSandboxBilling`).
+    if (capability.provider === "sandbox" && !sandboxBillingAllowed(services)) {
+      throw new HttpError(
+        503,
+        "payment_provider_not_configured",
+        "Payments are not enabled on this deployment. An operator must set SASPAY_API_KEY and SASPAY_WEBHOOK_SECRET before checkout can be used."
+      );
+    }
+
     const currency = chooseCurrency(plan.key, body.period, body.currency, capability.currencies);
     if (!currency) {
       throw new HttpError(
@@ -180,7 +193,10 @@ export function billingRoutes(services: Services): Hono<AppEnv> {
    * provider; a production SasPay deployment answers 404 here.
    */
   app.post("/checkout/:intentId/sandbox/settle", async (c) => {
-    if (!isSandbox(services.provider)) {
+    // Two conditions, both required: the provider must be the sandbox, and the deployment
+    // must allow settling it. Production is refused unless ALLOW_SANDBOX_BILLING=true —
+    // otherwise a missing SASPAY_API_KEY is a free upgrade path for any workspace owner.
+    if (!isSandbox(services.provider) || !sandboxBillingAllowed(services)) {
       throw new HttpError(
         404,
         "not_found",
@@ -438,6 +454,11 @@ export function planRoutes(services: Services): Hono<AppEnv> {
     });
   });
   return app;
+}
+
+/** Local/test deployments settle the sandbox freely; production needs an explicit opt-in. */
+function sandboxBillingAllowed(services: Services): boolean {
+  return services.config.environment !== "production" || services.config.allowSandboxBilling;
 }
 
 function chooseCurrency(

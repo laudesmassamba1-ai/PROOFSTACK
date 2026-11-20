@@ -142,7 +142,7 @@ ${project.enabledModules
   )
   .join("\n")}
   },
-  sync: { enabled: true, apiUrl: ${JSON.stringify(API_BASE)} },
+  sync: { enabled: true, apiUrl: ${JSON.stringify(API_BASE || window.location.origin)} },
 };
 
 export default config;`;

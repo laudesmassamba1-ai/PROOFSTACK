@@ -23,7 +23,7 @@ const MODULES = ["world", "flow", "exit"] as const;
 
 export function Projects() {
   const { workspaceId } = useSession();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [error, setError] = useState<ApiError | Error | null>(null);
   const [creating, setCreating] = useState(false);
@@ -83,7 +83,18 @@ export function Projects() {
   };
 
   if (!workspaceId) {
-    return <Empty title={t("ws.noWorkspace.title")} body={t("ws.noWorkspace.body")} />;
+    // A dead end is worse than a limit: the message must lead somewhere the person can act.
+    return (
+      <Empty
+        title={t("ws.noWorkspace.title")}
+        body={t("ws.noWorkspace.body")}
+        action={
+          <Link to="/app/workspace" className="app-btn app-btn-primary">
+            {locale === "fr" ? "Créer un espace de travail" : "Create a workspace"}
+          </Link>
+        }
+      />
+    );
   }
   if (error) return <ErrorState error={error} onRetry={() => void load()} />;
 

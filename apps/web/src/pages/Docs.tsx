@@ -63,13 +63,19 @@ export function Docs() {
   return (
     <>
       <Section>
-        <SectionHeading eyebrow={t("nav.docs")} title={t("docs.title")} lede={t("docs.lede")} />
-        <div className="brand-panel mt-8 flex flex-wrap items-center gap-3 p-4">
+        <SectionHeading
+          level={1}
+          index="01 — SHIPPED"
+          eyebrow={t("nav.docs")}
+          title={t("docs.title")}
+          lede={t("docs.lede")}
+        />
+        <div className="brand-panel mt-8 flex flex-wrap items-center gap-3 p-4" data-spot>
           <Terminal size={15} className="text-brand-mint" />
           <code className="text-[0.8rem] text-white/74">
             pnpm install && pnpm build && pnpm test
           </code>
-          <span className="ml-auto text-[0.76rem] text-white/38">Node 22 LTS · pnpm 12</span>
+          <span className="ml-auto text-[0.76rem] text-white/55">Node 22 LTS · pnpm 12</span>
         </div>
       </Section>
 

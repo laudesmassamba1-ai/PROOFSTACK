@@ -7,6 +7,8 @@ export function Pricing() {
   return (
     <Section>
       <SectionHeading
+        level={1}
+        index="01 — PLANS"
         eyebrow={t("pricing.eyebrow")}
         title={t("pricing.title")}
         lede={t("pricing.lede")}

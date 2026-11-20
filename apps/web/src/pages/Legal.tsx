@@ -33,8 +33,8 @@ function Shell({
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-14 text-white/72">
       <p className="text-[11px] uppercase tracking-[0.18em] text-white/40">PROOFCORE</p>
-      <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">{title}</h1>
-      <p className="mt-1 text-xs text-white/40">Dernière mise à jour : {updated}</p>
+      <h1 className="cine-section-title mt-3 text-white">{title}</h1>
+      <p className="cine-mono mt-2">Dernière mise à jour : {updated}</p>
       <div className="mt-6 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-xs leading-relaxed text-amber-800 dark:text-amber-300">
         <strong>À compléter avant publication commerciale.</strong> Les éléments suivants dépendent
         de l'entité qui exploite le service et ne peuvent pas être inventés :

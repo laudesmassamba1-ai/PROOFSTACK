@@ -69,7 +69,8 @@ export function RunsTrend({
                 width={barW * 0.7}
                 height={passedH}
                 rx={2}
-                className="fill-success/70"
+                className="insight-bar fill-success/70"
+                style={{ "--bar-delay": `${index * 30}ms` } as React.CSSProperties}
               />
             )}
             {failedH > 0 && (
@@ -79,7 +80,8 @@ export function RunsTrend({
                 width={barW * 0.7}
                 height={failedH}
                 rx={2}
-                className="fill-danger/80"
+                className="insight-bar fill-danger/80"
+                style={{ "--bar-delay": `${index * 30 + 90}ms` } as React.CSSProperties}
               />
             )}
             {(index % Math.ceil(runs.length / 7) === 0 || runs.length <= 7) && (
@@ -149,11 +151,14 @@ export function SeverityBreakdown({
           </span>
           <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-surface-2">
             <div
-              className="h-full rounded-full transition-all"
-              style={{
-                width: `${Math.max(entry.count > 0 ? 4 : 0, (entry.count / max) * 100)}%`,
-                backgroundColor: SEVERITY_COLORS[entry.severity] ?? "#94a3b8",
-              }}
+              className="insight-meter h-full rounded-full"
+              style={
+                {
+                  width: `${Math.max(entry.count > 0 ? 4 : 0, (entry.count / max) * 100)}%`,
+                  backgroundColor: SEVERITY_COLORS[entry.severity] ?? "#94a3b8",
+                  "--bar-delay": `${normalized.indexOf(entry) * 70}ms`,
+                } as React.CSSProperties
+              }
             />
           </div>
           <span className="w-8 text-right text-xs font-semibold tabular-nums">{entry.count}</span>
@@ -187,7 +192,7 @@ export function ModulePassRates({
             <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-surface-2">
               {rate !== null && (
                 <div
-                  className={`h-full rounded-full ${rate >= 90 ? "bg-success" : rate >= 60 ? "bg-warning" : "bg-danger"}`}
+                  className={`insight-meter h-full rounded-full ${rate >= 90 ? "bg-success" : rate >= 60 ? "bg-warning" : "bg-danger"}`}
                   style={{ width: `${rate}%` }}
                 />
               )}

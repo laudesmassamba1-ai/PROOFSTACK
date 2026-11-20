@@ -33,17 +33,20 @@ export function Product() {
     <>
       <Section>
         <SectionHeading
+          level={1}
+          index="01 — THE SUITE"
           eyebrow={t("modules.eyebrow")}
           title="An integrated suite, not five tools in a tab bar"
           lede="PROOFCORE validates five independent properties of a product — reach, reliability, reversibility, safety and cleanliness — with shared machinery underneath and a module you can adopt alone."
         />
         <div className="mt-10">
-          <ModuleShowcase />
+          <ModuleShowcase headingLevel={2} />
         </div>
       </Section>
 
       <Section>
         <SectionHeading
+          index="02 — THE ASSISTANT"
           eyebrow="The assistant"
           title="It works on the machine, not on a screenshot of it"
           lede="The assistant opens a real browser, reads the page it rendered, acts on it and keeps the session. A terminal runs the shell itself. The tools that change files show the change before they make it."
@@ -77,7 +80,11 @@ export function Product() {
       </Section>
 
       <Section tone="deeper">
-        <SectionHeading eyebrow="Shared by design" title="What the modules refuse to duplicate" />
+        <SectionHeading
+          index="03 — SHARED BY DESIGN"
+          eyebrow="Shared by design"
+          title="What the modules refuse to duplicate"
+        />
         <div className="mt-9 grid gap-5 md:grid-cols-2">
           {SHARED.map(({ icon: Icon, title, body }) => (
             <article key={title} className="brand-panel p-6">

@@ -257,7 +257,7 @@ export function Billing() {
             ? "Choisissez un espace dans l'en-tête, ou créez-en un. Rien n'est chargé avant ce choix."
             : "Pick a workspace in the header, or create one. Nothing is loaded until a workspace is chosen."
         }
-        tester="empty"
+        tester={false}
       />
     );
   }

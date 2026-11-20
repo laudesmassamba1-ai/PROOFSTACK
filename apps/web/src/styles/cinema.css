@@ -1,0 +1,2032 @@
+/* biome-ignore-all lint/style/noDescendingSpecificity: the motion block is ordered hidden → revealed on purpose, and the shared glyph rules follow their specific overrides; both are documented in place. */
+/* ============================================================================
+   CINEMA LAYER — the art direction pass for the brand site.
+   Loaded after global.css so it owns the marketing surfaces; the workspace keeps
+   the paper Ink & Object vocabulary. New class names only (cine-*, orbit-*,
+   bento-*), plus deliberate re-skins of the shared primitives (.eyebrow, .btn,
+   .brand-panel, .section-deeper) so every marketing page benefits at once.
+
+   Direction, decoded from the references:
+   - a deep blue-black field with one luminous subject and concentric rings;
+   - oversized editorial type, sentence case, one gradient word;
+   - thin vertical index rail, tiny mono captions in the corners;
+   - bento cards of unequal size, generous radius, hairline borders;
+   - acid accent used as a punctuation mark, never as a surface.
+   ============================================================================ */
+
+:root {
+  /* Field */
+  --cine-0: #04070a;
+  --cine-1: #070c11;
+  --cine-2: #0b121a;
+  --cine-3: #101a23;
+  --cine-line: rgba(255, 255, 255, 0.09);
+  --cine-line-2: rgba(255, 255, 255, 0.16);
+
+  /* Ink on the field — checked against #04070a */
+  --cine-text: #f4f7f6;
+  --cine-text-2: #aeb8bd; /* ~8.4:1 */
+  --cine-text-3: #8d979e; /* ~5.9:1 — the floor for small print */
+  --cine-text-4: #6d777e; /* decorative only, never body copy */
+
+  /* Brand spectrum */
+  --cine-mint: #78e3cb;
+  --cine-emerald: #73d68b;
+  --cine-cyan: #70c9db;
+  --cine-violet: #8b7bf7;
+  --cine-pink: #e967a6;
+  --cine-acid: #c9f96a;
+
+  --cine-spectrum: linear-gradient(96deg, #78e3cb 0%, #70c9db 38%, #8b7bf7 74%, #e967a6 100%);
+  --cine-spectrum-soft: linear-gradient(
+    135deg,
+    rgba(120, 227, 203, 0.18),
+    rgba(139, 123, 247, 0.14) 55%,
+    rgba(233, 103, 166, 0.1)
+  );
+
+  /* Physics */
+  --cine-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --cine-ease-in-out: cubic-bezier(0.76, 0, 0.24, 1);
+  --cine-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --cine-radius: 22px;
+  --cine-radius-sm: 14px;
+  --cine-gutter: clamp(1.25rem, 4vw, 2.5rem);
+  --cine-measure: 1280px;
+}
+
+/* A route arrives as one gesture: the page fades up under the header. */
+.brand-shell > main {
+  animation: cine-page-in 560ms var(--cine-ease-out) both;
+}
+
+@keyframes cine-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------------------------------------------------------------- field ---- */
+
+.brand-shell {
+  position: relative;
+  background: var(--cine-0);
+  color: var(--cine-text);
+  isolation: isolate;
+}
+
+/* One aurora for the whole site, fixed: sections glide over it instead of each
+   painting its own gradient (which is what made the old pages feel stitched). */
+.brand-shell::before {
+  content: "";
+  position: fixed;
+  inset: -20vh -10vw;
+  z-index: -1;
+  background:
+    radial-gradient(46% 38% at 78% 8%, rgba(120, 227, 203, 0.1), transparent 62%),
+    radial-gradient(42% 34% at 12% 22%, rgba(49, 95, 200, 0.12), transparent 66%),
+    radial-gradient(38% 32% at 88% 74%, rgba(139, 123, 247, 0.09), transparent 70%),
+    linear-gradient(180deg, #04070a 0%, #05090d 48%, #04070a 100%);
+  pointer-events: none;
+}
+
+/* Film grain: 2% opacity, no image request. Gives the flat gradients a surface. */
+.brand-shell::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.028;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ------------------------------------------------------------- typography ---- */
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--cine-mint);
+}
+
+/* The acid diamond from the fourth reference: a punctuation mark, not a bullet. */
+.eyebrow::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  background: var(--cine-acid);
+  transform: rotate(45deg);
+  box-shadow: 0 0 12px rgba(201, 249, 106, 0.55);
+}
+
+.cine-display {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 0.98;
+  text-wrap: balance;
+}
+
+.cine-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.95rem, 3.4vw, 3.05rem);
+  font-weight: 580;
+  line-height: 1.04;
+  letter-spacing: -0.038em;
+  text-wrap: balance;
+  color: var(--cine-text);
+}
+
+.cine-lede {
+  max-width: 62ch;
+  font-size: clamp(0.97rem, 1.1vw, 1.06rem);
+  line-height: 1.65;
+  color: var(--cine-text-2);
+  text-wrap: pretty;
+}
+
+.cine-mono {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cine-text-3);
+}
+
+/* A word painted by the spectrum, with the gradient drifting slowly. */
+.cine-spectrum-text {
+  background: var(--cine-spectrum);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: cine-spectrum-drift 11s var(--cine-ease-in-out) infinite alternate;
+}
+
+@keyframes cine-spectrum-drift {
+  from {
+    background-position: 0% 50%;
+  }
+  to {
+    background-position: 100% 50%;
+  }
+}
+
+/* ---------------------------------------------------------------- buttons ---- */
+
+.btn {
+  position: relative;
+  overflow: hidden;
+  border-radius: 999px;
+  padding: 0.78rem 1.3rem;
+  font-size: 0.9rem;
+  font-weight: 540;
+  letter-spacing: -0.005em;
+  isolation: isolate;
+  transition:
+    transform 420ms var(--cine-ease-out),
+    box-shadow 420ms var(--cine-ease-out),
+    background 260ms linear,
+    border-color 260ms linear,
+    color 200ms linear;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+}
+
+.btn:active {
+  transform: translateY(0) scale(0.985);
+  transition-duration: 90ms;
+}
+
+/* The sweep lives in the background itself: a wide gradient that slides on hover.
+   A pseudo-element would have painted behind the button's own background (invisible)
+   or above its label (unreadable), so the surface is the animation. */
+.btn-primary {
+  background: linear-gradient(105deg, #b9efce 0%, #f6fffa 44%, #c9f6d9 62%, #a7ecc1 100%);
+  background-size: 260% 100%;
+  background-position: 0% 0;
+  color: #04211a;
+  border-color: rgba(255, 255, 255, 0.5);
+  transition:
+    transform 420ms var(--cine-ease-out),
+    box-shadow 420ms var(--cine-ease-out),
+    background-position 900ms var(--cine-ease-out),
+    border-color 260ms linear;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 14px 34px -16px rgba(115, 214, 139, 0.72);
+}
+
+.btn-primary:hover {
+  background-position: 100% 0;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.8) inset,
+    0 18px 40px -16px rgba(115, 214, 139, 0.9);
+}
+
+.btn-ghost {
+  border-color: var(--cine-line-2);
+  color: var(--cine-text);
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(6px);
+}
+
+.btn-ghost:hover {
+  border-color: rgba(120, 227, 203, 0.55);
+  background: rgba(120, 227, 203, 0.07);
+  box-shadow: 0 12px 30px -22px rgba(120, 227, 203, 0.8);
+}
+
+/* Magnetic controls: the engine writes --magnet-x/y, the transform composes
+   with the hover lift already declared above. */
+/* `translate` (not `transform`) so the magnetic offset composes with the hover
+   lift and the press scale instead of replacing them. */
+[data-magnet] {
+  translate: var(--magnet-x, 0px) var(--magnet-y, 0px);
+}
+
+/* ---------------------------------------------------------------- header ---- */
+
+.brand-shell > header {
+  transition:
+    background 360ms linear,
+    border-color 360ms linear,
+    box-shadow 360ms linear;
+}
+
+.brand-shell > header a.rounded-full,
+.brand-shell > header button.rounded-full {
+  font-size: 0.83rem;
+}
+
+.nav-flyout {
+  border-radius: 20px;
+  border-color: var(--cine-line-2);
+  background: rgba(6, 10, 14, 0.94);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 14px 18px -14px rgba(0, 0, 0, 0.9);
+  animation: cine-flyout 340ms var(--cine-ease-out) both;
+}
+
+@keyframes cine-flyout {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.nav-flyout-item {
+  border-radius: 12px;
+  transition:
+    background 220ms linear,
+    transform 420ms var(--cine-ease-out);
+}
+
+.nav-flyout-item:hover {
+  transform: translateX(3px);
+}
+
+/* The bento motif draws itself: each ring has pathLength="1", so one dash
+   covers it and the stroke grows from nothing when the card is first painted. */
+.bento-motif ellipse,
+.bento-motif circle {
+  /* In user units: comfortably longer than any ring's perimeter, so the stroke is
+     fully hidden at the start and fully drawn at the end. */
+  stroke-dasharray: 900;
+  stroke-dashoffset: 900;
+  animation: cine-draw 1600ms var(--cine-ease-in-out) 200ms forwards;
+}
+
+.bento-motif circle:nth-of-type(n + 3) {
+  animation-delay: 900ms;
+}
+
+@keyframes cine-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.bento-card:hover .bento-motif ellipse {
+  animation: none;
+  stroke-dashoffset: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bento-motif ellipse,
+  .bento-motif circle {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ------------------------------------------------------------------ rail ---- */
+
+/* Vertical section index, bottom-left, like the reference's numbered column.
+   Decorative on the surface, real links underneath: it is keyboard reachable. */
+.cine-rail {
+  position: fixed;
+  left: max(14px, calc((100vw - var(--cine-measure)) / 2 - 46px));
+  top: 50%;
+  z-index: 40;
+  display: none;
+  transform: translateY(-50%);
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.cine-rail-year {
+  writing-mode: vertical-rl;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.34em;
+  color: var(--cine-text-4);
+}
+
+.cine-rail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cine-rail-link {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  color: var(--cine-text-4);
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.04em;
+  border: 1px solid transparent;
+  transition:
+    color 240ms linear,
+    border-color 240ms linear,
+    background 240ms linear;
+}
+
+.cine-rail-link:hover,
+.cine-rail-link:focus-visible {
+  color: var(--cine-text);
+  border-color: var(--cine-line-2);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.cine-rail-link[aria-current="true"] {
+  color: #04211a;
+  background: var(--cine-mint);
+  border-color: var(--cine-mint);
+}
+
+@media (min-width: 1440px) {
+  .cine-rail {
+    display: flex;
+  }
+}
+
+/* ------------------------------------------------------------------ hero ---- */
+
+.cine-hero {
+  position: relative;
+  padding-top: clamp(1.5rem, 4vw, 3rem);
+  padding-bottom: clamp(2.5rem, 6vw, 5rem);
+  overflow: clip;
+}
+
+.cine-hero-grid {
+  display: grid;
+  gap: clamp(2rem, 5vw, 3.5rem);
+  align-items: center;
+}
+
+@media (min-width: 1024px) {
+  .cine-hero-grid {
+    grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+    gap: clamp(1rem, 3vw, 3rem);
+  }
+}
+
+.cine-hero-copy {
+  position: relative;
+  z-index: 3;
+  min-width: 0;
+}
+
+.cine-hero-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.cine-hero-index {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.2em;
+  color: var(--cine-text-4);
+}
+
+.cine-hero-title {
+  margin-top: 1.1rem;
+  font-family: var(--font-display);
+  font-size: clamp(2.4rem, 5.4vw, 4.55rem);
+  font-weight: 600;
+  line-height: 0.96;
+  letter-spacing: -0.05em;
+  text-wrap: balance;
+  color: #ffffff;
+}
+
+.cine-hero-lede {
+  margin-top: 1.35rem;
+  max-width: 52ch;
+  font-size: clamp(0.98rem, 1.15vw, 1.08rem);
+  line-height: 1.62;
+  color: var(--cine-text-2);
+  text-wrap: pretty;
+}
+
+.cine-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 1.85rem;
+}
+
+.cine-hero-quiet-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.4rem;
+  font-size: 0.84rem;
+  color: var(--cine-text-3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  transition:
+    color 200ms linear,
+    border-color 200ms linear;
+}
+
+.cine-hero-quiet-link:hover {
+  color: var(--cine-text);
+  border-color: var(--cine-mint);
+}
+
+.cine-command {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1.6rem;
+  padding: 0.6rem 0.5rem 0.6rem 0.8rem;
+  max-width: 100%;
+  border: 1px solid var(--cine-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--cine-text-2);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  transition: border-color 240ms linear;
+}
+
+.cine-command:hover {
+  border-color: rgba(120, 227, 203, 0.4);
+}
+
+.cine-command code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cine-command-copy {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  border: 1px solid var(--cine-line);
+  color: var(--cine-text-3);
+  transition:
+    color 180ms linear,
+    border-color 180ms linear,
+    background 180ms linear;
+}
+
+.cine-command-copy:hover {
+  color: #04211a;
+  background: var(--cine-mint);
+  border-color: var(--cine-mint);
+}
+
+.cine-hero-note {
+  margin-top: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.63rem;
+  letter-spacing: 0.04em;
+  color: var(--cine-text-4);
+}
+
+/* Module chips under the hero: a table of contents, not a second nav. */
+.cine-hero-modules {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: clamp(2rem, 4vw, 3rem);
+  border-top: 1px solid var(--cine-line);
+  padding-top: 1px;
+}
+
+@media (min-width: 720px) {
+  .cine-hero-modules {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+.cine-hero-module {
+  --module-accent: var(--cine-mint);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 12px;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.16em;
+  color: var(--cine-text-2);
+  transition:
+    background 220ms linear,
+    color 220ms linear;
+}
+
+.cine-hero-module:hover {
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--cine-text);
+}
+
+.cine-hero-module-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--module-accent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--module-accent) 70%, transparent);
+}
+
+.cine-hero-module svg {
+  color: var(--module-accent);
+}
+
+.cine-hero-module-arrow {
+  color: var(--cine-text-4);
+  transition: transform 320ms var(--cine-ease-out);
+}
+
+.cine-hero-module:hover .cine-hero-module-arrow {
+  transform: translate(2px, -2px);
+  color: var(--cine-text);
+}
+
+/* ----------------------------------------------------------- orbit stage ---- */
+
+.orbit-stage {
+  position: relative;
+  width: 100%;
+  max-width: 620px;
+  margin-inline: auto;
+  aspect-ratio: 1 / 1;
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+}
+
+.orbit-stage::before {
+  /* The floor glow: what makes the subject sit inside a space. */
+  content: "";
+  position: absolute;
+  inset: 12% 4% 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    50% 42% at 50% 62%,
+    rgba(120, 227, 203, 0.14),
+    rgba(49, 95, 200, 0.1) 48%,
+    transparent 72%
+  );
+  filter: blur(14px);
+  z-index: -1;
+}
+
+.orbit-rings {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  color: rgba(255, 255, 255, 0.26);
+}
+
+.orbit-ring {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.orbit-ring--bright {
+  stroke: rgba(120, 227, 203, 0.55);
+  stroke-dasharray: 2 9;
+  stroke-linecap: round;
+}
+
+.orbit-ring-group {
+  transform-origin: 300px 300px;
+  animation: orbit-spin 64s linear infinite;
+}
+
+.orbit-ring-group--reverse {
+  animation-direction: reverse;
+  animation-duration: 92s;
+}
+
+@keyframes orbit-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.orbit-mark {
+  position: relative;
+  z-index: 2;
+  width: 46%;
+  height: 46%;
+  filter: drop-shadow(0 40px 80px rgba(0, 0, 0, 0.6))
+    drop-shadow(0 0 60px rgba(120, 227, 203, 0.16));
+  animation: orbit-bob 9s ease-in-out infinite;
+}
+
+@keyframes orbit-bob {
+  0%,
+  100% {
+    transform: translateY(-6px);
+  }
+  50% {
+    transform: translateY(8px);
+  }
+}
+
+.orbit-mark-shape {
+  animation: orbit-hue 14s linear infinite alternate;
+}
+
+@keyframes orbit-hue {
+  from {
+    filter: hue-rotate(0deg) saturate(1.05);
+  }
+  to {
+    filter: hue-rotate(28deg) saturate(1.18);
+  }
+}
+
+.orbit-chip {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.42rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--cine-line-2);
+  background: rgba(7, 12, 17, 0.82);
+  backdrop-filter: blur(10px);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  color: var(--cine-text-2);
+  box-shadow: 0 8px 18px -12px rgba(0, 0, 0, 0.9);
+  animation: orbit-float 7s ease-in-out infinite;
+}
+
+.orbit-chip svg {
+  color: var(--cine-mint);
+}
+
+.orbit-chip--pass {
+  top: 12%;
+  left: 2%;
+}
+
+.orbit-chip--score {
+  right: 0%;
+  bottom: 20%;
+  animation-delay: -3.2s;
+}
+
+.orbit-chip--run {
+  left: 8%;
+  bottom: 8%;
+  animation-delay: -5.1s;
+}
+
+@keyframes orbit-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-9px);
+  }
+}
+
+@media (max-width: 1023px) {
+  .orbit-stage {
+    max-width: 440px;
+    margin-top: 0.5rem;
+  }
+
+  .orbit-chip--pass {
+    top: 6%;
+    left: 0;
+  }
+
+  .orbit-chip--score {
+    right: -2%;
+    bottom: 14%;
+  }
+
+  .orbit-chip--run {
+    display: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .orbit-chip {
+    font-size: 0.54rem;
+    padding: 0.34rem 0.55rem;
+  }
+}
+
+/* --------------------------------------------------------------- marquee ---- */
+
+.cine-marquee {
+  position: relative;
+  overflow: hidden;
+  border-top: 1px solid var(--cine-line);
+  border-bottom: 1px solid var(--cine-line);
+  background: rgba(255, 255, 255, 0.012);
+  padding-block: 0.85rem;
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+
+.cine-marquee-track {
+  display: flex;
+  width: max-content;
+  gap: 0;
+  animation: cine-marquee 44s linear infinite;
+}
+
+.cine-marquee:hover .cine-marquee-track {
+  animation-play-state: paused;
+}
+
+.cine-marquee-set {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.cine-marquee-item {
+  display: inline-flex;
+  align-items: center;
+  gap: clamp(1.2rem, 3vw, 2.6rem);
+  padding-inline: clamp(1.2rem, 3vw, 2.6rem);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--cine-text-3);
+  white-space: nowrap;
+}
+
+.cine-marquee-item::after {
+  content: "";
+  width: 5px;
+  height: 5px;
+  background: var(--cine-acid);
+  transform: rotate(45deg);
+  opacity: 0.7;
+}
+
+@keyframes cine-marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+/* ----------------------------------------------------------------- bands ---- */
+
+.cine-section {
+  position: relative;
+  padding-block: clamp(2.75rem, 4.6vw, 4.75rem);
+}
+
+.cine-section-head {
+  display: grid;
+  gap: 1rem;
+}
+
+/* Two columns ONLY for a section's own header. Nested inside a body column (the AI
+   section, the engine section) it must stack: otherwise a two-column head is squeezed
+   into an already narrow column and the title breaks every two words. */
+@media (min-width: 1024px) {
+  .cine-section > .cine-section-head {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.86fr);
+    align-items: end;
+    gap: clamp(2rem, 5vw, 5rem);
+  }
+}
+
+.cine-section-index {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.24em;
+  color: var(--cine-text-4);
+}
+
+.cine-section-index::after {
+  content: "";
+  width: clamp(40px, 8vw, 96px);
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.24), transparent);
+}
+
+.cine-section-title {
+  margin-top: 0.85rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.85rem, 3.3vw, 2.95rem);
+  font-weight: 580;
+  line-height: 1.03;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+  color: var(--cine-text);
+}
+
+.cine-section-lede {
+  max-width: 56ch;
+  font-size: 0.98rem;
+  line-height: 1.68;
+  color: var(--cine-text-2);
+  text-wrap: pretty;
+}
+
+@media (min-width: 1024px) {
+  .cine-section-lede {
+    padding-bottom: 0.35rem;
+  }
+}
+
+.section-deeper {
+  border-top: 1px solid var(--cine-line);
+  border-bottom: 1px solid var(--cine-line);
+  background:
+    radial-gradient(60% 120% at 8% 0%, rgba(120, 227, 203, 0.05), transparent 60%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018), rgba(255, 255, 255, 0) 40%), #060a0e;
+}
+
+/* Bands float on the aurora instead of switching to a flat colour. */
+[data-tone="deeper"] {
+  position: relative;
+}
+
+[data-tone="deeper"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(70% 70% at 100% 20%, rgba(139, 123, 247, 0.05), transparent 65%);
+  pointer-events: none;
+}
+
+/* ----------------------------------------------------------------- cards ---- */
+
+.brand-panel {
+  position: relative;
+  border-radius: var(--cine-radius);
+  border: 1px solid var(--cine-line);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012)),
+    rgba(9, 14, 19, 0.72);
+  backdrop-filter: blur(6px);
+  transition:
+    border-color 360ms linear,
+    transform 560ms var(--cine-ease-out),
+    box-shadow 560ms var(--cine-ease-out);
+}
+
+.brand-panel:hover {
+  border-color: var(--cine-line-2);
+}
+
+/* Every panel gets a pointer-tracked sheen when the engine is on. */
+[data-spot] {
+  position: relative;
+}
+
+[data-spot]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    320px circle at var(--spot-x, 50%) var(--spot-y, 0%),
+    rgba(120, 227, 203, 0.13),
+    transparent 62%
+  );
+  transition: opacity 420ms linear;
+}
+
+[data-spot]:hover::after,
+[data-spot]:focus-visible::after {
+  opacity: 1;
+}
+
+/* ----------------------------------------------------------------- bento ---- */
+
+.bento {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 720px) {
+  .bento {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .bento {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .bento-card:nth-child(1) {
+    grid-column: span 4;
+  }
+
+  .bento-card:nth-child(2) {
+    grid-column: span 2;
+  }
+
+  .bento-card:nth-child(3),
+  .bento-card:nth-child(4),
+  .bento-card:nth-child(5) {
+    grid-column: span 2;
+  }
+
+  .bento-engine {
+    grid-column: span 6;
+  }
+}
+
+.bento-card {
+  --module-accent: var(--cine-mint);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-height: 216px;
+  padding: clamp(1.15rem, 2vw, 1.6rem);
+  overflow: hidden;
+  border-radius: var(--cine-radius);
+  border: 1px solid var(--cine-line);
+  background:
+    radial-gradient(
+      120% 100% at 0% 0%,
+      color-mix(in srgb, var(--module-accent) 10%, transparent),
+      transparent 52%
+    ),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)), #080d12;
+  text-decoration: none;
+  isolation: isolate;
+  transition:
+    border-color 320ms linear,
+    transform 620ms var(--cine-ease-out),
+    box-shadow 620ms var(--cine-ease-out);
+}
+
+.bento-card:nth-child(1) {
+  min-height: 280px;
+}
+
+.bento-card:hover,
+.bento-card:focus-visible {
+  border-color: color-mix(in srgb, var(--module-accent) 46%, transparent);
+  transform: translateY(-4px);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.05) inset,
+    0 12px 18px -14px rgba(0, 0, 0, 0.95),
+    0 0 0 1px color-mix(in srgb, var(--module-accent) 16%, transparent);
+}
+
+.bento-card::before {
+  /* A hairline that draws itself down the left edge on hover. */
+  content: "";
+  position: absolute;
+  inset: 18% auto 18% 0;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, var(--module-accent), transparent);
+  opacity: 0;
+  transform: scaleY(0.3);
+  transition:
+    opacity 360ms linear,
+    transform 620ms var(--cine-ease-out);
+}
+
+.bento-card:hover::before,
+.bento-card:focus-visible::before {
+  opacity: 0.9;
+  transform: scaleY(1);
+}
+
+.bento-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.bento-icon {
+  display: inline-flex;
+  color: var(--module-accent);
+}
+
+.bento-id {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.22em;
+  color: var(--cine-text-3);
+}
+
+.bento-index {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--cine-text-4);
+}
+
+.bento-arrow {
+  color: var(--cine-text-4);
+  transition:
+    transform 420ms var(--cine-ease-out),
+    color 240ms linear;
+}
+
+.bento-card:hover .bento-arrow {
+  color: var(--module-accent);
+  transform: translate(3px, -3px);
+}
+
+.bento-title {
+  margin-top: 0.35rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.1rem, 1.5vw, 1.4rem);
+  font-weight: 580;
+  letter-spacing: -0.02em;
+  color: var(--cine-text);
+}
+
+.bento-tag {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--module-accent) 80%, white);
+}
+
+.bento-q {
+  max-width: 34ch;
+  font-size: 0.87rem;
+  line-height: 1.6;
+  color: var(--cine-text-2);
+}
+
+.bento-tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.28rem;
+  margin-top: auto;
+  padding-top: 0.7rem;
+  list-style: none;
+}
+
+.bento-tokens li {
+  padding: 0.14rem 0.4rem;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.035);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  color: var(--cine-text-3);
+}
+
+.bento-out {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.05em;
+  color: var(--cine-text-4);
+}
+
+.bento-out i {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--module-accent);
+}
+
+/* The large first card carries a small instrument drawing on the right. */
+.bento-motif {
+  position: absolute;
+  right: -6%;
+  top: 50%;
+  width: 46%;
+  max-width: 260px;
+  transform: translateY(-50%);
+  opacity: 0.5;
+  pointer-events: none;
+  transition:
+    opacity 520ms linear,
+    transform 720ms var(--cine-ease-out);
+}
+
+.bento-card:hover .bento-motif {
+  opacity: 0.85;
+  transform: translateY(-50%) scale(1.04);
+}
+
+@media (max-width: 719px) {
+  .bento-motif {
+    display: none;
+  }
+}
+
+.bento-engine {
+  display: grid;
+  gap: 0.9rem;
+  align-content: center;
+}
+
+@media (min-width: 768px) {
+  .bento-engine {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+}
+
+.bento-engine-title {
+  margin-top: 0.3rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.05rem, 1.5vw, 1.3rem);
+  font-weight: 580;
+  letter-spacing: -0.02em;
+}
+
+.bento-engine-body {
+  margin-top: 0.35rem;
+  max-width: 70ch;
+  font-size: 0.84rem;
+  line-height: 1.65;
+  color: var(--cine-text-2);
+}
+
+.bento-states {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.08em;
+}
+
+.bento-state {
+  padding: 0.2rem 0.45rem;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--cine-text-4);
+}
+
+.bento-state--pass {
+  color: var(--cine-emerald);
+  border-color: color-mix(in srgb, var(--cine-emerald) 34%, transparent);
+}
+
+.bento-state--fail {
+  color: #fb7185;
+  border-color: rgba(251, 113, 133, 0.35);
+}
+
+.bento-state--warn {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+/* ----------------------------------------------------------------- steps ---- */
+
+.cine-steps {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 768px) {
+  .cine-steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.cine-step {
+  position: relative;
+  padding: clamp(1.15rem, 2vw, 1.5rem);
+  padding-top: clamp(2.4rem, 4vw, 3.2rem);
+  border-radius: var(--cine-radius);
+  border: 1px solid var(--cine-line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.008));
+  overflow: hidden;
+  transition:
+    border-color 320ms linear,
+    background 320ms linear;
+}
+
+.cine-step:hover {
+  border-color: var(--cine-line-2);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.012));
+}
+
+.cine-step-num {
+  position: absolute;
+  top: 0.55rem;
+  left: 1rem;
+  font-family: var(--font-display);
+  font-size: clamp(2.4rem, 4vw, 3.4rem);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.05em;
+  color: transparent;
+  -webkit-text-stroke: 1px rgba(255, 255, 255, 0.16);
+  transition: -webkit-text-stroke-color 320ms linear;
+}
+
+.cine-step:hover .cine-step-num {
+  -webkit-text-stroke-color: rgba(120, 227, 203, 0.5);
+}
+
+.cine-step-kicker {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--cine-mint);
+}
+
+.cine-step-title {
+  margin-top: 0.5rem;
+  font-size: 1rem;
+  font-weight: 560;
+  color: var(--cine-text);
+}
+
+.cine-step-body {
+  margin-top: 0.45rem;
+  font-size: 0.86rem;
+  line-height: 1.62;
+  color: var(--cine-text-2);
+}
+
+/* ---------------------------------------------------------------- stats ---- */
+
+/* The strip already hangs under the marquee, so it carries one rule, not three. */
+.stat-strip {
+  border-top: 0;
+  border-bottom: 1px solid var(--cine-line);
+}
+
+.stat-strip-value {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  color: var(--cine-text);
+}
+
+.stat-strip-label {
+  color: var(--cine-text-3);
+}
+
+.stat-strip-note {
+  color: var(--cine-text-4);
+}
+
+/* --------------------------------------------------------------- AI panel ---- */
+
+.ai-sample {
+  border-radius: var(--cine-radius);
+  border-color: var(--cine-line);
+  background:
+    radial-gradient(70% 90% at 100% 0%, rgba(139, 123, 247, 0.09), transparent 60%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.008));
+  box-shadow: 0 12px 18px -14px rgba(0, 0, 0, 0.95);
+}
+
+.ai-sample-bar {
+  padding: 0.8rem 1rem;
+  border-bottom-color: var(--cine-line);
+}
+
+.ai-line-h {
+  font-size: 0.82rem;
+}
+
+.ai-line-p,
+.ai-line-i {
+  color: var(--cine-text-2);
+}
+
+.ai-sample-body {
+  gap: 0.8rem;
+  padding: 1.15rem 1.15rem 1.3rem;
+}
+
+.ai-sample-foot {
+  color: var(--cine-text-3);
+  border-top-color: var(--cine-line);
+}
+
+/* --------------------------------------------------------------- terminal ---- */
+
+.terminal-preview {
+  border-radius: var(--cine-radius);
+  border-color: var(--cine-line-2);
+  background: linear-gradient(180deg, #081016, #060b10);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 14px 20px -16px rgba(0, 0, 0, 0.95);
+}
+
+.terminal-preview-bar {
+  border-bottom-color: var(--cine-line);
+}
+
+/* ------------------------------------------------------------------- CTA ---- */
+
+.cine-cta {
+  position: relative;
+  overflow: hidden;
+  border-radius: clamp(22px, 3vw, 32px);
+  border: 1px solid var(--cine-line-2);
+  padding: clamp(2.4rem, 6vw, 5rem) clamp(1.4rem, 4vw, 3.5rem);
+  background:
+    radial-gradient(60% 90% at 50% 0%, rgba(120, 227, 203, 0.13), transparent 62%),
+    radial-gradient(50% 70% at 84% 100%, rgba(139, 123, 247, 0.14), transparent 66%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.01));
+  text-align: center;
+  isolation: isolate;
+}
+
+.cine-cta-rings {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  display: grid;
+  place-items: center;
+  opacity: 0.55;
+  color: rgba(255, 255, 255, 0.12);
+}
+
+.cine-cta-rings span {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+}
+
+.cine-cta-rings span:nth-child(1) {
+  width: 56%;
+  aspect-ratio: 1;
+}
+
+.cine-cta-rings span:nth-child(2) {
+  width: 78%;
+  aspect-ratio: 1;
+  opacity: 0.7;
+}
+
+.cine-cta-rings span:nth-child(3) {
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  border-radius: 50%;
+  opacity: 0.45;
+}
+
+.cine-cta-title {
+  margin: 1rem auto 0;
+  max-width: 22ch;
+  font-family: var(--font-display);
+  font-size: clamp(1.85rem, 4.4vw, 3.4rem);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+
+/* ----------------------------------------------------------------- footer ---- */
+
+.brand-shell > footer {
+  position: relative;
+  border-top: 1px solid var(--cine-line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.012), transparent 40%);
+}
+
+.brand-shell > footer h4 {
+  color: var(--cine-text-3);
+}
+
+.brand-shell > footer a {
+  color: var(--cine-text-2);
+}
+
+.brand-shell > footer a:hover {
+  color: var(--cine-text);
+}
+
+/* --------------------------------------------------------------- pricing ---- */
+
+.pk-plan {
+  transition:
+    border-color 320ms linear,
+    transform 620ms var(--cine-ease-out),
+    box-shadow 620ms var(--cine-ease-out);
+}
+
+.pk-plan:hover {
+  transform: translateY(-3px);
+  border-color: var(--cine-line-2);
+}
+
+.pk-plan-featured {
+  background:
+    radial-gradient(90% 70% at 50% 0%, rgba(120, 227, 203, 0.12), transparent 60%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.012));
+  box-shadow: 0 40px 90px -60px rgba(120, 227, 203, 0.5);
+}
+
+/* ------------------------------------------------------------ module page ---- */
+
+.cine-hero-mini {
+  position: relative;
+  padding-top: clamp(1rem, 2vw, 2rem);
+  overflow: clip;
+}
+
+.cine-module-title {
+  margin-top: 0.9rem;
+  font-family: var(--font-display);
+  font-size: clamp(2.05rem, 4.2vw, 3.6rem);
+  font-weight: 600;
+  line-height: 1.04;
+  letter-spacing: -0.048em;
+  text-wrap: balance;
+  max-width: 22ch;
+}
+
+.cine-check-grid {
+  display: grid;
+  gap: 12px;
+}
+
+@media (min-width: 768px) {
+  .cine-check-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.cine-check {
+  padding: 1.3rem 1.35rem;
+  border-radius: var(--cine-radius);
+  border: 1px solid var(--cine-line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.032), rgba(255, 255, 255, 0.008));
+  transition: border-color 320ms linear;
+}
+
+.cine-check:hover {
+  border-color: var(--cine-line-2);
+}
+
+.cine-check h3 {
+  font-size: 0.98rem;
+  font-weight: 580;
+  color: var(--cine-text);
+}
+
+.cine-check p {
+  margin-top: 0.5rem;
+  font-size: 0.87rem;
+  line-height: 1.62;
+  color: var(--cine-text-2);
+}
+
+/* ------------------------------------------------------------ motion prims ---- */
+
+/* Hidden states are only applied once the engine has run (html.cine-ready), so a
+   failed script never hides content.
+
+   Both sides of each pair carry the same specificity (`html.cine-ready` + attribute +
+   state) and the revealed rule comes last, so `.is-in` always wins. An earlier version
+   used a shorter `.is-in` selector and outranked itself: sections stayed at opacity 0. */
+html.cine-ready [data-anim] {
+  opacity: 0;
+}
+
+html.cine-ready [data-anim="chars"] .cine-char,
+html.cine-ready [data-anim="words"] .cine-word-inner {
+  transform: translateY(115%) rotate(4deg);
+}
+
+html.cine-ready [data-anim="mask"] {
+  clip-path: inset(0 0 100% 0);
+  transform: translateY(14px);
+}
+
+html.cine-ready [data-anim="fade"] {
+  transform: translateY(26px);
+  filter: blur(6px);
+}
+
+[data-anim] {
+  transition:
+    opacity 780ms var(--cine-ease-in-out),
+    transform 900ms var(--cine-ease-in-out),
+    filter 900ms var(--cine-ease-in-out),
+    clip-path 980ms var(--cine-ease-in-out);
+  transition-delay: var(--anim-delay, 0ms);
+}
+
+html.cine-ready [data-anim].is-in {
+  opacity: 1;
+  transform: none;
+  filter: none;
+  clip-path: inset(0 0 0 0);
+}
+
+html.cine-ready [data-anim="chars"].is-in .cine-char,
+html.cine-ready [data-anim="words"].is-in .cine-word-inner {
+  transform: translateY(0) rotate(0deg);
+  transition: transform 1000ms var(--cine-ease-out);
+  transition-delay: var(--char-delay, 0ms);
+}
+
+.cine-char,
+.cine-word-inner {
+  display: inline-block;
+  will-change: transform;
+}
+
+/* Masks must clip the moving glyphs, never the descenders' neighbours. */
+.cine-char-mask,
+.cine-word {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+  padding-bottom: 0.12em;
+  margin-bottom: -0.12em;
+}
+
+.cine-space {
+  display: inline-block;
+  width: 0.28em;
+}
+
+/* Scroll-scrubbed decorative layers (rings, glow, chips). */
+[data-scrub] {
+  transform: translate3d(0, var(--scrub-y, 0px), 0) scale(var(--scrub-scale, 1));
+}
+
+[data-scrub="orbit"] {
+  rotate: var(--scrub-rotate, 0deg);
+}
+
+/* Magnetic + tilt targets need a compositing hint. */
+[data-magnet],
+[data-tilt] {
+  will-change: transform;
+}
+
+[data-tilt] {
+  transform: perspective(900px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+  transition: transform 120ms linear;
+}
+
+/* ----------------------------------------------------------------- mobile ---- */
+
+@media (max-width: 767px) {
+  .cine-hero {
+    padding-top: 0.5rem;
+  }
+
+  .cine-hero-title {
+    font-size: clamp(2.3rem, 11.5vw, 3.2rem);
+  }
+
+  .cine-hero-lede {
+    font-size: 0.97rem;
+  }
+
+  .cine-hero-actions .btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .cine-section {
+    padding-block: 3rem;
+  }
+
+  .brand-panel {
+    border-radius: 18px;
+  }
+}
+
+/* ==========================================================================
+   WORKSPACE — the same physics, applied to the paper instrument.
+   The dashboard keeps its Ink & Object vocabulary (paper, ink, rules); this
+   layer only refines proportion, depth and touch: a squircle frame with a
+   lit top hairline, a display face for state headlines, volumetric surfaces
+   instead of flat cards, and spring hover/press on every control.
+   ========================================================================== */
+
+.app-shell {
+  padding: clamp(10px, 1.6vw, 20px);
+  background:
+    radial-gradient(
+      58% 46% at 100% 0%,
+      color-mix(in srgb, var(--mint) 12%, transparent),
+      transparent 62%
+    ),
+    radial-gradient(
+      48% 42% at 0% 100%,
+      color-mix(in srgb, var(--world) 6%, transparent),
+      transparent 64%
+    ),
+    var(--paper);
+}
+
+.app-frame {
+  position: relative;
+  border-radius: 26px;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  box-shadow:
+    0 1px 0 color-mix(in srgb, #ffffff 70%, transparent) inset,
+    0 10px 18px -14px color-mix(in srgb, var(--ink) 34%, transparent);
+}
+
+/* A lit hairline along the top edge: the frame reads as a glass plate, not a box. */
+.app-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0 12% auto;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--mint) 60%, transparent),
+    transparent
+  );
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.app-topbar {
+  padding: 12px 20px;
+  gap: 14px;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  backdrop-filter: blur(14px);
+}
+
+/* Display face for every state headline. On a utility screen this is the one
+   typographic gesture that carries hierarchy — the rest stays quiet. */
+.app-shell .app-display,
+.app-shell .app-page-title,
+.app-shell .app-section-title,
+.app-shell .app-situation-headline,
+.app-shell .app-module-title,
+.app-shell .app-service-title {
+  font-family: var(--font-display);
+  letter-spacing: -0.038em;
+  line-height: 0.99;
+  text-wrap: balance;
+}
+
+.app-shell .app-page-title {
+  font-size: clamp(2rem, 4.4vw, 3.2rem);
+}
+
+.app-shell .app-situation-headline {
+  font-size: clamp(1.9rem, 4.6vw, 3.5rem);
+  line-height: 1;
+}
+
+/* Mono labels get a diamond marker, the same punctuation as the site. */
+.app-shell .app-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 9.5px;
+  letter-spacing: 0.2em;
+  color: var(--ink-soft);
+}
+
+.app-shell .app-eyebrow::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  flex: 0 0 auto;
+  background: var(--accent);
+  transform: rotate(45deg);
+}
+
+/* Volumetric surfaces: a low-opacity gradient plus a tinted shadow, never a
+   flat rectangle with a default shadow. */
+.app-shell .app-card,
+.app-shell .app-object-card,
+.app-shell .app-project-row,
+.app-shell .app-module-figure {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--ink) 3.5%, transparent), transparent 42%),
+    var(--surface);
+  border: 1px solid var(--rule);
+  box-shadow: 0 1px 0 color-mix(in srgb, #ffffff 60%, transparent) inset;
+}
+
+.app-shell .app-card {
+  border-radius: 20px;
+}
+
+.app-shell .app-object-card {
+  border-radius: 20px;
+  transition:
+    transform 480ms var(--cine-ease-out),
+    border-color 240ms linear,
+    box-shadow 480ms var(--cine-ease-out);
+}
+
+.app-shell .app-object-card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--rule));
+  box-shadow:
+    0 1px 0 color-mix(in srgb, #ffffff 70%, transparent) inset,
+    0 10px 18px -14px color-mix(in srgb, var(--ink) 45%, transparent);
+}
+
+.app-shell .app-card h2,
+.app-shell .app-section-title {
+  letter-spacing: -0.025em;
+}
+
+/* Controls: distinct hover, press and focus — not an opacity change. */
+.app-shell .app-btn {
+  border-radius: 999px;
+  transition:
+    transform 320ms var(--cine-ease-out),
+    background 200ms linear,
+    border-color 200ms linear,
+    box-shadow 320ms var(--cine-ease-out);
+}
+
+.app-shell .app-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--ink) 28%, var(--rule));
+}
+
+.app-shell .app-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.985);
+  transition-duration: 90ms;
+}
+
+.app-shell .app-btn-primary:hover:not(:disabled) {
+  box-shadow: 0 10px 22px -14px color-mix(in srgb, var(--ink) 70%, transparent);
+}
+
+.app-shell .app-meter > span,
+.app-shell .app-quota-fill {
+  transition: width 900ms var(--cine-ease-out);
+}
+
+/* Chart bars grow from the baseline, once, with a per-bar delay. */
+.insight-bar {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: insight-bar-in 820ms var(--cine-ease-out) both;
+  animation-delay: var(--bar-delay, 0ms);
+}
+
+@keyframes insight-bar-in {
+  from {
+    transform: scaleY(0.02);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+.insight-meter {
+  transform-origin: left center;
+  animation: insight-meter-in 760ms var(--cine-ease-out) both;
+  animation-delay: var(--bar-delay, 0ms);
+}
+
+@keyframes insight-meter-in {
+  from {
+    transform: scaleX(0.02);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Tables: tabular figures, a hover rail, a sticky header. */
+.app-shell .app-table {
+  font-variant-numeric: tabular-nums;
+}
+
+.app-shell .app-table tbody tr {
+  transition: background 160ms linear;
+}
+
+.app-shell .app-table tbody tr:hover {
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
+}
+
+/* The side rail of the mobile sheet keeps the numbered editorial rhythm. */
+.app-shell .app-mobile-link {
+  border-radius: 12px;
+  transition:
+    background 180ms linear,
+    transform 320ms var(--cine-ease-out);
+}
+
+.app-shell .app-mobile-link:active {
+  transform: scale(0.99);
+}
+
+/* Touch targets: 44px is the floor, not a preference. Footer links, the hero's
+   module chips and the quiet link all get a taller hit area on phones without
+   changing their visual size. */
+@media (max-width: 767px) {
+  /* The orbit becomes a poster behind the copy instead of a 390px block under the
+     CTA: the hero keeps its visual and its first screen stays one screen. */
+  .cine-hero-grid {
+    position: relative;
+  }
+
+  .cine-hero-grid > div:last-child {
+    position: absolute;
+    right: -36%;
+    bottom: -30%;
+    z-index: 0;
+    width: 68%;
+    opacity: 0.26;
+    pointer-events: none;
+  }
+
+  .orbit-stage {
+    max-width: none;
+  }
+
+  .orbit-chip {
+    display: none;
+  }
+
+  .stat-strip-item {
+    padding-block: 1.1rem;
+  }
+
+  .brand-shell > footer a,
+  .cine-hero-module,
+  .cine-hero-quiet-link,
+  .brand-shell > header a,
+  .brand-shell > header button {
+    min-height: 44px;
+  }
+
+  /* A footer link is a row, so the whole row is the target — not just its text. */
+  .brand-shell > footer a {
+    display: flex;
+    width: 100%;
+    align-items: center;
+  }
+
+  .brand-shell > header nav > button:last-child {
+    min-width: 44px;
+    min-height: 44px;
+    display: grid;
+    place-items: center;
+  }
+
+  .cine-command-copy,
+  .terminal-preview-bar button {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+  }
+
+  .brand-shell > footer li + li {
+    margin-top: 0.15rem;
+  }
+
+  .cine-hero-actions .btn,
+  .cine-hero-actions a {
+    min-height: 46px;
+  }
+}
+
+/* --------------------------------------------------------- reduced motion ---- */
+
+@media (prefers-reduced-motion: reduce) {
+  .insight-bar,
+  .insight-meter {
+    animation: none;
+  }
+
+  .orbit-ring-group,
+  .orbit-mark,
+  .orbit-mark-shape,
+  .orbit-chip,
+  .cine-marquee-track,
+  .cine-spectrum-text {
+    animation: none !important;
+  }
+
+  html.cine-ready [data-anim],
+  html.cine-ready [data-anim="chars"] .cine-char,
+  html.cine-ready [data-anim="words"] .cine-word-inner {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    clip-path: none;
+  }
+
+  [data-anim] {
+    transition: none;
+  }
+
+  [data-scrub],
+  [data-tilt] {
+    transform: none;
+    rotate: none;
+  }
+
+  .cine-marquee-track {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .cine-marquee-set[aria-hidden="true"] {
+    display: none;
+  }
+}

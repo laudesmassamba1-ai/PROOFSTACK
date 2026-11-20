@@ -81,6 +81,67 @@ Les prix sont **lus depuis `@proofcore/billing`**, jamais recopiés dans le site
 
 **Mémoire auto-dirigée.** Personne ne demande à l'IA de retenir : (1) côté API, après chaque tour, un appel court et séparé relit l'échange, répond `{"facts":[…]}`, max 2, et n'écrit que ce qui sera encore vrai dans un mois (`source: assistant`) — il a le droit de répondre `[]`, et la plupart des tours ne produisent rien ; (2) côté CLI, l'agent a un outil `remember` qu'il appelle seul ; (3) l'UI affiche « Retenu par l'assistant : … » après le tour. Un échec de curation ne fait jamais échouer la réponse.
 
+### 2026-11-20 (nuit) — refonte visuelle « cinema » du site
+
+Direction artistique refaite à partir de six références déposées dans `ref_visuelles/` :
+sujet lumineux unique sur anneaux concentriques, titre éditorial surdimensionné avec un mot
+en dégradé, rail d'index vertical, cartes bento de tailles inégales, accent acide en
+ponctuation. La ligne directrice ne bouge pas : noir `#04070a`, émeraude/mint, mono en
+petites capitales, « local d'abord ».
+
+| Fichier                                                | Rôle                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/styles/cinema.css`                       | Nouvelle couche, importée **après** `global.css` dans `main.tsx`. Tokens (`--cine-*`), typographie, boutons, bento, section, footer, CTA, primitives de mouvement, `prefers-reduced-motion`. Ne redéfinit que les surfaces marketing.                 |
+| `apps/web/src/lib/cinema.ts`                           | Moteur maison (aucune dépendance) : `data-anim` chars/words/fade/mask, `data-scrub` (rotation/parallaxe liée au scroll), `data-magnet` (ressort sous-amorti), `data-spot` (reflet au pointeur). Un seul rAF partagé, arrêté quand l'onglet est caché. |
+| `apps/web/src/components/brand/OrbitStage.tsx`         | Le P iridescent du logo sur trois anneaux, chips de preuve flottantes. Décoratif (`aria-hidden`).                                                                                                                                                     |
+| `apps/web/src/pages/Home.tsx`                          | Héros deux colonnes, marquee mono, bento des modules, sections numérotées, CTA à anneaux.                                                                                                                                                             |
+| `apps/web/src/components/marketing/ModuleShowcase.tsx` | Mur → bento asymétrique (WORLD 4/6, FLOW 2/6, trois audits 2/6, bande moteur 6/6).                                                                                                                                                                    |
+| `apps/web/src/layouts/BrandLayout.tsx`                 | `Section`/`SectionHeading` avec index éditorial, mesure 1280 px, `initCinema` par route.                                                                                                                                                              |
+
+Points vérifiés en chemin (bugs réels, pas des préférences) :
+
+1. **Spécificité CSS** : `html.cine-ready [data-anim]` (0,2,1) battait `[data-anim].is-in` (0,2,0) — les sections seraient restées à `opacity: 0`. Les deux côtés portent maintenant la même spécificité, l'état révélé venant en dernier.
+2. **`translate` vs `transform`** : le magnet écrit `--magnet-x/y` ; en `transform`, `.btn:hover` l'écrasait. Il utilise `translate`, qui se compose.
+3. **Sweep du pseudo-élément** : le reflet de `.btn::after` en `z-index: -1` passait sous le fond du bouton (invisible) ; le dégradé se déplace maintenant dans le fond lui-même.
+4. **StrictMode** : le teardown efface les drapeaux `data-*-armed`, sinon la seconde passe du double effet ne ré-armait rien et le héros attendait le filet de 3 s.
+
+Passe suivante — **le workspace** : `.app-shell` garde le papier « Ink & Object » et reçoit la même physique (cadre 26 px avec filet lumineux, surfaces volumétriques, titres en `Bricolage`, pastilles mono à losange, survol ressort des cartes/objets, barres de graphique qui poussent depuis la ligne de base, tableaux à chiffres tabulaires). `AppLayout` monte `initCinema` par route, comme `BrandLayout`. Règles du dossier `anti-ai-design-main/SKILL.md` appliquées : pas de grille 3 colonnes symétrique (bento), hiérarchie typographique modulaire, une seule famille d'icônes (Lucide), ombres teintées multi-couches < 20 px de flou, `transition` toujours propriété par propriété, cibles ≥ 44 px, `prefers-reduced-motion` respecté.
+
+Vérifié : `pnpm --filter @proofcore/web build` vert, `biome check` 0 erreur sur les fichiers touchés.
+
+### Chorégraphie GSAP + Lenis (choix utilisateur, 2026-11)
+
+- Ajouts : `gsap` 3.15.1, `lenis` 1.3.27 dans `apps/web`. Justification écrite dans
+  `docs/design/MOTION_GUIDELINES.md` (Performance).
+- Code : `lib/choreography.ts` (`startSmoothScroll` pour la coque marketing, `riseWords`
+  via `gsap.context`), `components/app/SplitHeadline.tsx` (titre à masques par mot),
+  CSS `.split-mask` / `.split-word` en fin de `global.css`.
+- Piège : Lenis n'ajoute la classe `lenis` sur `<html>` qu'au premier défilement, pas
+  à l'initialisation. Une sonde qui lit la classe sans défiler renvoie faux à tort.
+- Vérifié (résultats réels) : `tsc -p apps/web` exit 0 ; `biome check apps/web/src`
+  exit 0 (85 fichiers) ; `pnpm test` 47 fichiers / 621 tests passés ; `pnpm --filter
+  @proofcore/web build` exit 0 ; sonde Playwright (`artifacts/motion-capture/probe.mjs`) :
+  Lenis actif sans mouvement réduit, absent avec mouvement réduit, aucune erreur de page.
+- Non vérifié : `/app` redirige vers `/signin` sans session, donc l'Overview n'a pas été
+  capturé. Les captures `home`, `product` (desktop et mobile) existent dans
+  `artifacts/motion-capture/`. Pas de revue visuelle de l'effet de titre au-delà du rendu.
+- Mise à jour (suite) : `choreography.ts` corrigé : `riseWords` ne joue qu'une fois par
+  session de page (plus à chaque changement de texte), montée 12 px sans rotation, easing
+  `CustomEase` cubic-bezier(.2,.8,.2,1). `revealCards` : y 10, sans scale. Commentaires
+  remis en place.
+- `/app` capturé avec une session (`artifacts/motion-capture/capture-app.mjs`, compte de
+  test local créé dans la base de dev, mot de passe aléatoire non conservé) : desktop et
+  mobile, 0 erreur de page, reste sur `/app`. Constat : la zone module sous la tête reste
+  vide à la capture (2 s d'attente). Cause non établie : deux moteurs de révélation se
+  superposent (`lib/reveal.ts` `data-reveal` et `revealCards` GSAP). Sonde DOM non
+  exécutée (refusée par le garde-fou).
+- Vérifié : `tsc -p apps/web` exit 0 ; `biome check` sur les fichiers touchés exit 0 ;
+  `node tooling/scripts/build.mjs` exit 0. `biome check .` exit 1 : une seule erreur de
+  format, dans le tableau d'en-tête de `APP-MEMORY.md` (lignes 92–99, antérieure à ma
+  section).
+- Trouvé, non traité : environ 300 ternaires `fr ? … : …` restent dans 11 pages de
+  `pages/app/` (AiChat, Settings, Scan, Workspace, Billing…).
+
 ## 4. CE QU'ON VEUT FAIRE (feuille de route)
 
 1. **Brancher l'IA sur les 5 modules** — un audit narratif détaillé et humain : `proofcore audit explain` (ou `--explain` sur audit/scan/test) qui envoie le run réel + la mémoire + l'effort, en français, avec les emplacements de fichiers. Quota par plan via le compteur `ai_audit`.
@@ -122,3 +183,12 @@ pnpm cloud:deploy --dry-run
 - Bug réparé au passage : le dialog IA se bloquait sur `) : null}` orphelin quand replacingKey/état connecté changeait (trou laissé par le thread frère) ; chatModels inutilisé remplacé par profileModels.
 - Full suite 620/620 verte, lint 0, build ok. Commit "fix(web): the fake terminal card and the AI starburst are gone...".
 - Leçon : quand on supprime une icône d'import, vérifier les JSX conditionnels autour (`note ? (...) : null`) — biome formate mais ne répare pas le JSX.
+
+## 2026-11-20 — audit de prise en main, accessibilité et verrou sandbox
+
+- Parcours nouvel utilisateur : l'Empty de `/app` (aucun espace de travail) n'avait aucune action ; il porte maintenant un `Link` vers `/app/workspace` (`ws.overview.noWorkspace.action`, EN/FR).
+- Facturation : le provider sandbox ne peut plus créditer un abonnement en production. `settle` répond 404 hors sandbox, `start` répond 503 `payment_provider_not_configured`, sauf `ALLOW_SANDBOX_BILLING=true`. Couvert par `apps/api/test/billing-sandbox-gate.test.ts` (3 cas).
+- Accessibilité : un seul `h1` par page (marketing via `SectionHeading level={1}`), plus aucun saut de niveau — les cartes passent en `h2` quand le groupe suit le `h1` directement, le footer est devenu `<nav aria-label>` + `<p>`, `ModuleShowcase` accepte `headingLevel` (2 sur `/product`, 3 sur l'accueil). Audit Playwright sur 19 routes : `h1: 1`, `jumps: []`, aucune erreur console.
+- Contrôles/labels/alt/ids : audit sur 15 routes, aucun nom accessible manquant, aucun `img` sans `alt`, aucun id dupliqué ; menu mobile OK (12 liens, Escape referme).
+- `pnpm typecheck` OK, `npx biome check .` OK (389 fichiers), `pnpm test` 624/624 (48 fichiers), `pnpm --filter @proofcore/web build` OK.
+- Non vérifié : `/app` derrière authentification n'a pas été audité visuellement ; aucune capture réelle des modules.

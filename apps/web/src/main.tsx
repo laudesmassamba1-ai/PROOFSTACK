@@ -8,6 +8,9 @@ import { initCaretFollower } from "./lib/caret-follower.js";
 import { SessionProvider } from "./lib/session.js";
 import { ThemeProvider } from "./lib/theme.js";
 import "./styles/global.css";
+// Art-direction layer for the brand site: tokens, orbit hero, bento cards and the
+// choreography primitives. Imported after global.css so it owns the marketing surfaces.
+import "./styles/cinema.css";
 
 const container = document.getElementById("root");
 if (!container) throw new Error("root element missing");

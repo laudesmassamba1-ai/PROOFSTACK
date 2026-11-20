@@ -28,8 +28,10 @@ export function NotFound() {
     <Section className="min-h-[60vh] max-w-[760px]">
       <TesterScene variant="lost" className="notfound-tester" />
       <p className="eyebrow mt-4">404</p>
-      <h1 className="mt-3 text-[2rem] tracking-tight">{t("notfound.title")}</h1>
-      <p className="mt-3 text-white/54">{t("notfound.body")}</p>
+      <h1 className="cine-module-title" data-anim="mask">
+        {t("notfound.title")}
+      </h1>
+      <p className="cine-lede mt-4">{t("notfound.body")}</p>
       <Link to="/" className="btn btn-primary mt-7">
         {t("notfound.cta")}
       </Link>

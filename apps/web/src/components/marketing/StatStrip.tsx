@@ -66,7 +66,10 @@ export function StatStrip({ className = "" }: { className?: string }) {
   const { ref, inView } = useReveal<HTMLDivElement>({ threshold: 0.35 });
 
   return (
-    <section aria-label={t("home.stats.label")} className="mx-auto max-w-[1240px] px-5 lg:px-8">
+    <section
+      aria-label={t("home.stats.label")}
+      className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-10"
+    >
       <div ref={ref} className={`stat-strip reveal ${className}`}>
         {STATS.map((stat) => (
           <Stat key={stat.label} {...stat} active={inView} />
