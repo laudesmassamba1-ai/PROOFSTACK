@@ -12,6 +12,7 @@ import { HttpError, RateLimiter } from "../http/errors.js";
 import { readBody, requireWorkspace } from "../http/guards.js";
 import { pageBody, readPage } from "../http/pagination.js";
 import type { AppEnv, Services } from "../http/services.js";
+import { quotaError } from "../http/entitlement-http.js";
 
 /**
  * Scanning a URL from the app.
@@ -115,6 +116,11 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
   app.post("/audits", async (c) => {
     const user = c.get("user");
     const limited = limiter.check(user.id);
+    // The scan id is minted before the gate so the meter can name its subject even
+    // when the scan itself never happens: the gate is a pure check, the meter only
+    // records once the page has actually been read.
+    const auditId = `aud_${crypto.randomUUID().replaceAll("-", "").slice(0, 20)}`;
+    await requireAiAuditQuota(c, services, user.workspaceId ?? (await primaryWorkspaceId(services, user.id)), auditId);
     if (!limited.allowed) {
       c.header("Retry-After", String(limited.retryAfterSeconds));
       const minutes = Math.max(1, Math.ceil(limited.retryAfterSeconds / 60));
@@ -174,10 +180,26 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
       );
     }
 
+    // The scan happened and produced a report: only now does it consume the
+    // workspace's monthly AI-audit quota. A scan that failed above (502) is a
+    // harness problem and is never billed — same policy as a failed test run.
+    const metered = await services.meter.meter({
+      workspaceId: workspace.id,
+      kind: "ai_audit",
+      subjectId: auditId,
+      quantity: 1,
+      at: services.clock(),
+    });
+    if (metered.reason === "quota_exhausted") {
+      // Race window between the gate and the meter (a concurrent scan consumed the
+      // last unit): deny here rather than record an over-quota report.
+      throw quotaError(metered);
+    }
+
     const failed = result.findings.filter((item) => item.status === "FAIL").length;
     const warnings = result.findings.filter((item) => item.status === "WARN").length;
     const worstVerdict = failed > 0 ? "fail" : warnings > 0 ? "warnings" : "pass";
-    const id = `aud_${crypto.randomUUID().replaceAll("-", "").slice(0, 20)}`;
+    const id = auditId;
     await services.store.createPageAudit({
       id,
       workspaceId: workspace.id,

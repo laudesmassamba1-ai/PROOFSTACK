@@ -13,10 +13,10 @@ code is sent anywhere to be "processed for you" unless you ask for a cloud featu
 
 | File                                      | For                              | How it installs                                                                                                    |
 | ----------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `proofcore-0.2.0-setup-win-x64.exe`       | Windows 10/11, x64               | Double-click. Installs to `%LOCALAPPDATA%\PROOFCORE`, adds the user `PATH`, adds a Start Menu entry. No elevation. |
-| `proofcore-0.2.0-installer-linux-x64.run` | Linux x64 (Mint, Ubuntu, Debian) | `chmod +x` then run. Installs to `~/.local/share/proofcore`, adds one `PATH` line to your shell profile.           |
-| `proofcore_0.2.0_amd64.deb`               | Debian, Ubuntu, Linux Mint       | `sudo dpkg -i proofcore_0.2.0_amd64.deb`                                                                           |
-| `proofcore-0.2.0-installer-darwin-*.run`  | macOS Intel and Apple Silicon    | Same as Linux.                                                                                                     |
+| `proofcore-<version>-setup-win-x64.exe`       | Windows 10/11, x64               | Double-click. Installs to `%LOCALAPPDATA%\PROOFCORE`, adds the user `PATH`, adds a Start Menu entry. No elevation. |
+| `proofcore-<version>-installer-linux-x64.run` | Linux x64 (Mint, Ubuntu, Debian) | `chmod +x` then run. Installs to `~/.local/share/proofcore`, adds one `PATH` line to your shell profile.           |
+| `proofcore_<version>_amd64.deb`               | Debian, Ubuntu, Linux Mint       | `sudo dpkg -i proofcore_<version>_amd64.deb`                                                                           |
+| `proofcore-<version>-installer-darwin-*.run`  | macOS Intel and Apple Silicon    | Same as Linux.                                                                                                     |
 
 Every artifact is self-contained: the Node runtime the CLI needs is inside the file, so the
 installation is one executable. That is also why the Windows setup is ~116 MB — it carries
@@ -51,7 +51,7 @@ a Windows `.exe` can be produced from Linux).
 Pushing a tag builds and publishes everything:
 
 ```bash
-git tag v0.2.0
+git tag v0.4.0
 git push origin v0.2.0
 ```
 
