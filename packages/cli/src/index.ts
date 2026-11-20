@@ -296,9 +296,7 @@ async function main(argv: string[]): Promise<number> {
         const installs = findInstalls();
         process.stderr.write(`\u001b[2m${process.execPath}\u001b[0m\n`);
         if (installs.length > 1) {
-          process.stderr.write(
-            `\u001b[33m${installs.length} installs on PATH\u001b[0m\n`
-          );
+          process.stderr.write(`\u001b[33m${installs.length} installs on PATH\u001b[0m\n`);
           for (const item of installs) {
             process.stderr.write(`  \u001b[2m${item.kind} ${item.realPath}\u001b[0m\n`);
           }
