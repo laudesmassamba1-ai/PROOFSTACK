@@ -51,6 +51,7 @@ import {
   syncAccountAi,
 } from "./agent-runtime.js";
 import {
+  type AuditOptions,
   parseAuditTarget,
   printAuditHelp,
   renderAudit,
@@ -58,7 +59,7 @@ import {
   runFailAudit,
 } from "./audit.js";
 import { mapArchitecture } from "./code-tools.js";
-import { evaluate, inspectMachine, summarize } from "./doctor-env.js";
+import { evaluate, findInstalls, inspectMachine, summarize } from "./doctor-env.js";
 import { HUB_COMMANDS, hubWebPath, runHub } from "./hub.js";
 import { HubTui } from "./hub-tui.js";
 import {
@@ -287,7 +288,25 @@ async function main(argv: string[]): Promise<number> {
     case "--version":
     case "-v":
     case "version": {
+      // Stdout stays exactly the version: scripts parse it, and CI asserts the shape.
+      // Which binary answered, and whether that is ambiguous, goes to stderr — the same
+      // rule as the update notice below.
       stdout.write(`${CLI_VERSION}\n`);
+      if (!flags.json && !flags.quiet && stdin.isTTY) {
+        const installs = findInstalls();
+        process.stderr.write(`\u001b[2m${process.execPath}\u001b[0m\n`);
+        if (installs.length > 1) {
+          process.stderr.write(
+            `\u001b[33m${installs.length} installs on PATH\u001b[0m\n`
+          );
+          for (const item of installs) {
+            process.stderr.write(`  \u001b[2m${item.kind} ${item.realPath}\u001b[0m\n`);
+          }
+          process.stderr.write(
+            `\u001b[2mRun \`proofcore doctor\` for the fix: one install, one version.\u001b[0m\n`
+          );
+        }
+      }
       // A newer release is worth one line, on stderr so a script reading the version is
       // unaffected. Read from the cache: `--version` must not wait for the network.
       const pending = updateAvailable(readState());
@@ -340,6 +359,8 @@ async function main(argv: string[]): Promise<number> {
       return commandAi(flags, args);
     case "mcp":
       return commandMcp(flags, args);
+    case "check":
+      return commandCheck(flags, args);
     case "audit":
       return commandAudit(flags, args);
     case "map":
@@ -2412,6 +2433,106 @@ function printBanner(flags: GlobalFlags): void {
   );
 }
 
+/**
+ * `proofcore check <url>` — one command, any URL, online or localhost.
+ *
+ * The complaint this answers: testing a site took `init`, then editing a config, then
+ * knowing which module applied to a URL. FAIL and CLEAN are the two modules that can judge
+ * any address without knowing the product behind it, so one command runs both and prints a
+ * single verdict.
+ *
+ * Credentials are passed with `--header`/`--cookie`, because a page behind a login is the
+ * normal case, not the exception. They are never echoed back and never written to a report.
+ */
+async function commandCheck(flags: GlobalFlags, args: string[]): Promise<number> {
+  const target = args.find((arg) => !arg.startsWith("-") && arg !== "check");
+  if (!target) {
+    err(flags, red(flags, 'Usage: proofcore check <url> [--header "k: v"] [--cookie "k=v"]'));
+    err(flags, dim(flags, "Example: proofcore check http://localhost:3000"));
+    return 64;
+  }
+  const headers: Record<string, string> = {};
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+    if (arg === "--header") {
+      const raw = args[++i] ?? "";
+      const index = raw.indexOf(":");
+      if (index <= 0) {
+        err(flags, red(flags, `--header expects "Name: value", got "${raw}"`));
+        return 64;
+      }
+      headers[raw.slice(0, index).trim().toLowerCase()] = raw.slice(index + 1).trim();
+    } else if (arg === "--cookie") {
+      const raw = args[++i] ?? "";
+      if (!raw) {
+        err(flags, red(flags, "--cookie expects a cookie value"));
+        return 64;
+      }
+      headers.cookie = headers.cookie ? `${headers.cookie}; ${raw}` : raw;
+    }
+  }
+
+  let url: URL;
+  try {
+    url = parseAuditTarget(target);
+  } catch (error) {
+    err(flags, red(flags, error instanceof Error ? error.message : String(error)));
+    return 64;
+  }
+
+  const options: AuditOptions = { headers };
+  try {
+    if (!flags.quiet) {
+      out(
+        flags,
+        `${bold(flags, "PROOFCORE")} ${dim(flags, "check")} ${cyan(flags, url.toString())}`
+      );
+      out(flags, "");
+      out(flags, `${dim(flags, "FAIL")} ${dim(flags, "· security")}`);
+    }
+    const security = await runFailAudit(url.toString(), options);
+    if (flags.json) {
+      if (!flags.quiet) stdout.write("");
+    } else {
+      renderAudit(security, flags);
+    }
+
+    if (!flags.quiet) {
+      out(flags, "");
+      out(flags, `${dim(flags, "CLEAN")} ${dim(flags, "· interface quality")}`);
+    }
+    const quality = await runCleanAudit(url.toString(), options);
+    if (!flags.json) {
+      renderAudit(quality, flags);
+    }
+
+    const blocking = [...security.checks, ...quality.checks].filter(
+      (check) => check.status === "FAIL"
+    );
+    if (flags.json) {
+      stdout.write(
+        `${stableStringify({ url: url.toString(), security, quality, blocking: blocking.length }, 2)}\n`
+      );
+    } else if (!flags.quiet) {
+      out(flags, "");
+      out(
+        flags,
+        blocking.length === 0
+          ? green(flags, "✓ nothing blocking on this URL")
+          : red(
+              flags,
+              `${blocking.length} blocking finding(s): ${blocking.map((c) => c.id).join(", ")}`
+            )
+      );
+      out(flags, dim(flags, "WORLD and FLOW need the product's own endpoints: proofcore modules"));
+    }
+    return blocking.length === 0 ? 0 : 1;
+  } catch (error) {
+    err(flags, red(flags, error instanceof Error ? error.message : String(error)));
+    return 2;
+  }
+}
+
 async function commandAudit(flags: GlobalFlags, args: string[]): Promise<number> {
   const kind = args[0];
   const target = args.find((a, index) => index > 0 && !a.startsWith("-"));
@@ -3396,6 +3517,7 @@ function printHelp(flags: GlobalFlags): void {
   w("  sync                     Upload the last run to the API");
   w("  ai <status|tools|ask|agent>  MCP servers, AI providers and external agents");
   w("  audit fail|clean <url>       FAIL: security scan · CLEAN: UI quality score");
+  w("  check <url>                  both of the above, in one run");
   w("  map [dir]                   architecture as a Mermaid dependency diagram");
   w("  index                       build the local semantic index");
   w('  search "<query>"            concept search over the index');
@@ -3427,6 +3549,11 @@ function printHelp(flags: GlobalFlags): void {
   w("  --verbose                Show every case, including passes");
   w("  --no-color               Disable colour");
   w("  --cwd <dir>              Run against another directory");
+
+  w("");
+  w("check options (works on localhost and on a live site behind a login)");
+  w('  --header "Name: value"   Extra request header, repeatable');
+  w('  --cookie "name=value"    Cookie sent with the request, repeatable');
   w("");
   w(bold(flags, "exit codes"));
   w("  0  all cases passed (skips allowed)");

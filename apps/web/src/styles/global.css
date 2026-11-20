@@ -1227,6 +1227,83 @@ p {
   text-transform: uppercase;
 }
 
+/* The invitation notification: a request waiting for an answer, so it sits above the
+   page until it is answered — not buried in a settings screen. */
+.app-invite-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 12px 18px 0;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 12px;
+  padding: 11px 13px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  color: var(--ink);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.app-invite-banner > svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--accent);
+}
+
+.app-invite-body {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: grid;
+  gap: 6px;
+}
+
+.app-invite-title {
+  font-weight: 680;
+}
+
+.app-invite-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-invite-list > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.app-invite-role {
+  color: var(--muted);
+}
+
+.app-invite-actions {
+  display: inline-flex;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.app-invite-notice {
+  color: var(--muted);
+}
+
+.app-invite-error {
+  color: var(--destructive);
+}
+
+@media (max-width: 640px) {
+  .app-invite-banner {
+    margin: 10px 12px 0;
+  }
+
+  .app-invite-list > li {
+    align-items: flex-start;
+  }
+}
+
 .app-offline-banner {
   display: flex;
   align-items: center;
@@ -6046,6 +6123,15 @@ p {
   color: var(--ink);
   font-family: var(--font-mono);
   font-size: 0.66rem;
+}
+
+.modules-index-note {
+  border-top: 1px solid var(--rule);
+  margin: 0;
+  padding: 11px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.7rem;
+  line-height: 1.55;
 }
 
 /* ---------- gauge headroom (FAIL/CLEAN audit cards) ---------- */

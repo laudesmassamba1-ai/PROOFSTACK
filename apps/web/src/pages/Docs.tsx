@@ -46,7 +46,7 @@ const PENDING = [
   },
   {
     title: "Email delivery",
-    body: "No provider is configured, so verification, password reset and teammate invitations are absent rather than faked.",
+    body: "No provider is configured, so verification and password-reset emails are reported as unsent rather than faked. Workspace invitations do not depend on email: the invited person is notified inside the app and must accept.",
   },
   {
     title: "Operator console",

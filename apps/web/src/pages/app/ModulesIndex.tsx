@@ -203,9 +203,18 @@ export function ModulesIndexPage() {
             </div>
           ))}
           <div className="modules-index-command-row">
+            <span>CHECK</span>
+            <code>proofcore check &lt;url&gt;</code>
+          </div>
+          <div className="modules-index-command-row">
             <span>HUB</span>
             <code>/modules · /world · /flow · /module exit</code>
           </div>
+          <p className="modules-index-note">
+            {fr
+              ? '`check` enchaîne FAIL et CLEAN sur n\'importe quelle adresse, localhost compris. Une page derrière un login se teste avec --header "Authorization: Bearer …" ou --cookie "nom=valeur".'
+              : '`check` runs FAIL and CLEAN on any address, localhost included. A page behind a login is tested with --header "Authorization: Bearer …" or --cookie "name=value".'}
+          </p>
         </div>
       </section>
     </div>

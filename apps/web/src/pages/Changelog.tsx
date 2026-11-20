@@ -38,7 +38,7 @@ const RELEASES = [
       "Web and API are live on Vercel and Cloudflare Workers with a provisioned D1 database; a production sign-up → session → overview path is verified",
       "WORLD and FLOW drive HTTP targets; Playwright browser journeys are not implemented yet",
       "SasPay live payments are untested without credentials; the sandbox provider exercises the lifecycle",
-      "The authenticated dashboard is English-only; no email provider is configured, so verification and invitations are absent",
+      "No email provider is configured, so verification and password-reset messages are reported as unsent rather than faked; workspace invitations reach the person inside the app",
     ],
   },
 ];

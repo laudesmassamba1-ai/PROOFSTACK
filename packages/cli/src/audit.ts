@@ -68,11 +68,29 @@ export interface AuditResult {
 
 const USER_AGENT = "PROOFCORE-Audit/0.2 (+real checks; respects robots intent)";
 
-async function fetchTarget(url: string): Promise<{ response: Response; text: string; ms: number }> {
+/**
+ * Extra request headers.
+ *
+ * Sites behind a login cannot be audited without credentials, so the operator can pass the
+ * ones they already have (`--header "Authorization: Bearer …"`, `--cookie "s=…"`). They are
+ * used for the request only: never logged, never written to a report.
+ */
+export interface AuditOptions {
+  headers?: Record<string, string>;
+}
+
+function requestHeaders(options: AuditOptions | undefined): Record<string, string> {
+  return { "user-agent": USER_AGENT, ...options?.headers };
+}
+
+async function fetchTarget(
+  url: string,
+  options?: AuditOptions
+): Promise<{ response: Response; text: string; ms: number }> {
   const started = Date.now();
   const response = await fetch(url, {
     redirect: "follow",
-    headers: { "user-agent": USER_AGENT },
+    headers: requestHeaders(options),
     signal: AbortSignal.timeout(12_000),
   });
   const text = await response.text();
@@ -104,8 +122,8 @@ function push(
   checks.push({ id, status: ok ? "PASS" : warnOnly ? "WARN" : "FAIL", observed, why });
 }
 
-export async function runFailAudit(url: string): Promise<AuditResult> {
-  const { response, text, ms } = await fetchTarget(url);
+export async function runFailAudit(url: string, options?: AuditOptions): Promise<AuditResult> {
+  const { response, text, ms } = await fetchTarget(url, options);
   const headers = response.headers;
   const checks: AuditCheck[] = [];
   const csp = headers.get("content-security-policy");
@@ -266,8 +284,8 @@ async function renderWithService(url: string): Promise<string | undefined> {
   }
 }
 
-export async function runCleanAudit(url: string): Promise<AuditResult> {
-  const { response, text: servedHtml, ms } = await fetchTarget(url);
+export async function runCleanAudit(url: string, options?: AuditOptions): Promise<AuditResult> {
+  const { response, text: servedHtml, ms } = await fetchTarget(url, options);
   const clientRendered = looksClientRendered(servedHtml);
   const rendered = clientRendered ? await renderWithService(response.url) : undefined;
   const html = rendered ?? servedHtml;

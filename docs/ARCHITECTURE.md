@@ -88,6 +88,25 @@ The API says `emailVerification: "not_configured"` instead of claiming an email 
 sent. The adapter boundary is documented in
 `docs/deployment/ENVIRONMENT_VARIABLES.md`.
 
+### Membership requires consent
+
+`workspace_invitations` holds the request; `workspace_members` holds the membership, and
+only an `accept` creates the second from the first. Before this, `POST …/members` wrote the
+membership row directly: one person granted another access to a tenant without asking, and
+the notification the product advertised did not exist.
+
+- Inviting an existing account creates a `pending` row and notifies the invitee (email when
+  a provider is configured, and the in-app list at `/api/account/invitations` always).
+- The answer is a conditional `UPDATE … WHERE status = 'pending'`, so two tabs cannot both
+  accept and a revoked invitation cannot be revived.
+- Someone else's invitation answers **404**, like any other tenant-scoped id.
+- A partial unique index keeps one pending invitation per person per workspace while still
+  allowing a later re-invitation after a decline.
+
+The CLI's `/modules` entry points at `/app/modules`: a page that lists the five modules with
+the exact command that runs them. Any link the CLI can open has to be a real route — that
+page did not exist and fell through to the 404.
+
 ### Web origins
 
 Credentialed calls are accepted only from an allowlist (`WEB_ORIGIN`), matched by

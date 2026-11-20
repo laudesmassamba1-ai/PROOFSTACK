@@ -26,6 +26,14 @@ interface Member {
   joinedAt: string;
 }
 
+interface PendingInvitation {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  createdAt: string;
+}
+
 const ROLES = ["owner", "admin", "member", "viewer"] as const;
 
 const ROLE_LABELS: Record<string, { fr: string; en: string }> = {
@@ -63,6 +71,8 @@ export function WorkspacePage(): React.ReactElement {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<(typeof INVITABLE_ROLES)[number]>("member");
   const [inviting, setInviting] = useState(false);
+  const [invitations, setInvitations] = useState<PendingInvitation[] | null>(null);
+  const [revokingInvitation, setRevokingInvitation] = useState<string | null>(null);
   const [busyMember, setBusyMember] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -89,6 +99,10 @@ export function WorkspacePage(): React.ReactElement {
         createdAt: body.createdAt,
       });
       setMembers(body.members);
+      const pending = await apiFetch<{ items: PendingInvitation[] }>(
+        `/api/v1/workspaces/${session.workspaceId}/invitations`
+      ).catch(() => ({ items: [] as PendingInvitation[] }));
+      setInvitations(pending.items);
     } catch (caught) {
       setError(caught as ApiError);
     }
@@ -158,6 +172,13 @@ export function WorkspacePage(): React.ReactElement {
     }
   };
 
+  /**
+   * Inviting no longer grants access.
+   *
+   * The API records a pending invitation and the person decides; this form therefore
+   * reports "invitation sent", never "joined". Anything else would be a lie the
+   * workspace owner would only discover weeks later.
+   */
   const invite = async () => {
     const email = inviteEmail.trim().toLowerCase();
     if (!email.includes("@") || !session.workspaceId || inviting) return;
@@ -165,16 +186,38 @@ export function WorkspacePage(): React.ReactElement {
     setError(null);
     setNotice(null);
     try {
-      const body = await apiFetch<{ member: Member }>(
-        `/api/v1/workspaces/${session.workspaceId}/members`,
-        { method: "POST", body: { email, role: inviteRole } }
-      );
-      if (!body.member)
-        throw new Error(fr ? "Réponse d'invitation inattendue." : "Unexpected invite response.");
-      setMembers((items) => [...(items ?? []), body.member]);
+      const body = await apiFetch<{
+        invitation: { id: string; role: string; createdAt: string };
+        invitee: { name: string; email: string };
+        email: { delivered: boolean; status: string };
+      }>(`/api/v1/workspaces/${session.workspaceId}/invitations`, {
+        method: "POST",
+        body: { email, role: inviteRole },
+      });
+      setInvitations((items) => [
+        {
+          id: body.invitation.id,
+          email: body.invitee.email,
+          name: body.invitee.name,
+          role: body.invitation.role,
+          createdAt: body.invitation.createdAt,
+        },
+        ...(items ?? []),
+      ]);
       setInviteEmail("");
+      const who = body.invitee.name || body.invitee.email;
       setNotice(
-        fr ? `${body.member.email} rejoint l'espace.` : `${body.member.email} joined the workspace.`
+        fr
+          ? `Invitation envoyée à ${who}. La personne rejoindra l'espace seulement si elle accepte.${
+              body.email.delivered
+                ? ""
+                : " Aucun e-mail n'est parti : aucun fournisseur n'est configuré, elle verra l'invitation dans l'application."
+            }`
+          : `Invitation sent to ${who}. They join only if they accept.${
+              body.email.delivered
+                ? ""
+                : " No email was sent: no provider is configured, so they will see it in the app."
+            }`
       );
     } catch (caught) {
       if (caught instanceof ApiErrorClass || (caught as ApiError).code) {
@@ -184,6 +227,27 @@ export function WorkspacePage(): React.ReactElement {
       }
     } finally {
       setInviting(false);
+    }
+  };
+
+  const revokeInvitation = async (invitation: PendingInvitation) => {
+    if (!session.workspaceId || revokingInvitation) return;
+    setRevokingInvitation(invitation.id);
+    setError(null);
+    try {
+      await apiFetch(`/api/v1/workspaces/${session.workspaceId}/invitations/${invitation.id}`, {
+        method: "DELETE",
+      });
+      setInvitations((items) => (items ?? []).filter((item) => item.id !== invitation.id));
+      setNotice(
+        fr
+          ? `Invitation de ${invitation.email} annulée.`
+          : `Invitation for ${invitation.email} revoked.`
+      );
+    } catch (caught) {
+      setError(caught as ApiError);
+    } finally {
+      setRevokingInvitation(null);
     }
   };
 
@@ -545,51 +609,109 @@ export function WorkspacePage(): React.ReactElement {
               })}
             </ul>
 
-            {canManage ? (
-              <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-muted/40 px-3.5 py-3">
-                <ShieldCheck size={14} aria-hidden className="text-muted" />
-                <input
-                  type="email"
-                  value={inviteEmail}
-                  onChange={(event) => setInviteEmail(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") void invite();
-                  }}
-                  placeholder={
-                    fr
-                      ? "email@exemple.dev — doit déjà avoir un compte"
-                      : "email@example.dev — must already have an account"
-                  }
-                  className="app-input min-w-[220px] flex-1"
-                  aria-label={fr ? "Email à inviter" : "Email to invite"}
-                />
-                <select
-                  className="app-shell-pill app-shell-select"
-                  value={inviteRole}
-                  onChange={(event) =>
-                    setInviteRole(event.target.value as (typeof INVITABLE_ROLES)[number])
-                  }
-                  aria-label={fr ? "Rôle attribué" : "Assigned role"}
-                >
-                  {INVITABLE_ROLES.map((role) => (
-                    <option key={role} value={role}>
-                      {roleLabel(role, fr)}
-                    </option>
+            {canManage && invitations !== null && invitations.length > 0 ? (
+              <div className="mt-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                  {fr ? "Invitations en attente" : "Pending invitations"}
+                </p>
+                <p className="mt-1 text-xs text-muted">
+                  {fr
+                    ? "Ces personnes n'ont aucun accès tant qu'elles n'ont pas accepté."
+                    : "These people have no access until they accept."}
+                </p>
+                <ul className="mt-2 grid gap-2">
+                  {invitations.map((invitation) => (
+                    <li
+                      key={invitation.id}
+                      className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-line px-3.5 py-2.5"
+                    >
+                      <span
+                        aria-hidden
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-dashed border-line text-xs font-semibold text-muted"
+                      >
+                        {invitation.name.slice(0, 1).toUpperCase()}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{invitation.name}</p>
+                        <p className="truncate text-xs text-muted">{invitation.email}</p>
+                      </div>
+                      <span className="app-badge">{roleLabel(invitation.role, fr)}</span>
+                      <button
+                        type="button"
+                        className="app-btn"
+                        onClick={() => void revokeInvitation(invitation)}
+                        disabled={revokingInvitation === invitation.id}
+                        aria-label={
+                          fr
+                            ? `Annuler l'invitation de ${invitation.email}`
+                            : `Revoke the invitation for ${invitation.email}`
+                        }
+                      >
+                        {revokingInvitation === invitation.id ? (
+                          <Loader2 size={13} className="animate-spin" aria-hidden />
+                        ) : (
+                          <X size={13} aria-hidden />
+                        )}
+                        {fr ? "Annuler" : "Revoke"}
+                      </button>
+                    </li>
                   ))}
-                </select>
-                <button
-                  type="button"
-                  className="app-btn app-btn-primary"
-                  onClick={() => void invite()}
-                  disabled={inviting || !inviteEmail.includes("@")}
-                >
-                  {inviting ? (
-                    <Loader2 size={13} className="animate-spin" aria-hidden />
-                  ) : (
-                    <Plus size={13} aria-hidden />
-                  )}
-                  {fr ? "Inviter" : "Invite"}
-                </button>
+                </ul>
+              </div>
+            ) : null}
+
+            {canManage ? (
+              <div className="mt-4 grid gap-2 rounded-lg border border-line bg-muted/40 px-3.5 py-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <ShieldCheck size={14} aria-hidden className="text-muted" />
+                  <input
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(event) => setInviteEmail(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") void invite();
+                    }}
+                    placeholder={
+                      fr
+                        ? "email@exemple.dev — doit déjà avoir un compte"
+                        : "email@example.dev — must already have an account"
+                    }
+                    className="app-input min-w-[220px] flex-1"
+                    aria-label={fr ? "Email à inviter" : "Email to invite"}
+                  />
+                  <select
+                    className="app-shell-pill app-shell-select"
+                    value={inviteRole}
+                    onChange={(event) =>
+                      setInviteRole(event.target.value as (typeof INVITABLE_ROLES)[number])
+                    }
+                    aria-label={fr ? "Rôle proposé" : "Offered role"}
+                  >
+                    {INVITABLE_ROLES.map((role) => (
+                      <option key={role} value={role}>
+                        {roleLabel(role, fr)}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="app-btn app-btn-primary"
+                    onClick={() => void invite()}
+                    disabled={inviting || !inviteEmail.includes("@")}
+                  >
+                    {inviting ? (
+                      <Loader2 size={13} className="animate-spin" aria-hidden />
+                    ) : (
+                      <Plus size={13} aria-hidden />
+                    )}
+                    {fr ? "Envoyer l'invitation" : "Send invitation"}
+                  </button>
+                </div>
+                <p className="text-xs text-muted">
+                  {fr
+                    ? "La personne reçoit une notification et choisit d'accepter ou de refuser. Rien ne lui est accordé avant sa réponse."
+                    : "The person is notified and chooses to accept or decline. Nothing is granted before they answer."}
+                </p>
               </div>
             ) : null}
           </div>

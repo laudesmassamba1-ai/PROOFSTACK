@@ -24,6 +24,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 
 import { DesktopTools } from "../components/app/DesktopTools.js";
+import { InvitationBanner } from "../components/app/InvitationBanner.js";
 import { WindowControls } from "../components/app/WindowControls.js";
 import { AiMark } from "../components/brand/AiMark.js";
 import { Mark } from "../components/brand/Logo.js";
@@ -576,6 +577,8 @@ export function AppLayout() {
             </button>
           </div>
         ) : null}
+
+        <InvitationBanner />
 
         <main id="main" className="app-main" key={location.pathname}>
           <Outlet />

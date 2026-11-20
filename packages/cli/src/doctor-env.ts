@@ -15,9 +15,9 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, realpathSync, statSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { findChromium } from "@proofcore/adapter-browser";
 
 export type CheckStatus = "ok" | "warn" | "fail" | "skip";
@@ -58,6 +58,63 @@ export function fileMode(path: string): number | null {
   }
 }
 
+/**
+ * One `proofcore` executable found on PATH.
+ *
+ * Duplicate installs are the single most confusing failure mode this CLI has: the desktop
+ * app installs a binary in `/opt`, an npm global install writes another into the Node bin
+ * directory, and `proofcore` runs whichever comes first on PATH. The reports then disagree
+ * with each other and the version number stops meaning anything.
+ */
+export interface InstallCandidate {
+  /** The path as PATH resolved it (what the shell would run). */
+  path: string;
+  /** The file it really is, after symlinks: two links to one binary are one install. */
+  realPath: string;
+  /** `desktop`, `npm`, `standalone`, or `unknown` — how it was installed. */
+  kind: string;
+}
+
+function classifyInstall(realPath: string): string {
+  // The desktop package keeps an Electron app next to a `sidecar` binary.
+  if (realPath.includes("/opt/") && existsSync(join(realPath, "..", "resources", "app.asar"))) {
+    return "desktop";
+  }
+  if (realPath.includes("node_modules")) return "npm";
+  if (realPath.includes(".local/share") || realPath.includes("sidecar")) return "standalone";
+  return "unknown";
+}
+
+/**
+ * Every distinct `proofcore` on PATH, in PATH order.
+ *
+ * Deliberately does not execute them: on this machine one of them is the desktop app, and
+ * asking it for `--version` would open a window. Installation shape is inferred from the
+ * paths instead, which cannot have side effects.
+ */
+export function findInstalls(): InstallCandidate[] {
+  const names = process.platform === "win32" ? ["proofcore.exe", "proofcore.cmd"] : ["proofcore"];
+  const seen = new Set<string>();
+  const found: InstallCandidate[] = [];
+  for (const directory of (process.env.PATH ?? "").split(delimiter)) {
+    if (!directory) continue;
+    for (const name of names) {
+      const candidate = join(directory, name);
+      let realPath: string;
+      try {
+        if (!existsSync(candidate)) continue;
+        realPath = realpathSync(candidate);
+      } catch {
+        continue;
+      }
+      if (seen.has(realPath)) continue;
+      seen.add(realPath);
+      found.push({ path: candidate, realPath, kind: classifyInstall(realPath) });
+    }
+  }
+  return found;
+}
+
 export interface MachineFacts {
   platform: string;
   arch: string;
@@ -75,6 +132,8 @@ export interface MachineFacts {
   executableDirWritable: boolean | null;
   columns: number;
   colorEnabled: boolean;
+  /** Every distinct install found on PATH; one entry is the healthy case. */
+  installs?: InstallCandidate[];
 }
 
 /** Turns facts into verdicts. Pure: the tests build the facts, not the machine. */
@@ -115,6 +174,25 @@ export function evaluate(facts: MachineFacts): Check[] {
   } else {
     checks.push({ name: "config", status: "ok", detail: facts.configDir });
   }
+
+  // A second install is why "it works" and "it fails" can both be true on one machine.
+  const installs = facts.installs ?? [];
+  checks.push({
+    name: "install",
+    status: installs.length <= 1 ? "ok" : "warn",
+    detail:
+      installs.length === 0
+        ? "not found on PATH"
+        : installs.map((item) => `${item.kind} ${item.realPath}`).join(" · "),
+    ...(installs.length > 1
+      ? {
+          fix: `Remove all but one, otherwise the version depends on PATH order. Keep the desktop install and run \`npm uninstall -g proofcore\`, or delete the other binary: ${installs
+            .slice(1)
+            .map((item) => item.realPath)
+            .join(", ")}`,
+        }
+      : {}),
+  });
 
   if (facts.sessionMode !== null) {
     // A session token readable by other users on the machine is a leak, not a preference.
@@ -253,6 +331,7 @@ export async function inspectMachine(options: { cwd: string }): Promise<MachineF
     executableDirWritable,
     columns: process.stdout.columns ?? 0,
     colorEnabled: Boolean(process.stdout.isTTY) && !process.env.NO_COLOR,
+    installs: findInstalls(),
   };
 }
 
