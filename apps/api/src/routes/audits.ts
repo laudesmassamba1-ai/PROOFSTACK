@@ -75,6 +75,8 @@ const scanSchema = z
     login: loginSchema.optional(),
     /** The token published on the site; its presence upgrades the report to full detail. */
     ownershipToken: z.string().min(1).max(200).optional(),
+    /** Set when the scan is started from a project page, so its result stays with it. */
+    projectId: z.string().min(1).max(64).optional(),
   })
   .strict();
 
@@ -135,6 +137,11 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
         "insufficient_role",
         "Viewers cannot start a scan. Ask for member rights."
       );
+    }
+    // Checked before the scan runs: a scan billed to the workspace and then refused for a
+    // project that does not exist here would cost a unit for nothing.
+    if (body.projectId && !(await services.store.getProject(workspace.id, body.projectId))) {
+      throw new HttpError(404, "project_not_found", "No project with this id in this workspace.");
     }
 
     // The scan id is minted before the gate so gate and meter name the same subject:
@@ -223,6 +230,7 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
       payload: JSON.stringify(result),
       ownership: result.ownership,
       redacted: result.redacted,
+      projectId: body.projectId ?? null,
     });
 
     return c.json({ audit: { id, ...result } }, 201);
@@ -265,7 +273,16 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
   app.get("/audits", async (c) => {
     const { workspace } = await requireWorkspace(c, services, c.req.query("workspaceId"));
     const page = readPage(c);
-    const { rows, total } = await services.store.listPageAudits(workspace.id, page);
+    const projectId = c.req.query("projectId") || null;
+    // A project id that is not in this workspace is a 404, not an empty list: an empty list
+    // would read as "this project has no scans" when the id may belong to someone else.
+    if (projectId && !(await services.store.getProject(workspace.id, projectId))) {
+      throw new HttpError(404, "project_not_found", "No project with this id in this workspace.");
+    }
+    const { rows, total } = await services.store.listPageAudits(workspace.id, {
+      ...page,
+      projectId,
+    });
     return c.json(
       pageBody(
         rows.map((row) => ({
@@ -279,6 +296,7 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
           warnings: Number(row.warnings),
           ownership: String(row.ownership ?? "unverified"),
           redacted: Boolean(Number(row.redacted ?? 1)),
+          projectId: row.project_id ? String(row.project_id) : null,
           createdAt: String(row.created_at),
         })),
         total,
@@ -298,6 +316,7 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
       // whether the detail it is about to display is complete.
       ownership: String(row.ownership ?? "unverified"),
       redacted: Boolean(Number(row.redacted ?? 1)),
+      projectId: row.project_id ? String(row.project_id) : null,
       result: JSON.parse(String(row.payload)),
     });
   });

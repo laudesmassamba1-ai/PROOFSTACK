@@ -239,6 +239,102 @@ describe("page audits", () => {
     expect(body.items[0]?.worstVerdict).toBe("fail");
   });
 
+  it("keeps a scan attached to its project and filters the list on it", async () => {
+    const { cookie, workspaceId } = await signUp("project-scan@example.com");
+    const project = await harness.store.createProject({
+      workspaceId,
+      name: "Site",
+      baseUrl: "https://example.com",
+      environment: "production",
+      enabledModules: ["world"],
+    });
+    const other = await harness.store.createProject({
+      workspaceId,
+      name: "Other",
+      baseUrl: "https://other.example",
+      environment: "production",
+      enabledModules: ["world"],
+    });
+    const base = {
+      workspaceId,
+      createdBy: "u",
+      status: 200,
+      durationMs: 90,
+      worstVerdict: "fail",
+      failed: 1,
+      warnings: 0,
+      payload: "{}",
+      ownership: "unverified",
+      redacted: true,
+    };
+    await harness.store.createPageAudit({
+      ...base,
+      id: "aud_project",
+      url: "https://example.com/",
+      finalUrl: "https://example.com/",
+      projectId: project.id,
+    });
+    await harness.store.createPageAudit({
+      ...base,
+      id: "aud_project_other",
+      url: "https://other.example/",
+      finalUrl: "https://other.example/",
+      projectId: other.id,
+    });
+    await harness.store.createPageAudit({
+      ...base,
+      id: "aud_no_project",
+      url: "https://pasted.example/",
+      finalUrl: "https://pasted.example/",
+    });
+
+    const filtered = (await (
+      await harness.request(`/api/v1/audits?workspaceId=${workspaceId}&projectId=${project.id}`, {
+        headers: { cookie },
+      })
+    ).json()) as { items: { id: string; projectId: string | null }[]; total: number };
+    expect(filtered.total).toBe(1);
+    expect(filtered.items[0]).toMatchObject({ id: "aud_project", projectId: project.id });
+
+    // The workspace-wide list still shows everything, and says which scans have a project.
+    const all = (await (
+      await harness.request(`/api/v1/audits?workspaceId=${workspaceId}`, { headers: { cookie } })
+    ).json()) as { items: { id: string; projectId: string | null }[]; total: number };
+    expect(all.total).toBe(3);
+    expect(all.items.find((item) => item.id === "aud_no_project")?.projectId).toBeNull();
+
+    // An unknown project is not "a project with no scans".
+    const unknown = await harness.request(
+      `/api/v1/audits?workspaceId=${workspaceId}&projectId=prj_missing`,
+      { headers: { cookie } }
+    );
+    expect(unknown.status).toBe(404);
+
+    // Naming a project from another workspace is refused before the network read, so no
+    // quota is spent on a scan that could never be attached.
+    const stranger = await signUp("project-scan-other@example.com");
+    const refused = await harness.request("/api/v1/audits", {
+      method: "POST",
+      headers: { cookie },
+      body: JSON.stringify({
+        workspaceId,
+        url: "https://example.com",
+        projectId: (
+          await harness.store.createProject({
+            workspaceId: stranger.workspaceId,
+            name: "Theirs",
+            baseUrl: "https://theirs.example",
+            environment: "production",
+            enabledModules: ["world"],
+          })
+        ).id,
+      }),
+    });
+    expect(refused.status).toBe(404);
+    const error = (await refused.json()) as { error: { code: string } };
+    expect(error.error.code).toBe("project_not_found");
+  });
+
   it("returns a verification token that is stable, workspace-scoped and unforgeable", async () => {
     const owner = await signUp("token-owner@example.com");
     const other = await signUp("token-other@example.com");

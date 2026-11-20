@@ -152,7 +152,7 @@ export function Overview() {
   const nextAction = !hasProjects
     ? { label: t("ws.overview.next.create"), to: "/app/projects", primary: true }
     : !hasRuns
-      ? { label: t("ws.overview.next.install"), to: "/app/cli", primary: true }
+      ? { label: t("ws.overview.next.scan"), to: "/app/start", primary: true }
       : failures > 0 && firstFailure
         ? {
             label: t("ws.overview.next.review"),
@@ -397,8 +397,8 @@ export function Overview() {
               body={t("ws.overview.runs.empty")}
               tester="working"
               action={
-                <Link to="/app/cli" className="app-btn">
-                  <Terminal size={14} /> {t("ws.overview.next.install")}
+                <Link to="/app/start" className="app-btn">
+                  <Terminal size={14} /> {t("ws.overview.next.scan")}
                 </Link>
               }
             />

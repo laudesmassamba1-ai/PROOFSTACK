@@ -37,6 +37,14 @@ interface Finding {
   fingerprint: string | null;
   detectedAt: string;
 }
+interface WebScan {
+  id: string;
+  url: string;
+  worstVerdict: string;
+  failed: number;
+  warnings: number;
+  createdAt: string;
+}
 
 export function ProjectDetail() {
   const { projectId } = useParams();
@@ -68,6 +76,9 @@ export function ProjectDetail() {
   const [busy, setBusy] = useState(false);
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState<ApiError | Error | null>(null);
+  // Scans started from this page carry the project id, so this list is the project's own
+  // history — not the workspace's scans, and not only what CI uploaded.
+  const [scans, setScans] = useState<WebScan[] | null>(null);
 
   const load = useCallback(async () => {
     if (!workspaceId || !projectId) return;
@@ -86,6 +97,24 @@ export function ProjectDetail() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!workspaceId || !projectId) return;
+    let alive = true;
+    void apiFetch<{ items: WebScan[] }>(
+      `/api/v1/audits?workspaceId=${workspaceId}&projectId=${projectId}&limit=10`
+    )
+      .then((body) => {
+        if (alive) setScans(body.items);
+      })
+      .catch(() => {
+        // The history is a convenience: a failure here must not hide the project.
+        if (alive) setScans([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [workspaceId, projectId]);
 
   const createKey = async () => {
     if (!workspaceId || !projectId) return;
@@ -120,7 +149,7 @@ export function ProjectDetail() {
     try {
       const body = await apiFetch<{ audit: { id: string } }>("/api/v1/audits", {
         method: "POST",
-        body: { workspaceId, url: project.baseUrl },
+        body: { workspaceId, url: project.baseUrl, projectId: project.id },
       });
       navigate(`/app/scan?audit=${body.audit.id}&explain=1`);
     } catch (caught) {
@@ -381,6 +410,64 @@ export default config;`;
           </Card>
         </div>
       </div>
+
+      <Card
+        title={fr ? "Scans de ce site" : "Scans of this site"}
+        description={
+          fr
+            ? "Lancés depuis cette page, sur l'adresse du projet. Le plus récent en haut."
+            : "Started from this page against the project address, newest first."
+        }
+        className="mt-4"
+      >
+        {scans === null ? (
+          <Loading label={fr ? "Chargement des scans…" : "Loading scans…"} />
+        ) : scans.length === 0 ? (
+          <Empty
+            title={fr ? "Aucun scan de ce site" : "No scan of this site yet"}
+            body={
+              fr
+                ? "Le bouton « Lancer les modules » en haut lance un scan et le garde ici, rattaché à ce projet."
+                : "The “Run the modules” button above starts a scan and keeps it here, attached to this project."
+            }
+            tester={false}
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="app-table">
+              <thead>
+                <tr>
+                  <th>{fr ? "Verdict" : "Verdict"}</th>
+                  <th>{fr ? "Échecs" : "Failures"}</th>
+                  <th>{fr ? "Avertissements" : "Warnings"}</th>
+                  <th>{fr ? "Quand" : "When"}</th>
+                  <th>{fr ? "Résultat" : "Result"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {scans.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      <StatusBadge status={item.worstVerdict === "fail" ? "failed" : "passed"} />
+                    </td>
+                    <td className="tabular-nums">{item.failed}</td>
+                    <td className="tabular-nums">{item.warnings}</td>
+                    <td className="text-muted">{relativeTime(item.createdAt)}</td>
+                    <td>
+                      <Link
+                        to={`/app/scan?audit=${item.id}&explain=1`}
+                        className="inline-flex items-center gap-1 text-primary hover:underline"
+                      >
+                        <Play size={13} /> {fr ? "ouvrir" : "open"}
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
 
       <Card
         title={fr ? "Constats" : "Findings"}

@@ -201,3 +201,11 @@ pnpm cloud:deploy --dry-run
 - Bug corrigé : la config générée émettait `exit` trois fois (FAIL et CLEAN retombaient sur la branche `exit`). Table `moduleBlocks` explicite ; FAIL/CLEAN n'ont pas de bloc de config.
 - Limites assumées : l'interprétation IA exige une clé fournisseur dans `/app/ai` (message + lien si absente) ; le résumé en clair ne dépend d'aucun modèle. L'audit reste au niveau de l'espace, non rattaché au projet (pas de colonne `project_id`).
 - Vérifié : `biome check .` 0, `pnpm typecheck` 0, `pnpm --filter @proofcore/web build` 0, `pnpm test` 624/624 ; parcours Playwright : clic → 201 audit → `/app/scan?audit=…` → résumé + appel IA (`ai_not_configured` affiché proprement).
+
+## 2026-11-20 (nuit) — scan rattaché au projet, premier parcours guidé
+
+- Migration `0015_audit_project.sql` : `page_audits.project_id` (nullable) + index `(workspace_id, project_id, created_at DESC)`. `createPageAudit` l'écrit, `listPageAudits` filtre dessus sans changer le comportement des lignes antérieures.
+- `POST /api/v1/audits` accepte `projectId` : projet inconnu ou d'un autre espace → 404 `project_not_found` **avant** le scan, donc aucun quota consommé. `GET /audits?projectId=` filtre, et répond 404 pour un projet absent plutôt qu'une liste vide trompeuse.
+- Page projet : « Lancer les modules » envoie le `projectId` ; nouvelle carte « Scans de ce site » (10 derniers, lien vers `/app/scan?audit=…&explain=1`).
+- Nouvelle page `/app/start` : un seul champ (l'adresse) → scan + verdicts + résumé + lecture IA sur le même écran, sans navigation. Entrée depuis l'état vide de la vue d'ensemble (« Analyser mon site maintenant »).
+- Vérifié : biome 0, typecheck 0, build 0, `pnpm test` 625/625 (nouveau test : rattachement, filtre, 404 pour projet inconnu et pour projet d'un autre espace) ; Playwright local : projet → scan → la carte liste l'audit créé ; `/app/start` reste sur la même page et affiche verdicts, résumé et message IA sans clé.

@@ -1535,17 +1535,20 @@ export class AppStore {
     payload: string;
     ownership: string;
     redacted: boolean;
+    /** The project the scan was run from, when there was one. */
+    projectId?: string | null;
   }): Promise<void> {
     await this.db
       .prepare(
         `INSERT INTO page_audits
-           (id, workspace_id, created_by, url, final_url, status, duration_ms,
+           (id, workspace_id, project_id, created_by, url, final_url, status, duration_ms,
             worst_verdict, failed, warnings, payload, ownership, redacted, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         input.id,
         input.workspaceId,
+        input.projectId ?? null,
         input.createdBy,
         input.url,
         input.finalUrl,
@@ -1572,20 +1575,24 @@ export class AppStore {
 
   async listPageAudits(
     workspaceId: string,
-    options: { limit: number; offset: number }
+    options: { limit: number; offset: number; projectId?: string | null }
   ): Promise<{ rows: Row[]; total: number }> {
+    // The project page asks for its own history; the workspace-wide list stays the default,
+    // so a scan with no project is still reachable from the scan screen.
+    const scope = options.projectId ? " AND project_id = ?" : "";
+    const args: unknown[] = options.projectId ? [workspaceId, options.projectId] : [workspaceId];
     const total = await this.db
-      .prepare("SELECT COUNT(*) AS count FROM page_audits WHERE workspace_id = ?")
-      .bind(workspaceId)
+      .prepare(`SELECT COUNT(*) AS count FROM page_audits WHERE workspace_id = ?${scope}`)
+      .bind(...args)
       .first<Row>();
     const rows = await this.db
       .prepare(
         `SELECT id, url, final_url, status, duration_ms, worst_verdict, failed, warnings,
-                ownership, redacted, created_at
-         FROM page_audits WHERE workspace_id = ?
+                ownership, redacted, project_id, created_at
+         FROM page_audits WHERE workspace_id = ?${scope}
          ORDER BY created_at DESC LIMIT ? OFFSET ?`
       )
-      .bind(workspaceId, options.limit, options.offset)
+      .bind(...args, options.limit, options.offset)
       .all<Row>();
     return { rows, total: total ? num(total, "count") : 0 };
   }
