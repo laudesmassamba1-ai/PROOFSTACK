@@ -479,6 +479,19 @@ export function ScanPage(): React.ReactElement {
                 {scan.findings.length} {fr ? "constats" : "findings"}
               </p>
             </div>
+            <span className={`scan-ownership is-${scan.ownership ?? "unverified"}`}>
+              {scan.ownership === "local"
+                ? fr
+                  ? "Local"
+                  : "Local"
+                : scan.ownership === "verified"
+                  ? fr
+                    ? "Propriétaire vérifié"
+                    : "Verified owner"
+                  : fr
+                    ? "Site distant non vérifié"
+                    : "Remote, unverified"}
+            </span>
             <button
               type="button"
               className="app-btn app-btn-primary"

@@ -35,6 +35,7 @@ export const USAGE_LIMIT_KEYS: Record<UsageEventKind, EntitlementKey> = {
   export_job: "exit_datasets",
   api_request: "api_access",
   cli_sync: "cli_access",
+  ai_audit: "monthly_ai_audits",
 };
 
 export interface MeterInput {

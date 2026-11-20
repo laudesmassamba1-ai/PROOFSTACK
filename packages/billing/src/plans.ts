@@ -19,9 +19,12 @@ const xof = (whole: number) => ({ currency: "XOF", minor: String(whole) });
 export const FREE_ENTITLEMENTS: Record<EntitlementKey, number | boolean> = {
   workspace_limit: 1,
   project_limit: 1,
-  monthly_test_runs: 50,
-  world_profiles: 3,
-  flow_scenarios: 4,
+  // Ten runs a month is a taste, not a QA department: enough to wire the modules up and
+  // see them work, not enough to run a team's regression on the free tier.
+  monthly_test_runs: 10,
+  monthly_ai_audits: 3,
+  world_profiles: 2,
+  flow_scenarios: 3,
   exit_datasets: 1,
   report_retention_days: 14,
   team_members: 1,
@@ -78,7 +81,8 @@ const PLAN_SEEDS: PlanSeed[] = [
     entitlements: {
       workspace_limit: 1,
       project_limit: 5,
-      monthly_test_runs: 1000,
+      monthly_test_runs: 300,
+      monthly_ai_audits: 60,
       world_profiles: UNLIMITED,
       flow_scenarios: 40,
       exit_datasets: 10,
@@ -118,7 +122,8 @@ const PLAN_SEEDS: PlanSeed[] = [
     entitlements: {
       workspace_limit: 2,
       project_limit: 20,
-      monthly_test_runs: 5000,
+      monthly_test_runs: 1500,
+      monthly_ai_audits: 300,
       world_profiles: UNLIMITED,
       flow_scenarios: 150,
       exit_datasets: 40,
@@ -158,7 +163,8 @@ const PLAN_SEEDS: PlanSeed[] = [
     entitlements: {
       workspace_limit: 10,
       project_limit: UNLIMITED,
-      monthly_test_runs: 25000,
+      monthly_test_runs: 8000,
+      monthly_ai_audits: UNLIMITED,
       world_profiles: UNLIMITED,
       flow_scenarios: UNLIMITED,
       exit_datasets: UNLIMITED,

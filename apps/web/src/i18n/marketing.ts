@@ -108,6 +108,14 @@ export const marketingEn = {
     "Create a workspace, install the CLI, run your first suite. The free plan covers one project and every module — no card required.",
   "home.cta.primary": "Create a free workspace",
   "home.cta.pricing": "See pricing",
+
+  "hero.artifact.title": "PROOFCORE · REPORT",
+  "hero.artifact.note": "example run · not a live execution",
+  "home.stats.label": "The engine in numbers",
+  "home.stats.modules": "modules, one engine",
+  "home.stats.commands": "commands, init to report",
+  "home.stats.entities": "entities in the case model",
+  "home.stats.formats": "report formats, one run",
 } as const;
 
 export type MarketingKey = keyof typeof marketingEn;
@@ -217,6 +225,14 @@ export const marketingFr: Record<MarketingKey, string> = {
     "Créez un espace de travail, installez le CLI, lancez une première suite. Le plan gratuit couvre un projet et tous les modules — sans carte bancaire.",
   "home.cta.primary": "Créer un espace gratuit",
   "home.cta.pricing": "Voir les tarifs",
+
+  "hero.artifact.title": "PROOFCORE · RAPPORT",
+  "hero.artifact.note": "exemple enregistré · pas une exécution en direct",
+  "home.stats.label": "Le moteur en chiffres",
+  "home.stats.modules": "modules, un seul moteur",
+  "home.stats.commands": "commandes, de init à report",
+  "home.stats.entities": "entités dans le modèle de cas",
+  "home.stats.formats": "formats de rapport, une exécution",
 };
 
 export type MarketingFr = typeof marketingFr;

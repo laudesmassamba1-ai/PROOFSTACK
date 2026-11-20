@@ -13,6 +13,8 @@ import { ParticleLogo } from "../components/brand/ParticleLogo.js";
 import { CliPreview } from "../components/marketing/CliPreview.js";
 import { EngineDiagram } from "../components/marketing/EngineDiagram.js";
 import { ModuleShowcase } from "../components/marketing/ModuleShowcase.js";
+import { RunArtifact } from "../components/marketing/RunArtifact.js";
+import { StatStrip } from "../components/marketing/StatStrip.js";
 import { useI18n } from "../i18n/index.js";
 import { Section, SectionHeading } from "../layouts/BrandLayout.js";
 
@@ -52,37 +54,44 @@ export function Home() {
           }}
         />
         <div className="relative z-[2] mx-auto flex min-h-[86vh] max-w-[1240px] flex-col justify-center gap-12 px-5 py-20 sm:py-24 lg:px-8">
-          <div className="max-w-[760px]">
-            <HeroLockup size={54} />
-            <p className="eyebrow mt-10 text-white/80">{t("hero.eyebrow")}</p>
-            {/*
+          {/* Copy left, proof right: the artifact is the hero's second voice —
+              the promise above, the evidence below (an honestly-labelled one). */}
+          <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_0.95fr]">
+            <div>
+              <HeroLockup size={54} />
+              <p className="eyebrow mt-10 text-white/80">{t("hero.eyebrow")}</p>
+              {/*
               The headline is the image, per the reference decoding: uppercase, ultra-tight
               leading (0.86–0.92) and negative tracking (−0.05em), sized to dominate the
               viewport on desktop (88–148px) while still fitting a 320px phone.
             */}
-            <h1 className="rise rise-2 hero-title mt-4 max-w-[16ch] text-balance text-white">
-              {t("hero.title")}
-            </h1>
-            <p className="rise rise-3 mt-6 max-w-[58ch] text-[1.02rem] leading-relaxed text-white/62">
-              {t("hero.lede")}
-            </p>
-            <div className="mt-9 flex flex-wrap items-center gap-3">
-              <Link to="/download" className="btn btn-primary">
-                {t("hero.cta.download")} <ArrowRight size={16} />
-              </Link>
-              <Link to="/signup" className="btn btn-ghost">
-                {t("hero.cta.primary")}
-              </Link>
-              <Link to="/platform" className="btn btn-ghost">
-                {t("hero.cta.explore")}
-              </Link>
-            </div>
-            <div className="mt-10 flex max-w-[620px] flex-col gap-3">
-              <div className="brand-panel inline-flex w-fit max-w-full items-center gap-3 px-4 py-3">
-                <Terminal size={15} className="shrink-0 text-brand-mint" />
-                <code className="truncate text-[0.78rem] text-white/72">{t("hero.cli")}</code>
+              <h1 className="rise rise-2 hero-title mt-4 max-w-[16ch] text-balance text-white">
+                {t("hero.title")}
+              </h1>
+              <p className="rise rise-3 mt-6 max-w-[58ch] text-[1.02rem] leading-relaxed text-white/62">
+                {t("hero.lede")}
+              </p>
+              <div className="mt-9 flex flex-wrap items-center gap-3">
+                <Link to="/download" className="btn btn-primary">
+                  {t("hero.cta.download")} <ArrowRight size={16} />
+                </Link>
+                <Link to="/signup" className="btn btn-ghost">
+                  {t("hero.cta.primary")}
+                </Link>
+                <Link to="/platform" className="btn btn-ghost">
+                  {t("hero.cta.explore")}
+                </Link>
               </div>
-              <p className="font-mono text-[0.68rem] text-white/32">{t("hero.status")}</p>
+              <div className="mt-10 flex max-w-[620px] flex-col gap-3">
+                <div className="brand-panel inline-flex w-fit max-w-full items-center gap-3 px-4 py-3">
+                  <Terminal size={15} className="shrink-0 text-brand-mint" />
+                  <code className="truncate text-[0.78rem] text-white/72">{t("hero.cli")}</code>
+                </div>
+                <p className="font-mono text-[0.68rem] text-white/32">{t("hero.status")}</p>
+              </div>
+            </div>
+            <div className="w-full max-w-[470px] justify-self-center lg:justify-self-end">
+              <RunArtifact />
             </div>
           </div>
 
@@ -112,6 +121,9 @@ export function Home() {
         </div>
       </section>
 
+      {/* Quiet facts, counted up once on first intersection. */}
+      <StatStrip />
+
       <Section id="modules">
         <SectionHeading
           eyebrow={t("modules.eyebrow")}
@@ -120,6 +132,11 @@ export function Home() {
         />
         <div className="mt-10" data-reveal>
           <ModuleShowcase />
+        </div>
+        <div data-reveal className="mt-10 flex flex-wrap items-center gap-3">
+          <Link to="/pricing" className="btn btn-ghost">
+            {t("home.cta.pricing")} <ArrowRight size={16} />
+          </Link>
         </div>
       </Section>
 
@@ -142,6 +159,11 @@ export function Home() {
                 </li>
               ))}
             </ul>
+            <div data-reveal className="mt-8 flex flex-wrap items-center gap-3">
+              <Link to="/platform" className="btn btn-ghost">
+                {t("home.engine.link")} <ArrowRight size={16} />
+              </Link>
+            </div>
           </div>
           <div data-reveal>
             <EngineDiagram />
@@ -173,6 +195,14 @@ export function Home() {
         </ol>
         <div className="mt-10" data-reveal>
           <CliPreview />
+        </div>
+        <div data-reveal className="mt-10 flex flex-wrap items-center gap-3">
+          <Link to="/download" className="btn btn-primary">
+            {t("hero.cta.download")} <ArrowRight size={16} />
+          </Link>
+          <Link to="/pricing" className="btn btn-ghost">
+            {t("home.cta.pricing")}
+          </Link>
         </div>
       </Section>
 

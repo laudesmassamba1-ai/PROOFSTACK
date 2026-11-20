@@ -66,6 +66,7 @@ export const ENTITLEMENT_KEYS = [
   "workspace_limit",
   "project_limit",
   "monthly_test_runs",
+  "monthly_ai_audits",
   "world_profiles",
   "flow_scenarios",
   "exit_datasets",
@@ -237,6 +238,7 @@ export const usageEventKindSchema = z.enum([
   "export_job",
   "api_request",
   "cli_sync",
+  "ai_audit",
 ]);
 export type UsageEventKind = z.infer<typeof usageEventKindSchema>;
 

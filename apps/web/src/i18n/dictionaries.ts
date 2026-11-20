@@ -241,7 +241,7 @@ export const fr: Messages = {
   "hero.cta.docs": "Lire la documentation",
   "hero.cta.download": "Télécharger l’app",
   "hero.cli": "$ npm i -g proofcore && proofcore init",
-  "hero.status": "Moteur v0.1 · s'exécute en local, en CI ou sur une préproduction",
+  "hero.status": "CLI v0.2 · s'exécute en local, en CI ou sur une préproduction",
   "home.signal": "Trois systèmes. Une preuve.",
   "home.engine.eyebrow": "Moteur unifié",
   "home.engine.title": "Trois dimensions de confiance, un seul modèle d'exécution",
