@@ -53,8 +53,9 @@ const PLAN_SEEDS: PlanSeed[] = [
     active: true,
     prices: [],
     entitlements: { ...FREE_ENTITLEMENTS },
-    // FAIL and CLEAN audits are included on every plan; the audit meter is
-    // monthly_test_runs, like the engine modules.
+    // FAIL and CLEAN audits are included on every plan; the in-chat audit tools
+    // are free, while metered AI audits (page scans) count against
+    // monthly_ai_audits via the `ai_audit` usage kind.
     modules: ["world", "flow", "exit", "fail", "clean"],
   },
   {
@@ -95,8 +96,9 @@ const PLAN_SEEDS: PlanSeed[] = [
       client_sharing: false,
       priority_support: false,
     },
-    // FAIL and CLEAN audits are included on every plan; the audit meter is
-    // monthly_test_runs, like the engine modules.
+    // FAIL and CLEAN audits are included on every plan; the in-chat audit tools
+    // are free, while metered AI audits (page scans) count against
+    // monthly_ai_audits via the `ai_audit` usage kind.
     modules: ["world", "flow", "exit", "fail", "clean"],
   },
   {
@@ -136,8 +138,9 @@ const PLAN_SEEDS: PlanSeed[] = [
       client_sharing: true,
       priority_support: false,
     },
-    // FAIL and CLEAN audits are included on every plan; the audit meter is
-    // monthly_test_runs, like the engine modules.
+    // FAIL and CLEAN audits are included on every plan; the in-chat audit tools
+    // are free, while metered AI audits (page scans) count against
+    // monthly_ai_audits via the `ai_audit` usage kind.
     modules: ["world", "flow", "exit", "fail", "clean"],
   },
   {
@@ -177,8 +180,9 @@ const PLAN_SEEDS: PlanSeed[] = [
       client_sharing: true,
       priority_support: true,
     },
-    // FAIL and CLEAN audits are included on every plan; the audit meter is
-    // monthly_test_runs, like the engine modules.
+    // FAIL and CLEAN audits are included on every plan; the in-chat audit tools
+    // are free, while metered AI audits (page scans) count against
+    // monthly_ai_audits via the `ai_audit` usage kind.
     modules: ["world", "flow", "exit", "fail", "clean"],
   },
 ];

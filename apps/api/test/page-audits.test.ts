@@ -1,5 +1,5 @@
 import { scanPage } from "@proofcore/core";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
 import { migrate } from "../src/db/d1.js";
 import { migrationFiles, NodeSqliteDatabase } from "../src/db/node-sqlite.js";
@@ -42,6 +42,9 @@ async function bootstrap() {
         headers: { "content-type": "application/json", origin: config.webOrigin, ...init.headers },
       }),
     store: built.services.store,
+    // Exposed so quota tests can seed usage through the real meter instead of
+    // hand-writing rows the resolver might not read the same way.
+    services: built.services,
     /**
      * Every row of every table, serialised. "This value was never persisted" is a claim
      * about the whole database, not about the one table that was easiest to query.
@@ -526,5 +529,90 @@ describe("page audits", () => {
       { headers: { cookie: stranger.cookie } }
     );
     expect(response.status).toBe(404);
+  });
+});
+
+describe("page audit quota (monthly_ai_audits)", () => {
+  /** Fill the free plan's AI-audit budget through the real meter. */
+  async function exhaustFreeQuota(email: string): Promise<void> {
+    for (let i = 0; i < 3; i += 1) {
+      const metered = await harness.services.meter.meter({
+        workspaceId: (await signUp(email)).workspaceId,
+        kind: "ai_audit",
+        subjectId: `seed_${email}_${i}`,
+        quantity: 1,
+      });
+      expect(metered.reason).toBe("recorded");
+    }
+  }
+
+  it("refuses an unauthenticated scan with 401", async () => {
+    const owner = await signUp("quota-auth-owner@example.com");
+    const response = await harness.request("/api/v1/audits", {
+      method: "POST",
+      body: JSON.stringify({ workspaceId: owner.workspaceId, url: "https://example.com" }),
+    });
+    expect(response.status).toBe(401);
+    const body = (await response.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("not_authenticated");
+  });
+
+  it("denies the scan with the cheapest plan required when the quota is exhausted", async () => {
+    const { cookie, workspaceId } = await signUp("quota-gone@example.com");
+    await exhaustFreeQuota("quota-gone@example.com");
+
+    const response = await harness.request("/api/v1/audits", {
+      method: "POST",
+      headers: { cookie },
+      body: JSON.stringify({ workspaceId, url: "https://example.com" }),
+    });
+    expect(response.status).toBe(403);
+    const body = (await response.json()) as {
+      error: { code: string; details: { limit: number; used: number; requiredPlanKey?: string } };
+    };
+    expect(body.error.code).toBe("quota_exhausted");
+    expect(body.error.details).toMatchObject({ limit: 3, used: 3, requiredPlanKey: "developer" });
+
+    // A denied scan never creates a report: nothing billed, nothing stored.
+    const list = (await (
+      await harness.request(`/api/v1/audits?workspaceId=${workspaceId}`, { headers: { cookie } })
+    ).json()) as { total: number };
+    expect(list.total).toBe(0);
+  });
+
+  it("meters a successful scan and lets the next one through while headroom remains", async () => {
+    const { cookie, workspaceId } = await signUp("quota-happy@example.com");
+    vi.stubGlobal(
+      "fetch",
+      stubSite(pageWithMeta(null)) as unknown as typeof fetch
+    );
+    try {
+      const response = await harness.request("/api/v1/audits", {
+        method: "POST",
+        headers: { cookie },
+        body: JSON.stringify({ workspaceId, url: "https://example.com" }),
+      });
+      expect(response.status).toBe(201);
+
+      // The counter moved through the ai_audit kind, the same one the billing
+      // page reads — not a private tally the dashboard could disagree with.
+      const snapshot = await harness.services.meter.snapshot(workspaceId);
+      expect(snapshot.usage.ai_audit).toBe(1);
+      expect(snapshot.entitlements.entitlements.monthly_ai_audits).toBe(3);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("does not bill a scan that could not reach the site", async () => {
+    const { cookie, workspaceId } = await signUp("quota-failed@example.com");
+    const response = await harness.request("/api/v1/audits", {
+      method: "POST",
+      headers: { cookie },
+      body: JSON.stringify({ workspaceId, url: "https://proofcore-test.invalid/" }),
+    });
+    expect(response.status).toBe(502);
+    const snapshot = await harness.services.meter.snapshot(workspaceId);
+    expect(snapshot.usage.ai_audit ?? 0).toBe(0);
   });
 });

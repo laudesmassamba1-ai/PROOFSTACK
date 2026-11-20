@@ -8,11 +8,11 @@ import {
 import { Hono } from "hono";
 import { z } from "zod";
 import type { AppConfig } from "../env.js";
+import { quotaErrorFromDecision, quotaErrorFromMeter } from "../http/entitlement-http.js";
 import { HttpError, RateLimiter } from "../http/errors.js";
 import { readBody, requireWorkspace } from "../http/guards.js";
 import { pageBody, readPage } from "../http/pagination.js";
 import type { AppEnv, Services } from "../http/services.js";
-import { quotaError } from "../http/entitlement-http.js";
 
 /**
  * Scanning a URL from the app.
@@ -116,11 +116,6 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
   app.post("/audits", async (c) => {
     const user = c.get("user");
     const limited = limiter.check(user.id);
-    // The scan id is minted before the gate so the meter can name its subject even
-    // when the scan itself never happens: the gate is a pure check, the meter only
-    // records once the page has actually been read.
-    const auditId = `aud_${crypto.randomUUID().replaceAll("-", "").slice(0, 20)}`;
-    await requireAiAuditQuota(c, services, user.workspaceId ?? (await primaryWorkspaceId(services, user.id)), auditId);
     if (!limited.allowed) {
       c.header("Retry-After", String(limited.retryAfterSeconds));
       const minutes = Math.max(1, Math.ceil(limited.retryAfterSeconds / 60));
@@ -140,6 +135,20 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
         "insufficient_role",
         "Viewers cannot start a scan. Ask for member rights."
       );
+    }
+
+    // The scan id is minted before the gate so gate and meter name the same subject:
+    // the gate is a pure check (nothing recorded), and the meter below only writes
+    // once the page has actually been read.
+    const auditId = `aud_${crypto.randomUUID().replaceAll("-", "").slice(0, 20)}`;
+    const gate = await services.meter.authorize({
+      workspaceId: workspace.id,
+      check: { key: "monthly_ai_audits", requested: 1 },
+      subjectId: auditId,
+      quantity: 0,
+    });
+    if (!gate.allowed) {
+      throw quotaErrorFromDecision(gate.decision, "AI-audit");
     }
 
     // Validate before the request, and name the fix in the message: the most common
@@ -193,7 +202,7 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
     if (metered.reason === "quota_exhausted") {
       // Race window between the gate and the meter (a concurrent scan consumed the
       // last unit): deny here rather than record an over-quota report.
-      throw quotaError(metered);
+      throw quotaErrorFromMeter(metered, "AI-audit");
     }
 
     const failed = result.findings.filter((item) => item.status === "FAIL").length;

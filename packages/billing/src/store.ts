@@ -74,6 +74,9 @@ const USAGE_KINDS: UsageEventKind[] = [
   "export_job",
   "api_request",
   "cli_sync",
+  // Missing kind means `usageByKind` never pre-seeds its counter to 0, so a
+  // workspace with no AI audit yet reported `undefined` instead of 0.
+  "ai_audit",
 ];
 
 export class MemoryBillingStore implements BillingStore {

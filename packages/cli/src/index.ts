@@ -24,10 +24,6 @@ import {
 import type { ModuleId, ReportFormat, TestRun } from "@proofcore/contracts";
 import { iso, Logger, ProofCoreError, scanPage, stableStringify } from "@proofcore/core";
 import { ENGINE_VERSION, type EngineEvent, runEngine } from "@proofcore/engine";
-import { createExitProvider, defaultExportSource } from "@proofcore/module-exit";
-import { createFlowProvider, defaultFlowTarget } from "@proofcore/module-flow";
-import * as worldProfiles from "@proofcore/module-world";
-import { createWorldProvider, HttpProductUnderTest } from "@proofcore/module-world";
 import {
   buildSemanticIndex,
   completeCode,
@@ -52,9 +48,11 @@ import {
   syncAccountAi,
 } from "./agent-runtime.js";
 import { printAuditHelp } from "./audit.js";
+import { pickPositional, positionalWords } from "./argv.js";
 import { mapArchitecture } from "./code-tools.js";
 import { evaluate, findInstalls, inspectMachine, summarize } from "./doctor-env.js";
 import { HUB_COMMANDS, hubWebPath, runHub } from "./hub.js";
+import { assembleProviders, blockingSafetyWarnings } from "./providers.js";
 import { HubTui } from "./hub-tui.js";
 import {
   appModeCommand,
@@ -271,7 +269,10 @@ async function main(argv: string[]): Promise<number> {
     case undefined:
       // A bare invocation in a terminal opens the hub - one prompt, /help, no ceremony.
       // Piped or CI invocations keep the deterministic help output they already had.
-      if (stdin.isTTY && !flags.json) return startHub(flags);
+      // The `insideHub` guard is the recursion brake: a hub dispatch whose alias
+      // resolves to an empty argv (`/history typed-something`) used to call main([])
+      // and open a second hub inside the first.
+      if (stdin.isTTY && !flags.json && !insideHub) return startHub(flags);
       printHelp(flags);
       return 0;
     case "--help":
@@ -551,14 +552,17 @@ async function commandUpdate(flags: GlobalFlags, args: string[]): Promise<number
         2
       )}\n`
     );
-    return check.error ? 1 : 0;
+    // An unreadable manifest is a harness failure, not a product defect: scripts that
+    // branch on "2 = infrastructure" were getting 1, the code that means "the tool works
+    // but found bugs".
+    return check.error ? 2 : 0;
   }
 
   out(flags, `${bold(flags, "PROOFCORE")} ${dim(flags, `update · current ${CLI_VERSION}`)}`);
   if (check.error) {
     out(flags, `${yellow(flags, "warn")} could not read the release manifest: ${check.error}`);
     out(flags, dim(flags, `  from ${check.channel} · ${check.checkedAt}`));
-    return 1;
+    return 2;
   }
   if (!available) {
     out(
@@ -828,28 +832,6 @@ function moduleStatus(
     default:
       return { ok: false, detail: "unknown module" };
   }
-}
-
-/**
- * Turn profile ids from `--profiles` into profile objects.
- *
- * The provider validates ids against the installed set and throws a clear error for an
- * unknown one, so an operator who typos `fr-BJ` gets told, rather than silently
- * running fewer profiles than they asked for.
- */
-function resolveProfileIds(ids: string[]) {
-  const { PROFILES } = worldProfiles;
-  const byId = new Map(PROFILES.map((profile) => [profile.id, profile]));
-  const missing = ids.filter((id) => !byId.has(id));
-  if (missing.length > 0) {
-    throw new ProofCoreError({
-      message: `Unknown locale profile(s): ${missing.join(", ")}. Available: ${PROFILES.map((p) => p.id).join(", ")}`,
-      category: "CONFIGURATION",
-      code: "unknown_profile",
-      details: { missing },
-    });
-  }
-  return ids.map((id) => byId.get(id)).filter((def) => def !== undefined);
 }
 
 /**
@@ -1165,12 +1147,11 @@ async function commandTest(flags: GlobalFlags, args: string[]): Promise<number> 
       : { ...loaded.config, engine: { ...loaded.config.engine, seed: testArgs.seed } };
   const modules = testArgs.modules.length > 0 ? testArgs.modules : config.enabledModules;
 
-  // Refuse an unsafe configuration before running anything.
-  const blocking = loaded.warnings.filter(
-    (warning: { message: string }) =>
-      warning.message.includes("refused") ||
-      warning.message.includes("not allowed") ||
-      warning.message.includes("requires")
+  // Refuse an unsafe configuration before running anything. The predicate is the same one
+  // the MCP server uses: a config the tool refuses must not become a run the CLI accepts.
+  const blockingMessages = new Set(blockingSafetyWarnings(loaded.warnings));
+  const blocking = loaded.warnings.filter((warning: { message: string }) =>
+    blockingMessages.has(warning.message)
   );
   if (blocking.length > 0) {
     err(flags, red(flags, "Refusing to run: the configuration is unsafe."));
@@ -1178,51 +1159,16 @@ async function commandTest(flags: GlobalFlags, args: string[]): Promise<number> 
     return 2;
   }
 
-  const logger = new Logger({ level: flags.verbose ? "debug" : flags.quiet ? "error" : "warn" });
-  const tokenFor = (envVar: string | undefined) => (envVar ? () => process.env[envVar] : undefined);
-
-  const providers = [];
-  if (modules.includes("world")) {
-    const worldTarget =
-      config.modules.world.target.kind === "http"
-        ? new HttpProductUnderTest({
-            config,
-            ...(config.modules.world.target.tokenEnvVar
-              ? { tokenProvider: tokenFor(config.modules.world.target.tokenEnvVar) }
-              : {}),
-          })
-        : undefined;
-    providers.push(
-      createWorldProvider({
-        ...(worldTarget === undefined ? {} : { target: worldTarget }),
-        ...(testArgs.profiles.length === 0
-          ? {}
-          : { profiles: resolveProfileIds(testArgs.profiles) }),
-      })
-    );
-  }
-  if (modules.includes("flow")) {
-    const flowTarget = defaultFlowTarget(config, tokenFor(readFlowTokenVar(config)));
-    const webhookSecretVar = readFlowWebhookVar(config);
-    providers.push(
-      createFlowProvider({
-        ...(flowTarget === undefined ? {} : { target: flowTarget }),
-        ...(webhookSecretVar && process.env[webhookSecretVar]
-          ? { webhookSecret: process.env[webhookSecretVar] }
-          : {}),
-      })
-    );
-  }
-  if (modules.includes("exit")) {
-    const source = defaultExportSource(config, tokenFor(undefined));
-    providers.push(createExitProvider({ ...(source === undefined ? {} : { source }) }));
-  }
+  // Provider assembly lives in providers.ts, shared with the MCP server's `run_tests`:
+  // two copies of the target/token/profile logic had already started to drift.
+  const providers = await assembleProviders(loaded, modules, { profiles: testArgs.profiles });
 
   if (providers.length === 0) {
     err(flags, red(flags, "No modules selected."));
     return 64;
   }
 
+  const logger = new Logger({ level: flags.verbose ? "debug" : flags.quiet ? "error" : "warn" });
   const showProgress = !flags.json && !flags.quiet && stdout.isTTY;
   let progressTotal = 0;
   let progressDone = 0;
@@ -1316,7 +1262,6 @@ async function commandTest(flags: GlobalFlags, args: string[]): Promise<number> 
   if (flags.json) {
     stdout.write(`${stableStringify(run, 2)}\n`);
   } else {
-    const totals = runTotals(run);
     out(flags, "");
     out(
       flags,
@@ -1325,7 +1270,6 @@ async function commandTest(flags: GlobalFlags, args: string[]): Promise<number> 
         verbose: flags.verbose,
       }).trimEnd()
     );
-    void totals;
   }
 
   if (process.env.CI && !flags.quiet && !flags.json) {

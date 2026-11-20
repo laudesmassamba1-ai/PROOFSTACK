@@ -11,11 +11,11 @@ code is sent anywhere to be "processed for you" unless you ask for a cloud featu
 
 ## What gets built
 
-| File                                      | For                              | How it installs                                                                                                    |
-| ----------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| File                                          | For                              | How it installs                                                                                                    |
+| --------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `proofcore-<version>-setup-win-x64.exe`       | Windows 10/11, x64               | Double-click. Installs to `%LOCALAPPDATA%\PROOFCORE`, adds the user `PATH`, adds a Start Menu entry. No elevation. |
 | `proofcore-<version>-installer-linux-x64.run` | Linux x64 (Mint, Ubuntu, Debian) | `chmod +x` then run. Installs to `~/.local/share/proofcore`, adds one `PATH` line to your shell profile.           |
-| `proofcore_<version>_amd64.deb`               | Debian, Ubuntu, Linux Mint       | `sudo dpkg -i proofcore_<version>_amd64.deb`                                                                           |
+| `proofcore_<version>_amd64.deb`               | Debian, Ubuntu, Linux Mint       | `sudo dpkg -i proofcore_<version>_amd64.deb`                                                                       |
 | `proofcore-<version>-installer-darwin-*.run`  | macOS Intel and Apple Silicon    | Same as Linux.                                                                                                     |
 
 Every artifact is self-contained: the Node runtime the CLI needs is inside the file, so the

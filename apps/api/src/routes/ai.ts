@@ -9,6 +9,7 @@ import {
   type ProviderDefinition,
 } from "../ai-providers.js";
 import { browsePage, describeBrowsedPage } from "../browser-render.js";
+import { quotaErrorFromDecision } from "../http/entitlement-http.js";
 import { clientAddress, HttpError, RateLimiter } from "../http/errors.js";
 import { readBody, requireWorkspace } from "../http/guards.js";
 import { pageBody, readPage } from "../http/pagination.js";
@@ -559,6 +560,30 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
         "relay_kind_mismatch",
         `This account uses an ${actual} model; call the matching relay endpoint.`
       );
+    }
+
+    // Entitlement gate, BEFORE the provider is called: the relay spends the
+    // workspace's monthly AI-audit budget, so an exhausted workspace gets the
+    // upgrade message instead of a provider call it cannot pay for. Pure gate
+    // (quantity 0): a chat turn is not an audit and must not consume the
+    // counter by itself — the counter moves when an audit scan is metered.
+    const workspaces = await services.store.listWorkspaces(user.id);
+    const workspace = workspaces[0];
+    if (!workspace) {
+      throw new HttpError(
+        403,
+        "quota_exhausted",
+        "No workspace is attached to this account, so no plan quota can be checked."
+      );
+    }
+    const gate = await services.meter.authorize({
+      workspaceId: workspace.id,
+      check: { key: "monthly_ai_audits", requested: 1 },
+      subjectId: `relay:${user.id}`,
+      quantity: 0,
+    });
+    if (!gate.allowed) {
+      throw quotaErrorFromDecision(gate.decision, "AI-audit");
     }
     if (!hasEncryptionSecret(services.config)) {
       throw new HttpError(503, "key_storage_unavailable", "The stored AI key cannot be read.");
