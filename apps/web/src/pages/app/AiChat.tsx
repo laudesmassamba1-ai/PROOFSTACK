@@ -16,7 +16,6 @@ import {
   Search,
   Send,
   ShieldAlert,
-  Sparkles,
   Terminal,
   Trash2,
   Users,

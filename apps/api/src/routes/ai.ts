@@ -319,7 +319,12 @@ async function callUpstream(input: {
       }
     : {
         model: input.model,
-        messages: input.messages,
+        // Anthropic takes the system prompt at the top level; OpenAI does not. Every
+        // caller that passes `system` without already embedding it (the memory curator
+        // does exactly that) was silently sending instructions to nobody.
+        messages: input.messages.some((message) => message.role === "system")
+          ? input.messages
+          : [{ role: "system", content: input.system }, ...input.messages],
         tools: TOOLS.map((tool) => ({
           type: "function",
           function: { name: tool.name, description: tool.description, parameters: tool.parameters },

@@ -672,6 +672,77 @@ describe("ai memory and sub-agents", () => {
     expect(system?.content).toContain("XOF, never as floats");
   });
 
+  it("curates memory itself: the assistant decides what to keep, nobody asks it to", async () => {
+    const { request } = harness;
+    const { cookie, workspaceId } = await ready("ai-curator@example.com");
+
+    // Two different calls hit the same fake provider: the answer, then the curator.
+    // Telling them apart by their system prompt is the point — the curator is a separate
+    // pass with a narrow job, not the answer model introspecting.
+    upstreamState.respond = (_n, body) => {
+      const messages = (body as { messages?: { role: string; content: string }[] }).messages ?? [];
+      const system = messages.find((message) => message.role === "system")?.content ?? "";
+      if (system.includes("long-term memory")) {
+        return {
+          status: 200,
+          body: {
+            choices: [
+              {
+                message: {
+                  role: "assistant",
+                  content: JSON.stringify({
+                    facts: [
+                      {
+                        kind: "convention",
+                        text: "Every money amount in this product is stored in XOF, never as a float.",
+                      },
+                      // Out of contract: below the length floor, must be dropped.
+                      { kind: "convention", text: "short" },
+                    ],
+                  }),
+                },
+              },
+            ],
+          },
+        };
+      }
+      return {
+        status: 200,
+        body: { choices: [{ message: { role: "assistant", content: "Noted." } }] },
+      };
+    };
+
+    const turn = await request("/api/v1/ai/chat", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({
+        workspaceId,
+        message: "We invoice in XOF everywhere. Keep that in mind.",
+        effort: "quick",
+      }),
+    });
+    expect(turn.status).toBe(200);
+    const payload = (await turn.json()) as {
+      memory: { facts: number; added: { kind: string; text: string; created: boolean }[] };
+    };
+    expect(payload.memory.added).toHaveLength(1);
+    expect(payload.memory.added[0]?.kind).toBe("convention");
+
+    // The curator is told what to do even on an OpenAI-shaped provider: the system
+    // prompt used to be dropped for that dialect, so the pass ran blind.
+    const curator = JSON.parse(upstreamState.requests.at(-1)?.body ?? "{}") as {
+      messages: { role: string; content: string }[];
+    };
+    expect(curator.messages.find((message) => message.role === "system")?.content).toContain(
+      "long-term memory"
+    );
+
+    const list = await request(`/api/v1/ai/memory?workspaceId=${workspaceId}`, { cookie });
+    const facts = ((await list.json()) as { facts: { text: string; source: string }[] }).facts;
+    expect(facts.map((fact) => fact.source)).toEqual(["assistant"]);
+    expect(facts[0]?.text).toContain("XOF, never as a float");
+  });
+
   it("lets the user add and forget a fact, and refuses a viewer", async () => {
     const { request } = harness;
     const { cookie, workspaceId } = await ready("ai-memory-user@example.com");
