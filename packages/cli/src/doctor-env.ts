@@ -81,7 +81,7 @@ function classifyInstall(realPath: string): string {
     return "desktop";
   }
   if (realPath.includes("node_modules")) return "npm";
-  if (realPath.includes(".local/share") || realPath.includes("sidecar")) return "standalone";
+  if (realPath.includes(".local/") || realPath.includes("sidecar")) return "standalone";
   return "unknown";
 }
 
@@ -175,21 +175,30 @@ export function evaluate(facts: MachineFacts): Check[] {
     checks.push({ name: "config", status: "ok", detail: facts.configDir });
   }
 
-  // A second install is why "it works" and "it fails" can both be true on one machine.
+  // A second install is why "it works" and "it fails" can both be true on one machine. The
+  // desktop app ships its own `proofcore` command that opens a window, so it only conflicts
+  // when it comes first on PATH: after the CLI, `proofcore <command>` does the right thing.
   const installs = facts.installs ?? [];
+  const cliInstalls = installs.filter((item) => item.kind !== "desktop");
+  const desktopShadows = installs[0]?.kind === "desktop" && installs.length > 1;
+  const ambiguous = cliInstalls.length > 1 || desktopShadows;
   checks.push({
     name: "install",
-    status: installs.length <= 1 ? "ok" : "warn",
+    status: ambiguous ? "warn" : installs.length === 0 ? "warn" : "ok",
     detail:
       installs.length === 0
         ? "not found on PATH"
         : installs.map((item) => `${item.kind} ${item.realPath}`).join(" · "),
-    ...(installs.length > 1
+    ...(ambiguous
       ? {
-          fix: `Remove all but one, otherwise the version depends on PATH order. Keep the desktop install and run \`npm uninstall -g proofcore\`, or delete the other binary: ${installs
-            .slice(1)
-            .map((item) => item.realPath)
-            .join(", ")}`,
+          fix: desktopShadows
+            ? `The first on PATH is the desktop app, so \`proofcore <command>\` opens a window instead of running. Put the CLI first, or launch the app from its icon: ${cliInstalls
+                .map((item) => item.realPath)
+                .join(", ")}`
+            : `Remove the extras so the version stops depending on PATH order: ${cliInstalls
+                .slice(1)
+                .map((item) => item.realPath)
+                .join(", ")}`,
         }
       : {}),
   });

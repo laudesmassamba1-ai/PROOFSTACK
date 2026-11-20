@@ -162,6 +162,13 @@ const facts = (overrides: Partial<MachineFacts> = {}): MachineFacts => ({
   executableDirWritable: true,
   columns: 120,
   colorEnabled: true,
+  installs: [
+    {
+      path: "/home/me/.local/bin/proofcore",
+      realPath: "/home/me/.local/share/proofcore/bin/proofcore",
+      kind: "standalone",
+    },
+  ],
   ...overrides,
 });
 
@@ -170,6 +177,54 @@ describe("evaluate", () => {
     const summary = summarize(evaluate(facts()));
     expect(summary.fail).toBe(0);
     expect(summary.warn).toBe(0);
+  });
+
+  it("warns when two installs compete for the same command", () => {
+    const checks = evaluate(
+      facts({
+        installs: [
+          { path: "/a/proofcore", realPath: "/a/node_modules/proofcore/proofcore.js", kind: "npm" },
+          { path: "/b/proofcore", realPath: "/b/proofcore", kind: "standalone" },
+        ],
+      })
+    );
+    const install = checks.find((check) => check.name === "install");
+    expect(install?.status).toBe("warn");
+    expect(install?.fix).toContain("/b/proofcore");
+  });
+
+  it("warns when the desktop app comes first, because it opens a window instead", () => {
+    const checks = evaluate(
+      facts({
+        installs: [
+          { path: "/usr/bin/proofcore", realPath: "/opt/App/proofcore", kind: "desktop" },
+          {
+            path: "/home/me/.local/bin/proofcore",
+            realPath: "/home/me/.local/bin/proofcore",
+            kind: "standalone",
+          },
+        ],
+      })
+    );
+    const install = checks.find((check) => check.name === "install");
+    expect(install?.status).toBe("warn");
+    expect(install?.fix).toContain("opens a window");
+  });
+
+  it("accepts the desktop app next to the CLI, as long as the CLI answers first", () => {
+    const checks = evaluate(
+      facts({
+        installs: [
+          {
+            path: "/home/me/.local/bin/proofcore",
+            realPath: "/home/me/.local/bin/proofcore",
+            kind: "standalone",
+          },
+          { path: "/usr/bin/proofcore", realPath: "/opt/App/proofcore", kind: "desktop" },
+        ],
+      })
+    );
+    expect(checks.find((check) => check.name === "install")?.status).toBe("ok");
   });
 
   it("flags a session file other users could read", () => {
