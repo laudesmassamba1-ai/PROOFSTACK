@@ -53,3 +53,6 @@ artifacts/desktop/
 
 # electron-builder sometimes leaves a Wine prefix when cross-building Windows
 .wine-test/
+
+# Design reference packs dropped in the repo root are read-only inputs, not sources.
+anti-ai-design-main/

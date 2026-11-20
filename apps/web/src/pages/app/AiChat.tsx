@@ -918,9 +918,18 @@ export function AiChatPage(): React.ReactElement {
         method: "POST",
         credentials: "include",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ providerId: profile.providerId ?? "custom" }),
+        body: JSON.stringify({
+          providerId: profile.providerId ?? "custom",
+          // A custom provider has no address of its own: without its base URL the server
+          // cannot list the models and answers 400, which used to leave the picker with
+          // a single option and no explanation.
+          ...(profile.baseUrl ? { baseUrl: profile.baseUrl } : {}),
+        }),
       });
-      if (!response.ok) return;
+      if (!response.ok) {
+        setProfileModels([]);
+        return;
+      }
       const data = (await response.json()) as { chatModels?: string[]; models?: string[] };
       const list = data.chatModels ?? data.models ?? [];
       setProfileModels(Array.isArray(list) ? list : []);
@@ -929,7 +938,7 @@ export function AiChatPage(): React.ReactElement {
     } finally {
       setModelsLoading(false);
     }
-  }, [profile?.configured, profile?.providerId]);
+  }, [profile?.configured, profile?.providerId, profile?.baseUrl]);
 
   // Loaded when the dialog opens and whenever the connected provider changes.
   useEffect(() => {
@@ -1936,24 +1945,37 @@ export function AiChatPage(): React.ReactElement {
                 >
                   {testing ? (fr ? "Test…" : "Testing…") : fr ? "Tester la clé" : "Test the key"}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => void connectProvider()}
-                  disabled={
-                    profileSaving ||
-                    (!keyDraft && !profile?.configured) ||
-                    (activePreset === "custom" && !baseUrlDraft.trim())
-                  }
-                  className="app-btn app-btn-primary app-btn-sm"
-                >
-                  {profileSaving
-                    ? fr
-                      ? "Connexion…"
-                      : "Connecting…"
-                    : fr
-                      ? "Connecter"
-                      : "Connect"}
-                </button>
+                {/* A connected model needs no "Connect" button: pressing it again would
+                    re-send the provider form the user did not change. The primary action
+                    becomes closing the panel, which is what they came to do. */}
+                {profile?.configured && !replacingKey ? (
+                  <button
+                    type="button"
+                    onClick={() => setSettingsOpen(false)}
+                    className="app-btn app-btn-primary app-btn-sm"
+                  >
+                    {fr ? "Terminé" : "Done"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void connectProvider()}
+                    disabled={
+                      profileSaving ||
+                      (!keyDraft && !profile?.configured) ||
+                      (activePreset === "custom" && !baseUrlDraft.trim())
+                    }
+                    className="app-btn app-btn-primary app-btn-sm"
+                  >
+                    {profileSaving
+                      ? fr
+                        ? "Connexion…"
+                        : "Connecting…"
+                      : fr
+                        ? "Connecter"
+                        : "Connect"}
+                  </button>
+                )}
               </div>
             </div>
 
