@@ -588,7 +588,7 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
   "ws.cli.noRun.body":
     "Les projets existent, mais la CLI n'a téléversé aucune exécution. Créez un token limité, lancez les contrôles, puis synchronisez.",
   "ws.cli.what.1": "Tourne sur votre machine ou en CI — pas dans le navigateur ni dans l'API.",
-  "ws.cli.what.2": "Un moteur, un schéma de rapport, trois modules.",
+  "ws.cli.what.2": "Un moteur, un schéma de rapport, cinq modules.",
   "ws.cli.what.3":
     "Le cloud stocke les résultats que vous synchronisez explicitement ; aucun envoi silencieux.",
   "ws.cli.what.4": "Chaque constat en échec inclut une commande reproductible.",
