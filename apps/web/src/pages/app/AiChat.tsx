@@ -12,9 +12,12 @@ import {
   Paperclip,
   Plug,
   Plus,
+  RefreshCw,
   Search,
   Send,
   ShieldAlert,
+  Sparkles,
+  Terminal,
   Trash2,
   Users,
   X,
@@ -28,7 +31,6 @@ import {
   printConversation,
 } from "../../components/app/ChatMarkdown.js";
 import { LoadMore } from "../../components/app/LoadMore.js";
-import { AiMark } from "../../components/brand/AiMark.js";
 import { useI18n } from "../../i18n/index.js";
 import {
   type Attachment,
@@ -343,8 +345,8 @@ function describeFailure(
   }
   if (status === 502 || status === 504) {
     return fr
-      ? "La passerelle a coupé la requête avant la réponse (délai dépassé). Réessaie : si ça se répète, baisse le niveau d'effort — Ultra enchaîne beaucoup d'appels d'outils."
-      : "The gateway cut the request before the answer (timeout). Retry; if it repeats, lower the effort level — Ultra chains many tool calls.";
+      ? "La passerelle a coupé la requête avant la réponse (délai dépassé). Réessaie ; si ça se répète, baisse le niveau d'effort, Ultra enchaîne beaucoup d'appels d'outils."
+      : "The gateway cut the request before the answer (timeout). Retry; if it repeats, lower the effort level, Ultra chains many tool calls.";
   }
   if (message) return message;
   if (raw && raw.length < 200 && !raw.trimStart().startsWith("<")) return raw;
@@ -427,8 +429,8 @@ function EffortPicker({
           ))}
           <p className="chat-effort-note">
             {fr
-              ? "Chaque niveau lance au moins deux sous-agents de relecture, puis une synthèse. Plus l'effort monte, plus il y a de relecteurs — et plus de jetons consommés sur votre propre clé."
-              : "Every level runs at least two reviewing sub-agents, then a synthesis. Higher effort means more reviewers — and more tokens spent on your own key."}
+              ? "Chaque niveau lance au moins deux sous-agents de relecture, puis une synthèse. Plus l'effort monte, plus il y a de relecteurs, et plus de jetons consommés sur votre propre clé."
+              : "Every level runs at least two reviewing sub-agents, then a synthesis. Higher effort means more reviewers, and more tokens spent on your own key."}
           </p>
         </div>
       )}
@@ -650,6 +652,8 @@ export function AiChatPage(): React.ReactElement {
   >([]);
   const [memoryOpen, setMemoryOpen] = useState(false);
   const [memoryDraft, setMemoryDraft] = useState("");
+  /** What the assistant decided to keep after the last turn, shown once. */
+  const [memoryNotice, setMemoryNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   // The browser opens beside the chat, not inside the transcript: a page you can click is a
   // panel, not a message.
@@ -663,11 +667,16 @@ export function AiChatPage(): React.ReactElement {
   const [modelDraft, setModelDraft] = useState("gpt-4o-mini");
   const [keyDraft, setKeyDraft] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  /** Catalogue of the *connected* provider, loaded when the dialog opens. */
+  const [profileModels, setProfileModels] = useState<string[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const [applyingModel, setApplyingModel] = useState(false);
+  /** True while the user is deliberately replacing the stored key. */
+  const [replacingKey, setReplacingKey] = useState(false);
   const [providers, setProviders] = useState<ProviderOption[]>([
     { id: "openai", label: "OpenAI", kind: "openai" },
     { id: "anthropic", label: "Anthropic (Claude)", kind: "anthropic" },
   ]);
-  const [chatModels, setChatModels] = useState<string[]>([]);
   const [profileError, setProfileError] = useState<string | null>(null);
   /** The provider list is server-owned: adding Claude must not need a web release. */
   const loadProviders = useCallback(async () => {
@@ -892,6 +901,104 @@ export function AiChatPage(): React.ReactElement {
     [activeId, startNewChat]
   );
 
+  /**
+   * The models the stored key can actually use.
+   *
+   * Read from the provider through the server, which is the only side that holds the
+   * key. Without it the picker had a single option — the current model — so "change the
+   * model" opened a menu with nothing to choose, which is the bug this fixes.
+   */
+  const loadProfileModels = useCallback(async () => {
+    if (!profile?.configured) {
+      setProfileModels([]);
+      return;
+    }
+    setModelsLoading(true);
+    try {
+      const response = await fetch("/api/v1/ai/profile/test", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ providerId: profile.providerId ?? "custom" }),
+      });
+      if (!response.ok) return;
+      const data = (await response.json()) as { chatModels?: string[]; models?: string[] };
+      const list = data.chatModels ?? data.models ?? [];
+      setProfileModels(Array.isArray(list) ? list : []);
+    } catch {
+      setProfileModels([]);
+    } finally {
+      setModelsLoading(false);
+    }
+  }, [profile?.configured, profile?.providerId]);
+
+  // Loaded when the dialog opens and whenever the connected provider changes.
+  useEffect(() => {
+    if (settingsOpen) void loadProfileModels();
+  }, [settingsOpen, loadProfileModels]);
+
+  /**
+   * Applies a model to the already-stored key.
+   *
+   * It sends `model` alone: the server keeps the encrypted key and re-validates the id
+   * against the provider before storing it. The dialog stays open and confirms, because
+   * closing on success is what made the previous flow feel like nothing happened.
+   */
+  const applyModel = useCallback(
+    async (model: string) => {
+      if (!model || model === profile?.model) return;
+      setApplyingModel(true);
+      setProfileError(null);
+      try {
+        const response = await fetch("/api/v1/ai/profile", {
+          method: "PUT",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            providerId: profile?.providerId ?? activePreset,
+            ...(profile?.providerId === "custom" && profile.baseUrl
+              ? { baseUrl: profile.baseUrl }
+              : {}),
+            model,
+          }),
+        });
+        const raw = await response.text();
+        if (!response.ok) {
+          let parsed: unknown = null;
+          try {
+            parsed = JSON.parse(raw);
+          } catch {
+            parsed = null;
+          }
+          setProfileError(
+            describeFailure(
+              response.status,
+              (parsed ?? {}) as Parameters<typeof describeFailure>[1],
+              raw,
+              fr
+            )
+          );
+          return;
+        }
+        const data = JSON.parse(raw) as ProfileState & { chatModels?: string[] };
+        setProfile((current) => ({ ...(current ?? {}), ...data, configured: true }));
+        if (data.chatModels) setProfileModels(data.chatModels);
+        setModelDraft("");
+        setTestResult({
+          ok: true,
+          message: fr
+            ? `Modèle appliqué : ${data.model ?? model}`
+            : `Model applied: ${data.model ?? model}`,
+        });
+      } catch (error) {
+        setProfileError(error instanceof Error ? error.message : "Network error");
+      } finally {
+        setApplyingModel(false);
+      }
+    },
+    [profile?.providerId, profile?.model, profile?.baseUrl, activePreset, fr]
+  );
+
   const testConnection = useCallback(async () => {
     // `activePreset` and `baseUrlDraft` decide where the key is sent: both must be in
     // the dependency list or a stale provider would be tested.
@@ -995,7 +1102,7 @@ export function AiChatPage(): React.ReactElement {
       }
       const data = parsed as ConnectResponse;
       setProfile(data);
-      if (data.chatModels) setChatModels(data.chatModels);
+      if (data.chatModels) setProfileModels(data.chatModels);
       setKeyDraft("");
       setModelDraft("");
       setTestResult(null);
@@ -1057,7 +1164,10 @@ export function AiChatPage(): React.ReactElement {
         message?: string;
         trace?: AgentTraceStep[];
         subagents?: { id: string; label: string; ok: boolean; note: string }[];
-        memory?: { facts: number };
+        memory?: {
+          facts: number;
+          added?: { kind: string; text: string; created: boolean }[];
+        };
         error?: { code?: string; message?: string; details?: Record<string, unknown> };
       } = {};
       try {
@@ -1088,7 +1198,11 @@ export function AiChatPage(): React.ReactElement {
         )
       );
       // The assistant may have written a fact during this turn: reload so the counter
-      // and the list are never stale.
+      // and the list are never stale, and say out loud what it decided to keep.
+      const written = (data.memory?.added ?? []).filter((fact) => fact.created);
+      setMemoryNotice(
+        written.length > 0 ? written.map((fact) => `${fact.kind} · ${fact.text}`).join(" — ") : null
+      );
       void loadMemory();
       if (!activeId) {
         setConversations((items) => [
@@ -1269,18 +1383,27 @@ export function AiChatPage(): React.ReactElement {
               className={`chat-memory-chevron${memoryOpen ? " is-open" : ""}`}
             />
           </button>
+          {memoryNotice ? (
+            <p className="chat-memory-notice">
+              <Brain size={12} aria-hidden="true" />
+              <span>
+                {fr ? "Retenu par l'assistant : " : "Kept by the assistant: "}
+                {memoryNotice}
+              </span>
+            </p>
+          ) : null}
           {memoryOpen ? (
             <div className="chat-memory-body">
               <p className="chat-memory-note">
                 {fr
-                  ? "Ce que l'assistant sait déjà de ce projet : il le reçoit à chaque tour, quel que soit le modèle connecté."
-                  : "What the assistant already knows about this project: it is given to every turn, whichever model is connected."}
+                  ? "Ce que l'assistant sait déjà de ce projet. Il le reçoit à chaque tour, quel que soit le modèle connecté — et c'est lui qui décide quoi retenir, pas vous."
+                  : "What the assistant already knows about this project. It is given to every turn, whichever model is connected — and it decides what to keep, not you."}
               </p>
               {memory.length === 0 ? (
                 <p className="chat-memory-empty">
                   {fr
-                    ? "Rien encore. L'assistant ajoute un fait quand il apprend une convention, une décision ou une leçon."
-                    : "Nothing yet. The assistant adds a fact when it learns a convention, a decision or a lesson."}
+                    ? "Rien encore. Dès qu'il apprend une convention, une décision ou une leçon durable, l'assistant l'écrit ici de lui-même."
+                    : "Nothing yet. As soon as it learns a durable convention, decision or lesson, the assistant writes it here on its own."}
                 </p>
               ) : (
                 <ul className="chat-memory-list">
@@ -1349,7 +1472,7 @@ export function AiChatPage(): React.ReactElement {
             </button>
           )}
           <div className="chat-topbar-title">
-            <AiMark size={15} className="text-accent" />
+            <Brain size={15} className="text-accent" />
             {fr ? "Assistant PROOFCORE" : "PROOFCORE Assistant"}
           </div>
           {activeWorkspace && <span className="chat-workspace-chip">{activeWorkspace.name}</span>}
@@ -1385,7 +1508,7 @@ export function AiChatPage(): React.ReactElement {
             {/* empty state: centered greeting + composer, like the reference */}
             {!hasMessages && (
               <div className="chat-greeting">
-                <AiMark size={56} className="chat-greeting-mark" decorative />
+                <Terminal size={44} className="chat-greeting-mark text-brand-mint" aria-hidden />
                 <h1 className="chat-greeting-title">{greeting}</h1>
                 <p className="chat-greeting-support">
                   {fr
@@ -1432,7 +1555,7 @@ export function AiChatPage(): React.ReactElement {
                       ) : (
                         <div key={message.id} className="chat-msg chat-msg-ai">
                           <div className="chat-msg-avatar">
-                            <AiMark size={15} />
+                            <Brain size={14} />
                           </div>
                           <div className="chat-msg-body">
                             {message.trace && message.trace.length > 0 && (
@@ -1554,7 +1677,7 @@ export function AiChatPage(): React.ReactElement {
           <div className="chat-dialog">
             <div className="flex items-center justify-between">
               <h3 className="flex items-center gap-2">
-                <AiMark size={15} />
+                <Plug size={15} />
                 {fr ? "Connexion du modèle IA" : "AI model connection"}
               </h3>
               <button
@@ -1572,137 +1695,191 @@ export function AiChatPage(): React.ReactElement {
                 : "Your key stays private. Replace or delete it at any time."}
             </p>
             <div className="mt-4 space-y-3">
-              {/* Step 1 — which provider. The model is never asked for: the server reads
-                  the provider catalogue and picks one from it. */}
-              <div>
-                <p className="app-label">
-                  1. {fr ? "Choisis le fournisseur" : "Choose the provider"}
-                </p>
-                <div className="chat-provider-grid">
-                  {providers.map((preset) => {
-                    const active = activePreset === preset.id;
-                    const note = PROVIDER_HINTS[preset.id];
-                    return (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        onClick={() => {
-                          setActivePreset(preset.id);
-                          setModelDraft("");
-                          setTestResult(null);
-                          setProfileError(null);
-                        }}
-                        title={note?.[fr ? "fr" : "en"] ?? preset.label}
-                        className={`chat-provider ${active ? "is-active" : ""}`}
-                      >
-                        <span className="truncate">{preset.label}</span>
-                        {note && (
-                          <span className="chat-provider-note">{note[fr ? "fr" : "en"]}</span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {activePreset === "custom" && (
-                <label className="block text-xs font-medium">
-                  {fr ? "URL de base" : "Base URL"}
-                  <input
-                    value={baseUrlDraft}
-                    onChange={(event) => setBaseUrlDraft(event.target.value)}
-                    className="app-input"
-                    placeholder="https://api.example.com/v1"
-                  />
-                </label>
-              )}
-
-              {/* Step 2 — the key. That is all we need. */}
-              <label className="block text-xs font-medium">
-                2. {fr ? "Colle ta clé API" : "Paste your API key"}
-                <input
-                  type="password"
-                  value={keyDraft}
-                  onChange={(event) => setKeyDraft(event.target.value)}
-                  className="app-input font-mono"
-                  placeholder={
-                    profile?.configured
-                      ? fr
-                        ? "Laisser vide pour conserver la clé actuelle"
-                        : "Leave empty to keep the current key"
-                      : activePreset === "ollama"
-                        ? "ollama"
-                        : "sk-…"
-                  }
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-                <span className="mt-1 block text-[10.5px] font-normal leading-relaxed text-muted">
+              {/* While a model is connected the dialog has one job: let the user change
+                  the model or replace the key, without pretending they must start over. */}
+              {profile?.configured && !replacingKey ? (
+                <p className="chat-dialog-state">
                   {fr
-                    ? "Créée chez le fournisseur, jamais stockée en clair ici. PROOFCORE lit la liste des modèles de la clé et choisit le meilleur modèle de conversation — tu n'as rien à connaître."
-                    : "Created at the provider, never stored in clear here. PROOFCORE reads the key's model list and picks the best chat model — nothing to know on your side."}
-                </span>
-              </label>
+                    ? "Un modèle est connecté. Change de modèle ou remplace la clé ci-dessous ; rien d'autre n'est nécessaire."
+                    : "A model is connected. Change the model or replace the key below; nothing else is needed."}
+                </p>
+              ) : null}
 
-              {/* Connected state: what was chosen for the user, and how to change it. */}
-              {profile?.configured && (
-                <div className="rounded-xl border border-line bg-surface-2/60 px-3 py-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="min-w-0 truncate text-xs font-medium text-foreground">
-                      {profile.providerLabel ?? profile.providerId ?? "—"}
-                      <span className="ml-1.5 font-mono text-[10.5px] font-normal text-muted">
-                        {profile.model}
-                      </span>
+              {!profile?.configured || replacingKey ? (
+                <>
+                  <div>
+                    <p className="app-label">
+                      1. {fr ? "Choisis le fournisseur" : "Choose the provider"}
                     </p>
+                    <div className="chat-provider-grid">
+                      {providers.map((preset) => {
+                        const active = activePreset === preset.id;
+                        const note = PROVIDER_HINTS[preset.id];
+                        return (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            onClick={() => {
+                              setActivePreset(preset.id);
+                              setModelDraft("");
+                              setTestResult(null);
+                              setProfileError(null);
+                            }}
+                            title={note?.[fr ? "fr" : "en"] ?? preset.label}
+                            className={`chat-provider ${active ? "is-active" : ""}`}
+                          >
+                            <span className="truncate">{preset.label}</span>
+                            {note ? (
+                              <span className="chat-provider-note">{note[fr ? "fr" : "en"]}</span>
+                            ) : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {activePreset === "custom" ? (
+                    <label className="block text-xs font-medium">
+                      {fr ? "URL de base" : "Base URL"}
+                      <input
+                        value={baseUrlDraft}
+                        onChange={(event) => setBaseUrlDraft(event.target.value)}
+                        className="app-input"
+                        placeholder="https://api.example.com/v1"
+                      />
+                    </label>
+                  ) : null}
+
+                  <div className="chat-key-form">
+                    <p className="app-label">
+                      2.{" "}
+                      {profile?.configured
+                        ? fr
+                          ? "Nouvelle clé (vide = garder l'actuelle)"
+                          : "New key (empty = keep the current one)"
+                        : fr
+                          ? "Colle ta clé API"
+                          : "Paste your API key"}
+                    </p>
+                    <input
+                      type="password"
+                      value={keyDraft}
+                      onChange={(event) => setKeyDraft(event.target.value)}
+                      className="app-input font-mono"
+                      placeholder={activePreset === "ollama" ? "ollama" : "sk-…"}
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                    <p className="chat-key-hint">
+                      {fr
+                        ? "Créée chez le fournisseur, jamais stockée en clair ici. PROOFCORE lit la liste des modèles de la clé et choisit le meilleur modèle de conversation — tu n'as rien à connaître."
+                        : "Created at the provider, never stored in clear here. PROOFCORE reads the key's model list and picks the best chat model — nothing to know on your side."}
+                    </p>
+                  </div>
+                </>
+              ) : null}
+
+              {/* Connected state. The model picker lists what the stored key can really
+                  use, read from the provider through the server, and applies on demand. */}
+              {profile?.configured ? (
+                <div className="chat-connected">
+                  <div className="chat-connected-head">
+                    <span className="chat-connected-dot" aria-hidden="true" />
+                    <p className="chat-connected-name">
+                      {profile.providerLabel ?? profile.providerId ?? "—"}
+                    </p>
+                    <span className="chat-connected-model">{profile.model}</span>
+                  </div>
+
+                  <div className="chat-connected-actions">
                     <button
                       type="button"
                       onClick={() => setAdvancedOpen((open) => !open)}
-                      className="shrink-0 text-[10.5px] text-accent hover:underline"
+                      aria-expanded={advancedOpen}
+                      className="chat-connected-link"
                     >
-                      {advancedOpen
+                      {fr ? "Changer de modèle" : "Change model"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReplacingKey((value) => !value);
+                        setTestResult(null);
+                        setProfileError(null);
+                      }}
+                      aria-expanded={replacingKey}
+                      className="chat-connected-link"
+                    >
+                      {replacingKey
                         ? fr
-                          ? "Masquer"
-                          : "Hide"
+                          ? "Annuler le remplacement"
+                          : "Cancel replacement"
                         : fr
-                          ? "Changer de modèle"
-                          : "Change model"}
+                          ? "Remplacer la clé"
+                          : "Replace the key"}
                     </button>
                   </div>
-                  {advancedOpen && (
-                    <div className="mt-2 space-y-2">
+
+                  {advancedOpen ? (
+                    <div className="chat-model-picker">
+                      <label className="chat-model-label" htmlFor="ai-model-select">
+                        {fr ? "Modèle de conversation" : "Chat model"}
+                      </label>
                       <select
-                        value={profile.model}
-                        onChange={(event) => setModelDraft(event.target.value)}
+                        id="ai-model-select"
                         className="app-select font-mono text-[11px]"
+                        value={modelDraft || profile.model}
+                        onChange={(event) => setModelDraft(event.target.value)}
+                        disabled={modelsLoading}
                       >
-                        {[
-                          profile.model,
-                          ...(chatModels ?? []).filter((m) => m !== profile.model),
-                        ].map((model) => (
-                          <option key={model} value={model}>
-                            {model}
-                          </option>
-                        ))}
+                        {/* The current model stays first even before the catalogue
+                            answers: an empty menu would look broken. */}
+                        {[profile.model, ...profileModels.filter((m) => m !== profile.model)].map(
+                          (model) => (
+                            <option key={model} value={model}>
+                              {model}
+                            </option>
+                          )
+                        )}
                       </select>
-                      {modelDraft && (
+                      <div className="chat-model-actions">
                         <button
                           type="button"
-                          onClick={() => void connectProvider()}
-                          disabled={profileSaving}
                           className="app-btn app-btn-primary app-btn-sm"
+                          disabled={applyingModel || !modelDraft || modelDraft === profile.model}
+                          onClick={() => void applyModel(modelDraft)}
                         >
-                          {fr ? "Appliquer" : "Apply"}
+                          {applyingModel
+                            ? fr
+                              ? "Application…"
+                              : "Applying…"
+                            : fr
+                              ? "Appliquer"
+                              : "Apply"}
                         </button>
-                      )}
-                      <p className="text-[10px] leading-relaxed text-muted">
-                        {fr
-                          ? "Liste lue depuis ta clé. Un modèle absent de cette liste ne fonctionnera pas."
-                          : "List read from your key. A model absent from it will not work."}
+                        <button
+                          type="button"
+                          className="app-btn app-btn-sm"
+                          onClick={() => void loadProfileModels()}
+                          disabled={modelsLoading}
+                        >
+                          <RefreshCw size={12} className={modelsLoading ? "animate-spin" : ""} />
+                          {fr ? "Recharger la liste" : "Reload the list"}
+                        </button>
+                      </div>
+                      <p className="chat-model-note">
+                        {modelsLoading
+                          ? fr
+                            ? "Lecture des modèles disponibles sur ta clé…"
+                            : "Reading the models available on your key…"
+                          : fr
+                            ? `${profileModels.length} modèle(s) lus depuis ta clé. Un modèle absent de cette liste ne fonctionnera pas.`
+                            : `${profileModels.length} model(s) read from your key. A model absent from this list will not work.`}
                       </p>
                     </div>
-                  )}
+                  ) : null}
                 </div>
-              )}
+              ) : null}
             </div>
             {profileError && <p className="chat-status is-error mt-3">{profileError}</p>}
             {testResult && (
@@ -1734,8 +1911,15 @@ export function AiChatPage(): React.ReactElement {
                   type="button"
                   onClick={async () => {
                     await fetch("/api/v1/ai/profile", { method: "DELETE", credentials: "include" });
+                    // The dialog stays open: the user just removed the key, so the next
+                    // thing they want is the field to enter the new one.
                     setProfile({ configured: false });
-                    setSettingsOpen(false);
+                    setProfileModels([]);
+                    setAdvancedOpen(false);
+                    setReplacingKey(false);
+                    setKeyDraft("");
+                    setModelDraft("");
+                    setTestResult(null);
                   }}
                   className="flex items-center gap-1.5 text-xs text-destructive hover:underline"
                 >

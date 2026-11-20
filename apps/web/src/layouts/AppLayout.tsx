@@ -1,6 +1,7 @@
 import {
   BadgeCheck,
   Boxes,
+  Brain,
   ChevronDown,
   CloudOff,
   Command,
@@ -26,7 +27,6 @@ import { Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-route
 import { DesktopTools } from "../components/app/DesktopTools.js";
 import { InvitationBanner } from "../components/app/InvitationBanner.js";
 import { WindowControls } from "../components/app/WindowControls.js";
-import { AiMark } from "../components/brand/AiMark.js";
 import { Mark } from "../components/brand/Logo.js";
 import { useI18n } from "../i18n/index.js";
 import { API_BASE, apiFetch } from "../lib/api.js";
@@ -223,7 +223,7 @@ export function AppLayout() {
       ["FAIL", "/app/modules/fail", <ShieldAlert key="fail" size={15} />],
       ["CLEAN", "/app/modules/clean", <BadgeCheck key="clean" size={15} />],
       [t("ws.nav.cli"), "/app/cli", <Terminal key="cli" size={15} />],
-      [t("ws.nav.ai"), "/app/ai", <AiMark key="ai" size={16} />],
+      [t("ws.nav.ai"), "/app/ai", <Brain key="ai" size={15} />],
       [t("ws.nav.billing"), "/app/billing", <CreditCard key="billing" size={15} />],
       [t("ws.nav.settings"), "/app/settings", <SettingsIcon key="settings" size={15} />],
     ];

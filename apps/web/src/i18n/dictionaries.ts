@@ -20,7 +20,7 @@ export const en = {
   "hero.eyebrow": "Integrated software quality suite",
   "hero.title": "Make Software Work Everywhere.",
   "hero.lede":
-    "One unified platform to validate global compatibility, transaction reliability, data portability — and to audit the security and the cleanliness of what you have deployed.",
+    "Your software has to work for a user in Abidjan, one in Paris and one in Montréal, on a phone as much as on a desktop. PROOFCORE tests what they actually live through: locale formats, checkout journeys, exports, security headers, interface quality. It runs on your machine; the report is yours.",
   "hero.cta.primary": "Start for free",
   "hero.cta.explore": "See how it works",
   "hero.cta.docs": "Read the docs",
@@ -30,13 +30,13 @@ export const en = {
   "home.ai.eyebrow": "The AI reading",
   "home.ai.title": "A report tells you what broke. The audit tells you what it costs.",
   "home.ai.lede":
-    "Connect your own model — any OpenAI-compatible endpoint, a local one included. The assistant reads the real findings of the five modules, ranks them by consequence, and writes the fix in the order you should apply it. The key stays encrypted on the server; the model never sees a secret.",
+    "Connect your own model: any OpenAI-compatible endpoint works, a local one included. The assistant reads the real findings of the five modules, ranks them by consequence and writes the fixes in the order to apply them. The key stays encrypted on the server; the model never sees a secret.",
   "home.ai.point.1.t": "Your key, your budget.",
   "home.ai.point.1.d":
     "The audit runs on the model you already pay for. No token markup, no hidden inference bill.",
   "home.ai.point.2.t": "Effort is a dial, not a mystery.",
   "home.ai.point.2.d":
-    "Low, medium or high: each level spawns at least two reviewing sub-agents — more as the effort rises — and shows the token budget it is about to spend.",
+    "Low, medium or high: each level spawns at least two reviewing sub-agents, more as the effort rises, and shows the token budget it is about to spend.",
   "home.ai.point.3.t": "Memory that survives a model change.",
   "home.ai.point.3.d":
     "Decisions, conventions and past lessons live with the workspace, so a new assistant starts already knowing your product.",
@@ -49,14 +49,14 @@ export const en = {
   "home.ai.sample.verdict":
     "The export pipeline is sound; the failure is in the date serialisation of the invoice lines. One defect, two consequences.",
   "home.ai.sample.i1":
-    'exit-014 blocks every user whose locale formats dates with a dot — orders of 12 March export as "12.03" and re-import as invalid.',
+    'exit-014 blocks every user whose locale formats dates with a dot: orders of 12 March export as "12.03" and re-import as invalid.',
   "home.ai.sample.i2":
-    "exit-021 silently truncates amounts above 10,000 — no error, no log. Worth a second look even though it only warns.",
+    "exit-021 silently truncates amounts above 10,000, with no error and no log. Worth a second look even though it only warns.",
   "home.ai.sample.i3":
     "Round trip on 1,000 records: 1,000 returned, checksums match. Nothing to do here.",
   "home.ai.sample.fix":
     "Fix exit-014 first: normalise to ISO 8601 at the boundary and assert the round trip for four locales. Then add a guard test for the truncation.",
-  "home.ai.sample.foot": "Example output, recorded from a real run — not a live model call.",
+  "home.ai.sample.foot": "Example output, recorded from a real run. Not a live model call.",
   "home.signal": "Three systems. One proof.",
   "home.engine.eyebrow": "Unified engine",
   "home.engine.title": "Three dimensions of trust, one execution model",
@@ -97,11 +97,11 @@ export const en = {
   "question.flow": "Can users successfully complete the critical operations?",
   "question.exit": "Can users retrieve their information without losing it?",
   "question.fail": "Where does the deployed application leak, expose or mislead?",
-  "question.clean": "Is the interface measured, scored and clean — provably?",
+  "question.clean": "Is the interface measured, scored and clean, provably?",
   "modules.eyebrow": "Five questions, one engine",
   "modules.title": "WORLD. FLOW. EXIT. FAIL. CLEAN.",
   "modules.lede":
-    "Five modules that share one execution engine, one report architecture, one CLI, one workspace and one billing system — three run fixture and transaction cases, two audit a live URL — and each still works on its own.",
+    "Five modules on one engine, with one CLI and one report. Three run fixture and transaction cases; two audit a live URL. Each works on its own when you only need that one.",
   "modules.world.name": "WORLD",
   "modules.world.tag": "Global compatibility",
   "modules.world.body":
@@ -140,7 +140,7 @@ export const en = {
   "pricing.eyebrow": "Pricing",
   "pricing.title": "Start free. Upgrade when coverage pays.",
   "pricing.lede":
-    "Start free, upgrade when coverage pays for itself. Every plan runs the same engine — the difference is how many projects, runs and seats you need.",
+    "Every plan runs the same engine. What changes is how many projects, runs and seats you need.",
   "pricing.monthly": "Monthly",
   "pricing.yearly": "Yearly",
   "pricing.perMonth": "/ month",
@@ -148,7 +148,7 @@ export const en = {
   "pricing.save": "Save {percent}%",
   "pricing.free": "Free",
   "pricing.founding":
-    "Founding-member pricing — your rate stays locked as long as you keep the subscription.",
+    "Founding-member pricing: your rate stays locked as long as you keep the subscription.",
   "pricing.guarantee":
     "Cancel anytime. Your data stays yours, and nothing is deleted when you downgrade.",
   "pricing.bestValue": "Best value",
@@ -159,7 +159,7 @@ export const en = {
   "pricing.contact": "Talk to us",
   "pricing.renewal.title": "How renewal works on Mobile Money",
   "pricing.renewal.body":
-    "Our current provider (SasPay) supports one-off charges, not automatic recurring debits. Paid plans are therefore prepaid periods with a documented grace period and manual renewal — never presented as an automatic subscription.",
+    "Our current provider (SasPay) supports one-off charges, not automatic recurring debits. Paid plans are therefore prepaid periods with a documented grace period and manual renewal. Never presented as an automatic subscription.",
   "pricing.compare.feature": "Capability",
   "pricing.included": "Included",
   "pricing.notIncluded": "Not included",
@@ -186,8 +186,8 @@ export const en = {
   "auth.submit.up": "Create account",
   "auth.noBackend":
     "The server connection did not complete. No account was created and nothing was sent. Try again in a moment.",
-  "auth.reachable.in": "API reachable — secure sign-in is live.",
-  "auth.reachable.up": "API reachable — your account will really be created.",
+  "auth.reachable.in": "API reachable. Secure sign-in is live.",
+  "auth.reachable.up": "API reachable. Your account will really be created.",
   "auth.checking": "Checking the API…",
   "auth.haveAccount": "Already have an account?",
   "auth.noAccount": "No account yet?",
@@ -233,7 +233,7 @@ export const en = {
   "device.codeLabel": "CODE SHOWN IN THE TERMINAL",
   "device.approve": "Approve",
   "device.deny": "Deny",
-  "device.approved": "Approved. Return to the terminal — it finishes the login on its own.",
+  "device.approved": "Approved. Return to the terminal: it finishes the login on its own.",
   "device.approvedFor": "Approved for {client}. Return to the terminal.",
   "device.denied": "Denied. The terminal will stop waiting.",
   "device.failed": "The request failed. Check the code and try again.",
@@ -269,7 +269,7 @@ export const fr: Messages = {
   "hero.eyebrow": "Suite intégrée de qualité logicielle",
   "hero.title": "Faites fonctionner vos logiciels partout.",
   "hero.lede":
-    "Une plateforme unifiée pour valider la compatibilité mondiale, la fiabilité des transactions, la portabilité des données — et pour auditer la sécurité et la propreté de ce que vous avez déployé.",
+    "Votre logiciel doit marcher pour un utilisateur à Abidjan, un à Paris et un à Montréal, sur mobile comme sur ordinateur. PROOFCORE teste ce qu'ils vivent vraiment : formats locaux, parcours de paiement, exports, en-têtes de sécurité, qualité d'interface. Tout tourne sur votre machine ; le rapport vous appartient.",
   "hero.cta.primary": "Commencer gratuitement",
   "hero.cta.explore": "Voir comment ça marche",
   "hero.cta.docs": "Lire la documentation",
@@ -279,13 +279,13 @@ export const fr: Messages = {
   "home.ai.eyebrow": "La lecture IA",
   "home.ai.title": "Un rapport dit ce qui casse. L'audit dit ce que ça coûte.",
   "home.ai.lede":
-    "Branchez votre propre modèle — n'importe quel point d'accès compatible OpenAI, y compris un modèle local. L'assistant lit les constats réels des cinq modules, les classe par conséquence et écrit la correction dans l'ordre où l'appliquer. La clé reste chiffrée côté serveur ; le modèle ne voit jamais de secret.",
+    "Branchez votre propre modèle : n'importe quel point d'accès compatible OpenAI, y compris un modèle local. L'assistant lit les constats réels des cinq modules, les classe par conséquence et écrit les corrections dans l'ordre où les appliquer. La clé reste chiffrée côté serveur ; le modèle ne voit jamais de secret.",
   "home.ai.point.1.t": "Votre clé, votre budget.",
   "home.ai.point.1.d":
     "L'audit tourne sur le modèle que vous payez déjà. Aucune marge sur les jetons, aucune facture d'inférence cachée.",
   "home.ai.point.2.t": "L'effort est un réglage, pas un mystère.",
   "home.ai.point.2.d":
-    "Bas, moyen ou élevé : chaque niveau crée au moins deux sous-agents de relecture — davantage à mesure que l'effort monte — et affiche le budget de jetons engagé.",
+    "Bas, moyen ou élevé : chaque niveau crée au moins deux sous-agents de relecture, davantage à mesure que l'effort monte, et affiche le budget de jetons engagé.",
   "home.ai.point.3.t": "Une mémoire qui survit au changement de modèle.",
   "home.ai.point.3.d":
     "Décisions, conventions et leçons passées vivent avec l'espace de travail : un nouvel assistant démarre en connaissant déjà votre produit.",
@@ -298,15 +298,15 @@ export const fr: Messages = {
   "home.ai.sample.verdict":
     "La chaîne d'export est saine ; la défaillance est dans la sérialisation des dates des lignes de facture. Un défaut, deux conséquences.",
   "home.ai.sample.i1":
-    'exit-014 bloque tous les utilisateurs dont la locale formate les dates avec un point — le 12 mars sort en "12.03" et revient invalide.',
+    'exit-014 bloque tous les utilisateurs dont la locale formate les dates avec un point : le 12 mars sort en "12.03" et revient invalide.',
   "home.ai.sample.i2":
-    "exit-021 tronque silencieusement les montants au-delà de 10 000 — sans erreur, sans journal. À regarder même si ce n'est qu'un avertissement.",
+    "exit-021 tronque silencieusement les montants au-delà de 10 000, sans erreur ni journal. À regarder même si ce n'est qu'un avertissement.",
   "home.ai.sample.i3":
     "Aller-retour sur 1 000 enregistrements : 1 000 retournés, empreintes identiques. Rien à faire ici.",
   "home.ai.sample.fix":
     "Corrigez exit-014 d'abord : normaliser en ISO 8601 à la frontière et tester l'aller-retour sur quatre locales. Ensuite, un test de garde pour la troncature.",
   "home.ai.sample.foot":
-    "Sortie d'exemple, enregistrée depuis une exécution réelle — pas un appel de modèle en direct.",
+    "Sortie d'exemple, enregistrée depuis une exécution réelle. Pas un appel de modèle en direct.",
   "home.signal": "Trois systèmes. Une preuve.",
   "home.engine.eyebrow": "Moteur unifié",
   "home.engine.title": "Trois dimensions de confiance, un seul modèle d'exécution",
@@ -314,7 +314,7 @@ export const fr: Messages = {
     "WORLD, FLOW et EXIT ne sont pas trois outils collés ensemble. Ils partagent un ordonnanceur, un modèle de cas et un rapport : un jeu de données localisé, un parcours de paiement et un aller-retour d'export produisent le même type de preuve.",
   "home.engine.1": "Ordonnancement déterministe, parallélisme borné et annulation.",
   "home.engine.2":
-    "Reprise uniquement pour les défauts transitoires du harnais, jamais pour masquer un défaut produit.",
+    "Reprise uniquement pour les défauts transitoires du harnais ; jamais pour masquer un défaut produit.",
   "home.engine.3": "Chaque constat porte la commande exacte qui le reproduit.",
   "home.engine.link": "Voir l'architecture",
   "home.modules.eyebrow": "Identités des modules",
@@ -351,11 +351,11 @@ export const fr: Messages = {
   "question.flow": "Les utilisateurs peuvent-ils terminer les opérations critiques ?",
   "question.exit": "Les utilisateurs peuvent-ils récupérer leurs informations sans perte ?",
   "question.fail": "Où l'application déployée fuit-elle, s'expose-t-elle, induit-elle en erreur ?",
-  "question.clean": "L'interface est-elle mesurée, notée et propre — de façon prouvable ?",
+  "question.clean": "L'interface est-elle mesurée, notée et propre, de façon prouvable ?",
   "modules.eyebrow": "Cinq questions, un moteur",
   "modules.title": "WORLD. FLOW. EXIT. FAIL. CLEAN.",
   "modules.lede":
-    "Cinq modules qui partagent un moteur d'exécution, une architecture de rapport, un CLI, un espace de travail et une facturation — trois exécutent des cas et des parcours, deux auditent une URL en ligne — et chacun reste utilisable seul.",
+    "Cinq modules sur un seul moteur, un seul CLI, un seul rapport. Trois exécutent des cas et des parcours ; deux auditent une URL en ligne. Chacun reste utilisable seul, quand vous n'avez besoin que de lui.",
   "modules.world.name": "WORLD",
   "modules.world.tag": "Compatibilité mondiale",
   "modules.world.body":
@@ -392,9 +392,9 @@ export const fr: Messages = {
   "proof.4.body":
     "Les tests tournent dans votre CLI et votre CI. Seules les métadonnées et les résultats sont synchronisés, et jamais par défaut.",
   "pricing.eyebrow": "Tarifs",
-  "pricing.title": "Gratuit d'abord. Passez quand la couverture paie.",
+  "pricing.title": "Gratuit d'abord. Passez au payant quand la couverture le justifie.",
   "pricing.lede":
-    "Commencez gratuitement, passez à un plan payant quand la couverture se rentabilise. Tous les plans exécutent le même moteur — la différence, ce sont vos besoins en projets, exécutions et sièges.",
+    "Tous les plans exécutent le même moteur. Ce qui change : votre nombre de projets, d'exécutions et de sièges.",
   "pricing.monthly": "Mensuel",
   "pricing.yearly": "Annuel",
   "pricing.perMonth": "/ mois",
@@ -402,7 +402,7 @@ export const fr: Messages = {
   "pricing.save": "Économisez {percent} %",
   "pricing.free": "Gratuit",
   "pricing.founding":
-    "Prix membre fondateur — votre tarif reste gelé tant que vous gardez l'abonnement.",
+    "Prix membre fondateur : votre tarif reste gelé tant que vous gardez l'abonnement.",
   "pricing.guarantee":
     "Résiliable à tout moment. Vos données restent les vôtres, rien n'est supprimé en cas de rétrogradation.",
   "pricing.bestValue": "Meilleure valeur",
@@ -413,7 +413,7 @@ export const fr: Messages = {
   "pricing.contact": "Nous parler",
   "pricing.renewal.title": "Renouvellement sur Mobile Money",
   "pricing.renewal.body":
-    "Notre fournisseur actuel (SasPay) propose des paiements ponctuels, pas des prélèvements récurrents automatiques. Les plans payants sont donc des périodes prépayées avec délai de grâce documenté et renouvellement manuel — jamais présentés comme un abonnement automatique.",
+    "Notre fournisseur actuel (SasPay) propose des paiements ponctuels, pas des prélèvements récurrents automatiques. Les plans payants sont donc des périodes prépayées, avec délai de grâce documenté et renouvellement manuel. Jamais présentés comme un abonnement automatique.",
   "pricing.compare.feature": "Capacité",
   "pricing.included": "Inclus",
   "pricing.notIncluded": "Non inclus",
@@ -440,8 +440,8 @@ export const fr: Messages = {
   "auth.submit.up": "Créer le compte",
   "auth.noBackend":
     "La connexion au serveur n'a pas abouti. Aucun compte n'a été créé et rien n'a été envoyé. Réessayez dans un instant.",
-  "auth.reachable.in": "API joignable — connexion sécurisée.",
-  "auth.reachable.up": "API joignable — le compte sera réellement créé.",
+  "auth.reachable.in": "API joignable. Connexion sécurisée.",
+  "auth.reachable.up": "API joignable. Le compte sera réellement créé.",
   "auth.checking": "Vérification de l'API…",
   "auth.haveAccount": "Vous avez déjà un compte ?",
   "auth.noAccount": "Pas encore de compte ?",
@@ -487,7 +487,7 @@ export const fr: Messages = {
   "device.codeLabel": "CODE AFFICHÉ DANS LE TERMINAL",
   "device.approve": "Approuver",
   "device.deny": "Refuser",
-  "device.approved": "Approuvé. Retournez au terminal — il termine la connexion seul.",
+  "device.approved": "Approuvé. Retournez au terminal : il termine la connexion seul.",
   "device.approvedFor": "Approuvé pour {client}. Retournez au terminal.",
   "device.denied": "Refusé. Le terminal arrêtera d'attendre.",
   "device.failed": "La requête a échoué. Vérifiez le code et réessayez.",

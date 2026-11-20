@@ -17,9 +17,15 @@ type DesktopAction = Parameters<NonNullable<Window["proofcoreDesktop"]>["action"
 
 const ACTIONS: { action: DesktopAction; fr: string; en: string; icon: typeof Terminal }[] = [
   {
-    action: "open-agent",
+    action: "open-console",
     fr: "Console locale",
     en: "Local console",
+    icon: Terminal,
+  },
+  {
+    action: "open-agent",
+    fr: "Agent IA local",
+    en: "Local AI agent",
     icon: MonitorPlay,
   },
   {
@@ -103,7 +109,9 @@ export function DesktopTools() {
   if (!bridge) return null;
 
   const run = async (action: DesktopAction) => {
-    if (action === "open-agent" || action === "open-site") setOpen(false);
+    if (action === "open-agent" || action === "open-console" || action === "open-site") {
+      setOpen(false);
+    }
     setBusy(action);
     setFailed(false);
     setOutput("");

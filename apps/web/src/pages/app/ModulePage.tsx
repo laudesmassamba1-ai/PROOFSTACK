@@ -1,10 +1,10 @@
 import {
   ArrowRight,
+  BadgeCheck,
   Globe2,
   PackageOpen,
   Route as RouteIcon,
   ShieldAlert,
-  Sparkles,
   Terminal,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -53,7 +53,7 @@ const MODULES = {
   },
   clean: {
     name: "CLEAN",
-    icon: Sparkles,
+    icon: BadgeCheck,
     summary: "ws.module.clean.summary",
     body: "ws.module.clean.body",
     command: "proofcore audit clean <url>",

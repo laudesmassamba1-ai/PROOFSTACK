@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { ProofCoreError } from "@proofcore/core";
 import { handleMcpToolCall, mcpToolDescriptors } from "./mcp-server.js";
+import { rememberFact } from "./memory.js";
 
 /**
  * The local agent loop.
@@ -299,6 +300,32 @@ const MAX_TOOL_RESULT_CHARS = 24_000;
  * the descriptor but the handler refuses it, because it cannot supply this process's
  * provider, approver and workspace.
  */
+/**
+ * Memory, as a tool the model can call on its own.
+ *
+ * The point of the tool is that nobody prompts for it: the agent notices that this turn
+ * established a convention or a decision and writes it down. It is not routed through the
+ * approver — asking a human to confirm every sentence would train them to press yes — and
+ * it writes only to `.proofcore/memory.json`, a file the user can read and delete.
+ */
+const REMEMBER_TOOL = {
+  name: "remember",
+  description:
+    "Decide on your own to keep one durable fact about this project: a convention, a decision and its reason, a stack fact, a goal, or a lesson from a failure. Use it when the fact will still be true next month and would change how a future assistant acts. Do not store run output, temporary state, secrets or credentials. Skip it entirely when nothing qualifies — most turns qualify for nothing.",
+  parameters: {
+    type: "object",
+    properties: {
+      kind: {
+        type: "string",
+        enum: ["decision", "convention", "stack", "goal", "lesson"],
+      },
+      text: { type: "string", description: "One declarative sentence, present tense." },
+    },
+    required: ["kind", "text"],
+    additionalProperties: false,
+  },
+} as const;
+
 const DELEGATE_TOOL = {
   name: "delegate",
   description:
@@ -331,7 +358,9 @@ function toolSchemas(allowDelegate: boolean): {
     description: descriptor.description,
     parameters: descriptor.inputSchema as Record<string, unknown>,
   }));
-  return allowDelegate ? [...base, DELEGATE_TOOL] : base;
+  // `remember` is local-only for the same reason `delegate` is: it writes into this
+  // workspace's memory file, which an external MCP client does not share.
+  return allowDelegate ? [...base, DELEGATE_TOOL, REMEMBER_TOOL] : [...base, REMEMBER_TOOL];
 }
 
 function truncate(text: string, limit = MAX_TOOL_RESULT_CHARS): string {
@@ -698,6 +727,38 @@ export class AgentSession {
         toolCalls += 1;
         const args = safeParse(call.arguments);
         this.options.onEvent?.({ type: "tool_call", name: call.name, args });
+
+        if (call.name === "remember") {
+          const kind = typeof args.kind === "string" ? args.kind : "";
+          const text = typeof args.text === "string" ? args.text.trim() : "";
+          const kinds = ["decision", "convention", "stack", "goal", "lesson"];
+          if (!kinds.includes(kind) || text.length < 8 || text.length > 400) {
+            const content =
+              "remember needs kind=decision|convention|stack|goal|lesson and a sentence of 8–400 characters. Nothing was stored.";
+            this.messages.push({ role: "tool", toolCallId: call.id, content });
+            this.options.onEvent?.({
+              type: "tool_result",
+              name: "remember",
+              content,
+              isError: true,
+            });
+            continue;
+          }
+          const updated = await rememberFact(
+            this.options.root,
+            text,
+            kind as "decision" | "convention" | "stack" | "goal" | "lesson"
+          );
+          const content = `Stored in project memory (${updated.facts.length} fact(s) now). It will be given to every future session.`;
+          this.messages.push({ role: "tool", toolCallId: call.id, content });
+          this.options.onEvent?.({
+            type: "tool_result",
+            name: "remember",
+            content,
+            isError: false,
+          });
+          continue;
+        }
 
         if (call.name === "delegate") {
           const question = typeof args.question === "string" ? args.question.trim() : "";

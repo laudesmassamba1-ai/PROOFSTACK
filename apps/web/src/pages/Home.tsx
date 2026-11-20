@@ -15,7 +15,6 @@ import { ParticleLogo } from "../components/brand/ParticleLogo.js";
 import { CliPreview } from "../components/marketing/CliPreview.js";
 import { EngineDiagram } from "../components/marketing/EngineDiagram.js";
 import { ModuleShowcase } from "../components/marketing/ModuleShowcase.js";
-import { RunArtifact } from "../components/marketing/RunArtifact.js";
 import { StatStrip } from "../components/marketing/StatStrip.js";
 import { useI18n } from "../i18n/index.js";
 import { Section, SectionHeading } from "../layouts/BrandLayout.js";
@@ -54,8 +53,8 @@ export function Home() {
         <div className="hero-scrim pointer-events-none absolute inset-0 z-[1]" aria-hidden="true" />
         <div className="relative z-[2] mx-auto max-w-[1240px] px-5 pb-10 pt-6 lg:px-8">
           {/* Copy left, proof right: the promise above, the evidence beside it. */}
-          <div className="grid items-center gap-10 lg:grid-cols-[1.06fr_0.94fr] lg:gap-8">
-            <div className="min-w-0">
+          <div className="grid items-center gap-10">
+            <div className="min-w-0 max-w-[640px]">
               <HeroLockup size={46} />
               <p className="eyebrow mt-7 text-white/78">{t("hero.eyebrow")}</p>
               <h1 className="rise rise-2 hero-title mt-3 max-w-[13ch] text-balance text-white">
@@ -85,9 +84,6 @@ export function Home() {
                 </div>
                 <p className="font-mono text-[0.66rem] text-white/32">{t("hero.status")}</p>
               </div>
-            </div>
-            <div className="w-full max-w-[440px] justify-self-center lg:justify-self-end">
-              <RunArtifact />
             </div>
           </div>
 

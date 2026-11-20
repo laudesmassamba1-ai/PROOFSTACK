@@ -434,6 +434,26 @@ describe("sub-agents", () => {
     await expect(readFile(join(root, "hello.ts"), "utf8")).rejects.toThrow();
   });
 
+  it("lets the agent decide to remember a fact, and writes it where the next session reads it", async () => {
+    replies.push(
+      toolCallReply("remember", {
+        kind: "convention",
+        text: "All amounts are stored in XOF, never as floats.",
+      }),
+      textReply("Noted.")
+    );
+
+    const session = new AgentSession({ root, provider: provider(), approve: async () => true });
+    await session.send("We charge in XOF.");
+
+    const memory = JSON.parse(await readFile(join(root, ".proofcore", "memory.json"), "utf8")) as {
+      facts: { kind: string; text: string }[];
+    };
+    expect(memory.facts).toHaveLength(1);
+    expect(memory.facts[0]?.kind).toBe("convention");
+    expect(memory.facts[0]?.text).toContain("XOF, never as floats");
+  });
+
   it("does not let a sub-agent start its own sub-agent", async () => {
     replies.push(
       toolCallReply("delegate", { question: "Investigate the config." }),

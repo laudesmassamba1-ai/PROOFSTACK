@@ -607,15 +607,18 @@ function systemPrompt(
   const memoryBlock =
     memory.length === 0
       ? [
-          "Workspace memory: empty. When you learn something durable about this product",
-          "(a convention, a decision, a hard-won lesson), call `remember` once — it is",
-          "what the next assistant, on a different model, will start from.",
+          "Workspace memory: empty. It is yours to build: when this turn teaches you",
+          "something durable about the product — a convention, a decision, a hard-won",
+          "lesson — call `remember` yourself, without being asked. It is what the next",
+          "assistant, on a different model, will start from.",
         ]
       : [
           `Workspace memory (${memory.length} facts, carried across models and sessions):`,
           ...memory.map((fact) => `- [${fact.kind}] ${fact.text}`),
           "Treat these as established context. If one contradicts what you observe now,",
-          "say so plainly instead of silently ignoring either.",
+          "say so plainly instead of silently ignoring either. And if this turn teaches",
+          "you something durable that is not here yet, call `remember` — you decide what",
+          "belongs in this workspace's memory, nobody has to ask you to.",
         ];
 
   return [
@@ -1256,6 +1259,75 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
       quota = { remaining: meter.remaining, limit: meter.limit };
     }
 
+    // ---- memory curation: the assistant decides what is worth keeping -----------
+    //
+    // Nobody says "remember this": the assistant is asked, once, whether this turn
+    // taught it anything durable, and writes what it judges useful. The curator is a
+    // separate, cheap call with a narrow job, because a model asked to both answer and
+    // introspect tends to introspect badly. It is allowed to answer `[]` — a memory that
+    // fills with noise is worse than an empty one.
+    let remembered: { kind: string; text: string; created: boolean }[] = [];
+    if (finalContent.length > 0) {
+      try {
+        const curated = await callUpstream({
+          kind: profile.providerKind,
+          baseUrl: profile.providerBaseUrl,
+          model: profile.providerModel,
+          apiKey,
+          system: [
+            "You maintain the long-term memory of a workspace in PROOFCORE.",
+            "Read the exchange and decide what a future assistant — on a DIFFERENT model,",
+            "next month — must already know to avoid asking again or contradicting you.",
+            "",
+            "Store only durable, product-specific facts: a convention, a decision and its",
+            "reason, a stack fact, a standing goal, or a lesson learned from a failure.",
+            "Never store: anything already in memory, run output, temporary state, secrets,",
+            "credentials, personal data, or anything that is only true today.",
+            "If nothing qualifies, return an empty array. Most turns qualify for nothing.",
+            "",
+            'Reply with JSON only: {"facts":[{"kind":"decision|convention|stack|goal|lesson","text":"one declarative sentence"}]}',
+            "At most two facts.",
+          ].join("\n"),
+          messages: [
+            {
+              role: "user",
+              content: `Already known:\n${
+                memoryForPrompt.length === 0
+                  ? "(nothing)"
+                  : memoryForPrompt.map((fact) => `- [${fact.kind}] ${fact.text}`).join("\n")
+              }\n\nExchange:\nUser: ${body.message}\nAssistant: ${finalContent.slice(0, 4000)}`,
+            },
+          ],
+          maxTokens: 320,
+          timeoutMs: 10_000,
+        });
+        const json = curated.text.slice(
+          curated.text.indexOf("{"),
+          curated.text.lastIndexOf("}") + 1
+        );
+        const parsed = JSON.parse(json) as {
+          facts?: { kind?: string; text?: string }[];
+        };
+        const kinds = new Set(["decision", "convention", "stack", "goal", "lesson"]);
+        for (const fact of (parsed.facts ?? []).slice(0, 2)) {
+          const kind = typeof fact.kind === "string" ? fact.kind : "";
+          const text = typeof fact.text === "string" ? fact.text.trim() : "";
+          if (!kinds.has(kind) || text.length < 8 || text.length > 400) continue;
+          const saved = await services.store.rememberWorkspaceFact({
+            workspaceId: workspace.id,
+            kind,
+            text,
+            source: "assistant",
+          });
+          remembered.push({ kind, text: saved.record.text, created: saved.created });
+        }
+      } catch {
+        // Curation is an improvement, not a requirement: a failed curator must not fail
+        // the answer the user is waiting for. Nothing is stored on a failure.
+        remembered = [];
+      }
+    }
+
     // Bounded history: a conversation that grows without limit eventually hits the
     // row size limit and would break permanently. Keep the most recent turns.
     const MAX_PERSISTED = 80;
@@ -1295,7 +1367,12 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
         ok: review.ok,
         note: review.ok ? review.note.slice(0, 600) : "",
       })),
-      memory: { facts: memory.length },
+      memory: {
+        facts: memory.length + remembered.filter((fact) => fact.created).length,
+        // What the assistant decided to keep this turn, so the UI can show it happening
+        // instead of asking the user to trust that memory is being written.
+        added: remembered,
+      },
       ...(quota ? { quota } : {}),
     });
   });

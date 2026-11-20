@@ -4467,7 +4467,13 @@ p {
 
 .chat-shell {
   display: flex;
-  height: calc(100vh - 36px);
+  /* The shell fills the page, not the viewport.
+     `100vh - 36px` ignored the workspace chrome above it (window inset, top bar and the
+     page padding), so on a 900px window the panel ended 106px below the fold and the
+     sidebar footer — the only way to connect or change a model — was clipped away.
+     156px is that chrome: 12px frame inset, 56px top bar, 38px page padding above,
+     36px below and the frame's bottom inset. */
+  height: calc(100dvh - 156px);
   min-height: 0;
   overflow: hidden;
   border-radius: 18px;
@@ -5332,14 +5338,16 @@ p {
   }
 
   .chat-shell {
-    height: calc(100vh - 36px);
+    height: calc(100dvh - 156px);
     border-radius: 14px;
   }
 }
 
 @media (max-width: 767px) {
   .chat-shell {
-    height: 100dvh;
+    /* Same rule as desktop: the viewport minus the chrome above the panel. On a phone
+       the top bar is two rows, so the subtraction is larger than on a desktop. */
+    height: calc(100dvh - 196px);
     border: 0;
     border-radius: 0;
   }
@@ -7526,4 +7534,151 @@ p {
 .chat-memory-add button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* ---------------------------------------------------------------- AI connection dialog
+   Three states in one panel: nothing connected (provider + key), connected (model
+   picker + key replacement), and explicitly replacing the key. They used to be one
+   stacked form, so "change the model" opened a menu with a single option and no way
+   back to the key field. */
+
+.chat-dialog-state {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--rule);
+  background: var(--surface-2);
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.chat-connected {
+  display: grid;
+  gap: 10px;
+  padding: 10px 11px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.chat-connected-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.chat-connected-dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.chat-connected-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.chat-connected-model {
+  margin-left: auto;
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-secondary);
+}
+
+.chat-connected-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+
+.chat-connected-link {
+  padding: 0;
+  font-size: 10.5px;
+  color: var(--accent);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-underline-offset: 2px;
+}
+
+.chat-connected-link:hover {
+  text-decoration: underline;
+}
+
+.chat-connected-link[aria-expanded="true"] {
+  color: var(--text-primary);
+  text-decoration: underline;
+}
+
+.chat-model-picker {
+  display: grid;
+  gap: 7px;
+  padding-top: 9px;
+  border-top: 1px solid var(--rule);
+}
+
+.chat-model-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.chat-model-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+
+.chat-model-note {
+  font-size: 10px;
+  line-height: 1.55;
+  color: var(--text-tertiary);
+}
+
+.chat-key-form {
+  display: grid;
+  gap: 7px;
+  padding: 10px 11px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-2) 60%, transparent);
+}
+
+.chat-key-hint {
+  font-size: 10px;
+  line-height: 1.55;
+  color: var(--text-tertiary);
+}
+
+.chat-memory-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 2px 6px 6px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--rule));
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.chat-memory-notice svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--accent);
 }

@@ -745,6 +745,16 @@ ipcMain.handle("proofcore:action", async (_event, action) => {
       mainWindow.show();
       mainWindow.focus();
       mainWindow.webContents.send("proofcore:navigate", "/app/ai/local");
+      return { ok: true, output: "Agent local ouvert." };
+    case "open-console":
+      // The shell console, not the assistant. They are two different pages and the menu
+      // used to send both to the assistant, which is why "Console locale" never opened it.
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        return { ok: false, output: "La fenêtre n'est pas prête." };
+      }
+      mainWindow.show();
+      mainWindow.focus();
+      mainWindow.webContents.send("proofcore:navigate", "/app/terminal");
       return { ok: true, output: "Console locale ouverte." };
     case "tests":
       return { ok: true, output: await runSidecar("test", ["--module", "world,flow,exit"]) };

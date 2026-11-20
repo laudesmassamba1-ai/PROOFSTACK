@@ -34,6 +34,7 @@ declare global {
       action: (
         name:
           | "open-agent"
+          | "open-console"
           | "tests"
           | "doctor"
           | "update"

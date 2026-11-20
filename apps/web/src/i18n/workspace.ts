@@ -33,7 +33,7 @@ export const workspaceEn = {
   "ws.service.body":
     "The site cannot be reached right now. Your last synced view is kept on this machine; actions that need the server are paused until the connection returns.",
   "ws.service.retry": "Try again",
-  "ws.service.openLocal": "Open local console",
+  "ws.service.openLocal": "Open the local agent",
   "ws.service.note": "Local engine tools remain available. Nothing is deleted while offline.",
   "ws.service.diagnostic": "Development API endpoint",
   "ws.offline.banner": "Offline.",
@@ -54,7 +54,7 @@ export const workspaceEn = {
   "ws.overview.onboard.step1":
     "Create a project: its base URL and enabled modules define what is verified.",
   "ws.overview.onboard.step2":
-    "Install the CLI and export the project token — the engine runs on your machine.",
+    "Install the CLI and export the project token: the engine runs on your machine.",
   "ws.overview.onboard.step3":
     "Run the checks and sync: the report lands here, verified and scored.",
   "ws.overview.onboard.copy": "Copy the CLI setup",
@@ -212,7 +212,7 @@ export const workspaceEn = {
     "{time} · the status is the uploaded run status, not a local test result.",
   "ws.cli.noRun.body":
     "The projects exist, but the CLI has not uploaded a run. Create a scoped token, run the checks, then sync.",
-  "ws.cli.what.1": "Runs on your machine or CI — not in the browser or the API.",
+  "ws.cli.what.1": "Runs on your machine or in CI, never in the browser or the API.",
   "ws.cli.what.2": "One engine, one report schema, five modules.",
   "ws.cli.what.3": "The cloud stores results you explicitly sync; no silent upload.",
   "ws.cli.what.4": "Every failed finding includes a reproducible command.",
@@ -233,7 +233,7 @@ export const workspaceEn = {
   "ws.cli.trouble.upload.body2": "is the explicit upload step.",
   "ai.title": "AI assistant",
   "ai.description":
-    "Chat with your own AI, connected to this workspace's real data. The model reads projects, runs, findings and reports through read-only tools — every consultation is shown.",
+    "Chat with your own AI, connected to this workspace's real data. The model reads projects, runs, findings and reports through read-only tools; every consultation is shown.",
   "ai.connect": "Connect my AI",
   "ai.settings": "AI settings",
   "ai.keyPrivacy":
@@ -243,7 +243,7 @@ export const workspaceEn = {
   "ai.apiKey": "API key",
   "ai.keyStored":
     "Examples: https://api.openai.com/v1, https://generativelanguage.googleapis.com/v1beta/openai, https://openrouter.ai/api/v1, a local Ollama.",
-  "ai.needKey": "Add your API key first — the AI is yours, PROOFCORE does not provide one.",
+  "ai.needKey": "Add your API key first. The AI is yours; PROOFCORE does not provide one.",
   "ai.empty": "Ask about your quality data.",
   "ai.emptyHint":
     '"What did the last run find on FLOW?" · "Summarize the failed findings." · "Which project is behind on EXIT?"',
@@ -270,7 +270,7 @@ export const workspaceEn = {
   "wh.lastDelivery": "Last delivery",
   "wh.never": "never",
   "wh.delete": "Remove",
-  "wh.createdNotice": "Webhook created. The secret is shown once — copy it now.",
+  "wh.createdNotice": "Webhook created. The secret is shown once; copy it now.",
   "admin.title": "Operations",
   "admin.description":
     "Users, workspaces, payments, runs and webhook delivery for this deployment.",
@@ -402,7 +402,7 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
   "ws.service.body":
     "Le site est momentanément injoignable. La dernière vue synchronisée reste sur cette machine ; les actions qui ont besoin du serveur attendent le retour de la connexion.",
   "ws.service.retry": "Réessayer",
-  "ws.service.openLocal": "Ouvrir la console locale",
+  "ws.service.openLocal": "Ouvrir l'agent local",
   "ws.service.note":
     "Les outils du moteur local restent disponibles. Rien n'est supprimé hors ligne.",
   "ws.service.diagnostic": "Point d'accès API de développement",
@@ -425,7 +425,7 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
   "ws.overview.onboard.step1":
     "Créez un projet : son URL de base et ses modules définissent ce qui est vérifié.",
   "ws.overview.onboard.step2":
-    "Installez le CLI et exportez le jeton du projet — le moteur tourne chez vous.",
+    "Installez le CLI et exportez le jeton du projet : le moteur tourne chez vous.",
   "ws.overview.onboard.step3":
     "Lancez les vérifications et sync : le rapport arrive ici, vérifié et noté.",
   "ws.overview.onboard.copy": "Copier la configuration CLI",
@@ -587,7 +587,7 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
     "{time} · le statut est celui du run téléversé, pas un résultat de test local.",
   "ws.cli.noRun.body":
     "Les projets existent, mais la CLI n'a téléversé aucune exécution. Créez un token limité, lancez les contrôles, puis synchronisez.",
-  "ws.cli.what.1": "Tourne sur votre machine ou en CI — pas dans le navigateur ni dans l'API.",
+  "ws.cli.what.1": "Tourne sur votre machine ou en CI, jamais dans le navigateur ni dans l'API.",
   "ws.cli.what.2": "Un moteur, un schéma de rapport, cinq modules.",
   "ws.cli.what.3":
     "Le cloud stocke les résultats que vous synchronisez explicitement ; aucun envoi silencieux.",
@@ -609,7 +609,7 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
   "ws.cli.trouble.upload.body2": "est l'étape de téléversement explicite.",
   "ai.title": "Assistant IA",
   "ai.description":
-    "Discutez avec votre propre IA, connectée aux données réelles de cet espace de travail. Le modèle lit projets, exécutions, constats et rapports via des outils en lecture seule — chaque consultation est affichée.",
+    "Discutez avec votre propre IA, connectée aux données réelles de cet espace de travail. Le modèle lit projets, exécutions, constats et rapports via des outils en lecture seule ; chaque consultation est affichée.",
   "ai.connect": "Connecter mon IA",
   "ai.settings": "Réglages IA",
   "ai.keyPrivacy":
@@ -619,7 +619,7 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
   "ai.apiKey": "Clé API",
   "ai.keyStored":
     "Exemples : https://api.openai.com/v1, https://generativelanguage.googleapis.com/v1beta/openai, https://openrouter.ai/api/v1, un Ollama local.",
-  "ai.needKey": "Ajoutez d'abord votre clé API — l'IA est la vôtre, PROOFCORE n'en fournit pas.",
+  "ai.needKey": "Ajoutez d'abord votre clé API. L'IA est la vôtre ; PROOFCORE n'en fournit pas.",
   "ai.empty": "Posez une question sur vos données qualité.",
   "ai.emptyHint":
     '"Qu\'a trouvé la dernière exécution sur FLOW ?" · "Résume les constats en échec." · "Quel projet est en retard sur EXIT ?"',
@@ -646,7 +646,7 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
   "wh.lastDelivery": "Dernière livraison",
   "wh.never": "jamais",
   "wh.delete": "Retirer",
-  "wh.createdNotice": "Webhook créé. Le secret s'affiche une seule fois — copiez-le maintenant.",
+  "wh.createdNotice": "Webhook créé. Le secret s'affiche une seule fois ; copiez-le maintenant.",
   "admin.title": "Opérations",
   "admin.description":
     "Utilisateurs, espaces de travail, paiements, exécutions et diffusion des webhooks de ce déploiement.",

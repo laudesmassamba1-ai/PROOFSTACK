@@ -6,7 +6,6 @@ import {
   Loader2,
   RefreshCw,
   ScanLine,
-  Sparkles,
   X,
 } from "lucide-react";
 import type React from "react";
@@ -498,11 +497,7 @@ export function ScanPage(): React.ReactElement {
               onClick={() => void explain()}
               disabled={explaining}
             >
-              {explaining ? (
-                <Loader2 size={13} className="animate-spin" aria-hidden />
-              ) : (
-                <Sparkles size={13} aria-hidden />
-              )}
+              {explaining ? <Loader2 size={13} className="animate-spin" aria-hidden /> : null}
               {fr ? "Interpréter avec l'IA" : "Interpret with AI"}
             </button>
           </div>
@@ -612,10 +607,7 @@ export function ScanPage(): React.ReactElement {
 
           {explanation || explainError ? (
             <Card className="scan-ai">
-              <p className="scan-ai-head">
-                <Sparkles size={14} aria-hidden />
-                {fr ? "Lecture de l'IA" : "AI reading"}
-              </p>
+              <p className="scan-ai-head">{fr ? "Lecture de l'IA" : "AI reading"}</p>
               {explanation ? <p className="scan-ai-body">{explanation}</p> : null}
               {explainError ? (
                 <p className="scan-ai-error">

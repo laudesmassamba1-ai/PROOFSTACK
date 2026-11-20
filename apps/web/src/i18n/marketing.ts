@@ -93,7 +93,7 @@ export const marketingEn = {
   "home.flow.eyebrow": "Developer workflow",
   "home.flow.title": "From install to report in three commands.",
   "home.flow.lede":
-    "The CLI runs the same engine the dashboard shows: a local project file, every module you enable, one report. Nothing is faked in the preview below — it is a recorded example, clearly labelled.",
+    "The CLI runs the same engine the dashboard shows: a local project file, every module you enable, one report. The preview below is a recorded example, clearly labelled.",
   "home.flow.step.1.k": "STEP 01 — INIT",
   "home.flow.step.1.t": "Describe the product under test",
   "home.flow.step.1.d":
@@ -110,7 +110,7 @@ export const marketingEn = {
   "home.cta.eyebrow": "Start today",
   "home.cta.title": "Put your software to the proof.",
   "home.cta.lede":
-    "Create a workspace, install the CLI, run your first suite. The free plan covers one project and every module — no card required.",
+    "Create a workspace, install the CLI, run your first suite. The free plan covers one project and every module. No card required.",
   "home.cta.primary": "Create a free workspace",
   "home.cta.pricing": "See pricing",
 
@@ -215,7 +215,7 @@ export const marketingFr: Record<MarketingKey, string> = {
   "home.flow.eyebrow": "Parcours développeur",
   "home.flow.title": "De l'installation au rapport en trois commandes.",
   "home.flow.lede":
-    "Le CLI exécute le même moteur que le tableau de bord : un fichier projet local, tous les modules activés, un rapport. Rien n'est simulé dans l'aperçu ci-dessous — c'est un exemple enregistré, signalé comme tel.",
+    "Le CLI exécute le même moteur que le tableau de bord : un fichier projet local, tous les modules activés, un rapport. L'aperçu ci-dessous est un exemple enregistré, signalé comme tel.",
   "home.flow.step.1.k": "ÉTAPE 01 — INIT",
   "home.flow.step.1.t": "Décrire le produit à tester",
   "home.flow.step.1.d":
@@ -232,7 +232,7 @@ export const marketingFr: Record<MarketingKey, string> = {
   "home.cta.eyebrow": "Commencer aujourd'hui",
   "home.cta.title": "Mettez votre logiciel à l'épreuve.",
   "home.cta.lede":
-    "Créez un espace de travail, installez le CLI, lancez une première suite. Le plan gratuit couvre un projet et tous les modules — sans carte bancaire.",
+    "Créez un espace de travail, installez le CLI, lancez une première suite. Le plan gratuit couvre un projet et tous les modules. Sans carte bancaire.",
   "home.cta.primary": "Créer un espace gratuit",
   "home.cta.pricing": "Voir les tarifs",
 
