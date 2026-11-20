@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { stdin, stdout } from "node:process";
@@ -47,12 +47,12 @@ import {
   sessionId,
   syncAccountAi,
 } from "./agent-runtime.js";
-import { printAuditHelp } from "./audit.js";
 import { pickPositional, positionalWords } from "./argv.js";
+import { printAuditHelp } from "./audit.js";
 import { mapArchitecture } from "./code-tools.js";
 import { evaluate, findInstalls, inspectMachine, summarize } from "./doctor-env.js";
+import { effortProfile, parseEffort, subagentPrompt } from "./effort.js";
 import { HUB_COMMANDS, hubWebPath, runHub } from "./hub.js";
-import { assembleProviders, blockingSafetyWarnings } from "./providers.js";
 import { HubTui } from "./hub-tui.js";
 import {
   appModeCommand,
@@ -63,6 +63,15 @@ import {
 } from "./launch.js";
 import { type ServeHandle, serveLocal } from "./local-bridge.js";
 import { mcpToolDescriptors, ProofcoreMcpServer, serveMcpStdio } from "./mcp-server.js";
+import {
+  forgetFact,
+  loadMemory,
+  MEMORY_FILE,
+  memoryPrompt,
+  rememberFact,
+  summarizeConversation,
+} from "./memory.js";
+import { assembleProviders, blockingSafetyWarnings } from "./providers.js";
 import { describeSandbox, runInSandbox } from "./sandbox.js";
 import { analyzeStack, readStackFacts } from "./stack-check.js";
 import {
@@ -380,6 +389,8 @@ async function main(argv: string[]): Promise<number> {
       return commandAgentTools(command, flags, args);
     case "agent":
       return commandAgent(flags, args);
+    case "memory":
+      return commandMemory(flags, args);
     case "whoami":
       return commandWhoami(flags);
     case "hub":
@@ -2433,7 +2444,18 @@ function isLocalTarget(target: string): boolean {
  * to the account's own model to interpret.
  */
 async function commandScan(flags: GlobalFlags, args: string[], only: string[]): Promise<number> {
-  const target = args.find((arg) => !arg.startsWith("-") && arg !== "scan" && arg !== "check");
+  // The target must not be a flag's VALUE: `scan --header "X: y" https://real` used to
+  // pick "X: y" as the URL, and every valued flag (--only, --cookie, --login-*…) had the
+  // same trap. The flag list here is the one the parser below consumes.
+  const target = pickPositional(args, [
+    "--only",
+    "--header",
+    "--cookie",
+    "--login-url",
+    "--login-email",
+    "--login-password",
+    "--verify-token",
+  ]);
   if (!target) {
     err(flags, red(flags, "Usage: proofcore scan <url> [--only fail,clean] [--explain]"));
     err(flags, dim(flags, "Example: proofcore scan http://localhost:3000"));
@@ -2811,6 +2833,46 @@ async function askHidden(question: string): Promise<string> {
 }
 
 /**
+ * The three facts about the stack that are worth re-reading on every run: they change
+ * (a Node upgrade, a switch from npm to pnpm) and they are the ones a memory prompt cites.
+ * Read from disk, never guessed.
+ */
+function stackSummaryForMemory(root: string): {
+  nodeVersion: string;
+  lockfile?: string;
+  frameworks: string[];
+} {
+  let lockfile: string | undefined;
+  for (const name of ["pnpm-lock.yaml", "package-lock.json", "yarn.lock", "bun.lockb"]) {
+    try {
+      readFileSync(join(root, name));
+      lockfile = name;
+      break;
+    } catch {
+      // absent: try the next one
+    }
+  }
+  let frameworks: string[] = [];
+  try {
+    const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    const names = Object.keys({ ...manifest.dependencies, ...manifest.devDependencies });
+    frameworks = names.filter((name) =>
+      ["react", "next", "vue", "svelte", "nuxt", "hono", "express", "@angular/core"].includes(name)
+    );
+  } catch {
+    frameworks = [];
+  }
+  return {
+    nodeVersion: process.versions.node,
+    ...(lockfile ? { lockfile } : {}),
+    frameworks,
+  };
+}
+
+/**
  * `proofcore agent` — the local coding loop.
  *
  * This is the architecture every CLI coding tool uses: the process on this machine owns
@@ -2822,11 +2884,26 @@ async function commandAgent(flags: GlobalFlags, args: string[]): Promise<number>
 
   const root = flags.cwd;
   const autoApprove = args.includes("--yes");
-  const maxSteps = Number(flagValue(args, "--max-steps") ?? "24");
-  const prompt = args
-    .filter((arg) => !arg.startsWith("-"))
-    .join(" ")
-    .trim();
+  /**
+   * Effort is the one dial the user is asked to understand: it decides how many
+   * sub-agents review the work, how far the turn may run, and therefore how many tokens
+   * the turn spends. The profile is read before anything else so a mistyped level is
+   * refused with the three accepted values.
+   */
+  const effortLevel = parseEffort(flagValue(args, "--effort"));
+  const profile = effortProfile(effortLevel);
+  const explicitSteps = Number(flagValue(args, "--max-steps") ?? "");
+  const maxSteps =
+    Number.isFinite(explicitSteps) && explicitSteps > 0 ? explicitSteps : profile.maxSteps;
+
+  // Memory: what this project has already taught the agent. Loaded before the provider
+  // is resolved so a failure to read it is reported as such, never as a missing model.
+  const memory = await loadMemory(root).catch(() => null);
+  const stack = stackSummaryForMemory(root);
+  const memoryBlock = memory ? memoryPrompt(memory, root, stack) : "";
+  const effortBlock = subagentPrompt(profile);
+  // `--model foo` used to paste "foo" into the prompt: flag values are not instructions.
+  const prompt = positionalWords(args, ["--model", "--base-url", "--max-steps"]).join(" ").trim();
 
   // A model saved in the web account is the default for this CLI. Logging in already
   // writes it, but refreshing here also repairs an expired relay cookie or a profile
@@ -2845,6 +2922,10 @@ async function commandAgent(flags: GlobalFlags, args: string[]): Promise<number>
   } catch (error) {
     err(flags, red(flags, describeError(error).message));
     return 2;
+  }
+
+  if (!flags.json) {
+    out(flags, dim(flags, `${profile.label} · ${memory?.facts.length ?? 0} fait(s) en mémoire`));
   }
 
   const history = args.includes("--continue")
@@ -2875,7 +2956,11 @@ async function commandAgent(flags: GlobalFlags, args: string[]): Promise<number>
       root,
       provider,
       approve,
-      maxSteps: Number.isFinite(maxSteps) && maxSteps > 0 ? maxSteps : 24,
+      maxSteps,
+      // The two blocks the model needs to behave like this workspace's agent: what the
+      // project already decided (memory) and how the chosen effort level expects the work
+      // to be organised (sub-agents, cross-checks, depth).
+      extraInstructions: [memoryBlock, effortBlock].filter((part) => part.trim()).join("\n\n"),
       onEvent: (event) => {
         if (event.type === "assistant_text" && !flags.json) out(flags, `\n${event.text}\n`);
         if (event.type === "tool_call" && !flags.json) {
@@ -2900,6 +2985,10 @@ async function commandAgent(flags: GlobalFlags, args: string[]): Promise<number>
     if (prompt) {
       const result = await session.send(prompt);
       await saveSession(root, sessionId(root), result.messages, { model: provider.model });
+      // A turn that changed files or ran tools is what a later session needs to know
+      // about; a turn that only talked is not. The summary is heuristic on purpose: an
+      // extra model call to write three lines of memory is a cost with no benefit.
+      await persistTurnMemory(root, prompt, result.messages).catch(() => undefined);
       if (flags.json) {
         stdout.write(
           `${JSON.stringify({ text: result.text, toolCalls: result.toolCalls, refused: result.refused }, null, 2)}\n`
@@ -2920,11 +3009,17 @@ async function commandAgent(flags: GlobalFlags, args: string[]): Promise<number>
       }
       if (line === "exit" || line === "quit") break;
       if (line === "clear") {
-        out(flags, dim(flags, "(history cleared on next launch)"));
+        // The help text promises "clear drops the history"; the code used to only print
+        // that it would happen on the next launch — a promise the code did not keep.
+        // The stored session is emptied now, and the live session too.
+        session.clearHistory();
+        await saveSession(root, sessionId(root), session.history, { model: provider.model });
+        out(flags, dim(flags, "(history cleared)"));
         continue;
       }
       const result = await session.send(line);
       await saveSession(root, sessionId(root), result.messages, { model: provider.model });
+      await persistTurnMemory(root, line, result.messages).catch(() => undefined);
       if (controller.signal.aborted) break;
     }
     return 0;
@@ -2934,6 +3029,112 @@ async function commandAgent(flags: GlobalFlags, args: string[]): Promise<number>
   } finally {
     process.off("SIGINT", onInterrupt);
   }
+}
+
+/**
+ * Keeps the project memory a little more current after a turn.
+ *
+ * Only facts the conversation genuinely established are stored: a goal the user stated,
+ * and a lesson when the turn had to correct itself. Nothing is invented, because memory
+ * that contains guesses is worse than an empty memory — the next agent would trust it.
+ */
+async function persistTurnMemory(
+  root: string,
+  question: string,
+  messages: { role: string; content: string }[]
+): Promise<void> {
+  const summary = summarizeConversation(messages);
+  if (!summary.trim()) return;
+  const goal = question.trim();
+  if (goal.length >= 12 && goal.length <= 280) {
+    await rememberFact(root, goal, "goal");
+  }
+  if (summary.length >= 40) {
+    await rememberFact(root, summary, "lesson");
+  }
+  const memory = await loadMemory(root);
+  if (!memory.summary.trim()) {
+    await saveMemorySummary(root, summary);
+  }
+}
+
+async function saveMemorySummary(root: string, summary: string): Promise<void> {
+  const { saveMemory } = await import("./memory.js");
+  const memory = await loadMemory(root);
+  await saveMemory(root, { ...memory, summary: summary.slice(0, 2000) });
+}
+
+/**
+ * `proofcore memory` — read, add and forget what the agent knows about this project.
+ *
+ * Memory an agent writes and nobody can inspect is a liability. This command is the
+ * inspection: the same file the agent reads at the start of a turn, printed, addable and
+ * removable, per project.
+ */
+async function commandMemory(flags: GlobalFlags, args: string[]): Promise<number> {
+  const root = flags.cwd;
+  // `--kind` takes a value: without naming it here, "convention" would be read as part of
+  // the sentence the user asked to remember, and the fact would end with the flag value.
+  const positionals = positionalWords(args, ["--kind"]);
+  const sub = positionals.find((word) => word !== "memory") ?? "show";
+  const rest = positionals
+    .filter((word) => word !== "memory" && word !== sub)
+    .join(" ")
+    .trim();
+
+  if (sub === "add") {
+    if (rest.length < 4) {
+      err(flags, red(flags, 'Usage: proofcore memory add "a durable fact"'));
+      return 64;
+    }
+    const kindFlag = flagValue(args, "--kind") ?? "convention";
+    const kind = ["decision", "convention", "stack", "goal", "lesson"].includes(kindFlag)
+      ? (kindFlag as "decision" | "convention" | "stack" | "goal" | "lesson")
+      : "convention";
+    await rememberFact(root, rest, kind);
+    out(flags, green(flags, `remembered [${kind}] ${rest}`));
+    return 0;
+  }
+
+  if (sub === "forget" || sub === "rm") {
+    if (rest.length < 2) {
+      err(flags, red(flags, 'Usage: proofcore memory forget "a phrase from the fact"'));
+      return 64;
+    }
+    const after = await forgetFact(root, rest);
+    out(flags, dim(flags, `${after.facts.length} fait(s) restant(s)`));
+    return 0;
+  }
+
+  const memory = await loadMemory(root);
+  const file = join(root, MEMORY_FILE);
+  if (flags.json) {
+    stdout.write(`${JSON.stringify({ ...memory, file }, null, 2)}\n`);
+    return 0;
+  }
+  out(flags, bold(flags, "PROOFCORE memory"));
+  out(flags, dim(flags, file));
+  if (memory.summary.trim()) out(flags, `\n${memory.summary.trim()}`);
+  if (memory.facts.length === 0) {
+    out(
+      flags,
+      dim(flags, "\nRien encore. L'agent enregistre une convention, une décision ou une leçon.")
+    );
+    out(flags, dim(flags, '  proofcore memory add "prices are in XOF, never floats"'));
+    return 0;
+  }
+  const byKind = new Map<string, string[]>();
+  for (const fact of memory.facts) {
+    const list = byKind.get(fact.kind) ?? [];
+    list.push(fact.text);
+    byKind.set(fact.kind, list);
+  }
+  for (const [kind, facts] of byKind) {
+    out(flags, `\n${kind.toUpperCase()}`);
+    for (const fact of facts) out(flags, `  - ${fact}`);
+  }
+  out(flags, dim(flags, `\n${memory.facts.length} fait(s) · ${file}`));
+  return 0;
 }
 
 /** Opens a URL in the user's browser, best effort. Never fatal: the URL is printed too. */
@@ -3662,7 +3863,9 @@ function printHelp(flags: GlobalFlags): void {
   w("  tools                       list every agent tool and where it lives");
   w("  app                         the application, in its own window (what the icon runs)");
   w('  agent ["prompt"] [--yes]     local coding agent: reads, edits, runs, with diffs');
+  w("  agent --effort low|medium|high   how many reviewers and how far a turn may run");
   w("  agent --configure           store the model URL/model/key (0600, local only)");
+  w("  memory [show|add|forget]    what the agent already knows about this project");
   w("  whoami                      which account and which model this CLI will use");
   w("  serve [--port 7317]         local agent + web page, synced to the account");
   w('  exec "<cmd>" [--writable]   run a command in a container, or refuse');
@@ -3699,6 +3902,7 @@ function printHelp(flags: GlobalFlags): void {
   w("  1  at least one product defect");
   w("  2  harness error or invalid configuration");
   w("  3  run cancelled");
+  w("  64  usage error: unknown command, bad flag or missing argument");
   w("");
   w(dim(flags, `cli ${CLI_VERSION} · engine ${ENGINE_VERSION} · ${iso()}`));
 }

@@ -290,6 +290,61 @@ describe("account relay for the local agent", () => {
     expect(response.status).toBe(401);
   });
 
+  it("denies the relay with the plan required when the AI-audit quota is exhausted", async () => {
+    const { request, signUp, services } = harness;
+    const { cookie, workspaceId } = await signUp("ai-relay-quota@example.com");
+    await request("/api/v1/ai/profile", {
+      method: "PUT",
+      cookie,
+      body: JSON.stringify({
+        providerId: "custom",
+        baseUrl: upstreamBase,
+        model: "test-model",
+        apiKey: "sk-relay-secret-9876",
+      }),
+    });
+
+    // Fill the counter through the real meter — the same rows the billing page and the
+    // scan gate read. The limit is read from the plan, not written here: the free tier is
+    // a commercial decision, and a hard-coded number would break on every revision.
+    const snapshot = await services.meter.snapshot(workspaceId);
+    const rawLimit = snapshot.entitlements.entitlements.monthly_ai_audits;
+    const limit = typeof rawLimit === "number" ? rawLimit : 0;
+    for (let i = 0; i < limit; i += 1) {
+      const metered = await services.meter.meter({
+        workspaceId,
+        kind: "ai_audit",
+        subjectId: `seed_relay_${i}`,
+        quantity: 1,
+      });
+      expect(metered.reason).toBe("recorded");
+    }
+
+    upstreamState.respond = () => ({
+      status: 200,
+      body: { choices: [{ message: { role: "assistant", content: "should not happen" } }] },
+    });
+    const response = await request("/api/v1/ai/relay/chat/completions", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({ messages: [{ role: "user", content: "hello" }] }),
+    });
+    expect(response.status).toBe(403);
+    const body = (await response.json()) as {
+      error: { code: string; details: { limit: number; used: number; requiredPlanKey?: string } };
+    };
+    expect(body.error.code).toBe("quota_exhausted");
+    expect(body.error.details).toMatchObject({
+      limit,
+      used: limit,
+      requiredPlanKey: "developer",
+    });
+
+    // The gate sits BEFORE the proxy: an exhausted workspace must not spend a
+    // provider call, so nothing reached the fake upstream.
+    expect(upstreamState.requests).toHaveLength(0);
+  });
+
   it("requires a saved profile instead of inventing a provider", async () => {
     const { request, signUp } = harness;
     const { cookie } = await signUp("ai-relay-empty@example.com");
@@ -493,6 +548,267 @@ describe("ai chat", () => {
     const { cookie } = await signUp("ai-404@example.com");
     const response = await request("/api/v1/ai/conversations/aic_missing", { cookie });
     expect(response.status).toBe(404);
+  });
+});
+
+describe("ai memory and sub-agents", () => {
+  /** A workspace with a stored key, ready to chat. */
+  async function ready(email: string): Promise<{ cookie: string; workspaceId: string }> {
+    const session = await harness.signUp(email);
+    await harness.request("/api/v1/ai/profile", {
+      method: "PUT",
+      cookie: session.cookie,
+      body: JSON.stringify({
+        providerId: "custom",
+        baseUrl: upstreamBase,
+        model: "test-model",
+        apiKey: "sk-memory-key-123",
+      }),
+    });
+    return session;
+  }
+
+  /** A provider that answers everything with one sentence. */
+  function answer(text: string): void {
+    upstreamState.respond = () => ({
+      status: 200,
+      body: { choices: [{ message: { role: "assistant", content: text } }] },
+    });
+  }
+
+  it("advertises at least two sub-agents per level, and more as effort rises", async () => {
+    const { request } = harness;
+    const { cookie } = await harness.signUp("ai-effort@example.com");
+    const response = await request("/api/v1/ai/effort", { cookie });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      efforts: { id: string; subagents: number; lenses: { id: string }[] }[];
+    };
+    for (const level of body.efforts) {
+      expect(level.subagents, level.id).toBeGreaterThanOrEqual(2);
+      // The advertised panel is the one that will actually run.
+      expect(level.lenses).toHaveLength(level.subagents);
+    }
+    const counts = body.efforts.map((level) => level.subagents);
+    expect(counts).toEqual([...counts].sort((a, b) => a - b));
+    expect(counts.at(-1)).toBeGreaterThan(counts[0] ?? 0);
+  });
+
+  it("writes a remembered fact and gives it to a brand-new conversation and model", async () => {
+    const { request } = harness;
+    const { cookie, workspaceId } = await ready("ai-memory@example.com");
+
+    // Turn 1: the model decides the workspace charges in XOF and remembers it.
+    upstreamState.respond = (attempt) => {
+      if (attempt === 1) {
+        return {
+          status: 200,
+          body: {
+            choices: [
+              {
+                message: {
+                  role: "assistant",
+                  content: null,
+                  tool_calls: [
+                    {
+                      id: "call_mem",
+                      type: "function",
+                      function: {
+                        name: "remember",
+                        arguments: JSON.stringify({
+                          kind: "convention",
+                          text: "All amounts are stored in XOF, never as floats.",
+                        }),
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        };
+      }
+      return {
+        status: 200,
+        body: { choices: [{ message: { role: "assistant", content: "Noted." } }] },
+      };
+    };
+
+    const first = await request("/api/v1/ai/chat", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({ workspaceId, message: "We charge in XOF.", effort: "quick" }),
+    });
+    expect(first.status).toBe(200);
+
+    const stored = await request(`/api/v1/ai/memory?workspaceId=${workspaceId}`, { cookie });
+    const memory = (await stored.json()) as {
+      facts: { kind: string; text: string; source: string }[];
+    };
+    expect(memory.facts).toHaveLength(1);
+    expect(memory.facts[0]?.kind).toBe("convention");
+    expect(memory.facts[0]?.source).toBe("assistant");
+
+    // A different model, a new conversation: the fact must already be in the prompt.
+    const fresh = `conv_${Math.random().toString(36).slice(2)}`;
+    upstreamState.requests = [];
+    answer("Understood.");
+    const second = await request("/api/v1/ai/chat", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({
+        workspaceId,
+        conversationId: undefined,
+        message: "Which currency do we use?",
+        effort: "quick",
+      }),
+    });
+    expect(second.status).toBe(200);
+    void fresh;
+    const systemPrompt = JSON.parse(upstreamState.requests[0]?.body ?? "{}") as {
+      messages: { role: string; content: string }[];
+    };
+    const system = systemPrompt.messages.find((message) => message.role === "system");
+    expect(system?.content).toContain("XOF, never as floats");
+  });
+
+  it("lets the user add and forget a fact, and refuses a viewer", async () => {
+    const { request } = harness;
+    const { cookie, workspaceId } = await ready("ai-memory-user@example.com");
+
+    const created = await request("/api/v1/ai/memory", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({
+        workspaceId,
+        kind: "stack",
+        text: "The checkout lives in apps/store.",
+      }),
+    });
+    expect(created.status).toBe(201);
+    const fact = ((await created.json()) as { fact: { id: string; source: string } }).fact;
+    expect(fact.source).toBe("user");
+
+    // Repeating the same sentence refreshes it instead of duplicating it.
+    const again = await request("/api/v1/ai/memory", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({
+        workspaceId,
+        kind: "stack",
+        text: "the checkout lives in apps/store",
+      }),
+    });
+    expect(again.status).toBe(200);
+    const list = await request(`/api/v1/ai/memory?workspaceId=${workspaceId}`, { cookie });
+    expect(((await list.json()) as { facts: unknown[] }).facts).toHaveLength(1);
+
+    const removed = await request(`/api/v1/ai/memory/${fact.id}`, {
+      method: "DELETE",
+      cookie,
+      body: JSON.stringify({ workspaceId }),
+    });
+    expect(removed.status).toBe(200);
+    const empty = await request(`/api/v1/ai/memory?workspaceId=${workspaceId}`, { cookie });
+    expect(((await empty.json()) as { facts: unknown[] }).facts).toHaveLength(0);
+  });
+
+  it("reports a reviewer that failed instead of hiding it, and still answers", async () => {
+    const { request } = harness;
+    const { cookie, workspaceId } = await ready("ai-lens@example.com");
+
+    let call = 0;
+    upstreamState.respond = () => {
+      call += 1;
+      // Call 1 is the main answer; calls 2..4 are reviewers. Fail two of them.
+      if (call === 2 || call === 3) return { status: 500, body: {} };
+      return {
+        status: 200,
+        body: { choices: [{ message: { role: "assistant", content: "Answer." } }] },
+      };
+    };
+
+    const response = await request("/api/v1/ai/chat", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({ workspaceId, message: "Explain the run.", effort: "balanced" }),
+    });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      message: string;
+      subagents: { id: string; ok: boolean }[];
+    };
+    expect(body.message).toBe("Answer.");
+    expect(body.subagents).toHaveLength(3); // balanced
+    expect(body.subagents.filter((agent) => !agent.ok)).toHaveLength(2);
+  });
+
+  it("counts a module-reading turn as an audit once, and a plain question as none", async () => {
+    const { request, services } = harness;
+    const { cookie, workspaceId } = await ready("ai-meter@example.com");
+
+    // A plain question: no module tool, so the audit counter must not move.
+    answer("Hello.");
+    await request("/api/v1/ai/chat", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({ workspaceId, message: "hello", effort: "quick" }),
+    });
+    let usage = await services.billing.usageByKind(
+      workspaceId,
+      "2000-01-01T00:00:00.000Z",
+      "2999-01-01T00:00:00.000Z"
+    );
+    expect(usage.ai_audit ?? 0).toBe(0);
+
+    // A turn that reads findings is an audit.
+    let turn = 0;
+    upstreamState.respond = () => {
+      turn += 1;
+      if (turn === 1) {
+        return {
+          status: 200,
+          body: {
+            choices: [
+              {
+                message: {
+                  role: "assistant",
+                  content: null,
+                  tool_calls: [
+                    {
+                      id: "call_f",
+                      type: "function",
+                      function: { name: "recent_findings", arguments: "{}" },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        };
+      }
+      return {
+        status: 200,
+        body: { choices: [{ message: { role: "assistant", content: "No findings." } }] },
+      };
+    };
+    const audited = await request("/api/v1/ai/chat", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({ workspaceId, message: "audit my runs", effort: "quick" }),
+    });
+    expect(audited.status).toBe(200);
+    const payload = (await audited.json()) as { quota?: { limit: number; remaining: number } };
+    // The free plan allows 3 AI audits; one was consumed by this turn.
+    expect(payload.quota).toBeDefined();
+    expect(payload.quota?.remaining).toBe((payload.quota?.limit ?? 0) - 1);
+
+    usage = await services.billing.usageByKind(
+      workspaceId,
+      "2000-01-01T00:00:00.000Z",
+      "2999-01-01T00:00:00.000Z"
+    );
+    expect(usage.ai_audit ?? 0).toBe(1);
   });
 });
 

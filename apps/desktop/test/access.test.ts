@@ -9,6 +9,7 @@ const {
   DAY_MS,
   evaluateAccess,
   formatRemaining,
+  normalizeStoredSession,
   parseJwtExpiry,
   sessionToken,
 } = require("../src/access.cjs");
@@ -86,6 +87,48 @@ describe("evaluateAccess", () => {
     });
     expect(state.allowed).toBe(false);
     expect(state.reason).toBe("expired");
+  });
+});
+
+describe("normalizeStoredSession", () => {
+  const fallback = "https://api.test";
+
+  it("keeps the apiUrl the session already carries (trimmed)", () => {
+    const session = normalizeStoredSession(
+      { cookie: "ps_session=abc", apiUrl: "https://other.test///" },
+      fallback
+    );
+    expect(session).toMatchObject({ apiUrl: "https://other.test", cookie: "ps_session=abc" });
+  });
+
+  it("fills the configured API in when the session has none", () => {
+    // A CLI session without apiUrl could never be re-confirmed by the site: the
+    // probe had no origin to ask, so the account aged out on the grace clock alone.
+    const session = normalizeStoredSession({ token: "tk", email: "a@b.test" }, fallback);
+    expect(session).toMatchObject({ apiUrl: fallback, token: "tk" });
+  });
+
+  it("keeps the other fields untouched instead of rebuilding the object", () => {
+    const expiresAt = "2026-03-08T12:00:00.000Z";
+    const session = normalizeStoredSession(
+      {
+        cookie: "ps_session=abc",
+        email: "a@b.test",
+        savedAt: "2026-03-01T00:00:00.000Z",
+        expiresAt,
+      },
+      fallback
+    );
+    expect(session).toMatchObject({
+      email: "a@b.test",
+      savedAt: "2026-03-01T00:00:00.000Z",
+      expiresAt,
+    });
+  });
+
+  it("answers null for a husk without a credential, so callers treat it as no session", () => {
+    expect(normalizeStoredSession(null, fallback)).toBeNull();
+    expect(normalizeStoredSession({ email: "a@b.test" }, fallback)).toBeNull();
   });
 });
 

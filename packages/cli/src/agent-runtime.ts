@@ -288,16 +288,50 @@ export interface ToolResult {
 const MAX_TOOL_RESULT_CHARS = 24_000;
 
 /** Tool schemas in the shape both providers accept: JSON Schema, plus a name. */
-function toolSchemas(): {
+/**
+ * The one tool that is not an MCP tool: delegation.
+ *
+ * Sub-agents are only real if the model can actually start one. A prompt that says
+ * "structure your work into sub-agents" and a runtime that cannot is a lie the model
+ * then narrates. `delegate` spawns a nested session with read-only tools, its own token
+ * budget and a scoped question, and returns its report to the parent — which is what the
+ * product's effort levels promise. It is local-agent-only: an external MCP client gets
+ * the descriptor but the handler refuses it, because it cannot supply this process's
+ * provider, approver and workspace.
+ */
+const DELEGATE_TOOL = {
+  name: "delegate",
+  description:
+    "Start one sub-agent on a scoped question about this workspace. The sub-agent can read files, search, and run read-only checks, then reports facts. It cannot edit anything. Use it when two parts of the task are independent, and prefer several narrow questions over one broad one.",
+  parameters: {
+    type: "object",
+    properties: {
+      question: {
+        type: "string",
+        description:
+          "What the sub-agent must establish, in one or two sentences. It has no memory of this conversation.",
+      },
+      scope: {
+        type: "string",
+        description: "Files or directories the sub-agent should stay inside. Optional.",
+      },
+    },
+    required: ["question"],
+    additionalProperties: false,
+  },
+} as const;
+
+function toolSchemas(allowDelegate: boolean): {
   name: string;
   description: string;
   parameters: Record<string, unknown>;
 }[] {
-  return mcpToolDescriptors().map((descriptor) => ({
+  const base = mcpToolDescriptors().map((descriptor) => ({
     name: descriptor.name,
     description: descriptor.description,
-    parameters: descriptor.inputSchema,
+    parameters: descriptor.inputSchema as Record<string, unknown>,
   }));
+  return allowDelegate ? [...base, DELEGATE_TOOL] : base;
 }
 
 function truncate(text: string, limit = MAX_TOOL_RESULT_CHARS): string {
@@ -308,8 +342,9 @@ function truncate(text: string, limit = MAX_TOOL_RESULT_CHARS): string {
 export async function callChatModel(
   provider: AgentProvider,
   messages: ChatMessage[],
-  options: { timeoutMs?: number; signal?: AbortSignal } = {}
+  options: { timeoutMs?: number; signal?: AbortSignal; allowDelegate?: boolean } = {}
 ): Promise<ModelReply> {
+  const allowDelegate = options.allowDelegate ?? true;
   const isAnthropic =
     provider.kind === "anthropic" || /anthropic|\/messages$/.test(provider.baseUrl);
   const url = isAnthropic
@@ -330,7 +365,7 @@ export async function callChatModel(
         max_tokens: 4096,
         system: messages.find((message) => message.role === "system")?.content,
         messages: toAnthropicMessages(messages),
-        tools: toolSchemas().map((tool) => ({
+        tools: toolSchemas(allowDelegate).map((tool) => ({
           name: tool.name,
           description: tool.description,
           input_schema: tool.parameters,
@@ -355,7 +390,7 @@ export async function callChatModel(
           }
           return { role: message.role, content: message.content };
         }),
-        tools: toolSchemas().map((tool) => ({
+        tools: toolSchemas(allowDelegate).map((tool) => ({
           type: "function",
           function: { name: tool.name, description: tool.description, parameters: tool.parameters },
         })),
@@ -378,7 +413,18 @@ export async function callChatModel(
     });
   }
 
-  const payload = (await response.json()) as Record<string, unknown>;
+  let payload: Record<string, unknown>;
+  try {
+    payload = (await response.json()) as Record<string, unknown>;
+  } catch {
+    // A proxy or a captive portal answers HTML with a 200. Without this, the agent dies on
+    // a bare SyntaxError; with it, the operator learns which layer answered.
+    throw new ProofCoreError({
+      message: `Model call failed: HTTP ${response.status} answered something that is not JSON (a proxy, an error page or a wrong base URL).`,
+      category: "PROVIDER",
+      code: "model_call_failed",
+    });
+  }
   return isAnthropic ? parseAnthropicReply(payload) : parseOpenAiReply(payload);
 }
 
@@ -394,6 +440,17 @@ function parseOpenAiReply(payload: Record<string, unknown>): ModelReply {
   const choice = (payload.choices as { message?: Record<string, unknown> }[] | undefined)?.[0];
   const message = choice?.message ?? {};
   const rawCalls = (message.tool_calls as Record<string, unknown>[] | undefined) ?? [];
+  // OpenAI-compatible servers speak prompt_tokens/completion_tokens; the internal shape is
+  // camelCase. Passing the raw object through typed it but carried the wrong keys, so every
+  // caller reading usage.promptTokens saw undefined for non-Anthropic providers.
+  const rawUsage = payload.usage as
+    | {
+        prompt_tokens?: number;
+        completion_tokens?: number;
+        promptTokens?: number;
+        completionTokens?: number;
+      }
+    | undefined;
   return {
     text: typeof message.content === "string" ? message.content : "",
     toolCalls: rawCalls.map((call, index) => {
@@ -404,7 +461,12 @@ function parseOpenAiReply(payload: Record<string, unknown>): ModelReply {
         arguments: String(fn.arguments ?? "{}"),
       };
     }),
-    usage: payload.usage as ModelReply["usage"],
+    usage: rawUsage
+      ? {
+          promptTokens: rawUsage.prompt_tokens ?? rawUsage.promptTokens,
+          completionTokens: rawUsage.completion_tokens ?? rawUsage.completionTokens,
+        }
+      : undefined,
   };
 }
 
@@ -491,6 +553,12 @@ export interface AgentSessionOptions {
   signal?: AbortSignal;
   /** System prompt additions, e.g. project rules from AGENTS.md. */
   extraInstructions?: string;
+  /**
+   * Whether this session may start sub-agents. Depth 0 (the user's session) can; a
+   * sub-agent cannot delegate again, which is what keeps one question from fanning out
+   * into an unbounded tree of model calls.
+   */
+  allowDelegate?: boolean;
 }
 
 export type AgentEvent =
@@ -547,6 +615,56 @@ export class AgentSession {
     return [...this.messages];
   }
 
+  /** Drops the conversation, keeping only the system prompt (`agent`'s `clear` verb). */
+  clearHistory(): void {
+    const system = this.messages.find((message) => message.role === "system");
+    this.messages = system ? [system] : [{ role: "system", content: SYSTEM_PROMPT }];
+  }
+
+  /**
+   * Runs one sub-agent and returns its report as the tool result.
+   *
+   * The sub-agent gets its own conversation, no memory of this one, read-only tools and a
+   * small step budget. Mutations are refused rather than approved interactively: two
+   * agents editing the same tree under one approver is how a workspace gets corrupted
+   * between two prompts. The parent does the writing.
+   */
+  private async runSubAgent(question: string, scope: string): Promise<string> {
+    if ((this.options.allowDelegate ?? true) === false) {
+      return "This session cannot delegate: sub-agents may not start their own sub-agents.";
+    }
+    const sub = new AgentSession(
+      {
+        root: this.options.root,
+        provider: this.options.provider,
+        // Read-only: every mutating call is refused, and the sub-agent is told why.
+        approve: async () => false,
+        maxSteps: Math.min(8, this.options.maxSteps ?? 8),
+        allowDelegate: false,
+        ...(this.options.signal ? { signal: this.options.signal } : {}),
+        extraInstructions: [
+          "Tu es un sous-agent de relecture. Tu ne modifies rien : tu lis, tu vérifies, tu rapportes.",
+          "Tu n'as aucun souvenir de la conversation qui t'a convoqué. La question ci-dessous est tout ce que tu sais.",
+          "Réponds en faits vérifiés, chacun avec son fichier et sa ligne quand ils existent. Si tu n'as pas pu vérifier, écris-le.",
+          scope ? `Périmètre : ${scope}` : "",
+        ]
+          .filter((part) => part.trim())
+          .join("\n"),
+      },
+      [
+        {
+          role: "user",
+          content: question,
+        },
+      ]
+    );
+    const result = await sub.send(question);
+    const text = result.text.trim();
+    return text.length > 0
+      ? `Rapport du sous-agent (lecture seule, ${result.toolCalls} outil(s)):\n${truncate(text, 6000)}`
+      : `Le sous-agent n'a rien rapporté (${result.toolCalls} outil(s), aucun texte final).`;
+  }
+
   /** One user turn, including every model/tool round trip it needs. */
   async send(userMessage: string): Promise<AgentTurnResult> {
     this.messages.push({ role: "user", content: userMessage });
@@ -559,6 +677,7 @@ export class AgentSession {
       if (this.options.signal?.aborted) break;
       const reply = await callChatModel(this.options.provider, this.messages, {
         ...(this.options.signal ? { signal: this.options.signal } : {}),
+        allowDelegate: this.options.allowDelegate ?? true,
       });
       if (reply.text.trim()) {
         finalText = reply.text;
@@ -579,6 +698,36 @@ export class AgentSession {
         toolCalls += 1;
         const args = safeParse(call.arguments);
         this.options.onEvent?.({ type: "tool_call", name: call.name, args });
+
+        if (call.name === "delegate") {
+          const question = typeof args.question === "string" ? args.question.trim() : "";
+          if (question.length < 8) {
+            const content = "delegate needs a question (at least a sentence). Nothing was started.";
+            this.messages.push({ role: "tool", toolCallId: call.id, content });
+            this.options.onEvent?.({
+              type: "tool_result",
+              name: call.name,
+              content,
+              isError: true,
+            });
+            continue;
+          }
+          const scope = typeof args.scope === "string" ? args.scope.trim() : "";
+          this.options.onEvent?.({
+            type: "tool_call",
+            name: "delegate",
+            args: { question, ...(scope ? { scope } : {}) },
+          });
+          const report = await this.runSubAgent(question, scope);
+          this.messages.push({ role: "tool", toolCallId: call.id, content: report });
+          this.options.onEvent?.({
+            type: "tool_result",
+            name: "delegate",
+            content: report.split("\n")[0] ?? "",
+            isError: false,
+          });
+          continue;
+        }
 
         const known = mcpToolDescriptors().some((descriptor) => descriptor.name === call.name);
         if (!known) {
@@ -638,29 +787,14 @@ async function previewOf(
   args: Record<string, unknown>,
   root: string
 ): Promise<string | undefined> {
+  // The three editing tools share one contract: run with apply:false, take their diff.
+  // Three copies of the same call had begun to look like three different contracts.
+  const diffTools = new Set(["write_file", "apply_patch", "edit_file"]);
   try {
-    if (tool === "write_file") {
-      const result = (await handleMcpToolCall(
-        "write_file",
-        { ...args, apply: false },
-        { cwd: root }
-      )) as { diff?: string };
-      return result?.diff;
-    }
-    if (tool === "apply_patch") {
-      const result = (await handleMcpToolCall(
-        "apply_patch",
-        { ...args, apply: false },
-        { cwd: root }
-      )) as { diff?: string };
-      return result?.diff;
-    }
-    if (tool === "edit_file") {
-      const result = (await handleMcpToolCall(
-        "edit_file",
-        { ...args, apply: false },
-        { cwd: root }
-      )) as { diff?: string };
+    if (diffTools.has(tool)) {
+      const result = (await handleMcpToolCall(tool, { ...args, apply: false }, { cwd: root })) as {
+        diff?: string;
+      };
       return result?.diff;
     }
     if (tool === "run_command" && typeof args.command === "string") {

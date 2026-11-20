@@ -21,7 +21,12 @@ const LINKS = [
 ];
 
 const MODULES = [
-  { to: "/world", id: "world", key: "modules.world.name" as const, tag: "modules.world.tag" as const },
+  {
+    to: "/world",
+    id: "world",
+    key: "modules.world.name" as const,
+    tag: "modules.world.tag" as const,
+  },
   { to: "/flow", id: "flow", key: "modules.flow.name" as const, tag: "modules.flow.tag" as const },
   { to: "/exit", id: "exit", key: "modules.exit.name" as const, tag: "modules.exit.tag" as const },
   { to: "/fail", id: "fail", key: "modules.fail.name" as const, tag: "modules.fail.tag" as const },
@@ -38,7 +43,7 @@ export function Nav() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const [modulesOpen, setModulesOpen] = useState(false);
-  const modulesRef = useRef<HTMLDivElement | null>(null);
+  const modulesRef = useRef<HTMLLIElement | null>(null);
   const location = useLocation();
 
   useEffect(() => {

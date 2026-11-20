@@ -231,7 +231,7 @@ describe("checkout: a redirect never grants a plan", () => {
     });
 
     expect(result.checkoutUrl).toBeDefined();
-    expect(result.amount.minor).toBe(1200n);
+    expect(result.amount.minor).toBe(1500n);
     // The critical assertion: a checkout URL exists, and access does not.
     const effective = await resolveEntitlements(store, WORKSPACE, new Date(clock.now()));
     expect(effective.entitled).toBe(false);
@@ -580,6 +580,6 @@ describe("plan catalogue", () => {
   it("marks XOF prices as whole units, because XOF has no subunit", () => {
     const plan = findPlan("developer");
     const xof = plan?.prices.find((p) => p.amount.currency === "XOF" && p.period === "monthly");
-    expect(xof?.amount.minor).toBe("15000");
+    expect(xof?.amount.minor).toBe("9000");
   });
 });

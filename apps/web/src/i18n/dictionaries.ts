@@ -27,6 +27,36 @@ export const en = {
   "hero.cta.download": "Download the app",
   "hero.cli": "$ npm i -g proofcore && proofcore init",
   "hero.status": "CLI · local, CI, or staging",
+  "home.ai.eyebrow": "The AI reading",
+  "home.ai.title": "A report tells you what broke. The audit tells you what it costs.",
+  "home.ai.lede":
+    "Connect your own model — any OpenAI-compatible endpoint, a local one included. The assistant reads the real findings of the five modules, ranks them by consequence, and writes the fix in the order you should apply it. The key stays encrypted on the server; the model never sees a secret.",
+  "home.ai.point.1.t": "Your key, your budget.",
+  "home.ai.point.1.d":
+    "The audit runs on the model you already pay for. No token markup, no hidden inference bill.",
+  "home.ai.point.2.t": "Effort is a dial, not a mystery.",
+  "home.ai.point.2.d":
+    "Low, medium or high: each level spawns at least two reviewing sub-agents — more as the effort rises — and shows the token budget it is about to spend.",
+  "home.ai.point.3.t": "Memory that survives a model change.",
+  "home.ai.point.3.d":
+    "Decisions, conventions and past lessons live with the workspace, so a new assistant starts already knowing your product.",
+  "home.ai.cta": "Run a first audit",
+  "home.ai.docs": "How the audit works",
+  "home.ai.sample.bar": "PROOFCORE ASSISTANT",
+  "home.ai.sample.effort": "effort: medium · 2 sub-agents",
+  "home.ai.sample.recorded": "recorded example",
+  "home.ai.sample.title": "EXIT — export round trip, 3 findings",
+  "home.ai.sample.verdict":
+    "The export pipeline is sound; the failure is in the date serialisation of the invoice lines. One defect, two consequences.",
+  "home.ai.sample.i1":
+    'exit-014 blocks every user whose locale formats dates with a dot — orders of 12 March export as "12.03" and re-import as invalid.',
+  "home.ai.sample.i2":
+    "exit-021 silently truncates amounts above 10,000 — no error, no log. Worth a second look even though it only warns.",
+  "home.ai.sample.i3":
+    "Round trip on 1,000 records: 1,000 returned, checksums match. Nothing to do here.",
+  "home.ai.sample.fix":
+    "Fix exit-014 first: normalise to ISO 8601 at the boundary and assert the round trip for four locales. Then add a guard test for the truncation.",
+  "home.ai.sample.foot": "Example output, recorded from a real run — not a live model call.",
   "home.signal": "Three systems. One proof.",
   "home.engine.eyebrow": "Unified engine",
   "home.engine.title": "Three dimensions of trust, one execution model",
@@ -246,6 +276,37 @@ export const fr: Messages = {
   "hero.cta.download": "Télécharger l’app",
   "hero.cli": "$ npm i -g proofcore && proofcore init",
   "hero.status": "CLI · s'exécute en local, en CI ou sur une préproduction",
+  "home.ai.eyebrow": "La lecture IA",
+  "home.ai.title": "Un rapport dit ce qui casse. L'audit dit ce que ça coûte.",
+  "home.ai.lede":
+    "Branchez votre propre modèle — n'importe quel point d'accès compatible OpenAI, y compris un modèle local. L'assistant lit les constats réels des cinq modules, les classe par conséquence et écrit la correction dans l'ordre où l'appliquer. La clé reste chiffrée côté serveur ; le modèle ne voit jamais de secret.",
+  "home.ai.point.1.t": "Votre clé, votre budget.",
+  "home.ai.point.1.d":
+    "L'audit tourne sur le modèle que vous payez déjà. Aucune marge sur les jetons, aucune facture d'inférence cachée.",
+  "home.ai.point.2.t": "L'effort est un réglage, pas un mystère.",
+  "home.ai.point.2.d":
+    "Bas, moyen ou élevé : chaque niveau crée au moins deux sous-agents de relecture — davantage à mesure que l'effort monte — et affiche le budget de jetons engagé.",
+  "home.ai.point.3.t": "Une mémoire qui survit au changement de modèle.",
+  "home.ai.point.3.d":
+    "Décisions, conventions et leçons passées vivent avec l'espace de travail : un nouvel assistant démarre en connaissant déjà votre produit.",
+  "home.ai.cta": "Lancer un premier audit",
+  "home.ai.docs": "Comment l'audit fonctionne",
+  "home.ai.sample.bar": "ASSISTANT PROOFCORE",
+  "home.ai.sample.effort": "effort : moyen · 2 sous-agents",
+  "home.ai.sample.recorded": "exemple enregistré",
+  "home.ai.sample.title": "EXIT — aller-retour d'export, 3 constats",
+  "home.ai.sample.verdict":
+    "La chaîne d'export est saine ; la défaillance est dans la sérialisation des dates des lignes de facture. Un défaut, deux conséquences.",
+  "home.ai.sample.i1":
+    'exit-014 bloque tous les utilisateurs dont la locale formate les dates avec un point — le 12 mars sort en "12.03" et revient invalide.',
+  "home.ai.sample.i2":
+    "exit-021 tronque silencieusement les montants au-delà de 10 000 — sans erreur, sans journal. À regarder même si ce n'est qu'un avertissement.",
+  "home.ai.sample.i3":
+    "Aller-retour sur 1 000 enregistrements : 1 000 retournés, empreintes identiques. Rien à faire ici.",
+  "home.ai.sample.fix":
+    "Corrigez exit-014 d'abord : normaliser en ISO 8601 à la frontière et tester l'aller-retour sur quatre locales. Ensuite, un test de garde pour la troncature.",
+  "home.ai.sample.foot":
+    "Sortie d'exemple, enregistrée depuis une exécution réelle — pas un appel de modèle en direct.",
   "home.signal": "Trois systèmes. Une preuve.",
   "home.engine.eyebrow": "Moteur unifié",
   "home.engine.title": "Trois dimensions de confiance, un seul modèle d'exécution",

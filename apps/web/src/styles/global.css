@@ -262,13 +262,58 @@ p {
  * The clamp keeps it dominant on a laptop and legible on a 320px phone without
  * ever breaking a word.
  */
+/*
+ * Hero headline, measured from the reference decoding: uppercase, ultra-tight leading
+ * and negative tracking. The upper bound is deliberately lower than the reference's
+ * 148px: at 1440×900 that size pushed the call to action and the proof artifact off the
+ * fold, so the visitor saw a poster instead of a product. 4.6rem keeps three lines on a
+ * laptop and still dominates the viewport.
+ */
 .hero-title {
-  font-size: clamp(2.1rem, 8.4vw, 8.5rem);
-  line-height: 0.9;
-  letter-spacing: -0.05em;
+  font-size: clamp(2rem, 5.4vw, 4.6rem);
+  line-height: 0.94;
+  letter-spacing: -0.045em;
   font-weight: 600;
   text-transform: uppercase;
   text-wrap: balance;
+}
+
+.hero-section {
+  /* Room for the fixed header, then the content decides the height — no forced 86vh
+     that manufactured dead space on tall screens. */
+  padding-top: 1rem;
+}
+
+/*
+ * Legibility scrim over the particle field.
+ * Desktop: the copy sits on the left, so the field is faded across the text column and
+ * left bright where the artifact is. Mobile: the layout stacks, so the fade runs
+ * vertically and the particles only bloom under the report card.
+ */
+.hero-scrim {
+  background: linear-gradient(
+    100deg,
+    rgba(5, 7, 8, 0.97) 0%,
+    rgba(5, 7, 8, 0.9) 30%,
+    rgba(5, 7, 8, 0.46) 58%,
+    rgba(5, 7, 8, 0.05) 82%
+  );
+}
+
+@media (max-width: 1023px) {
+  .hero-scrim {
+    background: linear-gradient(
+      180deg,
+      rgba(5, 7, 8, 0.95) 0%,
+      rgba(5, 7, 8, 0.82) 42%,
+      rgba(5, 7, 8, 0.42) 68%,
+      rgba(5, 7, 8, 0.72) 100%
+    );
+  }
+
+  .particle-canvas {
+    opacity: 0.72;
+  }
 }
 
 /* Reference A: wide-tracked wordmark */
@@ -299,134 +344,310 @@ p {
   flex-shrink: 0;
 }
 
-/* ---------- reference B: modular floating tiles ---------- */
+/* ---------- the module wall: an instrument panel, not a poster ---------- */
 
-.spectrum-field {
+.module-wall {
   position: relative;
+  padding: 1px;
+  border-radius: 22px;
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(120, 227, 203, 0.14), transparent 46%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
+}
+
+.module-wall-grid {
+  display: grid;
+  gap: 1px;
+  border-radius: 21px;
   overflow: hidden;
-  background:
-    radial-gradient(60% 70% at 12% 18%, rgba(49, 95, 200, 0.95), transparent 60%),
-    radial-gradient(50% 60% at 78% 8%, rgba(120, 100, 217, 0.75), transparent 62%),
-    radial-gradient(55% 65% at 88% 62%, rgba(242, 138, 73, 0.85), transparent 60%),
-    radial-gradient(60% 70% at 45% 92%, rgba(233, 103, 166, 0.8), transparent 62%),
-    linear-gradient(140deg, #1b2f77 0%, #5b3fa8 38%, #d9558f 68%, #f28a49 100%);
+  background: rgba(255, 255, 255, 0.07);
 }
 
-.spectrum-field::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(38% 46% at 20% 30%, rgba(255, 255, 255, 0.16), transparent 70%),
-    radial-gradient(30% 36% at 70% 70%, rgba(255, 255, 255, 0.12), transparent 70%);
-  pointer-events: none;
-}
-
-/*
- * Concentric rings behind the tiles, decoded from reference da2: huge soft circles
- * that structure the gradient without competing with the cards. Pure CSS, zero cost.
- */
-.spectrum-field::before {
-  content: "";
-  position: absolute;
-  inset: -12%;
-  background:
-    radial-gradient(
-      closest-side circle at 30% 42%,
-      transparent 58%,
-      rgba(255, 255, 255, 0.055) 58.5%,
-      rgba(255, 255, 255, 0.055) 60%,
-      transparent 60.5%
-    ),
-    radial-gradient(
-      closest-side circle at 30% 42%,
-      transparent 42%,
-      rgba(255, 255, 255, 0.045) 42.5%,
-      rgba(255, 255, 255, 0.045) 44%,
-      transparent 44.5%
-    ),
-    radial-gradient(
-      closest-side circle at 72% 62%,
-      transparent 50%,
-      rgba(255, 255, 255, 0.05) 50.5%,
-      rgba(255, 255, 255, 0.05) 51.5%,
-      transparent 52%
-    ),
-    radial-gradient(
-      closest-side circle at 72% 62%,
-      transparent 34%,
-      rgba(255, 255, 255, 0.04) 34.5%,
-      rgba(255, 255, 255, 0.04) 36%,
-      transparent 36.5%
-    );
-  pointer-events: none;
-}
-
-.tile {
-  position: relative;
-  background: linear-gradient(180deg, #ffffff 0%, #f4f6fb 100%);
-  border-radius: 18px;
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.9) inset,
-    0 -2px 6px -3px rgba(255, 255, 255, 0.7) inset,
-    0 18px 34px -18px rgba(12, 18, 40, 0.55),
-    0 42px 70px -40px rgba(12, 18, 40, 0.45),
-    0 90px 120px -60px rgba(20, 10, 40, 0.35);
-  color: #142033;
-  transform: translateZ(0);
-  transition:
-    transform 420ms cubic-bezier(0.2, 0.7, 0.2, 1),
-    box-shadow 420ms cubic-bezier(0.2, 0.7, 0.2, 1);
-}
-
-/* Glossy highlight along the top edge, like a bevelled extrusion. */
-.tile::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 18%);
-  pointer-events: none;
-}
-
-/* Touch devices keep the resting state: a hover that sticks looks like a layout bug. */
-@media (hover: hover) {
-  .tile:hover {
-    transform: translateY(-6px) rotateX(4deg);
-    box-shadow:
-      0 1px 0 rgba(255, 255, 255, 0.95) inset,
-      0 26px 46px -20px rgba(12, 18, 40, 0.6),
-      0 60px 90px -50px rgba(12, 18, 40, 0.5);
+@media (min-width: 640px) {
+  .module-wall-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-.tile:focus-within {
-  outline: 2px solid rgba(120, 227, 203, 0.75);
-  outline-offset: 3px;
+@media (min-width: 1024px) {
+  .module-wall-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  /* WORLD and FLOW lead the top row; EXIT closes it; the two audits share the second
+     row with the engine note. A 3-column grid keeps the meter rhythm identical in both
+     rows, which a 2+2+1 arrangement never does. */
+  .module-panel:nth-child(4),
+  .module-panel:nth-child(5) {
+    grid-column: span 1;
+  }
 }
 
-.tile-chip {
-  background: linear-gradient(180deg, #ffffff, #eef1f8);
-  border-radius: 12px;
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.9) inset,
-    0 12px 22px -12px rgba(10, 16, 40, 0.55);
+.module-panel {
+  --module-accent: var(--brand-mint);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  isolation: isolate;
+  padding: 1.4rem 1.35rem 1.25rem;
+  background: #070a0b;
+  text-decoration: none;
+  transition:
+    background 300ms var(--ease-standard),
+    transform 300ms var(--ease-standard);
 }
 
-.tile-ink {
-  color: #1b2f77;
+.module-panel-glow {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0;
+  background: radial-gradient(
+    90% 80% at 12% 0%,
+    color-mix(in srgb, var(--module-accent) 20%, transparent),
+    transparent 70%
+  );
+  transition: opacity 320ms var(--ease-standard);
 }
 
-.tile-body {
-  color: #4a5a72;
+.module-panel:hover {
+  background: #090d0f;
 }
 
-.tile-mono {
-  color: #68778a;
+.module-panel:hover .module-panel-glow,
+.module-panel:focus-visible .module-panel-glow {
+  opacity: 1;
 }
 
-.tile-link {
-  color: var(--brand-blue);
+.module-panel:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--module-accent) 70%, white);
+  outline-offset: -2px;
+}
+
+.module-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.module-panel-icon {
+  color: var(--module-accent);
+  display: inline-flex;
+}
+
+.module-panel-id {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.2em;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.module-panel-arrow {
+  margin-left: auto;
+  color: rgba(255, 255, 255, 0.26);
+  transition:
+    transform 260ms var(--ease-standard),
+    color 260ms var(--ease-standard);
+}
+
+.module-panel:hover .module-panel-arrow {
+  color: var(--module-accent);
+  transform: translate(2px, -2px);
+}
+
+.module-panel-title {
+  font-size: 1.08rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #f2f6f4;
+}
+
+.module-panel-tag {
+  margin-top: -0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--module-accent) 82%, white);
+}
+
+.module-panel-q {
+  font-size: 0.84rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.module-panel-tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: auto;
+  padding-top: 0.5rem;
+  list-style: none;
+}
+
+.module-panel-tokens li {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  padding: 0.16rem 0.42rem;
+  border-radius: 5px;
+  color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.module-panel-out {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.34);
+}
+
+.module-panel-out-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--module-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--module-accent) 18%, transparent);
+}
+
+.module-wall-foot {
+  gap: 0.5rem;
+  background:
+    radial-gradient(120% 100% at 100% 0%, rgba(120, 227, 203, 0.1), transparent 60%), #090d0f;
+}
+
+.module-wall-foot-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.module-wall-foot-body {
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.module-wall-states {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: auto;
+  padding-top: 0.6rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+}
+
+.wall-state {
+  padding: 0.18rem 0.4rem;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.wall-state-pass {
+  color: var(--brand-emerald);
+  border-color: color-mix(in srgb, var(--brand-emerald) 34%, transparent);
+}
+
+.wall-state-fail {
+  color: #fb7185;
+  border-color: rgba(251, 113, 133, 0.35);
+}
+
+.wall-state-warn {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+/* ---------- header flyout (the five modules under one label) ---------- */
+
+.nav-flyout {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: -0.75rem;
+  width: 21rem;
+  padding: 0.55rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(7, 10, 12, 0.97);
+  box-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(14px);
+  animation: nav-flyout-in 160ms var(--ease-standard) both;
+}
+
+@keyframes nav-flyout-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.nav-flyout-label {
+  padding: 0.35rem 0.6rem 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.32);
+}
+
+.nav-flyout-item {
+  --module-accent: var(--brand-mint);
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-inline: 0;
+  padding: 0.5rem 0.6rem;
+  border-radius: 10px;
+  text-decoration: none;
+  transition: background 160ms ease;
+}
+
+.nav-flyout-item:hover,
+.nav-flyout-item:focus-visible {
+  background: rgba(255, 255, 255, 0.06);
+  outline: none;
+}
+
+.nav-flyout-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--module-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--module-accent) 16%, transparent);
+}
+
+.nav-flyout-name {
+  display: block;
+  font-size: 0.84rem;
+  font-weight: 520;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.nav-flyout-tag {
+  display: block;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.nav-cta {
+  padding-inline: 1rem;
 }
 
 /* ---------- buttons ---------- */
@@ -6949,4 +7170,360 @@ p {
   .desktop-auth-main {
     padding: 12px 18px;
   }
+}
+
+/* --------------------------------------------------------------------------
+   SECTION BANDS — full-bleed alternating tone.
+   The band owns the background and the rules; the inner container keeps the
+   1240px measure so nothing shifts horizontally between sections.
+   -------------------------------------------------------------------------- */
+
+.section-deeper {
+  position: relative;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background:
+    radial-gradient(70% 120% at 15% 0%, rgba(120, 227, 203, 0.045), transparent 62%), #070a0c;
+}
+
+/* --------------------------------------------------------------------------
+   THE AI READING — a recorded audit, shown rather than described.
+   The card borrows the terminal chrome so it reads as product output, and the
+   severity bullets carry the same three colours the modules use for PASS/WARN/FAIL.
+   -------------------------------------------------------------------------- */
+
+.ai-sample {
+  margin: 0;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.01));
+  overflow: hidden;
+}
+
+.ai-sample-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.ai-sample-effort {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.44);
+}
+
+.ai-sample-rec {
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.12rem 0.36rem;
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.34);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ai-sample-body {
+  display: grid;
+  gap: 0.7rem;
+  padding: 1rem 1.05rem;
+}
+
+.ai-line-h {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.ai-line-p {
+  font-size: 0.83rem;
+  line-height: 1.62;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.ai-line-i {
+  position: relative;
+  padding-left: 1.1rem;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.56);
+}
+
+.ai-line-bullet {
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.ai-line-fail .ai-line-bullet {
+  background: #fb7185;
+}
+
+.ai-line-warn .ai-line-bullet {
+  background: #fbbf24;
+}
+
+.ai-line-pass .ai-line-bullet {
+  background: var(--brand-emerald);
+}
+
+.ai-sample-foot {
+  padding: 0.6rem 1.05rem 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.ai-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  border-radius: 50%;
+  color: #06231a;
+  background: var(--brand-emerald);
+}
+
+.hero-module-link {
+  animation: rise 520ms var(--ease-emphasized) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-module-link {
+    animation: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   ASSISTANT — reviewer panel and workspace memory.
+   Same tokens as the rest of the workspace: a reviewer's failure is a warning,
+   never a decoration, and memory rows are readable text, not chips.
+   -------------------------------------------------------------------------- */
+
+.chat-effort-agents {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.04em;
+  color: var(--accent, var(--ink-soft));
+}
+
+.chat-review {
+  margin: 6px 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--text-primary) 3%, transparent);
+  overflow: hidden;
+}
+
+.chat-review-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  cursor: pointer;
+  list-style: none;
+}
+
+.chat-review-summary::-webkit-details-marker {
+  display: none;
+}
+
+.chat-review-warn {
+  color: #b45309;
+}
+
+[data-theme="dark"] .chat-review-warn {
+  color: #fbbf24;
+}
+
+.chat-review-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 2px 10px 10px;
+  list-style: none;
+}
+
+.chat-review-list li {
+  display: grid;
+  gap: 2px;
+  padding-left: 9px;
+  border-left: 2px solid var(--accent, var(--border));
+}
+
+.chat-review-list li.is-failed {
+  border-left-color: #fbbf24;
+}
+
+.chat-review-label {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.chat-review-note {
+  font-size: 0.72rem;
+  line-height: 1.55;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+}
+
+.chat-memory {
+  margin-top: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+.chat-memory-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 4px 6px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.chat-memory-head:hover {
+  color: var(--text-primary);
+}
+
+.chat-memory-chevron {
+  margin-left: auto;
+  transition: transform var(--dur-1) var(--ease-standard);
+}
+
+.chat-memory-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.chat-memory-body {
+  display: grid;
+  gap: 6px;
+  padding: 4px 6px 6px;
+}
+
+.chat-memory-note {
+  font-size: 0.66rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.chat-memory-empty {
+  font-size: 0.66rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.chat-memory-list {
+  display: grid;
+  gap: 4px;
+  max-height: 190px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chat-memory-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 5px 6px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--text-primary) 3.5%, transparent);
+}
+
+.chat-memory-kind {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent, var(--text-secondary));
+  padding-top: 2px;
+}
+
+.chat-memory-text {
+  flex: 1 1 auto;
+  font-size: 0.68rem;
+  line-height: 1.45;
+  color: var(--text-primary);
+}
+
+.chat-memory-list button {
+  flex: 0 0 auto;
+  padding: 2px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.chat-memory-list button:hover {
+  color: #b91c1c;
+  background: color-mix(in srgb, #b91c1c 10%, transparent);
+}
+
+.chat-memory-add {
+  display: flex;
+  gap: 4px;
+}
+
+.chat-memory-add input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 5px 7px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 0.68rem;
+}
+
+.chat-memory-add button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.chat-memory-add button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }

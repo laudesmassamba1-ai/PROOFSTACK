@@ -137,4 +137,37 @@ function formatRemaining(ms) {
   return hours > 0 ? `${hours} h ${minutes % 60} min` : `${minutes} min`;
 }
 
-module.exports = { DAY_MS, evaluateAccess, formatRemaining, parseJwtExpiry, sessionToken };
+/**
+ * A session that can actually be verified.
+ *
+ * The CLI's session file always carries `apiUrl`, but older files, the environment cookie
+ * and hand-written sessions may not — and a session without `apiUrl` could never be
+ * confirmed by the site: `verifySession` would answer "not checked" every launch and the
+ * account would live on the grace clock alone, expiring with no way to renew it while the
+ * cookie itself was still valid. The fallback is the API this app is configured for, the
+ * same origin sign-in stores. Returns null when there is no credential at all, so callers
+ * can treat it like an absent session instead of storing a husk.
+ */
+function normalizeStoredSession(session, fallbackApiUrl) {
+  if (!session || typeof session !== "object") return null;
+  const hasCookie = typeof session.cookie === "string" && session.cookie.length > 0;
+  const hasToken = typeof session.token === "string" && session.token.length > 0;
+  if (!hasCookie && !hasToken) return null;
+  const apiUrl =
+    typeof session.apiUrl === "string" && session.apiUrl.trim()
+      ? session.apiUrl.replace(/\/+$/, "")
+      : typeof fallbackApiUrl === "string" && fallbackApiUrl.trim()
+        ? fallbackApiUrl.replace(/\/+$/, "")
+        : null;
+  if (!apiUrl) return null;
+  return { ...session, apiUrl };
+}
+
+module.exports = {
+  DAY_MS,
+  evaluateAccess,
+  formatRemaining,
+  normalizeStoredSession,
+  parseJwtExpiry,
+  sessionToken,
+};

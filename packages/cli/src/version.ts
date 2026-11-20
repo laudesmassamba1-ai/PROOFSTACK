@@ -6,4 +6,4 @@
  * between the two makes the CLI either miss updates or offer the same version forever, so a
  * test asserts they are equal.
  */
-export const CLI_VERSION = "0.4.0";
+export const CLI_VERSION = "0.5.0";

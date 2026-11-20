@@ -533,17 +533,30 @@ describe("page audits", () => {
 });
 
 describe("page audit quota (monthly_ai_audits)", () => {
-  /** Fill the free plan's AI-audit budget through the real meter. */
-  async function exhaustFreeQuota(email: string): Promise<void> {
-    for (let i = 0; i < 3; i += 1) {
+  /**
+   * Fill the free plan's AI-audit budget through the real meter.
+   *
+   * The count is read from the resolved entitlements instead of being written as `3`:
+   * the free tier is a commercial decision that will move again, and a test that hard-
+   * codes it turns every pricing change into a fake failure.
+   */
+  async function exhaustFreeQuota(account: {
+    cookie: string;
+    workspaceId: string;
+  }): Promise<number> {
+    const snapshot = await harness.services.meter.snapshot(account.workspaceId);
+    const raw = snapshot.entitlements.entitlements.monthly_ai_audits;
+    const limit = typeof raw === "number" ? raw : 0;
+    for (let i = 0; i < limit; i += 1) {
       const metered = await harness.services.meter.meter({
-        workspaceId: (await signUp(email)).workspaceId,
+        workspaceId: account.workspaceId,
         kind: "ai_audit",
-        subjectId: `seed_${email}_${i}`,
+        subjectId: `seed_${account.workspaceId}_${i}`,
         quantity: 1,
       });
       expect(metered.reason).toBe("recorded");
     }
+    return limit;
   }
 
   it("refuses an unauthenticated scan with 401", async () => {
@@ -559,7 +572,7 @@ describe("page audit quota (monthly_ai_audits)", () => {
 
   it("denies the scan with the cheapest plan required when the quota is exhausted", async () => {
     const { cookie, workspaceId } = await signUp("quota-gone@example.com");
-    await exhaustFreeQuota("quota-gone@example.com");
+    const limit = await exhaustFreeQuota({ cookie, workspaceId });
 
     const response = await harness.request("/api/v1/audits", {
       method: "POST",
@@ -571,7 +584,11 @@ describe("page audit quota (monthly_ai_audits)", () => {
       error: { code: string; details: { limit: number; used: number; requiredPlanKey?: string } };
     };
     expect(body.error.code).toBe("quota_exhausted");
-    expect(body.error.details).toMatchObject({ limit: 3, used: 3, requiredPlanKey: "developer" });
+    expect(body.error.details).toMatchObject({
+      limit,
+      used: limit,
+      requiredPlanKey: "developer",
+    });
 
     // A denied scan never creates a report: nothing billed, nothing stored.
     const list = (await (
@@ -582,10 +599,7 @@ describe("page audit quota (monthly_ai_audits)", () => {
 
   it("meters a successful scan and lets the next one through while headroom remains", async () => {
     const { cookie, workspaceId } = await signUp("quota-happy@example.com");
-    vi.stubGlobal(
-      "fetch",
-      stubSite(pageWithMeta(null)) as unknown as typeof fetch
-    );
+    vi.stubGlobal("fetch", stubSite(pageWithMeta(null)) as unknown as typeof fetch);
     try {
       const response = await harness.request("/api/v1/audits", {
         method: "POST",
@@ -598,7 +612,11 @@ describe("page audit quota (monthly_ai_audits)", () => {
       // page reads — not a private tally the dashboard could disagree with.
       const snapshot = await harness.services.meter.snapshot(workspaceId);
       expect(snapshot.usage.ai_audit).toBe(1);
-      expect(snapshot.entitlements.entitlements.monthly_ai_audits).toBe(3);
+      // One audit consumed of whatever the free plan grants — asserted as "more than
+      // one is left" so a pricing revision does not fail a metering test.
+      const granted = snapshot.entitlements.entitlements.monthly_ai_audits;
+      expect(typeof granted).toBe("number");
+      expect(Number(granted)).toBeGreaterThan(1);
     } finally {
       vi.unstubAllGlobals();
     }

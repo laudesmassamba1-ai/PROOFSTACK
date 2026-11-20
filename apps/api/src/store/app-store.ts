@@ -87,6 +87,23 @@ export interface AiConversationRecord {
   updatedAt: string;
 }
 
+/**
+ * One durable statement about a workspace.
+ *
+ * Memory is deliberately small and human: a sentence, a kind and where it came from.
+ * It is scoped to the workspace, so changing the model — or the person — does not
+ * restart the product's context.
+ */
+export interface WorkspaceMemoryRecord {
+  id: string;
+  workspaceId: string;
+  kind: string;
+  text: string;
+  source: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AiProfileRecord {
   userId: string;
   providerBaseUrl: string;
@@ -918,6 +935,94 @@ export class AppStore {
     const result = await this.db
       .prepare("DELETE FROM ai_conversations WHERE user_id = ? AND id = ?")
       .bind(userId, id)
+      .run();
+    return result.changes > 0;
+  }
+
+  // ------------------------------------------------------------------ memory
+
+  /** Everything the assistant is allowed to remember about this workspace. */
+  async listWorkspaceMemory(workspaceId: string, limit = 100): Promise<WorkspaceMemoryRecord[]> {
+    const rows = await this.db
+      .prepare(
+        `SELECT * FROM workspace_memory WHERE workspace_id = ?
+         ORDER BY updated_at DESC LIMIT ?`
+      )
+      .bind(workspaceId, limit)
+      .all<Row>();
+    return rows.map(mapWorkspaceMemory);
+  }
+
+  /**
+   * Remember a statement, or refresh the one that already says the same thing.
+   *
+   * The dedupe key is the normalised sentence, so "Prices are in XOF." and "prices are
+   * in XOF" are one memory rather than two that contradict each other later. Returns
+   * `created: false` when the fact was already known — the caller uses that to tell the
+   * model not to repeat itself.
+   */
+  async rememberWorkspaceFact(input: {
+    workspaceId: string;
+    kind: string;
+    text: string;
+    source?: string;
+  }): Promise<{ record: WorkspaceMemoryRecord; created: boolean }> {
+    const now = iso(this.clock());
+    const text = input.text.trim().replace(/\s+/g, " ").slice(0, 400);
+    const dedupeKey = text
+      .toLowerCase()
+      .replace(/[.!\s]+$/g, "")
+      .replace(/\s+/g, " ");
+    const existing = await this.db
+      .prepare("SELECT * FROM workspace_memory WHERE workspace_id = ? AND dedupe_key = ?")
+      .bind(input.workspaceId, dedupeKey)
+      .first<Row>();
+    if (existing) {
+      await this.db
+        .prepare("UPDATE workspace_memory SET updated_at = ?, kind = ? WHERE id = ?")
+        .bind(now, input.kind, str(existing, "id"))
+        .run();
+      const refreshed = await this.db
+        .prepare("SELECT * FROM workspace_memory WHERE id = ?")
+        .bind(str(existing, "id"))
+        .first<Row>();
+      return { record: mapWorkspaceMemory(refreshed ?? existing), created: false };
+    }
+    const id = `mem_${uuid().replaceAll("-", "").slice(0, 20)}`;
+    await this.db
+      .prepare(
+        `INSERT INTO workspace_memory (id, workspace_id, kind, text, source, dedupe_key, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        id,
+        input.workspaceId,
+        input.kind,
+        text,
+        input.source ?? "assistant",
+        dedupeKey,
+        now,
+        now
+      )
+      .run();
+    return {
+      record: {
+        id,
+        workspaceId: input.workspaceId,
+        kind: input.kind,
+        text,
+        source: input.source ?? "assistant",
+        createdAt: now,
+        updatedAt: now,
+      },
+      created: true,
+    };
+  }
+
+  async forgetWorkspaceFact(workspaceId: string, id: string): Promise<boolean> {
+    const result = await this.db
+      .prepare("DELETE FROM workspace_memory WHERE id = ? AND workspace_id = ?")
+      .bind(id, workspaceId)
       .run();
     return result.changes > 0;
   }
@@ -2085,6 +2190,18 @@ function mapUser(row: Row): UserRecord {
     passwordHash: str(row, "password_hash"),
     createdAt: str(row, "created_at"),
     emailVerifiedAt: nullableStr(row, "email_verified_at"),
+  };
+}
+
+function mapWorkspaceMemory(row: Row): WorkspaceMemoryRecord {
+  return {
+    id: str(row, "id"),
+    workspaceId: str(row, "workspace_id"),
+    kind: str(row, "kind"),
+    text: str(row, "text"),
+    source: str(row, "source"),
+    createdAt: str(row, "created_at"),
+    updatedAt: str(row, "updated_at"),
   };
 }
 

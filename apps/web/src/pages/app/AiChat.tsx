@@ -1,5 +1,6 @@
 import {
   BadgeCheck,
+  Brain,
   ChevronDown,
   Eraser,
   FileText,
@@ -15,6 +16,7 @@ import {
   Send,
   ShieldAlert,
   Trash2,
+  Users,
   X,
 } from "lucide-react";
 import type React from "react";
@@ -44,6 +46,12 @@ interface EffortLevel {
   label: { fr: string; en: string };
   hint: { fr: string; en: string };
   burn: string;
+  /**
+   * How many independent reviewers this level runs. Kept in step with the server's
+   * EFFORT_TUNING by `GET /api/v1/ai/effort`; this table is only the pre-load default so
+   * the picker is never empty.
+   */
+  subagents: number;
 }
 
 interface ConversationSummary {
@@ -58,6 +66,8 @@ interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   trace?: AgentTraceStep[];
+  /** Reviewer notes as the server reported them, failures included. */
+  reviews?: { id: string; label: string; ok: boolean; note: string }[];
   error?: string;
 }
 
@@ -74,31 +84,35 @@ interface ProfileState {
 const EFFORTS: EffortLevel[] = [
   {
     id: "quick",
+    subagents: 2,
     label: { fr: "Rapide", en: "Quick" },
-    hint: { fr: "Réponse directe, 1 outil max", en: "Direct answer, 1 tool max" },
+    hint: { fr: "Direct, 2 relecteurs", en: "Direct, 2 reviewers" },
     burn: "1×",
   },
   {
     id: "balanced",
+    subagents: 3,
     label: { fr: "Équilibré", en: "Balanced" },
-    hint: { fr: "Données utiles, réponse focalisée", en: "Useful data, focused answer" },
+    hint: { fr: "Données utiles, 3 relecteurs", en: "Useful data, 3 reviewers" },
     burn: "2×",
   },
   {
     id: "deep",
+    subagents: 4,
     label: { fr: "Approfondi", en: "Deep" },
     hint: {
-      fr: "Croise runs, findings et audits",
-      en: "Cross-references runs, findings and audits",
+      fr: "Croise runs et audits · 4 relecteurs",
+      en: "Cross-references runs and audits · 4 reviewers",
     },
     burn: "4×",
   },
   {
     id: "ultra",
+    subagents: 5,
     label: { fr: "Ultra", en: "Ultra" },
     hint: {
-      fr: "Audit complet multi-sources, rapport structuré",
-      en: "Full multi-source audit, structured report",
+      fr: "Audit multi-sources · 5 relecteurs",
+      en: "Multi-source audit · 5 reviewers",
     },
     burn: "8×",
   },
@@ -376,7 +390,10 @@ function EffortPicker({
         aria-haspopup="menu"
         onClick={() => setOpen((value) => !value)}
       >
-        {active.label[fr ? "fr" : "en"]} <span className="chat-effort-burn">· {active.burn}</span>
+        {active.label[fr ? "fr" : "en"]}{" "}
+        <span className="chat-effort-burn">
+          · {active.burn} · {active.subagents} {fr ? "agents" : "agents"}
+        </span>
         <ChevronDown
           size={12}
           style={{ transform: open ? "rotate(180deg)" : undefined, transition: "transform 140ms" }}
@@ -401,17 +418,65 @@ function EffortPicker({
                   <span className="chat-effort-burn">· {level.burn}</span>
                 </span>
                 <span className="chat-effort-hint">{level.hint[fr ? "fr" : "en"]}</span>
+                <span className="chat-effort-agents">
+                  <Users size={11} />
+                  {level.subagents} {fr ? "sous-agents" : "sub-agents"}
+                </span>
               </span>
             </button>
           ))}
           <p className="chat-effort-note">
             {fr
-              ? "Plus l'effort est élevé, plus l'assistant interroge d'outils et consomme de crédits sur votre fournisseur IA."
-              : "Higher effort means more tool calls and more credits burned on your AI provider."}
+              ? "Chaque niveau lance au moins deux sous-agents de relecture, puis une synthèse. Plus l'effort monte, plus il y a de relecteurs — et plus de jetons consommés sur votre propre clé."
+              : "Every level runs at least two reviewing sub-agents, then a synthesis. Higher effort means more reviewers — and more tokens spent on your own key."}
           </p>
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * The reviewer panel.
+ *
+ * It is shown even when every reviewer failed, because "no reviewer answered" is
+ * information the reader needs before trusting the answer above it. Collapsed by default:
+ * the notes are evidence, not the product.
+ */
+function ReviewPanel({
+  reviews,
+  fr,
+}: {
+  reviews: { id: string; label: string; ok: boolean; note: string }[];
+  fr: boolean;
+}): React.ReactElement {
+  const failed = reviews.filter((review) => !review.ok).length;
+  return (
+    <details className="chat-review">
+      <summary className="chat-review-summary">
+        <Users size={12} />
+        {fr
+          ? `${reviews.length - failed}/${reviews.length} relecteurs ont répondu`
+          : `${reviews.length - failed}/${reviews.length} reviewers answered`}
+        {failed > 0 ? (
+          <span className="chat-review-warn">{fr ? "· certains ont échoué" : "· some failed"}</span>
+        ) : null}
+      </summary>
+      <ul className="chat-review-list">
+        {reviews.map((review) => (
+          <li key={review.id} className={review.ok ? "" : "is-failed"}>
+            <span className="chat-review-label">{review.label}</span>
+            <span className="chat-review-note">
+              {review.ok
+                ? review.note
+                : fr
+                  ? "Ce relecteur n'a pas répondu (fournisseur indisponible). La réponse n'a pas été recoupée sur cet angle."
+                  : "This reviewer did not answer (provider unavailable), so that angle was not cross-checked."}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 
@@ -575,6 +640,16 @@ export function AiChatPage(): React.ReactElement {
   const [extracting, setExtracting] = useState(false);
   const [attachNotice, setAttachNotice] = useState<{ title: string; detail: string } | null>(null);
   const [effort, setEffort] = useState<EffortLevel["id"]>("balanced");
+  /**
+   * Workspace memory, loaded with the page. It is displayed here because memory only
+   * earns trust if the person can read it and delete what is wrong — and because seeing
+   * "12 faits" is how a user understands that a new model will not start from zero.
+   */
+  const [memory, setMemory] = useState<
+    { id: string; kind: string; text: string; source: string }[]
+  >([]);
+  const [memoryOpen, setMemoryOpen] = useState(false);
+  const [memoryDraft, setMemoryDraft] = useState("");
   const [busy, setBusy] = useState(false);
   // The browser opens beside the chat, not inside the transcript: a page you can click is a
   // panel, not a message.
@@ -726,6 +801,52 @@ export function AiChatPage(): React.ReactElement {
     pinnedRef.current = true;
     scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
   }, []);
+
+  const loadMemory = useCallback(async () => {
+    if (!activeWorkspaceId) return;
+    const response = await fetch(
+      `/api/v1/ai/memory?workspaceId=${encodeURIComponent(activeWorkspaceId)}`,
+      { credentials: "include" }
+    );
+    if (!response.ok) return;
+    const body = (await response.json()) as {
+      facts?: { id: string; kind: string; text: string; source: string }[];
+    };
+    setMemory(Array.isArray(body.facts) ? body.facts : []);
+  }, [activeWorkspaceId]);
+
+  useEffect(() => {
+    void loadMemory();
+  }, [loadMemory]);
+
+  const rememberFact = useCallback(async () => {
+    const text = memoryDraft.trim();
+    if (!text || !activeWorkspaceId) return;
+    const response = await fetch("/api/v1/ai/memory", {
+      method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ workspaceId: activeWorkspaceId, kind: "convention", text }),
+    });
+    if (response.ok) {
+      setMemoryDraft("");
+      await loadMemory();
+    }
+  }, [memoryDraft, activeWorkspaceId, loadMemory]);
+
+  const forgetFact = useCallback(
+    async (id: string) => {
+      if (!activeWorkspaceId) return;
+      const response = await fetch(`/api/v1/ai/memory/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ workspaceId: activeWorkspaceId }),
+      });
+      if (response.ok) setMemory((facts) => facts.filter((fact) => fact.id !== id));
+    },
+    [activeWorkspaceId]
+  );
 
   const loadConversation = useCallback(async (id: string) => {
     setActiveId(id);
@@ -935,6 +1056,8 @@ export function AiChatPage(): React.ReactElement {
         title?: string;
         message?: string;
         trace?: AgentTraceStep[];
+        subagents?: { id: string; label: string; ok: boolean; note: string }[];
+        memory?: { facts: number };
         error?: { code?: string; message?: string; details?: Record<string, unknown> };
       } = {};
       try {
@@ -954,9 +1077,19 @@ export function AiChatPage(): React.ReactElement {
       if (data.conversationId) setActiveId(data.conversationId);
       setMessages((items) =>
         items.map((item) =>
-          item.id === pendingId ? { ...item, content: data.message ?? "", trace: data.trace } : item
+          item.id === pendingId
+            ? {
+                ...item,
+                content: data.message ?? "",
+                trace: data.trace,
+                reviews: data.subagents,
+              }
+            : item
         )
       );
+      // The assistant may have written a fact during this turn: reload so the counter
+      // and the list are never stale.
+      void loadMemory();
       if (!activeId) {
         setConversations((items) => [
           {
@@ -979,7 +1112,7 @@ export function AiChatPage(): React.ReactElement {
     } finally {
       setBusy(false);
     }
-  }, [draft, attachments, busy, activeWorkspaceId, profile, activeId, effort, fr]);
+  }, [draft, attachments, busy, activeWorkspaceId, profile, activeId, effort, fr, loadMemory]);
 
   /** Reads each dropped/selected file, keeps successes, surfaces failures honestly. */
   const handleAttach = useCallback(
@@ -1117,6 +1250,74 @@ export function AiChatPage(): React.ReactElement {
               noun={fr ? "conversations" : "conversations"}
               label={fr ? "Charger 50 de plus" : "Load 50 more"}
             />
+          ) : null}
+        </div>
+
+        <div className="chat-memory">
+          <button
+            type="button"
+            className="chat-memory-head"
+            onClick={() => setMemoryOpen((open) => !open)}
+            aria-expanded={memoryOpen}
+          >
+            <Brain size={13} />
+            <span>
+              {fr ? "Mémoire du projet" : "Project memory"} · {memory.length}
+            </span>
+            <ChevronDown
+              size={12}
+              className={`chat-memory-chevron${memoryOpen ? " is-open" : ""}`}
+            />
+          </button>
+          {memoryOpen ? (
+            <div className="chat-memory-body">
+              <p className="chat-memory-note">
+                {fr
+                  ? "Ce que l'assistant sait déjà de ce projet : il le reçoit à chaque tour, quel que soit le modèle connecté."
+                  : "What the assistant already knows about this project: it is given to every turn, whichever model is connected."}
+              </p>
+              {memory.length === 0 ? (
+                <p className="chat-memory-empty">
+                  {fr
+                    ? "Rien encore. L'assistant ajoute un fait quand il apprend une convention, une décision ou une leçon."
+                    : "Nothing yet. The assistant adds a fact when it learns a convention, a decision or a lesson."}
+                </p>
+              ) : (
+                <ul className="chat-memory-list">
+                  {memory.map((fact) => (
+                    <li key={fact.id}>
+                      <span className="chat-memory-kind">{fact.kind}</span>
+                      <span className="chat-memory-text">{fact.text}</span>
+                      <button
+                        type="button"
+                        onClick={() => void forgetFact(fact.id)}
+                        aria-label={fr ? "Oublier ce fait" : "Forget this fact"}
+                      >
+                        <X size={11} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="chat-memory-add">
+                <input
+                  value={memoryDraft}
+                  onChange={(event) => setMemoryDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") void rememberFact();
+                  }}
+                  placeholder={fr ? "Ajouter un fait durable…" : "Add a durable fact…"}
+                  maxLength={400}
+                />
+                <button
+                  type="button"
+                  onClick={() => void rememberFact()}
+                  disabled={memoryDraft.trim().length < 4}
+                >
+                  <Plus size={12} />
+                </button>
+              </div>
+            </div>
           ) : null}
         </div>
 
@@ -1262,6 +1463,9 @@ export function AiChatPage(): React.ReactElement {
                                   }}
                                 />
                               ))}
+                            {message.reviews && message.reviews.length > 0 && (
+                              <ReviewPanel reviews={message.reviews} fr={fr} />
+                            )}
                             {message.error ? (
                               <div className="chat-error">{message.error}</div>
                             ) : message.content ? (

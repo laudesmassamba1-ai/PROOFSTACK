@@ -117,6 +117,9 @@ export async function subscriptionView(
 export function usageCounters(effective: EffectiveEntitlements, usage: Record<string, number>) {
   const keys: { key: EntitlementKey; kind: string; label: string }[] = [
     { key: "monthly_test_runs", kind: "test_run", label: "Test runs this period" },
+    // The AI-audit counter is metered separately because it is what a user hits first:
+    // a plan is judged on how many real readings of their product it allows.
+    { key: "monthly_ai_audits", kind: "ai_audit", label: "AI audits this period" },
     { key: "project_limit", kind: "", label: "Projects" },
   ];
   return keys.map(({ key, kind, label }) => {
@@ -130,7 +133,9 @@ export function usageCounters(effective: EffectiveEntitlements, usage: Record<st
       counted:
         key === "monthly_test_runs"
           ? "One per run id; retries and failed uploads are not double-billed."
-          : "Live count",
+          : key === "monthly_ai_audits"
+            ? "One per audit id; a retried scan or chat turn is metered once."
+            : "Live count",
     };
   });
 }

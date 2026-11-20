@@ -38,7 +38,7 @@ body{margin:0;display:grid;place-items:center;overflow:hidden;background:radial-
       <path d="M18 84V12H50C73 12 86 25 86 44C86 61 74 72 52 72H32V84ZM32 26V58H50C61 58 68 51 68 44C68 33 61 26 50 26Z" fill="#78E3CB" fill-rule="evenodd" opacity=".86" stroke="#0b0d10" stroke-width="2.4" transform="translate(4.5 4.5)"/>
       <path d="M18 84V12H50C73 12 86 25 86 44C86 61 74 72 52 72H32V84ZM32 26V58H50C61 58 68 51 68 44C68 33 61 26 50 26Z" fill="#73D68B" fill-rule="evenodd" stroke="#0b0d10" stroke-width="2.4"/>
     </svg>
-    <div><div class="wordmark">ROOFCORE</div><div class="sub">moteur local</div></div>
+    <div><div class="wordmark">PROOFCORE</div><div class="sub">moteur local</div></div>
   </header>
   <section class="body">
     <h1>Ouverture de PROOFCORE</h1>

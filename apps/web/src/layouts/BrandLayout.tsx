@@ -86,13 +86,23 @@ export function Section({
   id?: string;
   tone?: "dark" | "deeper";
 }) {
+  const inner = `mx-auto max-w-[1240px] px-5 py-14 sm:py-16 lg:px-8 lg:py-20 ${className}`;
+
+  // A "deeper" band must be full-bleed: painting the background on the max-width box
+  // left a visible inset rectangle floating on the page, which read as a rendering bug
+  // rather than as sectioning.
+  if (tone === "deeper") {
+    return (
+      <div className="section-deeper">
+        <section id={id} className={inner}>
+          {children}
+        </section>
+      </div>
+    );
+  }
+
   return (
-    <section
-      id={id}
-      className={`mx-auto max-w-[1240px] px-5 py-16 lg:px-8 lg:py-24 ${
-        tone === "deeper" ? "bg-[#070a0c]" : ""
-      } ${className}`}
-    >
+    <section id={id} className={inner}>
       {children}
     </section>
   );

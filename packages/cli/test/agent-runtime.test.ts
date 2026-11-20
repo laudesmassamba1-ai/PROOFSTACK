@@ -379,3 +379,80 @@ describe("sessions", () => {
     expect(sessionId("same")).not.toBe(sessionId("other"));
   });
 });
+
+describe("sub-agents", () => {
+  const provider = () => ({ baseUrl, model: "test-model", apiKey: "test-key" });
+
+  it("runs a real nested session and returns its report, not a narrated promise", async () => {
+    await writeFile(join(root, "hello.ts"), "export const hello = 1;\n", "utf8");
+
+    // Turn 1: the parent delegates instead of doing the reading itself.
+    replies.push(
+      toolCallReply("delegate", { question: "What does hello.ts export?", scope: "hello.ts" }),
+      // Turn 2 (inside the sub-agent): it reads the file for real.
+      toolCallReply("read_file", { path: "hello.ts" }),
+      // Turn 3 (inside the sub-agent): it reports.
+      textReply("hello.ts exports `hello = 1` at line 1."),
+      // Turn 4 (parent): answers from the report.
+      textReply("The sub-agent confirms hello.ts exports hello = 1.")
+    );
+
+    const session = new AgentSession({ root, provider: provider(), approve: async () => true });
+    const result = await session.send("Check what hello.ts exports.");
+
+    // The nested session really called the model: four round trips, not one.
+    expect(received).toHaveLength(4);
+    const report = result.messages.find(
+      (message) => message.role === "tool" && message.content.includes("Rapport du sous-agent")
+    );
+    expect(report?.content).toContain("exports `hello = 1`");
+    expect(result.text).toContain("confirms");
+  });
+
+  it("refuses every mutation inside a sub-agent, so it reviews instead of editing", async () => {
+    replies.push(
+      toolCallReply("delegate", { question: "Rewrite hello.ts to use let." }),
+      // The sub-agent tries to write. It must be refused without asking a human.
+      toolCallReply("write_file", { path: "hello.ts", content: "export let hello = 1;\n" }),
+      textReply("I cannot edit; the file is unchanged."),
+      textReply("Sub-agent finished.")
+    );
+
+    const approvals: string[] = [];
+    const session = new AgentSession({
+      root,
+      provider: provider(),
+      approve: async (request) => {
+        approvals.push(request.tool);
+        return true;
+      },
+    });
+
+    await session.send("Please rewrite hello.ts.");
+    // The parent was never asked to approve the sub-agent's write.
+    expect(approvals).toEqual([]);
+    await expect(readFile(join(root, "hello.ts"), "utf8")).rejects.toThrow();
+  });
+
+  it("does not let a sub-agent start its own sub-agent", async () => {
+    replies.push(
+      toolCallReply("delegate", { question: "Investigate the config." }),
+      toolCallReply("delegate", { question: "Go deeper." }),
+      textReply("No delegation from here."),
+      textReply("Done.")
+    );
+
+    const session = new AgentSession({ root, provider: provider(), approve: async () => true });
+    const result = await session.send("Investigate.");
+
+    // Depth is capped: the nested session asked for a sub-agent, was refused, and still
+    // reported — one report reached the parent, never a second level.
+    expect(received).toHaveLength(4);
+    const reports = result.messages.filter(
+      (message) => message.role === "tool" && message.content.includes("Rapport du sous-agent")
+    );
+    expect(reports).toHaveLength(1);
+    // And the nested turn did not itself contain a nested report.
+    expect(reports[0]?.content?.match(/Rapport du sous-agent/g)).toHaveLength(1);
+  });
+});

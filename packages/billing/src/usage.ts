@@ -211,6 +211,11 @@ export function usageKindFor(key: EntitlementKey): UsageEventKind | null {
   switch (key) {
     case "monthly_test_runs":
       return "test_run";
+    case "monthly_ai_audits":
+      // Without this mapping a pure gate (quantity 0) read `used = 0` for the
+      // AI-audit counter: a workspace that had burned its whole budget passed
+      // the gate and only the meter call caught it afterwards.
+      return "ai_audit";
     case "exit_datasets":
       return "export_job";
     case "api_access":

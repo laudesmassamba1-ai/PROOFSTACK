@@ -79,7 +79,7 @@ export function subagentPrompt(profile: EffortProfile): string {
 
   return [
     `Niveau d'effort demandé : ${profile.level}.`,
-    `Structure ton travail en sous-agents dès que deux parties du problème sont indépendantes — au minimum ${profile.subagents} sous-agents (relecture, vérification croisée, ou exploration parallèle), plus si le travail s'y prête.`,
+    `Tu disposes de l'outil \`delegate\` : dès que deux parties du problème sont indépendantes, ouvre au minimum ${profile.subagents} sous-agents avec des questions étroites (relecture, vérification croisée, exploration parallèle) — davantage si le travail s'y prête. Un sous-agent lit et rapporte, il ne modifie rien : c'est toi qui écris.`,
     "Chaque sous-agent reçoit un objectif précis, un périmètre de fichiers, et rapporte des faits avec leurs emplacements — pas des impressions.",
     `Un sous-agent relecture doit rejeter ou confirmer les conclusions des autres ; une conclusion qu'un autre agent n'a pas pu repasser ne se dit pas « vérifiée ».`,
     depth,

@@ -76,7 +76,7 @@ export function PricingTable({ currentPlanKey }: { currentPlanKey?: string }) {
         </label>
       </div>
 
-      <p className="mx-auto mb-6 flex w-fit items-center gap-2 rounded-full border border-brand-mint/25 bg-brand-emerald/8 px-4 py-1.5 text-[0.78rem] text-brand-mint/90">
+      <p className="mx-auto mb-10 flex w-fit items-center gap-2 rounded-full border border-brand-mint/25 bg-brand-emerald/8 px-4 py-1.5 text-[0.78rem] text-brand-mint/90">
         <Zap size={13} />
         {t("pricing.founding")}
       </p>
@@ -141,7 +141,7 @@ export function PricingTable({ currentPlanKey }: { currentPlanKey?: string }) {
                 </p>
               ) : null}
 
-              <ul className="mt-5 space-y-2.5 text-[0.85rem]">
+              <ul className="mt-5 space-y-1.5 text-[0.85rem]">
                 <LimitLine
                   label={t("mkt.pricing.projects")}
                   value={plan.entitlements.project_limit}
@@ -149,6 +149,10 @@ export function PricingTable({ currentPlanKey }: { currentPlanKey?: string }) {
                 <LimitLine
                   label={t("mkt.pricing.runs")}
                   value={plan.entitlements.monthly_test_runs}
+                />
+                <LimitLine
+                  label={t("mkt.pricing.aiAudits")}
+                  value={plan.entitlements.monthly_ai_audits}
                 />
                 <LimitLine
                   label={t("mkt.pricing.worldProfiles")}
@@ -245,9 +249,9 @@ function LimitLine({
           ? t("mkt.pricing.unlimited")
           : String(value ?? 0);
   return (
-    <li className="flex items-center justify-between gap-3 border-b border-white/6 pb-2 last:border-0">
+    <li className="flex min-h-[2.1rem] items-center justify-between gap-3 border-b border-white/6 pb-1.5 last:border-0">
       <span className="text-white/56">{label}</span>
-      <span className="font-mono text-[0.8rem] text-white/86">{display}</span>
+      <span className="shrink-0 font-mono text-[0.8rem] text-white/86">{display}</span>
     </li>
   );
 }
@@ -265,18 +269,18 @@ function FlagLine({
   const on = value === true;
   if (on && pending) {
     return (
-      <li className="flex items-center justify-between gap-3 text-[0.85rem]">
+      <li className="flex min-h-[2.1rem] items-center justify-between gap-3 border-b border-white/6 pb-1.5 text-[0.85rem]">
         <span className="text-white/56">{label}</span>
-        <span className="rounded-full border border-white/15 px-2 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wider text-white/45">
+        <span className="shrink-0 rounded-full border border-white/15 px-2 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wider text-white/45">
           {t("mkt.pricing.pending")}
         </span>
       </li>
     );
   }
   return (
-    <li className="flex items-center justify-between gap-3 text-[0.85rem]">
+    <li className="flex min-h-[2.1rem] items-center justify-between gap-3 border-b border-white/6 pb-1.5 text-[0.85rem]">
       <span className="text-white/56">{label}</span>
-      <span className={on ? "text-brand-mint" : "text-white/26"}>
+      <span className={`shrink-0 ${on ? "text-brand-mint" : "text-white/26"}`}>
         {on ? <Check size={15} /> : <Minus size={15} />}
         <span className="sr-only">
           {on ? t("mkt.pricing.included") : t("mkt.pricing.notIncluded")}

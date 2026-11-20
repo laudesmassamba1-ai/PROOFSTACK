@@ -19,16 +19,25 @@ const xof = (whole: number) => ({ currency: "XOF", minor: String(whole) });
 export const FREE_ENTITLEMENTS: Record<EntitlementKey, number | boolean> = {
   workspace_limit: 1,
   project_limit: 1,
-  // Ten runs a month is a taste, not a QA department: enough to wire the modules up and
-  // see them work, not enough to run a team's regression on the free tier.
-  monthly_test_runs: 10,
+  // Ten runs a month was a QA department on a free tier: it let a small team ship on
+  // our compute and never hit the point where the product's value is obvious. Five is a
+  // single afternoon of real use — enough to see every module work on one project, not
+  // enough to run someone's release process for free.
+  monthly_test_runs: 5,
+  // Three readings: one is a demo that ends in a wall, three is enough to try the free
+  // tier on a real page, a real run and one mistake. Depth (effort levels, reviewers)
+  // is what a plan buys — not the second attempt.
   monthly_ai_audits: 3,
-  world_profiles: 2,
-  flow_scenarios: 3,
+  world_profiles: 1,
+  flow_scenarios: 2,
   exit_datasets: 1,
-  report_retention_days: 14,
+  // Two weeks of history is a trial, not an archive: long enough to compare two runs,
+  // short enough that a team notices what retention buys.
+  report_retention_days: 7,
   team_members: 1,
   api_access: false,
+  // The CLI runs the same engine locally, so the free tier keeps it: a developer who can
+  // reproduce a finding on their own machine is the wedge, and it costs us nothing.
   cli_access: true,
   github_integration: false,
   advanced_reports: false,
@@ -63,7 +72,7 @@ const PLAN_SEEDS: PlanSeed[] = [
     key: "developer",
     name: "Developer",
     rank: 1,
-    description: "Full module depth, cloud sync from the CLI, extended reports.",
+    description: "Full module depth, cloud sync from the CLI, AI audits at depth.",
     trialDays: 14,
     graceDays: 7,
     renewalReminderDays: 7,
@@ -72,22 +81,24 @@ const PLAN_SEEDS: PlanSeed[] = [
     prepaidOnly: true,
     active: true,
     prices: [
-      { id: "price_developer_monthly_usd", period: "monthly", amount: usd(1200), featured: true },
-      { id: "price_developer_yearly_usd", period: "yearly", amount: usd(12000) },
-      { id: "price_developer_monthly_eur", period: "monthly", amount: eur(1200) },
-      { id: "price_developer_yearly_eur", period: "yearly", amount: eur(12000) },
-      { id: "price_developer_monthly_xof", period: "monthly", amount: xof(15000) },
-      { id: "price_developer_yearly_xof", period: "yearly", amount: xof(150000) },
+      { id: "price_developer_monthly_usd", period: "monthly", amount: usd(1500), featured: true },
+      { id: "price_developer_yearly_usd", period: "yearly", amount: usd(15000) },
+      { id: "price_developer_monthly_eur", period: "monthly", amount: eur(1500) },
+      { id: "price_developer_yearly_eur", period: "yearly", amount: eur(15000) },
+      // XOF is quoted at the euro peg (655.957), not converted at a made-up rate: 15 USD
+      // is about 9 000 CFA, so the three currencies tell the same story.
+      { id: "price_developer_monthly_xof", period: "monthly", amount: xof(9000) },
+      { id: "price_developer_yearly_xof", period: "yearly", amount: xof(90000) },
     ],
     entitlements: {
       workspace_limit: 1,
       project_limit: 5,
-      monthly_test_runs: 300,
-      monthly_ai_audits: 60,
+      monthly_test_runs: 200,
+      monthly_ai_audits: 40,
       world_profiles: UNLIMITED,
-      flow_scenarios: 40,
-      exit_datasets: 10,
-      report_retention_days: 180,
+      flow_scenarios: 25,
+      exit_datasets: 6,
+      report_retention_days: 90,
       team_members: 1,
       api_access: true,
       cli_access: true,
@@ -114,21 +125,21 @@ const PLAN_SEEDS: PlanSeed[] = [
     prepaidOnly: true,
     active: true,
     prices: [
-      { id: "price_studio_monthly_usd", period: "monthly", amount: usd(2900), featured: true },
-      { id: "price_studio_yearly_usd", period: "yearly", amount: usd(29000) },
-      { id: "price_studio_monthly_eur", period: "monthly", amount: eur(2900) },
-      { id: "price_studio_yearly_eur", period: "yearly", amount: eur(29000) },
-      { id: "price_studio_monthly_xof", period: "monthly", amount: xof(35000) },
-      { id: "price_studio_yearly_xof", period: "yearly", amount: xof(350000) },
+      { id: "price_studio_monthly_usd", period: "monthly", amount: usd(3900), featured: true },
+      { id: "price_studio_yearly_usd", period: "yearly", amount: usd(39000) },
+      { id: "price_studio_monthly_eur", period: "monthly", amount: eur(3900) },
+      { id: "price_studio_yearly_eur", period: "yearly", amount: eur(39000) },
+      { id: "price_studio_monthly_xof", period: "monthly", amount: xof(24000) },
+      { id: "price_studio_yearly_xof", period: "yearly", amount: xof(240000) },
     ],
     entitlements: {
       workspace_limit: 2,
       project_limit: 20,
-      monthly_test_runs: 1500,
-      monthly_ai_audits: 300,
+      monthly_test_runs: 1200,
+      monthly_ai_audits: 200,
       world_profiles: UNLIMITED,
-      flow_scenarios: 150,
-      exit_datasets: 40,
+      flow_scenarios: 100,
+      exit_datasets: 25,
       report_retention_days: 365,
       team_members: 10,
       api_access: true,
@@ -156,18 +167,20 @@ const PLAN_SEEDS: PlanSeed[] = [
     prepaidOnly: true,
     active: true,
     prices: [
-      { id: "price_agency_monthly_usd", period: "monthly", amount: usd(7900), featured: true },
-      { id: "price_agency_yearly_usd", period: "yearly", amount: usd(79000) },
-      { id: "price_agency_monthly_eur", period: "monthly", amount: eur(7900) },
-      { id: "price_agency_yearly_eur", period: "yearly", amount: eur(79000) },
-      { id: "price_agency_monthly_xof", period: "monthly", amount: xof(95000) },
-      { id: "price_agency_yearly_xof", period: "yearly", amount: xof(950000) },
+      { id: "price_agency_monthly_usd", period: "monthly", amount: usd(9900), featured: true },
+      { id: "price_agency_yearly_usd", period: "yearly", amount: usd(99000) },
+      { id: "price_agency_monthly_eur", period: "monthly", amount: eur(9900) },
+      { id: "price_agency_yearly_eur", period: "yearly", amount: eur(99000) },
+      { id: "price_agency_monthly_xof", period: "monthly", amount: xof(65000) },
+      { id: "price_agency_yearly_xof", period: "yearly", amount: xof(650000) },
     ],
     entitlements: {
       workspace_limit: 10,
       project_limit: UNLIMITED,
-      monthly_test_runs: 8000,
-      monthly_ai_audits: UNLIMITED,
+      monthly_test_runs: 5000,
+      // Not unlimited: an audit is model calls, and an unmetered plan is one an operator
+      // cannot forecast. 600 a month is more than an agency doing daily audits needs.
+      monthly_ai_audits: 600,
       world_profiles: UNLIMITED,
       flow_scenarios: UNLIMITED,
       exit_datasets: UNLIMITED,

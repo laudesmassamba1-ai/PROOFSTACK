@@ -33,7 +33,7 @@ const { createServer } = require("node:net");
 const { join } = require("node:path");
 const { cpus, homedir, totalmem } = require("node:os");
 const { chmodSync, mkdirSync, readFileSync, writeFileSync } = require("node:fs");
-const { evaluateAccess } = require("./src/access.cjs");
+const { evaluateAccess, normalizeStoredSession } = require("./src/access.cjs");
 const { createStore } = require("./src/store.cjs");
 const { loginPageHtml } = require("./src/login-page.cjs");
 const { signInWithCredentials } = require("./src/sign-in.cjs");
@@ -369,9 +369,12 @@ async function gate() {
 
   if (!session || session.error) {
     const fromCli = readCliSession();
-    if (fromCli) {
-      store.save(fromCli);
-      session = fromCli;
+    const normalized = normalizeStoredSession(fromCli, SITE_API);
+    if (normalized) {
+      // Stored with the apiUrl the verification probe needs: a CLI session imported
+      // without one could never be re-confirmed and would age out on the grace clock.
+      store.save(normalized);
+      session = normalized;
       importedFromCli = true;
     } else if (session?.error === "vault-locked") {
       // Do not overwrite a sealed file we cannot read: it is a login that exists, and
@@ -664,8 +667,8 @@ async function createWindow(port, url) {
 ipcMain.handle("proofcore:state", () => accessState);
 ipcMain.handle("proofcore:login", (_event, credentials) => signIn(credentials));
 ipcMain.handle("proofcore:session-updated", async () => {
-  const fromCli = readCliSession();
-  if (fromCli) store.save(fromCli);
+  const normalized = normalizeStoredSession(readCliSession(), SITE_API);
+  if (normalized) store.save(normalized);
   const session = store.load();
   return session && !session.error ? { saved: true } : { saved: false };
 });
@@ -694,7 +697,7 @@ ipcMain.handle("proofcore:open-external", (_event, url) => {
 });
 
 ipcMain.handle("proofcore:window", (_event, action) => {
-  if (!mainWindow) return false;
+  if (!mainWindow || mainWindow.isDestroyed()) return false;
   switch (action) {
     case "minimize":
       mainWindow.minimize();
@@ -736,7 +739,9 @@ ipcMain.handle("proofcore:action", async (_event, action) => {
   if (typeof action !== "string") return { ok: false, output: "Action invalide." };
   switch (action) {
     case "open-agent":
-      if (!mainWindow) return { ok: false, output: "La fenêtre n'est pas prête." };
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        return { ok: false, output: "La fenêtre n'est pas prête." };
+      }
       mainWindow.show();
       mainWindow.focus();
       mainWindow.webContents.send("proofcore:navigate", "/app/ai/local");
@@ -772,7 +777,7 @@ ipcMain.handle("proofcore:action", async (_event, action) => {
       await shell.openExternal("https://github.com/laudesmassamba1-ai/PROOFSTACK/releases/latest");
       return { ok: true, output: "Versions ouvertes dans le navigateur." };
     case "reload":
-      mainWindow?.reload();
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.reload();
       return { ok: true, output: "Interface rechargée." };
     case "quit":
       app.quit();

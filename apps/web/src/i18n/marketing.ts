@@ -20,6 +20,10 @@ export const marketingEn = {
   "mkt.engine.body":
     "Project, environment, suite, case, run, assertion, finding, evidence, report. The same eleven entities carry a locale fixture, a checkout journey and an export round trip — which is why one CLI, one API and one dashboard serve every module.",
   "mkt.engine.core": "core",
+  "mkt.wall.foot.kicker": "SHARED ENGINE",
+  "mkt.wall.foot.title": "One engine, five readings",
+  "mkt.wall.foot.body":
+    "Project, suite, case, run, assertion, finding, evidence, report: the same entities carry a locale fixture, a checkout journey, an export round trip and a URL audit. A skipped check is never reported as a pass.",
   "mkt.tile.reports": "Reports",
   "mkt.tile.reports.note": "JSON · JUnit · HTML",
   "mkt.tile.validation": "Validation",
@@ -33,8 +37,9 @@ export const marketingEn = {
   "mkt.pricing.worldProfiles": "WORLD locale profiles",
   "mkt.pricing.flowScenarios": "FLOW scenarios",
   "mkt.pricing.exitDatasets": "EXIT datasets",
+  "mkt.pricing.aiAudits": "AI audits / month",
   "mkt.pricing.teamMembers": "Team members",
-  "mkt.pricing.retention": "Report retention (days)",
+  "mkt.pricing.retention": "Retention (days)",
   "mkt.pricing.cli": "CLI cloud sync",
   "mkt.pricing.api": "API access",
   "mkt.pricing.github": "GitHub integration",
@@ -110,7 +115,7 @@ export const marketingEn = {
   "home.cta.pricing": "See pricing",
 
   "hero.artifact.title": "PROOFCORE · REPORT",
-  "hero.artifact.note": "example run · not a live execution",
+  "hero.artifact.note": "example · not live",
   "home.stats.label": "The engine in numbers",
   "home.stats.modules": "modules, one engine",
   "home.stats.commands": "commands, init to report",
@@ -137,6 +142,10 @@ export const marketingFr: Record<MarketingKey, string> = {
   "mkt.engine.body":
     "Projet, environnement, suite, cas, exécution, assertion, constat, preuve, rapport. Les mêmes onze entités portent un jeu de données localisé, un parcours de paiement et un aller-retour d'export — c'est pourquoi un CLI, une API et un tableau de bord servent tous les modules.",
   "mkt.engine.core": "moteur",
+  "mkt.wall.foot.kicker": "MOTEUR PARTAGÉ",
+  "mkt.wall.foot.title": "Un moteur, cinq lectures",
+  "mkt.wall.foot.body":
+    "Projet, suite, cas, exécution, assertion, constat, preuve, rapport : les mêmes entités portent un jeu de locales, un parcours de paiement, un aller-retour d'export et un audit d'URL. Un contrôle ignoré n'est jamais présenté comme un succès.",
   "mkt.tile.reports": "Rapports",
   "mkt.tile.reports.note": "JSON · JUnit · HTML",
   "mkt.tile.validation": "Validation",
@@ -150,8 +159,9 @@ export const marketingFr: Record<MarketingKey, string> = {
   "mkt.pricing.worldProfiles": "Profils locaux WORLD",
   "mkt.pricing.flowScenarios": "Scénarios FLOW",
   "mkt.pricing.exitDatasets": "Jeux de données EXIT",
+  "mkt.pricing.aiAudits": "Audits IA / mois",
   "mkt.pricing.teamMembers": "Membres d'équipe",
-  "mkt.pricing.retention": "Conservation des rapports (jours)",
+  "mkt.pricing.retention": "Rétention (jours)",
   "mkt.pricing.cli": "Synchronisation CLI",
   "mkt.pricing.api": "Accès API",
   "mkt.pricing.github": "Intégration GitHub",
@@ -227,7 +237,7 @@ export const marketingFr: Record<MarketingKey, string> = {
   "home.cta.pricing": "Voir les tarifs",
 
   "hero.artifact.title": "PROOFCORE · RAPPORT",
-  "hero.artifact.note": "exemple enregistré · pas une exécution en direct",
+  "hero.artifact.note": "exemple · pas en direct",
   "home.stats.label": "Le moteur en chiffres",
   "home.stats.modules": "modules, un seul moteur",
   "home.stats.commands": "commandes, de init à report",

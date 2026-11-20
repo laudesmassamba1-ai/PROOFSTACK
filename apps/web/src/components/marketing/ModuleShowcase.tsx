@@ -1,185 +1,114 @@
-import {
-  ArrowUpRight,
-  BadgeCheck,
-  Boxes,
-  FileBarChart2,
-  Globe2,
-  Plug,
-  Route,
-  ShieldAlert,
-  Timer,
-  Unplug,
-} from "lucide-react";
+import { ArrowUpRight, BadgeCheck, Globe2, PackageOpen, Route, ShieldAlert } from "lucide-react";
 import { Link } from "react-router";
 import { useI18n } from "../../i18n/index.js";
 
 /**
- * The module wall: white tiles over a blue→violet→pink→orange field, line icons and small
- * auxiliary chips. Deliberately static — a pointer-following tilt moved the text people
- * were reading, so the composition carries the depth and the content stays still.
+ * The module wall.
+ *
+ * It used to be white tiles floating on a blue→violet→pink→orange gradient. Nothing else
+ * on the site uses that field, and it fought the one thing the product is: a precision
+ * instrument that reads a product and reports facts. So the wall is now dark, hairline-
+ * ruled and instrument-like — each module owns one accent, carries the technical tokens
+ * it actually examines, and moves only on hover (a lifted card, a lit edge, a filling
+ * meter). The tokens are language-neutral on purpose: they are the check vocabulary, not
+ * marketing words.
  */
+
+interface ModuleMeta {
+  id: "world" | "flow" | "exit" | "fail" | "clean";
+  icon: typeof Globe2;
+  /** Technical vocabulary this module reads. Rendered in mono, untranslated. */
+  tokens: readonly string[];
+  /** What the module leaves behind. */
+  output: string;
+}
+
+const MODULES: readonly ModuleMeta[] = [
+  {
+    id: "world",
+    icon: Globe2,
+    tokens: ["locale", "RTL", "currency", "date-format", "form-input"],
+    output: "JSON · JUnit · HTML",
+  },
+  {
+    id: "flow",
+    icon: Route,
+    tokens: ["checkout", "retry", "timeout", "webhook", "idempotency"],
+    output: "JSON · JUnit · HTML",
+  },
+  {
+    id: "exit",
+    icon: PackageOpen,
+    tokens: ["export", "round-trip", "schema", "checksum"],
+    output: "JSON · JUnit · HTML",
+  },
+  {
+    id: "fail",
+    icon: ShieldAlert,
+    tokens: ["headers", "cookies", "csp", "mixed-content", "disclosure"],
+    output: "score / 100 · findings",
+  },
+  {
+    id: "clean",
+    icon: BadgeCheck,
+    tokens: ["headings", "alt-text", "labels", "viewport", "weight"],
+    output: "score / 100 · findings",
+  },
+];
+
 export function ModuleShowcase() {
   const { t } = useI18n();
 
   return (
-    <div className="spectrum-field relative overflow-hidden rounded-[28px] px-5 py-12 sm:px-8 lg:py-16">
-      <div className="relative mx-auto grid max-w-[1050px] gap-5">
-        <div className="grid gap-5 md:grid-cols-3">
-          <Tile
-            title={t("modules.world.name")}
-            subtitle={t("modules.world.tag")}
-            body={t("question.world")}
-            icon={<Globe2 size={26} className="tile-ink" />}
-            to="/world"
-            openLabel={t("modules.open")}
-          />
-          <Tile
-            title={t("modules.flow.name")}
-            subtitle={t("modules.flow.tag")}
-            body={t("question.flow")}
-            icon={<Route size={26} className="tile-ink" />}
-            to="/flow"
-            openLabel={t("modules.open")}
-            chip={t("mkt.engine.core")}
-          />
-          <Tile
-            title={t("modules.exit.name")}
-            subtitle={t("modules.exit.tag")}
-            body={t("question.exit")}
-            icon={<Unplug size={26} className="tile-ink" />}
-            to="/exit"
-            openLabel={t("modules.open")}
-          />
-        </div>
-
-        {/* The two audits live on the second row: same tiles, real HTTP targets. */}
-        <div className="grid gap-5 md:grid-cols-[1fr_1fr_1.4fr]">
-          <Tile
-            title={t("modules.fail.name")}
-            subtitle={t("modules.fail.tag")}
-            body={t("question.fail")}
-            icon={<ShieldAlert size={26} className="tile-ink" />}
-            to="/fail"
-            openLabel={t("modules.open")}
-          />
-          <Tile
-            title={t("modules.clean.name")}
-            subtitle={t("modules.clean.tag")}
-            body={t("question.clean")}
-            icon={<BadgeCheck size={26} className="tile-ink" />}
-            to="/clean"
-            openLabel={t("modules.open")}
-          />
-          <div className="tile p-5">
-            <div className="flex items-start gap-4">
-              <span className="tile-chip flex size-11 shrink-0 items-center justify-center">
-                <Boxes size={20} className="tile-ink" />
-              </span>
-              <div>
-                <h3 className="text-[1.05rem] font-semibold">{t("mkt.engine.title")}</h3>
-                <p className="tile-body mt-1.5 text-[0.88rem] leading-relaxed">
-                  {t("mkt.engine.body")}
-                </p>
-                <div className="mt-4 flex flex-wrap gap-2 font-mono text-[0.72rem] text-[#1b2f77]">
-                  {["PENDING", "RUNNING", "PASSED", "FAILED", "WARNING", "SKIPPED", "ERROR"].map(
-                    (status) => (
-                      <span key={status} className="rounded-md bg-[#eef1f8] px-2 py-1">
-                        {status}
-                      </span>
-                    )
-                  )}
-                </div>
+    <div className="module-wall">
+      <div className="module-wall-grid">
+        {MODULES.map((module, index) => {
+          const Icon = module.icon;
+          return (
+            <Link
+              key={module.id}
+              to={`/${module.id}`}
+              className={`module-panel module-${module.id}`}
+              style={{ "--i": index } as React.CSSProperties}
+            >
+              <span className="module-panel-glow" aria-hidden="true" />
+              <div className="module-panel-head">
+                <span className="module-panel-icon">
+                  <Icon size={18} />
+                </span>
+                <span className="module-panel-id">{module.id.toUpperCase()}</span>
+                <ArrowUpRight size={16} className="module-panel-arrow" />
               </div>
-            </div>
+              <h3 className="module-panel-title">{t(`modules.${module.id}.name`)}</h3>
+              <p className="module-panel-tag">{t(`modules.${module.id}.tag`)}</p>
+              <p className="module-panel-q">{t(`question.${module.id}`)}</p>
+              <ul className="module-panel-tokens">
+                {module.tokens.map((token) => (
+                  <li key={token}>{token}</li>
+                ))}
+              </ul>
+              <p className="module-panel-out">
+                <span className="module-panel-out-dot" aria-hidden="true" />
+                {module.output}
+              </p>
+            </Link>
+          );
+        })}
+
+        {/* The sixth cell: the engine that carries the five. Filling it keeps the wall a
+            complete rectangle instead of ending on a hole. */}
+        <div className="module-panel module-wall-foot">
+          <p className="module-panel-id">{t("mkt.wall.foot.kicker")}</p>
+          <p className="module-wall-foot-title">{t("mkt.wall.foot.title")}</p>
+          <p className="module-wall-foot-body">{t("mkt.wall.foot.body")}</p>
+          <div className="module-wall-states" aria-hidden="true">
+            {["PENDING", "RUNNING", "PASS", "WARN", "FAIL", "SKIPPED"].map((state) => (
+              <span key={state} className={`wall-state wall-state-${state.toLowerCase()}`}>
+                {state}
+              </span>
+            ))}
           </div>
         </div>
-
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          <MiniTile
-            icon={<FileBarChart2 size={18} className="tile-ink" />}
-            label={t("mkt.tile.reports")}
-            note={t("mkt.tile.reports.note")}
-          />
-          <MiniTile
-            icon={<BadgeCheck size={18} className="tile-ink" />}
-            label={t("mkt.tile.validation")}
-            note={t("mkt.tile.validation.note")}
-          />
-          <MiniTile
-            icon={<Plug size={18} className="tile-ink" />}
-            label={t("mkt.tile.integrations")}
-            note={t("mkt.tile.integrations.note")}
-          />
-          <MiniTile
-            icon={<Timer size={18} className="tile-ink" />}
-            label={t("mkt.tile.automation")}
-            note={t("mkt.tile.automation.note")}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Tile({
-  title,
-  subtitle,
-  body,
-  icon,
-  to,
-  openLabel,
-  chip,
-  style,
-}: {
-  title: string;
-  subtitle: string;
-  body: string;
-  icon: React.ReactNode;
-  to: string;
-  openLabel: string;
-  chip?: string;
-  style?: React.CSSProperties;
-}) {
-  return (
-    <div className="tile p-5" style={style}>
-      <div className="flex items-center justify-between">
-        <span className="tile-chip flex size-11 items-center justify-center">{icon}</span>
-        {chip ? (
-          <span className="rounded-full bg-[#eef1f8] px-2.5 py-1 font-mono text-[0.66rem] text-[#1b2f77]">
-            {chip}
-          </span>
-        ) : null}
-      </div>
-      <h3 className="mt-4 text-[1.15rem] font-semibold tracking-tight">{title}</h3>
-      <p className="tile-mono text-[0.78rem] uppercase tracking-[0.14em]">{subtitle}</p>
-      <p className="tile-body mt-3 text-[0.86rem] leading-relaxed">{body}</p>
-      <Link
-        to={to}
-        className="tile-link mt-4 inline-flex items-center gap-1.5 text-[0.84rem] font-medium hover:underline"
-      >
-        {openLabel} <ArrowUpRight size={15} />
-      </Link>
-    </div>
-  );
-}
-
-function MiniTile({
-  icon,
-  label,
-  note,
-  style,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  note: string;
-  style?: React.CSSProperties;
-}) {
-  return (
-    <div className="tile flex items-center gap-3 px-4 py-3.5" style={style}>
-      <span className="tile-chip flex size-9 shrink-0 items-center justify-center">{icon}</span>
-      <div className="min-w-0">
-        <p className="truncate text-[0.86rem] font-semibold">{label}</p>
-        <p className="tile-mono truncate font-mono text-[0.7rem]">{note}</p>
       </div>
     </div>
   );

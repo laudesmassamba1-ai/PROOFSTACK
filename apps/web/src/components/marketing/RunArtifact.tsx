@@ -41,10 +41,10 @@ export function RunArtifact({ className = "" }: { className?: string }) {
     <div ref={ref} className={`terminal-preview terminal-grid run-artifact reveal ${className}`}>
       <div className="terminal-preview-bar flex items-center gap-2.5 px-4 py-3">
         <span className="run-dot" aria-hidden="true" />
-        <span className="font-mono text-[0.66rem] tracking-[0.14em] text-white/55">
+        <span className="whitespace-nowrap font-mono text-[0.64rem] tracking-[0.12em] text-white/55">
           {t("hero.artifact.title")}
         </span>
-        <span className="run-artifact-tag ml-auto">{t("hero.artifact.note")}</span>
+        <span className="run-artifact-tag ml-auto truncate">{t("hero.artifact.note")}</span>
       </div>
 
       <div className="run-lines px-4 py-4 sm:px-5">
