@@ -91,37 +91,51 @@ export function DownloadPage() {
         <DownloadCard
           icon={Monitor}
           title="Windows"
-          subtitle={fr ? "Installateur autonome — aucun prérequis" : "Self-contained installer — no prerequisites"}
+          subtitle={
+            fr
+              ? "Installateur autonome — aucun prérequis"
+              : "Self-contained installer — no prerequisites"
+          }
           asset={picks?.winSetup ?? null}
           loading={state === "loading"}
           primary
           fallback={RELEASES_PAGE}
           cta={t("download.cta")}
-          note={fr ? "Installe pour l'utilisateur courant, sans élévation." : "Installs for the current user, no elevation."}
-        />
-        <DownloadCard
-          icon={Package}
-          title="Linux"
-          subtitle={fr ? "Installateur .run — aucune dépendance" : ".run installer — no dependencies"}
-          asset={picks?.linuxRun ?? null}
-          loading={state === "loading"}
-          fallback={RELEASES_PAGE}
-          cta={t("download.cta")}
-          note={fr ? "chmod +x, puis exécuter : ajoute le CLI au PATH." : "chmod +x, then run: adds the CLI to PATH."}
+          note={
+            fr
+              ? "Installe pour l'utilisateur courant, sans élévation."
+              : "Installs for the current user, no elevation."
+          }
         />
         <DownloadCard
           icon={Package}
           title="Linux"
           subtitle={
-            fr ? "Paquet Debian (.deb), ou AppImage" : "Debian package (.deb), or AppImage"
+            fr ? "Installateur .run — aucune dépendance" : ".run installer — no dependencies"
           }
+          asset={picks?.linuxRun ?? null}
+          loading={state === "loading"}
+          fallback={RELEASES_PAGE}
+          cta={t("download.cta")}
+          note={
+            fr
+              ? "chmod +x, puis exécuter : ajoute le CLI au PATH."
+              : "chmod +x, then run: adds the CLI to PATH."
+          }
+        />
+        <DownloadCard
+          icon={Package}
+          title="Linux"
+          subtitle={fr ? "Paquet Debian (.deb), ou AppImage" : "Debian package (.deb), or AppImage"}
           asset={picks?.deb ?? picks?.appImage ?? null}
           loading={state === "loading"}
           fallback={RELEASES_PAGE}
           cta={t("download.cta")}
           note={
             picks?.appImage
-              ? (fr ? "AppImage également disponible ci-dessous." : "AppImage also available below.")
+              ? fr
+                ? "AppImage également disponible ci-dessous."
+                : "AppImage also available below."
               : undefined
           }
         />
@@ -189,9 +203,7 @@ export function DownloadPage() {
           {/* Two ways in, because there are two kinds of machine: one with Node and one
               without. Both are real commands, and both are in the release above. */}
           <div className="mt-3 grid gap-1.5">
-            <code className="block font-mono text-[0.76rem] text-white/72">
-              npm i -g proofcore
-            </code>
+            <code className="block font-mono text-[0.76rem] text-white/72">npm i -g proofcore</code>
             <code className="block font-mono text-[0.72rem] text-white/48">
               {fr
                 ? "# ou : l'installateur autonome ci-dessus, sans Node installé"
