@@ -51,7 +51,7 @@ import {
   sessionId,
   syncAccountAi,
 } from "./agent-runtime.js";
-import { parseAuditTarget, printAuditHelp } from "./audit.js";
+import { printAuditHelp } from "./audit.js";
 import { mapArchitecture } from "./code-tools.js";
 import { evaluate, findInstalls, inspectMachine, summarize } from "./doctor-env.js";
 import { HUB_COMMANDS, hubWebPath, runHub } from "./hub.js";

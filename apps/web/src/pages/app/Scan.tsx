@@ -116,14 +116,29 @@ export function ScanPage(): React.ReactElement {
         `/api/v1/audits?workspaceId=${session.workspaceId}&limit=10`
       );
       setHistory(body.items);
+      return body.items;
     } catch {
       // History is a convenience; a failure here must not block scanning.
     }
   }, [session.workspaceId]);
 
   useEffect(() => {
-    void loadHistory();
-  }, [loadHistory]);
+    // Opening the page shows the last scan rather than an empty form: the result someone
+    // came back for is usually the one they just took.
+    void loadHistory().then((items) => {
+      const latest = items?.[0];
+      if (!latest) return;
+      void apiFetch<{ id: string; result: ScanResult }>(
+        `/api/v1/audits/${latest.id}?workspaceId=${session.workspaceId}`
+      )
+        .then((body) => {
+          setScan(body.result);
+          setAuditId(body.id);
+          setUrl(body.result.url);
+        })
+        .catch(() => undefined);
+    });
+  }, [loadHistory, session.workspaceId]);
 
   const run = async () => {
     if (!session.workspaceId || busy) return;
