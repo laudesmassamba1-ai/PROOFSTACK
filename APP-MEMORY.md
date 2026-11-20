@@ -102,3 +102,11 @@ pnpm cloud:deploy --dry-run
 - Chaque message d'erreur contient la commande qui répare.
 - FR = langue des interfaces agent ; EN = site marketing ; la source des prix = plans.ts uniquement.
 - Un test qui a échoué puis passé : relancer deux fois avant de croire à la correction.
+
+## 2026-11-16 (fin de journée) — déslop visuel et textuel
+- RunArtifact (le faux terminal de la landing) supprimé, avec sa grille CSS; le héros n'a plus qu'une colonne.
+- Icônes "étoiles IA" (Sparkles, AiMark) supprimées partout : boutons "Interpréter avec l'IA" sans icône, avatar chat = Brain, accueil chat = Terminal, nav IA = Brain. AiMark.tsx supprimé.
+- Copy FR/EN réécrite (dictionaries.ts, marketing.ts, workspace.ts, AiChat.tsx) : plus de murs de tirets cadratins, plus de règle de trois, exemples concrets (Abidjan/Paris/Montréal).
+- Bug réparé au passage : le dialog IA se bloquait sur `) : null}` orphelin quand replacingKey/état connecté changeait (trou laissé par le thread frère) ; chatModels inutilisé remplacé par profileModels.
+- Full suite 620/620 verte, lint 0, build ok. Commit "fix(web): the fake terminal card and the AI starburst are gone...".
+- Leçon : quand on supprime une icône d'import, vérifier les JSX conditionnels autour (`note ? (...) : null`) — biome formate mais ne répare pas le JSX.
