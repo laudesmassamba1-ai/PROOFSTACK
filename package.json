@@ -39,7 +39,8 @@
     "app:dist:win": "pnpm build:packages && pnpm --filter @proofcore/web build && pnpm --filter @proofcore/desktop dist:win",
     "cloud:deploy": "node tooling/scripts/deploy-cloudflare.mjs",
     "cloud:deploy:api": "node tooling/scripts/deploy-cloudflare.mjs --only api",
-    "cloud:deploy:web": "node tooling/scripts/deploy-cloudflare.mjs --only web"
+    "cloud:deploy:web": "node tooling/scripts/deploy-cloudflare.mjs --only web",
+    "smoke:deploy": "node tooling/scripts/smoke-deploy.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",

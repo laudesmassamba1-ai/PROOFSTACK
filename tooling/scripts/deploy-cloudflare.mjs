@@ -17,7 +17,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -28,6 +28,7 @@ const web = join(root, "apps", "web");
 const args = process.argv.slice(2);
 const only = args.includes("--only") ? args[args.indexOf("--only") + 1] : "all";
 const dry = args.includes("--dry-run");
+const skipSmoke = args.includes("--skip-smoke");
 
 const say = (message) => process.stdout.write(`▸ ${message}\n`);
 const run = (command, options) =>
@@ -75,7 +76,41 @@ function deployApi() {
   // before deploy keeps production ahead of the code that expects its tables.
   run(["npx", "wrangler", "d1", "migrations", "apply", "proofcore", "--remote"], { cwd: api });
   run(["npx", "wrangler", "deploy"], { cwd: api });
-  say("API deployed: verify with /health before announcing anything");
+  say("API deployed");
+}
+
+/**
+ * The origin this deployment is reachable at, read from the Worker's own vars rather
+ * than duplicated here: `API_ORIGIN` is what the API tells browsers it lives at, so a
+ * smoke check against anything else would test a different service.
+ */
+function tomlVar(name) {
+  const text = readFileSync(join(api, "wrangler.toml"), "utf8");
+  return text.match(new RegExp(`^${name}\\s*=\\s*"([^"]+)"`, "m"))?.[1];
+}
+
+/** A production Pages host: the first WEB_ORIGIN entry on pages.dev without a wildcard. */
+function pagesOrigin() {
+  return (tomlVar("WEB_ORIGIN") ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .find((value) => value.includes(".pages.dev") && !value.includes("*"));
+}
+
+// A deploy is not done when the upload finishes: it is done when /health answers and the
+// key pages serve the bundle they reference. Failure here fails the command, on purpose.
+function smoke() {
+  if (dry) return say("dry-run: smoke skipped");
+  if (skipSmoke) return say("smoke skipped (--skip-smoke)");
+  const targets = [];
+  const apiOrigin = process.env.PROOFCORE_API_URL ?? tomlVar("API_ORIGIN");
+  if (apiOrigin) targets.push("--api", apiOrigin);
+  const pages = only === "api" ? null : (process.env.PROOFCORE_PAGES_URL ?? pagesOrigin());
+  if (pages) targets.push("--web", pages);
+  if (targets.length === 0) return say("smoke: no target found, nothing checked");
+  say(`smoke: ${targets.join(" ")}`);
+  run(["node", join(root, "tooling", "scripts", "smoke-deploy.mjs"), ...targets]);
+  say("smoke: every check passed");
 }
 
 function deployWeb() {
@@ -110,4 +145,5 @@ function deployWeb() {
 preflight();
 if (only === "all" || only === "api") deployApi();
 if (only === "all" || only === "web") deployWeb();
+smoke();
 say(`done${dry ? " (dry-run)" : ""}`);

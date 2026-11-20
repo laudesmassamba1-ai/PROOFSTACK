@@ -50,6 +50,23 @@ still require a deploy to change. See
 [`docs/DEVELOPMENT_STATUS.md`](docs/DEVELOPMENT_STATUS.md) for the full, unvarnished
 list.
 
+## Deploy
+
+```bash
+pnpm cloud:deploy        # API + D1 migrations, then Pages — ends with the smoke check
+pnpm cloud:deploy --skip-smoke   # the same, without the post-deploy verification
+pnpm smoke:deploy        # check production without deploying (API, Vercel, Pages)
+```
+
+`cloud:deploy` fails when the release it just published does not answer: `/health` must
+report `status: ok` and `database: ok`, each web origin must be allowed to read it with
+credentials, and `/`, `/product`, `/pricing`, `/download` and `/signin` must serve the
+bundle the HTML references. The smoke check targets the Worker's own `API_ORIGIN` and the
+production Pages host, both read from `apps/api/wrangler.toml`; `PROOFCORE_API_URL`,
+`PROOFCORE_PAGES_URL` and `PROOFCORE_SMOKE_WEB` override them. Vercel publishes from the
+same commit, so run `pnpm smoke:deploy` after a Vercel production deploy to verify both
+surfaces at once.
+
 ## Quick start
 
 ```bash
