@@ -3,10 +3,15 @@
  *
  * It is a local page, not a redirect to the site: the app has to be able to explain itself
  * with no network, and a login screen that depends on the network is a login screen that
- * cannot say "no network". Two actions only - sign in, or open the site - and the reason is
- * always spelled out, because "Connectez-vous" without saying why is how people conclude an
- * app is broken.
+ * cannot say "no network".
+ *
+ * Written in the site's design language (`pageCss` — same palette, same motion tokens) with
+ * one entrance animation, a breathing dot, and the same reduced-motion reset as the site.
+ * Direct credentials are the primary path (same route as the web app); the reason line is
+ * always the answer to "why am I here", never just a generic prompt.
  */
+
+const { pageCss } = require("./theme.cjs");
 
 /** Kept as a function of the state so the page never shows a stale reason. */
 function loginPageHtml(state, options = {}) {
@@ -36,63 +41,75 @@ function loginPageHtml(state, options = {}) {
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PROOFCORE · connexion</title>
+<style>${pageCss}</style>
 <style>
-:root{--bg:#0b0d10;--panel:#14181d;--line:#242b33;--fg:#e8ecf1;--dim:#8b97a5;--acc:#4ade80}
-*{box-sizing:border-box}
-body{margin:0;min-height:100vh;display:grid;place-items:center;background:radial-gradient(1200px 600px at 50% -10%,#16202a,#0b0d10 60%);color:var(--fg);font:14px/1.6 ui-sans-serif,system-ui,sans-serif}
-.card{width:min(520px,92vw);background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:28px 26px;box-shadow:0 24px 80px rgba(0,0,0,.45)}
-.brand{display:flex;align-items:center;gap:10px;margin-bottom:18px}
-.brand b{letter-spacing:.18em;font-size:12px}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 12px var(--acc)}
-h1{margin:0 0 10px;font-size:20px;letter-spacing:-.01em}
-p{margin:0 0 18px;color:var(--dim)}
-.status{font:12px/1.5 ui-monospace,monospace;color:var(--dim);border-top:1px solid var(--line);padding-top:12px;margin-top:20px;white-space:pre-wrap}
-button{cursor:pointer;font:inherit;border-radius:10px;padding:10px 16px;border:1px solid var(--line);background:#1a2027;color:var(--fg)}
-button.primary{background:var(--acc);border-color:var(--acc);color:#06210f;font-weight:600}
-button:disabled{opacity:.55;cursor:progress}
-label{display:block;margin:12px 0 0;color:var(--dim);font-size:12px}
-input{display:block;width:100%;margin-top:6px;border:1px solid var(--line);border-radius:9px;background:#0f1318;color:var(--fg);font:14px/1.4 ui-sans-serif,system-ui,sans-serif;padding:10px 11px}
-input:focus{outline:2px solid #2b4a37;border-color:var(--acc)}
-.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
-</style></head><body>
+body{display:grid;place-items:center;padding:24px}
+.card{width:min(430px,94vw);animation:rise var(--m-slow) var(--m-rise) backwards}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:20px}
+.brand-mark{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#73d68b,#0fd9d0);display:grid;place-items:center;color:#06210f;font:800 17px/1 var(--font-display)}
+.brand b{letter-spacing:.18em;font-size:11.5px;font-weight:600}
+h1{margin:0 0 10px;font:600 21px/1.3 var(--font-display);letter-spacing:-.01em}
+.lead{margin:0 0 18px;color:var(--ink-soft);font-size:13px}
+label{display:block;margin:0 0 12px;color:var(--ink-soft);font-size:12px;font-weight:500}
+input{display:block;width:100%;margin-top:6px;border:1px solid var(--rule);border-radius:var(--r);background:var(--paper-raised);color:var(--ink);font:14px/1.4 var(--font-sans);padding:10px 12px;
+  transition:border-color var(--m-base) var(--m-ease),box-shadow var(--m-base) var(--m-ease)}
+input:focus{outline:none;border-color:rgba(99,214,162,.55);box-shadow:0 0 0 3px rgba(99,214,162,.14)}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+.status{font:11.5px/1.6 var(--font-mono);color:var(--ink-soft);border-top:1px solid var(--rule);padding-top:12px;margin-top:20px;min-height:18px;white-space:pre-wrap}
+.status.working{color:var(--accent)}
+.status.error{color:var(--danger)}
+.status.ok{color:var(--accent)}
+.shake{animation:pop var(--m-slow) var(--m-rise)}
+footer{margin-top:14px;font-size:11.5px;color:var(--ink-soft);opacity:.8}
+footer button{padding:0;border:none;background:none;color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+</style></head>
+<body>
 <main class="card">
-  <div class="brand"><span class="dot"></span><b>PROOFCORE</b></div>
+  <div class="brand"><span class="brand-mark">P</span><b>PROOFCORE</b></div>
   <h1>${esc(reason.title)}</h1>
-  <p>${esc(reason.body)}</p>
+  <p class="lead">${esc(reason.body)}</p>
   <form id="login-form" autocomplete="on">
     <label for="email">Email<input id="email" name="email" type="email" autocomplete="username" required></label>
     <label for="password">Mot de passe<input id="password" name="password" type="password" autocomplete="current-password" required></label>
     <div class="row">
       <button class="primary" id="login" type="submit">Se connecter</button>
-      <button id="site" type="button">Ouvrir le site</button>
+      <button id="site" type="button">Créer un compte</button>
     </div>
   </form>
   <div class="status" id="status">${esc(state?.detail ?? "")}</div>
+  <footer>Les outils tournent sur cette machine. <button id="why" type="button">Pourquoi un compte ?</button></footer>
 </main>
 <script>
 const status = document.getElementById('status');
 const login = document.getElementById('login');
 const form = document.getElementById('login-form');
+const card = document.querySelector('.card');
+const say=(text,cls)=>{status.className='status'+(cls?' '+cls:'');status.textContent=text};
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
   login.disabled = true;
-  status.textContent = 'Connexion au site…';
+  say('Connexion au site…', 'working');
   try {
     const result = await window.proofcoreDesktop.login({
       email: document.getElementById('email').value,
       password: document.getElementById('password').value
     });
-    status.textContent = result?.detail ?? '';
     if (result?.allowed) {
-      status.textContent = 'Connecté. Ouverture de l\\'application…';
+      say(result.detail ?? 'Connecté. Ouverture de l\\'application…', 'ok');
+      document.querySelector('.lead').textContent = 'Les outils se préparent.';
+    } else {
+      say(result?.detail ?? "Connexion refusée.", "error");
+      card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake');
+      document.getElementById('password').focus();
     }
   } catch (error) {
-    status.textContent = 'La connexion a échoué : ' + (error?.message ?? error);
+    say('La connexion a échoué : ' + (error?.message ?? error), 'error');
   } finally {
     login.disabled = false;
   }
 });
-document.getElementById('site').addEventListener('click', () => window.proofcoreDesktop.openExternal(${JSON.stringify(site)}));
+document.getElementById('site').addEventListener('click', () => window.proofcoreDesktop.openExternal(${JSON.stringify(site.concat("/register"))}));
+document.getElementById('why').addEventListener('click', () => window.proofcoreDesktop.openExternal(${JSON.stringify(site)}));
 </script>
 </body></html>`;
 }

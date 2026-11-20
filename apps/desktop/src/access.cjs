@@ -85,7 +85,15 @@ function evaluateAccess(input) {
 
   const savedAt = typeof session.savedAt === "string" ? Date.parse(session.savedAt) : Number.NaN;
   const jwtExpiry = parseJwtExpiry(token);
+  // Precedence: a server-stated expiry wins (sign-in returns session.expiresAt), then a JWT
+  // exp, then the local grace window from the last confirmation. A local deadline must never
+  // outlive the one the server already announced.
+  const serverExpiry =
+    typeof session.expiresAt === "string" && Number.isFinite(Date.parse(session.expiresAt))
+      ? Date.parse(session.expiresAt)
+      : null;
   const expiresAt =
+    serverExpiry ??
     jwtExpiry ??
     (Number.isFinite(savedAt) ? savedAt + graceDays * DAY_MS : now + graceDays * DAY_MS);
 

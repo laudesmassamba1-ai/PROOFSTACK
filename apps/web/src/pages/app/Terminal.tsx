@@ -212,9 +212,10 @@ export function TerminalPage() {
       termRef.current = null;
       fitRef.current = null;
     };
-    // Created once; a new session is an explicit action, not a re-render.
-    // biome-ignore lint/correctness/useExhaustiveDependencies: the terminal owns its lifecycle.
-  }, []);
+    // Created once; a new session is an explicit action (the Restart button), not a
+    // re-render. `connect` reads the same refs this effect owns, so listing it would
+    // recreate the terminal on a state change inside the effect.
+  }, [connect]);
 
   const restart = () => {
     const term = termRef.current;

@@ -29,7 +29,9 @@
     "enabled": true,
     "actions": {
       "source": {
-        "organizeImports": { "level": "on" }
+        "organizeImports": {
+          "level": "on"
+        }
       }
     }
   },
@@ -52,6 +54,9 @@
       },
       "security": {
         "noGlobalEval": "error"
+      },
+      "complexity": {
+        "noImportantStyles": "off"
       }
     }
   },

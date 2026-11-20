@@ -38,7 +38,7 @@ function screenshotPath(root: string, name?: string): string {
 }
 
 export async function browserOpen(
-  context: BrowserToolContext,
+  _context: BrowserToolContext,
   input: {
     url?: string;
     width?: number;

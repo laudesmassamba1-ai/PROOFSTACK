@@ -224,6 +224,11 @@ const targets = all
 
 mkdirSync(outDir, { recursive: true });
 mkdirSync(work, { recursive: true });
+// A clean checkout has no dist/: esbuild resolves the CLI's `@proofcore/*` imports to the
+// emitted packages, so bundling before they exist fails. Emit them first, so a fresh
+// clone and a CI runner build the same thing a warm working copy does.
+step("building the workspace packages");
+run(process.execPath, [join(root, "tooling/scripts/build.mjs")]);
 const blob = seaBlob(bundle());
 for (const target of targets) await buildTarget(target, blob);
 process.stdout.write(`\n${existsSync(outDir) ? `Binaries in ${outDir}\n` : ""}`);

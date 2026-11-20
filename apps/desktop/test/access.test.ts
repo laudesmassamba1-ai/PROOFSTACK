@@ -140,3 +140,94 @@ describe("createStore", () => {
     expect(store.load()).toHaveProperty("error");
   });
 });
+
+describe("signInWithCredentials", () => {
+  const { signInWithCredentials, readSetCookie } = require("../src/sign-in.cjs");
+  const url = "https://site.test";
+
+  const post = (status, headers, body) => async () => ({ status, headers, body });
+
+  it("reads the session out of Set-Cookie, never out of the body", async () => {
+    const result = await signInWithCredentials({
+      apiUrl: url,
+      email: "a@b.test",
+      password: "correct-password-123",
+      post: post(
+        200,
+        { "set-cookie": `${"ps_session"}=tok123; HttpOnly; Path=/"` },
+        JSON.stringify({
+          user: { email: "a@b.test" },
+          session: { expiresAt: "2026-03-08T12:00:00.000Z" },
+        })
+      ),
+    });
+    expect(result.ok).toBe(true);
+    expect(result.session.cookie).toBe("ps_session=tok123");
+    expect(result.session.expiresAt).toBe("2026-03-08T12:00:00.000Z");
+    // The gate honours the server's expiry, not a local guess.
+    const state = evaluateAccess({ session: result.session, now, online: true });
+    expect(state.expiresAt).toBe(Date.parse("2026-03-08T12:00:00.000Z"));
+  });
+
+  it("answers the API's one message for a wrong password, without inventing detail", async () => {
+    const result = await signInWithCredentials({
+      apiUrl: url,
+      email: "a@b.test",
+      password: "wrong-password-123",
+      post: post(
+        401,
+        {},
+        JSON.stringify({
+          error: { code: "invalid_credentials", message: "Email or password is incorrect." },
+        })
+      ),
+    });
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe("credentials");
+    expect(result.detail).toBe("Email or password is incorrect.");
+  });
+
+  it("keeps a network failure in its own words, so the person can act on it", async () => {
+    const result = await signInWithCredentials({
+      apiUrl: url,
+      email: "a@b.test",
+      password: "whatever-password-1",
+      post: async () => {
+        throw new Error("ENOTFOUND");
+      },
+    });
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe("network");
+    expect(result.detail).toContain("ENOTFOUND");
+  });
+
+  it("names rate limiting instead of echoing a generic error", async () => {
+    const result = await signInWithCredentials({
+      apiUrl: url,
+      email: "a@b.test",
+      password: "whatever-password-1",
+      post: post(429, {}, "{}"),
+    });
+    expect(result.code).toBe("rate-limited");
+    expect(result.detail).toContain("Trop de tentatives");
+  });
+
+  it("refuses a 200 without a cookie rather than storing half a session", async () => {
+    const result = await signInWithCredentials({
+      apiUrl: url,
+      email: "a@b.test",
+      password: "whatever-password-1",
+      post: post(200, {}, JSON.stringify({ user: { email: "a@b.test" } })),
+    });
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe("server");
+  });
+
+  it("finds one cookie among several Set-Cookie lines", () => {
+    const value = readSetCookie(
+      { "set-cookie": ["a=1; Path=/", "ps_session=tok; HttpOnly"] },
+      "ps_session"
+    );
+    expect(value).toBe("tok");
+  });
+});

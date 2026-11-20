@@ -6,6 +6,7 @@ export * from "./id.js";
 export * from "./json.js";
 export * from "./logger.js";
 export * from "./money.js";
+export * from "./page-scan.js";
 export * from "./result.js";
 export * from "./text.js";
 export * from "./time.js";

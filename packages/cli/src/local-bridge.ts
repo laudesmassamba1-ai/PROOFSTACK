@@ -770,90 +770,21 @@ async function pushTranscript(
   }
 }
 
+import { conversationShell } from "./app-page.js";
+
 /** Deterministic import key, so the same first message does not create two rows. */
 function conversationKeyFromTitle(text: string): string {
   return createHash("sha256").update(text).digest("hex").slice(0, 16);
 }
 
 function renderPage(options: ServeOptions): string {
+  // The conversation shell lives in app-page.ts, in the site's design language; this glue
+  // only feeds it the facts it shows in the header.
+  const page = conversationShell({
+    ...(options.provider ? { model: options.provider.model } : {}),
+    ...(options.root ? { cwd: options.root } : {}),
+  });
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PROOFCORE · agent local</title>
-<style>
-:root{--bg:#0b0d10;--panel:#14181d;--line:#242b33;--fg:#e8ecf1;--dim:#8b97a5;--acc:#4ade80;--warn:#fbbf24}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.55 ui-sans-serif,system-ui,sans-serif}
-header{display:flex;gap:12px;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)}
-header b{letter-spacing:.14em;font-size:12px}header span{color:var(--dim);font-size:12px}
-main{max-width:860px;margin:0 auto;padding:18px;display:flex;flex-direction:column;gap:12px;height:calc(100vh - 56px)}
-#log{flex:1;overflow:auto;display:flex;flex-direction:column;gap:10px}
-.msg{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);white-space:pre-wrap}
-.msg.me{border-color:#2b4a37}.tool{font-family:ui-monospace,monospace;font-size:12px;color:var(--dim);border-left:2px solid var(--line);padding-left:10px}
-.approve{border:1px solid var(--warn);border-radius:10px;padding:10px;background:#1d1a10}
-pre{margin:6px 0 0;font:12px/1.5 ui-monospace,monospace;max-height:220px;overflow:auto}
-.add{background:#0f2a1b;color:#b6f3ce}.del{background:#2a1414;color:#f7bcbc}
-button{cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--fg);padding:6px 12px;font:inherit}
-button.ok{border-color:var(--acc);color:var(--acc)}button.no{border-color:#ef4444;color:#ef4444}
-form{display:flex;gap:8px}textarea{flex:1;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit;resize:none;min-height:52px}
-</style></head><body>
-<header><b>PROOFCORE</b><span>agent local · ${escapeHtml(options.provider?.model ?? "aucun modèle configuré")}</span><span id="meta"></span></header>
-<main><div id="log"></div>
-<form id="f"><textarea id="q" placeholder="Demande quelque chose sur ce dépôt…" required></textarea><button class="ok">Envoyer</button></form>
-</main>
-<script>
-const log=document.getElementById('log'), form=document.getElementById('f'), q=document.getElementById('q');
-const add=(cls,text)=>{const d=document.createElement('div');d.className=cls;d.textContent=text;log.appendChild(d);log.scrollTop=log.scrollHeight;return d};
-const pre=(parent,text)=>{const p=document.createElement('pre');p.textContent=text;parent.appendChild(p);return p};
-fetch('/api/state').then(r=>r.json()).then(s=>{
-  document.getElementById('meta').textContent=(s.sync?'sync compte: '+(s.account?s.account.email:'non connecté'):'sync off')+(s.allowWrite?' · écriture auto':' · écriture sur accord');
-}).catch(()=>{});
-form.addEventListener('submit',async(e)=>{
-  e.preventDefault();const message=q.value.trim();if(!message)return;q.value='';
-  add('msg me',message);
-  const status=add('tool','… en cours');
-  const res=await fetch('/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({message})});
-  if(!res.ok){status.textContent='erreur HTTP '+res.status;return}
-  const reader=res.body.getReader(),dec=new TextDecoder();let buf='';
-  while(true){
-    const {value,done}=await reader.read();if(done)break;
-    buf+=dec.decode(value,{stream:true});
-    let idx;
-    while((idx=buf.indexOf('\\n\\n'))>=0){
-      const frame=buf.slice(0,idx);buf=buf.slice(idx+2);
-      const evt=/^event: (.+)$/m.exec(frame)?.[1];const data=/^data: (.+)$/m.exec(frame)?.[1];
-      if(!evt||!data)continue;const payload=JSON.parse(data);
-      if(evt==='assistant_text'){add('msg',payload.text)}
-      if(evt==='tool_call'){status.textContent='→ '+payload.name+' '+JSON.stringify(payload.args).slice(0,120);status.className='tool'}
-      if(evt==='approval'){
-        const box=add('approve','Approuver '+payload.tool+' ?');
-        if(payload.preview)pre(box,payload.preview);
-        const row=document.createElement('div');row.style.marginTop='8px';
-        const yes=document.createElement('button');yes.className='ok';yes.textContent='Appliquer';
-        const no=document.createElement('button');no.className='no';no.textContent='Refuser';no.style.marginLeft='8px';
-        const decide=(allow)=>{fetch('/api/approve',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:payload.id,allow})});box.replaceWith(Object.assign(document.createElement('div'),{className:'tool',textContent:(allow?'approuvé':'refusé')+' · '+payload.tool}))};
-        yes.onclick=()=>decide(true);no.onclick=()=>decide(false);
-        row.append(yes,no);box.appendChild(row);log.scrollTop=log.scrollHeight;
-      }
-      if(evt==='result'){status.remove();if(payload.syncError)add('tool','sync non effectuée: '+payload.syncError)}
-      if(evt==='done'){status.remove()}
-    }
-  }
-});
-</script></body></html>`;
-}
-
-function escapeHtml(text: string): string {
-  return text.replace(/[&<>"']/g, (char) => {
-    switch (char) {
-      case "&":
-        return "&amp;";
-      case "<":
-        return "&lt;";
-      case ">":
-        return "&gt;";
-      case '"':
-        return "&quot;";
-      default:
-        return "&#39;";
-    }
-  });
+<title>PROOFCORE · agent local</title>${page}`;
 }

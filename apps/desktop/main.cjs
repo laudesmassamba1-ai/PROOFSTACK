@@ -36,6 +36,7 @@ const { chmodSync, mkdirSync, readFileSync, writeFileSync } = require("node:fs")
 const { evaluateAccess } = require("./src/access.cjs");
 const { createStore } = require("./src/store.cjs");
 const { loginPageHtml } = require("./src/login-page.cjs");
+const { signInWithCredentials } = require("./src/sign-in.cjs");
 const { splashPageHtml } = require("./src/splash-page.cjs");
 const { createBrowserHost } = require("./src/browser.cjs");
 
@@ -457,48 +458,11 @@ async function signIn(credentials = {}) {
   if (!email || !password) {
     return { allowed: false, detail: "Renseignez votre email et votre mot de passe." };
   }
-  let response;
-  try {
-    response = await fetch(`${SITE_API.replace(/\/+$/, "")}/api/auth/sign-in/email`, {
-      method: "POST",
-      headers: { accept: "application/json", "content-type": "application/json" },
-      body: JSON.stringify({ email, password }),
-      signal: AbortSignal.timeout(20_000),
-    });
-  } catch (error) {
-    return {
-      allowed: false,
-      detail: `Le site est injoignable : ${error instanceof Error ? error.message : String(error)}`,
-    };
-  }
-  const text = await response.text();
-  if (!response.ok) {
-    let detail = `Connexion refusée (HTTP ${response.status}).`;
-    try {
-      const parsed = JSON.parse(text);
-      if (parsed?.error?.message) detail = parsed.error.message;
-    } catch {
-      // The status is enough when the site did not return its JSON envelope.
-    }
-    return { allowed: false, detail };
-  }
-  const rawCookie =
-    response.headers.getSetCookie?.()[0] ?? response.headers.get("set-cookie") ?? "";
-  const cookie = rawCookie.split(";")[0];
-  if (!cookie.startsWith("ps_session=")) {
-    return { allowed: false, detail: "Le site a accepté la connexion sans renvoyer de session." };
-  }
-  let account = email;
-  try {
-    const parsed = JSON.parse(text);
-    if (parsed?.user?.email) account = parsed.user.email;
-  } catch {
-    // The cookie is what matters; the email is a display hint.
-  }
-  const session = { apiUrl: SITE_API, cookie, email: account, savedAt: new Date().toISOString() };
-  saveCliSession(session);
-  store?.save(session);
-  log(`signed in as ${account}`);
+  const direct = await signInWithCredentials({ apiUrl: SITE_API, email, password });
+  if (!direct.ok) return { allowed: false, detail: direct.detail };
+  saveCliSession(direct.session);
+  store?.save(direct.session);
+  log(`signed in as ${direct.session.email}`);
 
   const state = await gate();
   if (!state.allowed) return state;

@@ -17,6 +17,7 @@ import { deviceRoutes } from "./routes/device.js";
 import { machineRoutes } from "./routes/machine.js";
 import { webhookRoutes } from "./routes/webhooks.js";
 import { workspaceRoutes } from "./routes/workspace.js";
+import { auditRoutes } from "./routes/audits.js";
 
 export interface CreateAppOptions {
   db: Database;
@@ -148,6 +149,7 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
   app.route("/api/v1", planRoutes(services));
   app.route("/api/v1", workspaceRoutes(services));
   app.route("/api/v1/ai", aiRoutes(services));
+  app.route("/api/v1", auditRoutes(services));
   app.route("/api/v1/browser", browserRoutes(services));
   app.route("/api/v1", billingRoutes(services));
   app.route("/api/v1/admin", adminRoutes(services));

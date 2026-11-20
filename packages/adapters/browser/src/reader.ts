@@ -127,7 +127,7 @@ export function htmlToMarkdown(html: string): string {
   );
   value = value.replace(
     /<a\s[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi,
-    (match, href: string, body: string) => {
+    (_match, href: string, body: string) => {
       const text = htmlToText(body).replace(/\n+/g, " ").trim();
       if (!text) return "";
       if (href.startsWith("#")) return text;

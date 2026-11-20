@@ -290,8 +290,9 @@ function snapshotInPage(options: {
     };
   }
 
-  // Whitespace is collapsed horizontally but newlines are kept: the reading order of a
-  // page is part of what it says, and a single paragraph blob is much harder to ground.
+  // innerText on purpose: the reading order of a page is part of what it says, and
+  // textContent would hand back the CSS-hidden script bodies between the paragraphs.
+  // biome-ignore lint/performance/useDomNodeTextContent: rendered text, not node text.
   const bodyText = (document.body?.innerText ?? "")
     .replace(/[ \t\u00a0]+/g, " ")
     .replace(/\n{3,}/g, "\n\n")

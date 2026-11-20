@@ -1400,6 +1400,7 @@ export class AppStore {
       "browser_sessions",
       "support_messages",
       "workspace_invitations",
+      "page_audits",
     ];
     for (const table of tables) {
       await this.db.prepare(`DELETE FROM ${table} WHERE workspace_id = ?`).bind(workspaceId).run();
@@ -1407,6 +1408,76 @@ export class AppStore {
     // The workspaces row carries its own id column, not workspace_id.
     await this.db.prepare("DELETE FROM workspaces WHERE id = ?").bind(workspaceId).run();
     return true;
+  }
+
+  // ----------------------------------------------------------- page audits
+
+  /**
+   * Scans are workspace data: they name the addresses a tenant cared about, so deleting the
+   * workspace deletes them (the table is in the deletion walk above).
+   */
+  async createPageAudit(input: {
+    id: string;
+    workspaceId: string;
+    createdBy: string;
+    url: string;
+    finalUrl: string;
+    status: number;
+    durationMs: number;
+    worstVerdict: string;
+    failed: number;
+    warnings: number;
+    payload: string;
+  }): Promise<void> {
+    await this.db
+      .prepare(
+        `INSERT INTO page_audits
+           (id, workspace_id, created_by, url, final_url, status, duration_ms,
+            worst_verdict, failed, warnings, payload, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        input.id,
+        input.workspaceId,
+        input.createdBy,
+        input.url,
+        input.finalUrl,
+        input.status,
+        input.durationMs,
+        input.worstVerdict,
+        input.failed,
+        input.warnings,
+        input.payload,
+        iso(this.clock())
+      )
+      .run();
+  }
+
+  async getPageAudit(workspaceId: string, id: string): Promise<Row | null> {
+    const row = await this.db
+      .prepare("SELECT * FROM page_audits WHERE workspace_id = ? AND id = ?")
+      .bind(workspaceId, id)
+      .first<Row>();
+    return row ?? null;
+  }
+
+  async listPageAudits(
+    workspaceId: string,
+    options: { limit: number; offset: number }
+  ): Promise<{ rows: Row[]; total: number }> {
+    const total = await this.db
+      .prepare("SELECT COUNT(*) AS count FROM page_audits WHERE workspace_id = ?")
+      .bind(workspaceId)
+      .first<Row>();
+    const rows = await this.db
+      .prepare(
+        `SELECT id, url, final_url, status, duration_ms, worst_verdict, failed, warnings, created_at
+         FROM page_audits WHERE workspace_id = ?
+         ORDER BY created_at DESC LIMIT ? OFFSET ?`
+      )
+      .bind(workspaceId, options.limit, options.offset)
+      .all<Row>();
+    return { rows, total: total ? num(total, "count") : 0 };
   }
 
   // --------------------------------------------------------------- projects

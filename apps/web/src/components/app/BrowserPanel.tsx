@@ -189,10 +189,12 @@ function NativeBrowser({
       void api.destroy();
     };
     // The browser is created from the URL the panel was opened with; later navigations go
-    // through the address bar, not through a remount.
-    // biome-ignore lint/correctness/useExhaustiveDependencies: created once per mount.
-  }, [api, applyBounds]);
+    // through the address bar, not through a remount. `initialUrl` and `fr` are read at
+    // create time only: re-creating the page would close the user's tabs.
+  }, [api, applyBounds, fr, initialUrl]);
 
+  // Re-applies bounds when the layout under the native view changes; the ResizeObserver on
+  // the element already fires for those (find bar, tabs), so only `api` is listed here.
   useEffect(() => {
     const element = viewportRef.current;
     if (!api || !element) return;
@@ -207,7 +209,7 @@ function NativeBrowser({
       window.removeEventListener("resize", onResize);
       document.removeEventListener("scroll", onResize, true);
     };
-  }, [api, applyBounds, findOpen, state?.tabs.length]);
+  }, [api, applyBounds]);
 
   // A modal rendered by the page cannot appear above a native view. When one opens, the
   // view steps aside; when it closes, the page comes back at the same place.

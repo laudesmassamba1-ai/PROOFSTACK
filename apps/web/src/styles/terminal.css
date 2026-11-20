@@ -67,6 +67,9 @@
   height: 100%;
 }
 
+/* !important on purpose: xterm.js sets the viewport background inline, after this file
+   loads, and the shell's own canvas behind it is the background the design expects.
+   Without the flag the terminal paints its own #300a30 over the page's. */
 .terminal-host .xterm-viewport {
   background: transparent !important;
   scrollbar-width: thin;

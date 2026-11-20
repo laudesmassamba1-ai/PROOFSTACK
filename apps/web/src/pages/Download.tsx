@@ -65,73 +65,71 @@ export function DownloadPage() {
   const version = release?.tag_name?.replace(/^v/, "") ?? "0.4.0";
 
   return (
-    <>
-      <Section>
-        <SectionHeading
-          eyebrow={t("download.eyebrow")}
-          title={t("download.title")}
-          lede={t("download.lede")}
+    <Section>
+      <SectionHeading
+        eyebrow={t("download.eyebrow")}
+        title={t("download.title")}
+        lede={t("download.lede")}
+      />
+
+      <div className="mt-10 grid gap-5 lg:grid-cols-3">
+        <DownloadCard
+          icon={Monitor}
+          title={fr ? "Windows" : "Windows"}
+          subtitle={fr ? "Application de bureau (.exe)" : "Desktop app (.exe)"}
+          asset={picks?.windows ?? null}
+          loading={state === "loading"}
+          primary
+          fallback={RELEASES_PAGE}
+          cta={t("download.cta")}
         />
+        <DownloadCard
+          icon={Package}
+          title="Linux"
+          subtitle={fr ? "Paquet Debian (.deb)" : "Debian package (.deb)"}
+          asset={picks?.deb ?? null}
+          loading={state === "loading"}
+          fallback={RELEASES_PAGE}
+          cta={t("download.cta")}
+        />
+        <DownloadCard
+          icon={Package}
+          title="Linux"
+          subtitle="AppImage"
+          asset={picks?.appImage ?? null}
+          loading={state === "loading"}
+          fallback={RELEASES_PAGE}
+          cta={t("download.cta")}
+        />
+      </div>
 
-        <div className="mt-10 grid gap-5 lg:grid-cols-3">
-          <DownloadCard
-            icon={Monitor}
-            title={fr ? "Windows" : "Windows"}
-            subtitle={fr ? "Application de bureau (.exe)" : "Desktop app (.exe)"}
-            asset={picks?.windows ?? null}
-            loading={state === "loading"}
-            primary
-            fallback={RELEASES_PAGE}
-            cta={t("download.cta")}
-          />
-          <DownloadCard
-            icon={Package}
-            title="Linux"
-            subtitle={fr ? "Paquet Debian (.deb)" : "Debian package (.deb)"}
-            asset={picks?.deb ?? null}
-            loading={state === "loading"}
-            fallback={RELEASES_PAGE}
-            cta={t("download.cta")}
-          />
-          <DownloadCard
-            icon={Package}
-            title="Linux"
-            subtitle="AppImage"
-            asset={picks?.appImage ?? null}
-            loading={state === "loading"}
-            fallback={RELEASES_PAGE}
-            cta={t("download.cta")}
-          />
-        </div>
+      <div className="mt-8 flex flex-wrap items-center gap-4">
+        <a
+          href={release?.html_url ?? RELEASES_PAGE}
+          className="btn btn-ghost"
+          target="_blank"
+          rel="noreferrer"
+        >
+          {t("download.all")} <span aria-hidden>→</span>
+        </a>
+        <span className="text-[0.82rem] text-white/40">
+          {state === "ready" ? `v${version}` : state === "loading" ? "…" : t("download.fallback")}
+        </span>
+      </div>
 
-        <div className="mt-8 flex flex-wrap items-center gap-4">
-          <a
-            href={release?.html_url ?? RELEASES_PAGE}
-            className="btn btn-ghost"
-            target="_blank"
-            rel="noreferrer"
-          >
-            {t("download.all")} <span aria-hidden>→</span>
-          </a>
-          <span className="text-[0.82rem] text-white/40">
-            {state === "ready" ? `v${version}` : state === "loading" ? "…" : t("download.fallback")}
-          </span>
+      <div className="brand-panel mt-10 flex items-start gap-4 p-5">
+        <Terminal size={18} className="mt-0.5 shrink-0 text-brand-mint" />
+        <div>
+          <h3 className="text-[0.96rem] font-semibold">{t("download.cli.title")}</h3>
+          <p className="mt-1 text-[0.86rem] leading-relaxed text-white/54">
+            {t("download.cli.body")}
+          </p>
+          <code className="mt-3 block text-[0.78rem] text-white/72">
+            {fr ? "proofcore update --yes" : "proofcore update --yes"}
+          </code>
         </div>
-
-        <div className="brand-panel mt-10 flex items-start gap-4 p-5">
-          <Terminal size={18} className="mt-0.5 shrink-0 text-brand-mint" />
-          <div>
-            <h3 className="text-[0.96rem] font-semibold">{t("download.cli.title")}</h3>
-            <p className="mt-1 text-[0.86rem] leading-relaxed text-white/54">
-              {t("download.cli.body")}
-            </p>
-            <code className="mt-3 block text-[0.78rem] text-white/72">
-              {fr ? "proofcore update --yes" : "proofcore update --yes"}
-            </code>
-          </div>
-        </div>
-      </Section>
-    </>
+      </div>
+    </Section>
   );
 }
 
