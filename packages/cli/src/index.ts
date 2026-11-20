@@ -1129,6 +1129,16 @@ async function commandTest(flags: GlobalFlags, args: string[]): Promise<number> 
     loaded = await loadConfig({ cwd: flags.cwd });
   } catch (error) {
     err(flags, red(flags, describeError(error).message));
+    // The question behind "no configuration" is almost always "so how do I test this URL?".
+    // Answer it here instead of sending the operator to the docs.
+    if (!flags.json) {
+      err(flags, dim(flags, "To screen a URL right now, without any configuration:"));
+      err(
+        flags,
+        `  ${cyan(flags, "proofcore check <url>")}  ${dim(flags, "(security + interface)")}`
+      );
+      err(flags, `  ${cyan(flags, "proofcore fail <url>")}   ${dim(flags, "(security only)")}`);
+    }
     return 2;
   }
 
