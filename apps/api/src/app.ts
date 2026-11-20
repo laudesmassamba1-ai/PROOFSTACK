@@ -10,6 +10,7 @@ import { createPaymentProvider } from "./providers.js";
 import { accountRoutes } from "./routes/account.js";
 import { adminRoutes } from "./routes/admin.js";
 import { aiRoutes } from "./routes/ai.js";
+import { auditRoutes } from "./routes/audits.js";
 import { authRoutes } from "./routes/auth.js";
 import { billingRoutes, planRoutes } from "./routes/billing.js";
 import { browserRoutes } from "./routes/browser.js";
@@ -17,7 +18,6 @@ import { deviceRoutes } from "./routes/device.js";
 import { machineRoutes } from "./routes/machine.js";
 import { webhookRoutes } from "./routes/webhooks.js";
 import { workspaceRoutes } from "./routes/workspace.js";
-import { auditRoutes } from "./routes/audits.js";
 
 export interface CreateAppOptions {
   db: Database;

@@ -161,16 +161,13 @@ html {
   }
   /* The !important flags here are the canonical reduced-motion reset: they must
    * beat every animation/transition rule regardless of specificity. Not a style
-   * accident — an accessibility contract.
+   * accident — an accessibility contract (noImportantStyles is off for this file).
    */
   *,
   *::before,
   *::after {
-    /* biome-ignore lint/complexity/noImportantStyles: reduced-motion reset must override everything */
     animation-duration: 0.001ms !important;
-    /* biome-ignore lint/complexity/noImportantStyles: reduced-motion reset must override everything */
     animation-iteration-count: 1 !important;
-    /* biome-ignore lint/complexity/noImportantStyles: reduced-motion reset must override everything */
     transition-duration: 0.001ms !important;
   }
 }
@@ -3656,7 +3653,6 @@ p {
 
   .app-form-sheet > * {
     /* Mobile stacking must win over the two-column layout's explicit grid-column. */
-    /* biome-ignore lint/complexity/noImportantStyles: responsive override must beat explicit placement */
     grid-column: 1 !important;
   }
 
@@ -3720,7 +3716,6 @@ p {
   .module-object-flow.has-data .flow-link-broken,
   .module-object-exit.has-data .exit-stack,
   .tester-sway {
-    /* biome-ignore lint/complexity/noImportantStyles: reduced-motion override must beat animation rules */
     animation: none !important;
   }
 
@@ -6125,6 +6120,12 @@ p {
   font-size: 0.66rem;
 }
 
+.modules-index-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .modules-index-note {
   border-top: 1px solid var(--rule);
   margin: 0;
@@ -6132,6 +6133,325 @@ p {
   color: var(--ink-soft);
   font-size: 0.7rem;
   line-height: 1.55;
+}
+
+/* ---------- /app/scan: one address, four readings ---------- */
+
+.scan-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.scan-bar-icon {
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+
+.scan-input {
+  flex: 1 1 320px;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+.scan-auth {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 14px 16px;
+}
+
+.scan-auth-hint {
+  font-size: 0.72rem;
+  line-height: 1.55;
+  color: var(--muted-foreground);
+}
+
+.scan-verdict-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 18px 0 10px;
+}
+
+.scan-meta {
+  margin-top: 2px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--muted-foreground);
+}
+
+.scan-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  border: 1px solid color-mix(in srgb, var(--warning) 26%, transparent);
+  border-radius: 10px;
+  padding: 8px 11px;
+  background: color-mix(in srgb, var(--warning) 7%, var(--surface));
+  font-size: 0.72rem;
+}
+
+.scan-modules {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin-bottom: 14px;
+}
+
+.scan-module {
+  display: grid;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 13px;
+  background: var(--surface);
+}
+
+.scan-module.is-pass {
+  border-left-color: var(--success);
+}
+
+.scan-module.is-warnings {
+  border-left-color: var(--warning);
+}
+
+.scan-module.is-fail {
+  border-left-color: var(--destructive);
+}
+
+.scan-module-name {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.scan-module-label {
+  font-size: 0.68rem;
+  color: var(--muted-foreground);
+}
+
+.scan-module-score {
+  font-family: var(--font-display, var(--font-sans));
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.scan-module-counts {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--muted-foreground);
+}
+
+.scan-ai {
+  margin-bottom: 14px;
+  padding: 15px 17px;
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+}
+
+.scan-ai-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.7rem;
+  font-weight: 680;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.scan-ai-body {
+  margin-top: 8px;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.scan-ai-error {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  color: var(--destructive);
+}
+
+.scan-findings {
+  margin-bottom: 12px;
+  padding: 15px 17px;
+}
+
+.scan-findings-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.scan-findings-head span {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--muted-foreground);
+}
+
+.scan-findings ul {
+  display: grid;
+  gap: 0;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scan-findings li {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  border-top: 1px solid var(--border);
+  padding: 9px 0;
+}
+
+.scan-finding-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding-top: 2px;
+}
+
+.scan-findings li.is-pass .scan-finding-status {
+  color: var(--success);
+}
+
+.scan-findings li.is-warn .scan-finding-status {
+  color: var(--warning);
+}
+
+.scan-findings li.is-fail .scan-finding-status {
+  color: var(--destructive);
+}
+
+.scan-findings li.is-skip .scan-finding-status {
+  color: var(--muted-foreground);
+}
+
+.scan-finding-id {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  color: var(--muted-foreground);
+}
+
+.scan-finding-observed {
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.scan-finding-why {
+  margin-top: 2px;
+  font-size: 0.74rem;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+}
+
+.scan-saved {
+  font-size: 0.7rem;
+  color: var(--muted-foreground);
+}
+
+.scan-history {
+  margin-top: 16px;
+  padding: 15px 17px;
+}
+
+.scan-history ul {
+  display: grid;
+  gap: 0;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scan-history-row {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--border);
+  padding: 8px 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.scan-history-row:hover .scan-history-url {
+  text-decoration: underline;
+}
+
+.scan-history-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted-foreground);
+}
+
+.scan-history-dot.is-fail {
+  background: var(--destructive);
+}
+
+.scan-history-dot.is-warnings {
+  background: var(--warning);
+}
+
+.scan-history-dot.is-pass {
+  background: var(--success);
+}
+
+.scan-history-url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+}
+
+.scan-history-counts,
+.scan-history-row time {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--muted-foreground);
+}
+
+@media (max-width: 640px) {
+  .scan-findings li {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+
+  .scan-history-row {
+    grid-template-columns: 10px minmax(0, 1fr);
+  }
+
+  .scan-history-counts,
+  .scan-history-row time {
+    display: none;
+  }
 }
 
 /* ---------- gauge headroom (FAIL/CLEAN audit cards) ---------- */

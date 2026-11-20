@@ -34,7 +34,10 @@ const PAGE = `<!doctype html>
 </body>
 </html>`;
 
-function htmlResponse(html: string, init: { status?: number; headers?: Record<string, string> } = {}) {
+function htmlResponse(
+  html: string,
+  init: { status?: number; headers?: Record<string, string> } = {}
+) {
   return new Response(html, {
     status: init.status ?? 200,
     headers: { "content-type": "text/html; charset=utf-8", ...init.headers },
@@ -79,7 +82,7 @@ describe("scanPage", () => {
   it("reports each family with counts, and never invents a pass", async () => {
     const result = await scanPage("https://example.com/", { fetchImpl: fetchOnce(PAGE) });
     const byModule = Object.fromEntries(result.modules.map((item) => [item.module, item]));
-    expect(Object.keys(byModule).sort()).toEqual(["clean", "exit", "fail", "world"]);
+    expect(Object.keys(byModule).sort()).toEqual(["clean", "exit", "fail", "flow", "world"]);
 
     // No HSTS on this response: a real failure, not a silent pass.
     const hsts = result.findings.find((item) => item.id === "hsts");
@@ -106,6 +109,59 @@ describe("scanPage", () => {
     expect(cookies?.observed).toContain("no cookie");
   });
 
+  it("finds the checkout entry point, probes it, and reports what it answered", async () => {
+    const shop = `<html lang="fr"><head><title>Boutique</title></head><body><main>
+      <a href="/panier">Panier</a>
+      <form action="/checkout"><input name="csrf_token" value="x"></form>
+      <script src="https://js.stripe.com/v3"></script>
+      <a href="/remboursement">Remboursement</a>
+    </main></body></html>`;
+    const seen: string[] = [];
+    const fetchImpl = (async (input: string | URL | Request) => {
+      const target = String(input);
+      seen.push(target);
+      if (target.endsWith("/panier")) return new Response("ok", { status: 200 });
+      return htmlResponse(shop);
+    }) as unknown as typeof fetch;
+
+    const result = await scanPage("https://shop.example/", { fetchImpl });
+    expect(result.findings.find((item) => item.id === "journey_entry")?.status).toBe("PASS");
+    expect(result.findings.find((item) => item.id === "journey_reachable")).toMatchObject({
+      status: "PASS",
+      observed: expect.stringContaining("HTTP 200"),
+    });
+    expect(result.findings.find((item) => item.id === "payment_methods")?.observed).toContain(
+      "Stripe"
+    );
+    expect(result.findings.find((item) => item.id === "journey_csrf")?.status).toBe("PASS");
+    expect(result.findings.find((item) => item.id === "refund_path")?.status).toBe("PASS");
+    // The probe happens once, and it is the entry point that was followed.
+    expect(seen.filter((item) => item.endsWith("/panier"))).toHaveLength(1);
+    expect(result.probes).toEqual([{ url: "https://shop.example/panier", status: 200 }]);
+  });
+
+  it("fails the journey when the entry point answers an error", async () => {
+    const shop = `<html lang="fr"><body><main><a href="/checkout">Commander</a></main></body></html>`;
+    const fetchImpl = (async (input: string | URL | Request) => {
+      if (String(input).endsWith("/checkout")) return new Response("boom", { status: 500 });
+      return htmlResponse(shop);
+    }) as unknown as typeof fetch;
+
+    const result = await scanPage("https://shop.example/", { fetchImpl });
+    expect(result.findings.find((item) => item.id === "journey_reachable")?.status).toBe("FAIL");
+    expect(result.modules.find((item) => item.module === "flow")?.verdict).toBe("fail");
+  });
+
+  it("says a page has no journey rather than marking it green", async () => {
+    const docs = `<html lang="fr"><head><title>Docs</title></head><body><main><h1>Docs</h1></main></body></html>`;
+    const result = await scanPage("https://docs.example/", { fetchImpl: fetchOnce(docs) });
+    expect(result.findings.find((item) => item.id === "journey_entry")?.status).toBe("SKIPPED");
+    expect(result.findings.find((item) => item.id === "webhook_observability")?.status).toBe(
+      "SKIPPED"
+    );
+    expect(result.modules.find((item) => item.module === "flow")?.verdict).not.toBe("pass");
+  });
+
   it("judges a client-rendered shell without pretending to have seen the page", async () => {
     const shell = `<html><head><title>app</title></head><body><div id="root"></div><script src="/app.js"></script></body></html>`;
     const result = await scanPage("https://app.example/", { fetchImpl: fetchOnce(shell) });
@@ -115,7 +171,8 @@ describe("scanPage", () => {
   });
 
   it("treats an error status as a finding, not a crash", async () => {
-    const failing = (async () => htmlResponse("<html><body>nope</body></html>", { status: 503 })) as unknown as typeof fetch;
+    const failing = (async () =>
+      htmlResponse("<html><body>nope</body></html>", { status: 503 })) as unknown as typeof fetch;
     const result = await scanPage("https://example.com/", { fetchImpl: failing });
     expect(result.status).toBe(503);
     expect(result.findings[0]).toMatchObject({ id: "http_status", status: "FAIL" });
@@ -140,7 +197,10 @@ describe("scanPage", () => {
     const redirecting = (async (input: string | URL | Request) => {
       const target = String(input);
       if (target === "https://example.com/") {
-        return new Response(null, { status: 301, headers: { location: "https://www.example.com/" } });
+        return new Response(null, {
+          status: 301,
+          headers: { location: "https://www.example.com/" },
+        });
       }
       return htmlResponse(PAGE, { headers: { "strict-transport-security": "max-age=31536000" } });
     }) as unknown as typeof fetch;

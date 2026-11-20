@@ -1,4 +1,4 @@
-import { ArrowRight, Terminal } from "lucide-react";
+import { ArrowRight, ScanLine, Terminal } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { ModuleObject } from "../../components/app/ModuleObjects.js";
@@ -132,9 +132,14 @@ export function ModulesIndexPage() {
             : "Each module answers one precise question. The same commands run in the CLI, without opening a browser."
         }
         actions={
-          <Link to="/app/cli" className="app-btn app-btn-sm">
-            <Terminal size={14} /> {fr ? "Configurer le CLI" : "Set up the CLI"}
-          </Link>
+          <div className="modules-index-actions">
+            <Link to="/app/scan" className="app-btn app-btn-primary app-btn-sm">
+              <ScanLine size={14} /> {fr ? "Scanner une adresse" : "Scan an address"}
+            </Link>
+            <Link to="/app/cli" className="app-btn app-btn-sm">
+              <Terminal size={14} /> {fr ? "Configurer le CLI" : "Set up the CLI"}
+            </Link>
+          </div>
         }
       />
 
@@ -203,8 +208,8 @@ export function ModulesIndexPage() {
             </div>
           ))}
           <div className="modules-index-command-row">
-            <span>CHECK</span>
-            <code>proofcore check &lt;url&gt;</code>
+            <span>SCAN</span>
+            <code>proofcore scan &lt;url&gt; --explain</code>
           </div>
           <div className="modules-index-command-row">
             <span>HUB</span>

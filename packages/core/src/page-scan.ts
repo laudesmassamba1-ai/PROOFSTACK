@@ -9,6 +9,7 @@
  *
  *   FAIL   security posture (TLS, headers, cookie flags, disclosure, exposed files)
  *   CLEAN  interface quality (language, viewport, landmarks, weight, tap targets)
+ *   FLOW   whether the journey has an entry point that answers, and how it would be paid
  *   WORLD  internationalisation (declared locale, alternates, RTL, input types, formats)
  *   EXIT   data portability (export affordances, machine-readable data, downloadable files)
  *
@@ -23,7 +24,7 @@
  *     response, so a scan costs one request plus whatever it deliberately probes.
  */
 
-export type ScanModule = "fail" | "clean" | "world" | "exit";
+export type ScanModule = "fail" | "clean" | "flow" | "world" | "exit";
 export type ScanStatus = "PASS" | "WARN" | "FAIL" | "SKIPPED";
 
 export interface ScanFinding {
@@ -91,7 +92,10 @@ const BLOCKED_HOSTNAMES = new Set([
 
 function isPrivateIpv4(host: string): boolean {
   const parts = host.split(".").map(Number);
-  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+  if (
+    parts.length !== 4 ||
+    parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)
+  ) {
     return false;
   }
   const [a, b] = parts as [number, number, number, number];
@@ -228,7 +232,8 @@ export function visibleText(html: string): string {
     .replace(/<(script|style|template|noscript)[\s\S]*?<\/\1>/gi, " ")
     .replace(/<[^>]+>/g, " ")
     .replace(/&(#\d+|#x[0-9a-f]+|[a-z]+);/gi, (match, entity: string) => {
-      if (entity.startsWith("#x")) return String.fromCodePoint(Number.parseInt(entity.slice(2), 16));
+      if (entity.startsWith("#x"))
+        return String.fromCodePoint(Number.parseInt(entity.slice(2), 16));
       if (entity.startsWith("#")) return String.fromCodePoint(Number.parseInt(entity.slice(1), 10));
       return ENTITIES[entity.toLowerCase()] ?? match;
     })
@@ -292,7 +297,7 @@ function analyse(body: {
   bytes: number;
   durationMs: number;
   probes: { url: string; status: number | null }[];
-}): ScanFinding[] {
+}): { findings: ScanFinding[]; checkoutUrl: URL | null } {
   const { html, headers, url } = body;
   const findings: ScanFinding[] = [];
   const text = visibleText(html);
@@ -379,7 +384,13 @@ function analyse(body: {
   const cookies = headers.get("set-cookie") ?? "";
   if (!cookies) {
     findings.push(
-      finding("fail", "cookie_flags", "SKIPPED", "no cookie set on this response", "Judged only when a cookie is issued.")
+      finding(
+        "fail",
+        "cookie_flags",
+        "SKIPPED",
+        "no cookie set on this response",
+        "Judged only when a cookie is issued."
+      )
     );
   } else {
     const missing: string[] = [];
@@ -396,7 +407,9 @@ function analyse(body: {
       )
     );
   }
-  const mixed = secure ? [...html.matchAll(/["'(](http:\/\/[^"')\s>]+)/gi)].map((m) => m[1] ?? "") : [];
+  const mixed = secure
+    ? [...html.matchAll(/["'(](http:\/\/[^"')\s>]+)/gi)].map((m) => m[1] ?? "")
+    : [];
   const mixedExternal = mixed.filter((value) => {
     try {
       return new URL(value).host !== url.host;
@@ -409,7 +422,11 @@ function analyse(body: {
       "fail",
       "mixed_content",
       !secure ? "SKIPPED" : mixedExternal.length > 0 ? "FAIL" : "PASS",
-      !secure ? "page is not https" : mixedExternal.length > 0 ? `${mixedExternal.length} http:// resource(s)` : "none",
+      !secure
+        ? "page is not https"
+        : mixedExternal.length > 0
+          ? `${mixedExternal.length} http:// resource(s)`
+          : "none",
       "An http resource on an https page is blocked or downgrades the protection."
     )
   );
@@ -433,7 +450,9 @@ function analyse(body: {
     finding(
       "fail",
       "error_disclosure",
-      /\b(?:stack trace|traceback|Warning: [A-Za-z_]+\(\)|on line \d+|SQLSTATE|at .*\.php:\d+)/i.test(text)
+      /\b(?:stack trace|traceback|Warning: [A-Za-z_]+\(\)|on line \d+|SQLSTATE|at .*\.php:\d+)/i.test(
+        text
+      )
         ? "WARN"
         : "PASS",
       "scanned the visible text",
@@ -472,8 +491,10 @@ function analyse(body: {
     )
   );
   const description =
-    attrTags(html, "meta").find((tag) => (attr(tag, "name") ?? "").toLowerCase() === "description") ?? "";
-  const descriptionContent = description ? attr(description, "content") ?? "" : "";
+    attrTags(html, "meta").find(
+      (tag) => (attr(tag, "name") ?? "").toLowerCase() === "description"
+    ) ?? "";
+  const descriptionContent = description ? (attr(description, "content") ?? "") : "";
   findings.push(
     finding(
       "clean",
@@ -558,7 +579,11 @@ function analyse(body: {
     (tag) => !["hidden", "submit", "button"].includes((attr(tag, "type") ?? "text").toLowerCase())
   );
   const labelled = inputs.filter(
-    (tag) => attr(tag, "aria-label") || attr(tag, "aria-labelledby") || attr(tag, "id") || attr(tag, "title")
+    (tag) =>
+      attr(tag, "aria-label") ||
+      attr(tag, "aria-labelledby") ||
+      attr(tag, "id") ||
+      attr(tag, "title")
   ).length;
   findings.push(
     finding(
@@ -571,7 +596,9 @@ function analyse(body: {
           : labelled >= inputs.length / 2
             ? "WARN"
             : "FAIL",
-      inputs.length === 0 ? "no form fields" : `${inputs.length - labelled} of ${inputs.length} unlabelled`,
+      inputs.length === 0
+        ? "no form fields"
+        : `${inputs.length - labelled} of ${inputs.length} unlabelled`,
       "A field without a label is unusable with a screen reader."
     )
   );
@@ -589,6 +616,114 @@ function analyse(body: {
     )
   );
 
+  const links = attrTags(html, "a");
+
+  // ----------------------------------------------------------------- FLOW
+  //
+  // FLOW walks a payment journey, which needs the product's own checkout. A page scan
+  // cannot do that, and pretending otherwise would accuse a site of failing a step nobody
+  // took. What a page *does* show is whether a journey entry point exists, where it goes,
+  // whether it answers, and how the payment would be handled — so those are the findings,
+  // named for what they are.
+  const journeyHref = (() => {
+    const candidates = links
+      .map((tag) => attr(tag, "href") ?? "")
+      .filter((href) =>
+        /(?:^|\/)(?:cart|panier|checkout|commande|order|basket|paiement|payment)\b/i.test(href)
+      );
+    return candidates[0] ?? null;
+  })();
+  let checkoutUrl: URL | null = null;
+  if (journeyHref) {
+    try {
+      checkoutUrl = new URL(journeyHref, url);
+    } catch {
+      checkoutUrl = null;
+    }
+  }
+  findings.push(
+    finding(
+      "flow",
+      "journey_entry",
+      journeyHref ? "PASS" : "SKIPPED",
+      journeyHref ?? "no checkout, cart or order link on this page",
+      "A journey nobody can start is a journey that cannot be verified."
+    )
+  );
+  findings.push(
+    finding(
+      "flow",
+      "journey_tls",
+      !checkoutUrl ? "SKIPPED" : checkoutUrl.protocol === "https:" ? "PASS" : "FAIL",
+      !checkoutUrl ? "no entry point found" : checkoutUrl.protocol.replace(":", ""),
+      "A payment step over http exposes card and Mobile Money details in transit."
+    )
+  );
+  const providers = [
+    ["Stripe", /js\.stripe\.com|stripe\.com\/v3/i],
+    ["Paystack", /paystack/i],
+    ["Flutterwave", /flutterwave/i],
+    ["PayPal", /paypal\.(?:com|objects)|paypal\.me/i],
+    ["SasPay", /saspay/i],
+    ["FedaPay", /fedapay/i],
+    ["Kkiapay", /kkiapay/i],
+    ["CinetPay", /cinetpay/i],
+    ["Mobile Money", /mobile money|mtn momo|moov money|orange money|wave\b/i],
+  ] as const;
+  const detectedProviders = providers
+    .filter(([, pattern]) => pattern.test(html))
+    .map(([name]) => name);
+  findings.push(
+    finding(
+      "flow",
+      "payment_methods",
+      detectedProviders.length > 0 ? "PASS" : "SKIPPED",
+      detectedProviders.length > 0 ? detectedProviders.join(", ") : "none detected in the HTML",
+      "Which payment methods exist decides who can actually buy from this site."
+    )
+  );
+  // A payment form without a token field is a form that can be replayed or forged.
+  const journeyForms = attrTags(html, "form").filter((tag) =>
+    /(?:checkout|payment|paiement|cart|panier)/i.test(attr(tag, "action") ?? "")
+  );
+  const hasToken = attrTags(html, "input").some((tag) => {
+    const name = (attr(tag, "name") ?? "").toLowerCase();
+    return /csrf|token|nonce|_wpnonce/.test(name);
+  });
+  findings.push(
+    finding(
+      "flow",
+      "journey_csrf",
+      journeyForms.length === 0 ? "SKIPPED" : hasToken ? "PASS" : "WARN",
+      journeyForms.length === 0
+        ? "no checkout form on this page"
+        : hasToken
+          ? "a token field is present"
+          : "no token field in the checkout form",
+      "Without a token an order form can be replayed or submitted from another site."
+    )
+  );
+  findings.push(
+    finding(
+      "flow",
+      "refund_path",
+      /(?:refund|remboursement|retour|returns|r\u00e9tractation)/i.test(html) ? "PASS" : "WARN",
+      /(?:refund|remboursement|r\u00e9tractation)/i.test(html)
+        ? "a refund or returns reference appears in the page"
+        : "no refund or returns path on this page",
+      "A customer who cannot see how to be refunded escalates to a chargeback."
+    )
+  );
+  findings.push(
+    finding(
+      "flow",
+      "webhook_observability",
+      "SKIPPED",
+      "not observable from a page",
+      "Whether a payment webhook is delivered, duplicated or retried needs the product's own endpoint; `proofcore flow` runs it when one is configured."
+    )
+  );
+
   // ---------------------------------------------------------------- WORLD
   findings.push(
     finding(
@@ -599,8 +734,8 @@ function analyse(body: {
       "The declared locale is what decides date, number and translation rules."
     )
   );
-  const languageMeta = attrTags(html, "meta").find((tag) =>
-    (attr(tag, "http-equiv") ?? "").toLowerCase() === "content-language"
+  const languageMeta = attrTags(html, "meta").find(
+    (tag) => (attr(tag, "http-equiv") ?? "").toLowerCase() === "content-language"
   );
   findings.push(
     finding(
@@ -672,7 +807,11 @@ function analyse(body: {
     finding(
       "world",
       "input_hints",
-      telInputs.length > 0 || autocomplete.length > 0 ? "PASS" : inputs.length > 0 ? "WARN" : "SKIPPED",
+      telInputs.length > 0 || autocomplete.length > 0
+        ? "PASS"
+        : inputs.length > 0
+          ? "WARN"
+          : "SKIPPED",
       inputs.length === 0
         ? "no fields"
         : `${telInputs.length} tel, ${autocomplete.length} with autocomplete`,
@@ -683,14 +822,17 @@ function analyse(body: {
     finding(
       "world",
       "translation_targets",
-      /(?:translate|traduire|lang(?:ue)?[-_ ]?(?:switch|select|chooser))/i.test(text) ? "PASS" : "SKIPPED",
-      /(?:translate|traduire)/i.test(text) ? "a language affordance appears in the page" : "none found",
+      /(?:translate|traduire|lang(?:ue)?[-_ ]?(?:switch|select|chooser))/i.test(text)
+        ? "PASS"
+        : "SKIPPED",
+      /(?:translate|traduire)/i.test(text)
+        ? "a language affordance appears in the page"
+        : "none found",
       "If a page offers several languages, the switch has to be reachable, not buried."
     )
   );
 
   // ----------------------------------------------------------------- EXIT
-  const links = attrTags(html, "a");
   const downloads = links.filter(
     (tag) =>
       attr(tag, "download") !== null ||
@@ -701,11 +843,15 @@ function analyse(body: {
       "exit",
       "export_affordances",
       downloads.length > 0 ? "PASS" : "SKIPPED",
-      downloads.length > 0 ? `${downloads.length} downloadable artifact(s)` : "none offered on this page",
+      downloads.length > 0
+        ? `${downloads.length} downloadable artifact(s)`
+        : "none offered on this page",
       "What the customer can take out is what they can keep when they leave."
     )
   );
-  const jsonLd = [...html.matchAll(/<script[^>]+application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi)];
+  const jsonLd = [
+    ...html.matchAll(/<script[^>]+application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi),
+  ];
   let validJsonLd = 0;
   for (const match of jsonLd) {
     try {
@@ -745,7 +891,7 @@ function analyse(body: {
     )
   );
 
-  return findings;
+  return { findings, checkoutUrl };
 }
 
 /** Weighted score: a skipped check is neutral, a failure costs more than a warning. */
@@ -777,7 +923,7 @@ export async function scanPage(rawUrl: string, options: ScanOptions = {}): Promi
   const html = /html|xml/i.test(contentType) || /^\s*</.test(text) ? text : "";
   const durationMs = Date.now() - started;
 
-  const findings = html
+  const analysis = html
     ? analyse({
         html,
         headers: response.headers,
@@ -787,15 +933,63 @@ export async function scanPage(rawUrl: string, options: ScanOptions = {}): Promi
         durationMs,
         probes: [],
       })
-    : [
+    : {
+        findings: [
+          finding(
+            "fail",
+            "content_type",
+            "SKIPPED",
+            contentType || "unknown content type",
+            "A non-HTML response is not a page: the interface checks do not apply."
+          ),
+        ],
+        checkoutUrl: null as URL | null,
+      };
+  const findings = analysis.findings;
+
+  // One extra request, and only when the page actually advertises a journey entry point:
+  // "the checkout link exists" and "the checkout link answers" are different facts, and
+  // the second one is the one a customer feels.
+  const probes: { url: string; status: number | null }[] = [];
+  if (analysis.checkoutUrl && !options.light) {
+    const target = analysis.checkoutUrl;
+    try {
+      const checked = assertScannableUrl(target.toString(), { allowPrivate: options.allowPrivate });
+      const { response: probeResponse } = await fetchFollowing(checked, options, 3);
+      probes.push({ url: checked.toString(), status: probeResponse.status });
+      const ok = probeResponse.status < 400;
+      findings.push(
         finding(
-          "fail",
-          "content_type",
-          "SKIPPED",
-          contentType || "unknown content type",
-          "A non-HTML response is not a page: the interface checks do not apply."
-        ),
-      ];
+          "flow",
+          "journey_reachable",
+          ok ? "PASS" : "FAIL",
+          `HTTP ${probeResponse.status} on ${checked.pathname || "/"}`,
+          "An entry point that answers an error is a journey the customer cannot start."
+        )
+      );
+    } catch (error) {
+      probes.push({ url: target.toString(), status: null });
+      findings.push(
+        finding(
+          "flow",
+          "journey_reachable",
+          "WARN",
+          `could not be reached: ${error instanceof Error ? error.message : "unknown error"}`,
+          "The journey entry point did not answer the scan. It may also require a session."
+        )
+      );
+    }
+  } else if (analysis.checkoutUrl) {
+    findings.push(
+      finding(
+        "flow",
+        "journey_reachable",
+        "SKIPPED",
+        "not probed in light mode",
+        "Reaching the entry point costs one more request."
+      )
+    );
+  }
 
   if (response.status >= 400) {
     findings.unshift(
@@ -818,10 +1012,10 @@ export async function scanPage(rawUrl: string, options: ScanOptions = {}): Promi
     durationMs,
     scannedAt: new Date().toISOString(),
     findings,
-    modules: (["fail", "clean", "world", "exit"] as ScanModule[]).map((module) =>
+    modules: (["fail", "clean", "flow", "world", "exit"] as ScanModule[]).map((module) =>
       summarise(findings, module)
     ),
-    probes: [],
+    probes,
     clientRendered: findings.some(
       (item) => item.id === "rendered_dom" && item.status === "SKIPPED"
     ),

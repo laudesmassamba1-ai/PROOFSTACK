@@ -22,7 +22,7 @@ import {
   starterConfig,
 } from "@proofcore/config";
 import type { ModuleId, ReportFormat, TestRun } from "@proofcore/contracts";
-import { iso, Logger, ProofCoreError, stableStringify } from "@proofcore/core";
+import { iso, Logger, ProofCoreError, scanPage, stableStringify } from "@proofcore/core";
 import { ENGINE_VERSION, type EngineEvent, runEngine } from "@proofcore/engine";
 import { createExitProvider, defaultExportSource } from "@proofcore/module-exit";
 import { createFlowProvider, defaultFlowTarget } from "@proofcore/module-flow";
@@ -40,6 +40,7 @@ import {
   type AgentProvider,
   AgentSession,
   type Approver,
+  callChatModel,
   clearStoredProvider,
   keyFingerprint,
   loadSession,
@@ -50,14 +51,7 @@ import {
   sessionId,
   syncAccountAi,
 } from "./agent-runtime.js";
-import {
-  type AuditOptions,
-  parseAuditTarget,
-  printAuditHelp,
-  renderAudit,
-  runCleanAudit,
-  runFailAudit,
-} from "./audit.js";
+import { parseAuditTarget, printAuditHelp } from "./audit.js";
 import { mapArchitecture } from "./code-tools.js";
 import { evaluate, findInstalls, inspectMachine, summarize } from "./doctor-env.js";
 import { HUB_COMMANDS, hubWebPath, runHub } from "./hub.js";
@@ -357,10 +351,23 @@ async function main(argv: string[]): Promise<number> {
       return commandAi(flags, args);
     case "mcp":
       return commandMcp(flags, args);
+    case "scan":
+      return commandScan(flags, args, []);
     case "check":
-      return commandCheck(flags, args);
-    case "audit":
-      return commandAudit(flags, args);
+      return commandScan(flags, args, ["fail", "clean"]);
+    case "audit": {
+      const kind = (args[0] ?? "").toLowerCase();
+      if (kind !== "fail" && kind !== "clean") {
+        printAuditHelp(flags);
+        return kind ? 2 : 0;
+      }
+      const target = args.slice(1).find((arg) => !arg.startsWith("-"));
+      if (!target) {
+        err(flags, red(flags, `Usage: proofcore audit ${kind} <url>`));
+        return 64;
+      }
+      return commandScan(flags, [target, ...args.slice(1)], [kind]);
+    }
     case "map":
       return commandMap(flags, args);
     case "index":
@@ -952,9 +959,15 @@ async function commandModule(flags: GlobalFlags, args: string[]): Promise<number
     if (!id) return commandModules(flags, rest);
     out(flags, "Usage: proofcore module world|flow|exit [test options]");
     out(flags, "       proofcore module fail|clean <url>");
+    out(flags, "       proofcore module world <url>   page-level scan of that address");
     return 0;
   }
+  const url = rest.find((arg) => /^https?:\/\//i.test(arg));
   if (id === "world" || id === "flow" || id === "exit") {
+    // A URL given directly is a request to look at *that* address, not to run the
+    // configured product. The page-level families answer it without any `init`; the engine
+    // module still needs the product's own endpoints, and `modules` says so.
+    if (url) return commandScan(flags, [url, ...rest.filter((arg) => arg !== url)], [id]);
     return commandTest(flags, ["--module", id, ...rest]);
   }
   if (id === "fail" || id === "clean") {
@@ -962,7 +975,9 @@ async function commandModule(flags: GlobalFlags, args: string[]): Promise<number
       err(flags, red(flags, `Usage: proofcore ${id} <url>`));
       return 64;
     }
-    return commandAudit(flags, [id, ...rest]);
+    // Same engine as `scan`, restricted to the requested family: one implementation of
+    // each check, so `fail <url>` and `scan --only fail` can never disagree.
+    return commandScan(flags, [rest[0], ...rest.slice(1)], [id]);
   }
   err(
     flags,
@@ -2442,27 +2457,36 @@ function printBanner(flags: GlobalFlags): void {
 }
 
 /**
- * `proofcore check <url>` — one command, any URL, online or localhost.
+ * `proofcore scan <url>` — the five modules, on one address, with no configuration.
  *
- * The complaint this answers: testing a site took `init`, then editing a config, then
- * knowing which module applied to a URL. FAIL and CLEAN are the two modules that can judge
- * any address without knowing the product behind it, so one command runs both and prints a
- * single verdict.
- *
- * Credentials are passed with `--header`/`--cookie`, because a page behind a login is the
- * normal case, not the exception. They are never echoed back and never written to a report.
+ * This is the short path the product was missing. `proofcore world` needs a target in a
+ * config file, which is correct for a paid product under test but wrong for "look at this
+ * link". Here the four families that can be judged from a page — FAIL, CLEAN, FLOW, WORLD,
+ * EXIT — run against the URL directly, localhost included, and `--explain` hands the result
+ * to the account's own model to interpret.
  */
-async function commandCheck(flags: GlobalFlags, args: string[]): Promise<number> {
-  const target = args.find((arg) => !arg.startsWith("-") && arg !== "check");
+async function commandScan(flags: GlobalFlags, args: string[], only: string[]): Promise<number> {
+  const target = args.find((arg) => !arg.startsWith("-") && arg !== "scan" && arg !== "check");
   if (!target) {
-    err(flags, red(flags, 'Usage: proofcore check <url> [--header "k: v"] [--cookie "k=v"]'));
-    err(flags, dim(flags, "Example: proofcore check http://localhost:3000"));
+    err(flags, red(flags, "Usage: proofcore scan <url> [--only fail,clean] [--explain]"));
+    err(flags, dim(flags, "Example: proofcore scan http://localhost:3000"));
     return 64;
   }
   const headers: Record<string, string> = {};
+  let explain = false;
+  const extraOnly: string[] = [];
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
-    if (arg === "--header") {
+    if (arg === "--explain") {
+      explain = true;
+    } else if (arg === "--only") {
+      const raw = args[++i] ?? "";
+      if (!raw) {
+        err(flags, red(flags, "--only expects a list, e.g. --only fail,clean"));
+        return 64;
+      }
+      extraOnly.push(...raw.split(",").map((item) => item.trim().toLowerCase()));
+    } else if (arg === "--header") {
       const raw = args[++i] ?? "";
       const index = raw.indexOf(":");
       if (index <= 0) {
@@ -2479,106 +2503,188 @@ async function commandCheck(flags: GlobalFlags, args: string[]): Promise<number>
       headers.cookie = headers.cookie ? `${headers.cookie}; ${raw}` : raw;
     }
   }
-
-  let url: URL;
-  try {
-    url = parseAuditTarget(target);
-  } catch (error) {
-    err(flags, red(flags, error instanceof Error ? error.message : String(error)));
+  const wanted = new Set([...only, ...extraOnly].filter(Boolean));
+  if (extraOnly.some((item) => !["fail", "clean", "flow", "world", "exit"].includes(item))) {
+    err(flags, red(flags, "--only accepts fail, clean, flow, world, exit."));
     return 64;
   }
 
-  const options: AuditOptions = { headers };
+  let result: Awaited<ReturnType<typeof scanPage>>;
   try {
-    if (!flags.quiet) {
-      out(
-        flags,
-        `${bold(flags, "PROOFCORE")} ${dim(flags, "check")} ${cyan(flags, url.toString())}`
-      );
-      out(flags, "");
-      out(flags, `${dim(flags, "FAIL")} ${dim(flags, "· security")}`);
-    }
-    const security = await runFailAudit(url.toString(), options);
-    if (flags.json) {
-      if (!flags.quiet) stdout.write("");
-    } else {
-      renderAudit(security, flags);
-    }
-
-    if (!flags.quiet) {
-      out(flags, "");
-      out(flags, `${dim(flags, "CLEAN")} ${dim(flags, "· interface quality")}`);
-    }
-    const quality = await runCleanAudit(url.toString(), options);
-    if (!flags.json) {
-      renderAudit(quality, flags);
-    }
-
-    const blocking = [...security.checks, ...quality.checks].filter(
-      (check) => check.status === "FAIL"
-    );
-    if (flags.json) {
-      stdout.write(
-        `${stableStringify({ url: url.toString(), security, quality, blocking: blocking.length }, 2)}\n`
-      );
-    } else if (!flags.quiet) {
-      out(flags, "");
-      out(
-        flags,
-        blocking.length === 0
-          ? green(flags, "✓ nothing blocking on this URL")
-          : red(
-              flags,
-              `${blocking.length} blocking finding(s): ${blocking.map((c) => c.id).join(", ")}`
-            )
-      );
-      out(flags, dim(flags, "WORLD and FLOW need the product's own endpoints: proofcore modules"));
-    }
-    return blocking.length === 0 ? 0 : 1;
+    result = await scanPage(target, {
+      headers,
+      // The CLI runs on the operator's machine: scanning their own localhost is the point.
+      allowPrivate: true,
+      timeoutMs: 15_000,
+    });
   } catch (error) {
     err(flags, red(flags, error instanceof Error ? error.message : String(error)));
     return 2;
   }
-}
+  const findings =
+    wanted.size === 0 ? result.findings : result.findings.filter((item) => wanted.has(item.module));
 
-async function commandAudit(flags: GlobalFlags, args: string[]): Promise<number> {
-  const kind = args[0];
-  const target = args.find((a, index) => index > 0 && !a.startsWith("-"));
-  if (
-    kind === "--help" ||
-    kind === "-h" ||
-    kind === "help" ||
-    !kind ||
-    (!target && kind !== "--help")
-  ) {
-    printAuditHelp(flags);
-    return kind && target ? 2 : 0;
-  }
-  if (kind !== "fail" && kind !== "clean") {
-    err(flags, `Unknown audit kind: ${kind}. Available: fail, clean.`);
-    printAuditHelp(flags);
-    return 2;
-  }
-  if (!target) {
-    err(flags, "Give the URL to audit, e.g. proofcore audit fail https://app.example/");
-    return 2;
-  }
-  try {
-    const url = parseAuditTarget(target);
-    const result =
-      kind === "fail" ? await runFailAudit(url.toString()) : await runCleanAudit(url.toString());
-    if (flags.json) {
-      stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-    } else {
-      renderAudit(result, flags);
+  if (flags.json) {
+    stdout.write(
+      `${stableStringify(
+        {
+          url: result.url,
+          finalUrl: result.finalUrl,
+          status: result.status,
+          durationMs: result.durationMs,
+          modules: result.modules.filter((item) => wanted.size === 0 || wanted.has(item.module)),
+          findings,
+          probes: result.probes,
+        },
+        2
+      )}\n`
+    );
+  } else {
+    out(flags, `${bold(flags, "PROOFCORE")} ${dim(flags, "scan")} ${cyan(flags, result.finalUrl)}`);
+    out(
+      flags,
+      dim(
+        flags,
+        `HTTP ${result.status} · ${Math.round(result.bytes / 1024)} kB · ${result.durationMs} ms${
+          result.clientRendered ? " · client-rendered" : ""
+        }`
+      )
+    );
+    for (const module of result.modules) {
+      if (wanted.size > 0 && !wanted.has(module.module)) continue;
+      const own = findings.filter((item) => item.module === module.module);
+      const mark =
+        module.verdict === "fail"
+          ? red(flags, "FAIL")
+          : module.verdict === "warnings"
+            ? yellow(flags, "WARN")
+            : module.verdict === "pass"
+              ? green(flags, "PASS")
+              : dim(flags, "  — ");
+      out(
+        flags,
+        `\n  ${mark} ${bold(flags, module.module.toUpperCase().padEnd(6))} ${dim(
+          flags,
+          `${module.passed} pass · ${module.warnings} warn · ${module.failed} fail · ${module.skipped} skipped`
+        )}`
+      );
+      for (const item of own) {
+        const glyph =
+          item.status === "PASS"
+            ? green(flags, "✓")
+            : item.status === "WARN"
+              ? yellow(flags, "!")
+              : item.status === "FAIL"
+                ? red(flags, "✗")
+                : dim(flags, "–");
+        out(flags, `    ${glyph} ${item.id.padEnd(22)} ${dim(flags, item.observed.slice(0, 64))}`);
+      }
     }
-    return result.checks.some((check) => check.status === "FAIL") ? 1 : 0;
+    const failed = findings.filter((item) => item.status === "FAIL").length;
+    out(flags, "");
+    out(
+      flags,
+      failed === 0
+        ? green(flags, "no blocking finding on this page")
+        : red(flags, `${failed} blocking finding(s)`)
+    );
+  }
+
+  if (explain) {
+    const code = await explainScan(flags, result, findings);
+    if (code !== 0) return code;
+  }
+
+  return findings.some((item) => item.status === "FAIL") ? 1 : 0;
+}
+
+/**
+ * `--explain`: send the report to the account's model and print its reading.
+ *
+ * The AI is not consulted to decide whether something failed — the checks already did. It
+ * is consulted for what a non-expert needs next: which three findings cost the most, and in
+ * which order to fix them. Printed to stdout so it can be piped, preceded by a rule.
+ */
+async function explainScan(
+  flags: GlobalFlags,
+  result: Awaited<ReturnType<typeof scanPage>>,
+  findings: { module: string; id: string; status: string; observed: string; why: string }[]
+): Promise<number> {
+  // The account's model is the default (login writes it); a locally configured provider
+  // works too. Either way the key never leaves the machine that owns it.
+  const account = await loadStoredSession().catch(() => null);
+  if (account) await syncAccountAi(account).catch(() => undefined);
+
+  let provider: AgentProvider;
+  try {
+    provider = await resolveProvider();
   } catch (error) {
-    err(flags, error instanceof Error ? error.message : String(error));
-    return 2;
+    err(
+      flags,
+      yellow(
+        flags,
+        `--explain needs a model: sign in (\`proofcore login\`) or run \`proofcore agent --configure\`. ${
+          error instanceof Error ? `(${error.message})` : ""
+        }`
+      )
+    );
+    return 0;
+  }
+
+  const report = [
+    `Scan of ${result.finalUrl} (HTTP ${result.status}, ${Math.round(result.bytes / 1024)} kB).`,
+    ...result.modules.map(
+      (item) =>
+        `- ${item.module.toUpperCase()}: ${item.verdict} — ${item.passed} pass, ${item.warnings} warn, ${item.failed} fail, ${item.skipped} skipped`
+    ),
+    ...findings.map(
+      (item) =>
+        `- [${item.module.toUpperCase()}][${item.status}] ${item.id}: ${item.observed} — ${item.why}`
+    ),
+  ].join("\n");
+
+  try {
+    const reply = await callChatModel(
+      provider,
+      [
+        {
+          role: "system",
+          content:
+            "Tu interprètes un scan PROOFCORE pour quelqu'un qui n'est pas expert. Cite les constats par leur identifiant, dis ce que le scan n'a pas pu mesurer, et ne prétends jamais avoir visité la page toi-même.",
+        },
+        {
+          role: "user",
+          content: `Quels sont les trois problèmes les plus coûteux, pourquoi comptent-ils pour ce site, et dans quel ordre les corriger ? Réponds en français, moins de 250 mots.\n\n${report}`,
+        },
+      ],
+      { timeoutMs: 45_000 }
+    );
+    out(flags, "");
+    out(flags, dim(flags, "─".repeat(48)));
+    out(flags, bold(flags, "Lecture de l'IA"));
+    out(flags, "");
+    out(flags, reply.text.trim());
+    return 0;
+  } catch (error) {
+    err(
+      flags,
+      red(flags, `--explain failed: ${error instanceof Error ? error.message : String(error)}`)
+    );
+    return 0;
   }
 }
 
+/**
+ * `proofcore check <url>` — one command, any URL, online or localhost.
+ *
+ * The complaint this answers: testing a site took `init`, then editing a config, then
+ * knowing which module applied to a URL. FAIL and CLEAN are the two modules that can judge
+ * any address without knowing the product behind it, so one command runs both and prints a
+ * single verdict.
+ *
+ * Credentials are passed with `--header`/`--cookie`, because a page behind a login is the
+ * normal case, not the exception. They are never echoed back and never written to a report.
+ */
 /**
  * `proofcore map [dir]` — the project's architecture as a Mermaid diagram.
  *

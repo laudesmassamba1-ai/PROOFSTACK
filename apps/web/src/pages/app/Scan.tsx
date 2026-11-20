@@ -1,4 +1,14 @@
-import { AlertTriangle, ArrowRight, Check, Eye, Loader2, RefreshCw, ScanLine, Sparkles, X } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Check,
+  Eye,
+  Loader2,
+  RefreshCw,
+  ScanLine,
+  Sparkles,
+  X,
+} from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
@@ -11,9 +21,9 @@ import { useSession } from "../../lib/session.js";
 /**
  * Scanning a URL from the app.
  *
- * Four families can be judged from a page — FAIL, CLEAN, WORLD, EXIT — and this screen runs
- * them without any configuration. FLOW is absent on purpose: it needs the product's own
- * checkout, and a page scan must not stand in for a journey it never walked.
+ * The five families, on one address, without configuration. FLOW is a page-level reading of
+ * the journey (does an entry point exist, does it answer, how would it be paid) — not the
+ * engine's full checkout walk, and the findings say so.
  *
  * "Interpréter avec l'IA" sends the report to the account's own model: the findings are
  * facts, but what they *mean for this site* is a judgement, and that is what the AI is for.
@@ -23,7 +33,7 @@ import { useSession } from "../../lib/session.js";
 type ScanStatus = "PASS" | "WARN" | "FAIL" | "SKIPPED";
 
 interface ScanFinding {
-  module: "fail" | "clean" | "world" | "exit";
+  module: "fail" | "clean" | "flow" | "world" | "exit";
   id: string;
   status: ScanStatus;
   observed: string;
@@ -31,7 +41,7 @@ interface ScanFinding {
 }
 
 interface ScanModuleSummary {
-  module: "fail" | "clean" | "world" | "exit";
+  module: "fail" | "clean" | "flow" | "world" | "exit";
   passed: number;
   warnings: number;
   failed: number;
@@ -64,6 +74,7 @@ interface AuditSummary {
 const MODULE_LABELS: Record<string, { fr: string; en: string }> = {
   fail: { fr: "Sécurité", en: "Security" },
   clean: { fr: "Interface", en: "Interface" },
+  flow: { fr: "Parcours", en: "Journey" },
   world: { fr: "International", en: "Global" },
   exit: { fr: "Données", en: "Data" },
 };
@@ -118,7 +129,11 @@ export function ScanPage(): React.ReactElement {
     if (!session.workspaceId || busy) return;
     const target = url.trim();
     if (!/^https?:\/\/\S+/i.test(target)) {
-      setError(new Error(fr ? "Une adresse http(s) complète est nécessaire." : "A full http(s) address is needed."));
+      setError(
+        new Error(
+          fr ? "Une adresse http(s) complète est nécessaire." : "A full http(s) address is needed."
+        )
+      );
       return;
     }
     setBusy(true);
@@ -177,7 +192,8 @@ export function ScanPage(): React.ReactElement {
       "",
       "Constats :",
       ...scan.findings.map(
-        (item) => `- [${item.module.toUpperCase()}][${item.status}] ${item.id}: ${item.observed} — ${item.why}`
+        (item) =>
+          `- [${item.module.toUpperCase()}][${item.status}] ${item.id}: ${item.observed} — ${item.why}`
       ),
       "",
       scan.clientRendered
@@ -218,17 +234,18 @@ export function ScanPage(): React.ReactElement {
     }
   };
 
-  const grouped = (module: string) => (scan?.findings ?? []).filter((item) => item.module === module);
+  const grouped = (module: string) =>
+    (scan?.findings ?? []).filter((item) => item.module === module);
 
   return (
     <div className="app-page">
       <PageHeader
         eyebrow={fr ? "SCAN / SANS CONFIGURATION" : "SCAN / NO SETUP"}
-        title={fr ? "UNE ADRESSE, QUATRE LECTURES." : "ONE ADDRESS, FOUR READINGS."}
+        title={fr ? "UNE ADRESSE, CINQ MODULES." : "ONE ADDRESS, FIVE MODULES."}
         description={
           fr
-            ? "Sécurité, interface, international et données : ce qu'une page dit d'elle-même, sans rien installer. Pour tester localhost, utilise le CLI."
-            : "Security, interface, international and data: what a page says about itself, with nothing to install. For localhost, use the CLI."
+            ? "FAIL, CLEAN, FLOW, WORLD et EXIT sur une adresse, sans configuration. Pour tester localhost, lance la même chose depuis le CLI : proofcore scan http://localhost:3000"
+            : "FAIL, CLEAN, FLOW, WORLD and EXIT on one address, with no setup. To test localhost, run the same thing from the CLI: proofcore scan http://localhost:3000"
         }
       />
 
@@ -250,8 +267,17 @@ export function ScanPage(): React.ReactElement {
           spellCheck={false}
           autoComplete="off"
         />
-        <button type="button" className="app-btn app-btn-primary" onClick={() => void run()} disabled={busy}>
-          {busy ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <ScanLine size={14} aria-hidden />}
+        <button
+          type="button"
+          className="app-btn app-btn-primary"
+          onClick={() => void run()}
+          disabled={busy}
+        >
+          {busy ? (
+            <Loader2 size={14} className="animate-spin" aria-hidden />
+          ) : (
+            <ScanLine size={14} aria-hidden />
+          )}
           {fr ? "Scanner" : "Scan"}
         </button>
         <button
@@ -299,8 +325,17 @@ export function ScanPage(): React.ReactElement {
                 {scan.findings.length} {fr ? "constats" : "findings"}
               </p>
             </div>
-            <button type="button" className="app-btn app-btn-primary" onClick={() => void explain()} disabled={explaining}>
-              {explaining ? <Loader2 size={13} className="animate-spin" aria-hidden /> : <Sparkles size={13} aria-hidden />}
+            <button
+              type="button"
+              className="app-btn app-btn-primary"
+              onClick={() => void explain()}
+              disabled={explaining}
+            >
+              {explaining ? (
+                <Loader2 size={13} className="animate-spin" aria-hidden />
+              ) : (
+                <Sparkles size={13} aria-hidden />
+              )}
               {fr ? "Interpréter avec l'IA" : "Interpret with AI"}
             </button>
           </div>
@@ -318,8 +353,12 @@ export function ScanPage(): React.ReactElement {
             {scan.modules.map((item) => (
               <div key={item.module} className={`scan-module is-${item.verdict}`}>
                 <span className="scan-module-name">{item.module.toUpperCase()}</span>
-                <span className="scan-module-label">{MODULE_LABELS[item.module]?.[fr ? "fr" : "en"]}</span>
-                <span className="scan-module-score">{item.verdict === "not_measured" ? "—" : `${item.score}`}</span>
+                <span className="scan-module-label">
+                  {MODULE_LABELS[item.module]?.[fr ? "fr" : "en"]}
+                </span>
+                <span className="scan-module-score">
+                  {item.verdict === "not_measured" ? "—" : `${item.score}`}
+                </span>
                 <span className="scan-module-counts">
                   {item.passed} · {item.warnings} · {item.failed} · {item.skipped}
                 </span>
@@ -339,7 +378,8 @@ export function ScanPage(): React.ReactElement {
                   {explainError}{" "}
                   {explainError.includes("clé") || explainError.includes("provider") ? (
                     <Link to="/app/ai" className="app-text-link">
-                      {fr ? "Configurer l'IA" : "Set up the AI"} <ArrowRight size={12} aria-hidden />
+                      {fr ? "Configurer l'IA" : "Set up the AI"}{" "}
+                      <ArrowRight size={12} aria-hidden />
                     </Link>
                   ) : null}
                 </p>
@@ -347,7 +387,7 @@ export function ScanPage(): React.ReactElement {
             </Card>
           ) : null}
 
-          {(["fail", "clean", "world", "exit"] as const).map((module) => {
+          {(["fail", "clean", "flow", "world", "exit"] as const).map((module) => {
             const items = grouped(module);
             if (items.length === 0) return null;
             return (
@@ -390,13 +430,19 @@ export function ScanPage(): React.ReactElement {
           <ul>
             {history.map((item) => (
               <li key={item.id}>
-                <button type="button" className="scan-history-row" onClick={() => void openPast(item.id)}>
+                <button
+                  type="button"
+                  className="scan-history-row"
+                  onClick={() => void openPast(item.id)}
+                >
                   <span className={`scan-history-dot is-${item.worstVerdict}`} aria-hidden />
                   <span className="scan-history-url">{item.url}</span>
                   <span className="scan-history-counts">
                     {item.failed} fail · {item.warnings} warn
                   </span>
-                  <time dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleDateString(fr ? "fr-FR" : "en-GB")}</time>
+                  <time dateTime={item.createdAt}>
+                    {new Date(item.createdAt).toLocaleDateString(fr ? "fr-FR" : "en-GB")}
+                  </time>
                 </button>
               </li>
             ))}

@@ -429,6 +429,9 @@ export function AppLayout() {
                   <NavLink to="/app/modules" end className="app-nav-popover-link" role="menuitem">
                     {locale === "fr" ? "Vue d’ensemble" : "Overview"}
                   </NavLink>
+                  <NavLink to="/app/scan" className="app-nav-popover-link" role="menuitem">
+                    {locale === "fr" ? "Scanner une adresse" : "Scan an address"}
+                  </NavLink>
                 </div>
               ) : null}
             </div>
