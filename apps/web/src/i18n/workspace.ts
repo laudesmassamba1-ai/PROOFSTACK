@@ -150,6 +150,7 @@ export const workspaceEn = {
     "Execution happens on your machine or in CI. The browser never runs a local command.",
   "ws.module.configure": "Configure a project",
   "ws.module.projects": "Projects",
+  "ws.module.runNow": "Run without installing",
   "ws.module.latestSummary":
     "{passed} passed · {failed} failed · {skipped} skipped · {warnings} warning(s)",
   "ws.module.latestNone": "No module run yet",
@@ -537,6 +538,7 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
     "L'exécution se fait sur votre machine ou en CI. Le navigateur ne lance jamais de commande locale.",
   "ws.module.configure": "Configurer un projet",
   "ws.module.projects": "Projets",
+  "ws.module.runNow": "Lancer sans installer",
   "ws.module.latestSummary":
     "{passed} réussi(s) · {failed} échec(s) · {skipped} ignoré(s) · {warnings} avertissement(s)",
   "ws.module.latestNone": "Aucune exécution du module",

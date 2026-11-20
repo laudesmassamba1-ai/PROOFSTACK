@@ -192,3 +192,12 @@ pnpm cloud:deploy --dry-run
 - Contrôles/labels/alt/ids : audit sur 15 routes, aucun nom accessible manquant, aucun `img` sans `alt`, aucun id dupliqué ; menu mobile OK (12 liens, Escape referme).
 - `pnpm typecheck` OK, `npx biome check .` OK (389 fichiers), `pnpm test` 624/624 (48 fichiers), `pnpm --filter @proofcore/web build` OK.
 - Non vérifié : `/app` derrière authentification n'a pas été audité visuellement ; aucune capture réelle des modules.
+
+## 2026-11-20 (nuit) — les modules se lancent depuis l'interface
+
+- Page projet : bouton « Lancer les modules » (en-tête et état vide des runs). Il envoie `POST /api/v1/audits` avec l'URL du projet, puis ouvre `/app/scan?audit=<id>&explain=1` : le résultat arrive avec un résumé en clair (compteurs + trois premiers constats bloquants) et l'interprétation IA déjà demandée.
+- `/app/scan` accepte `?audit=` (ouvre cet audit plutôt que le dernier) et `?explain=1` (une interprétation par audit, garde `useRef`) ; `explain` et `reportForModel` passés en `useCallback` pour que l'effet ne rejoue pas.
+- Pages module : CTA « Lancer sans installer » vers le scan ; la configuration CLI reste mais devient explicitement facultative (« Automatiser (optionnel) », « CLI (facultatif) »).
+- Bug corrigé : la config générée émettait `exit` trois fois (FAIL et CLEAN retombaient sur la branche `exit`). Table `moduleBlocks` explicite ; FAIL/CLEAN n'ont pas de bloc de config.
+- Limites assumées : l'interprétation IA exige une clé fournisseur dans `/app/ai` (message + lien si absente) ; le résumé en clair ne dépend d'aucun modèle. L'audit reste au niveau de l'espace, non rattaché au projet (pas de colonne `project_id`).
+- Vérifié : `biome check .` 0, `pnpm typecheck` 0, `pnpm --filter @proofcore/web build` 0, `pnpm test` 624/624 ; parcours Playwright : clic → 201 audit → `/app/scan?audit=…` → résumé + appel IA (`ai_not_configured` affiché proprement).

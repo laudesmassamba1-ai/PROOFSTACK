@@ -4,6 +4,7 @@ import {
   Globe2,
   PackageOpen,
   Route as RouteIcon,
+  ScanLine,
   ShieldAlert,
   Terminal,
 } from "lucide-react";
@@ -259,9 +260,16 @@ export function ModulePage() {
               body={t(meta.body)}
               tester="working"
               action={
-                <Link to="/app/projects" className="app-btn">
-                  {t("ws.module.configure")} <ArrowRight size={13} />
-                </Link>
+                // Two ways in, and the one that needs no install comes first: a module that
+                // cannot be started from the browser reads as documentation, not as a tool.
+                <div className="flex flex-wrap gap-2">
+                  <Link to="/app/scan" className="app-btn app-btn-primary">
+                    <ScanLine size={13} /> {t("ws.module.runNow")}
+                  </Link>
+                  <Link to="/app/projects" className="app-btn">
+                    {t("ws.module.configure")} <ArrowRight size={13} />
+                  </Link>
+                </div>
               }
             />
           ) : (

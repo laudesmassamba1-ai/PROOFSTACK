@@ -1,4 +1,4 @@
-import { ArrowLeft, FileJson, KeyRound, Trash2 } from "lucide-react";
+import { ArrowLeft, FileJson, KeyRound, Play, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { LoadMore } from "../../components/app/LoadMore.js";
@@ -66,6 +66,8 @@ export function ProjectDetail() {
   const [keyError, setKeyError] = useState<ApiError | Error | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [runError, setRunError] = useState<ApiError | Error | null>(null);
 
   const load = useCallback(async () => {
     if (!workspaceId || !projectId) return;
@@ -107,6 +109,27 @@ export function ProjectDetail() {
     }
   };
 
+  /**
+   * The five modules, from the browser: the project's own address is scanned server-side
+   * and the result opens already interpreted. No CLI, no token, no install step.
+   */
+  const runModules = async () => {
+    if (!workspaceId || !project || running) return;
+    setRunning(true);
+    setRunError(null);
+    try {
+      const body = await apiFetch<{ audit: { id: string } }>("/api/v1/audits", {
+        method: "POST",
+        body: { workspaceId, url: project.baseUrl },
+      });
+      navigate(`/app/scan?audit=${body.audit.id}&explain=1`);
+    } catch (caught) {
+      setRunError(caught as ApiError);
+    } finally {
+      setRunning(false);
+    }
+  };
+
   const remove = async () => {
     if (!workspaceId || !projectId) return;
     setBusy(true);
@@ -125,6 +148,14 @@ export function ProjectDetail() {
   if (error) return <ErrorState error={error} onRetry={() => void load()} />;
   if (!project) return <Loading label={fr ? "Chargement du projet…" : "Loading project…"} />;
 
+  // FAIL and CLEAN are audits, not engine modules: they have no block in the config.
+  // Mapping them through a fallback used to emit `exit` three times, which silently
+  // overloaded the key in the generated TypeScript.
+  const moduleBlocks: Record<string, string> = {
+    world: `    world: { enabled: true, profiles: ["en-US", "fr-FR", "fr-BJ"] },`,
+    flow: `    flow: { enabled: true, paymentMode: "simulated" },`,
+    exit: `    exit: { enabled: true, formats: ["json", "csv"] },`,
+  };
   const config = `import type { ProofCoreConfig } from "@proofcore/contracts";
 
 const config: ProofCoreConfig = {
@@ -133,13 +164,8 @@ const config: ProofCoreConfig = {
   environment: ${JSON.stringify(project.environment)},
   modules: {
 ${project.enabledModules
-  .map((module) =>
-    module === "world"
-      ? `    world: { enabled: true, profiles: ["en-US", "fr-FR", "fr-BJ"] },`
-      : module === "flow"
-        ? `    flow: { enabled: true, paymentMode: "simulated" },`
-        : `    exit: { enabled: true, formats: ["json", "csv"] },`
-  )
+  .map((module) => moduleBlocks[module])
+  .filter((block): block is string => Boolean(block))
   .join("\n")}
   },
   sync: { enabled: true, apiUrl: ${JSON.stringify(API_BASE)} },
@@ -160,16 +186,35 @@ export default config;`;
         title={project.name}
         description={`${project.baseUrl}${project.stack ? ` · ${project.stack}` : ""}`}
         actions={
-          <button
-            type="button"
-            className="app-btn app-btn-danger"
-            onClick={() => setConfirmingDelete(true)}
-            disabled={busy}
-          >
-            <Trash2 size={14} /> {fr ? "Supprimer" : "Delete"}
-          </button>
+          <>
+            <button
+              type="button"
+              className="app-btn app-btn-primary"
+              onClick={() => void runModules()}
+              disabled={running}
+            >
+              <Play size={14} />{" "}
+              {running
+                ? fr
+                  ? "Modules en cours…"
+                  : "Running modules…"
+                : fr
+                  ? "Lancer les modules"
+                  : "Run the modules"}
+            </button>
+            <button
+              type="button"
+              className="app-btn app-btn-danger"
+              onClick={() => setConfirmingDelete(true)}
+              disabled={busy}
+            >
+              <Trash2 size={14} /> {fr ? "Supprimer" : "Delete"}
+            </button>
+          </>
         }
       />
+
+      {runError ? <ErrorState error={runError} onRetry={() => void runModules()} /> : null}
 
       {confirmingDelete ? (
         <Card className="mb-5 border-danger/40">
@@ -204,17 +249,27 @@ export default config;`;
           title={fr ? "Runs" : "Runs"}
           description={
             fr
-              ? "Enregistrés depuis les envois CLI/CI, un par identifiant de run."
-              : "Stored from CLI/CI uploads, one per run id."
+              ? "Un run vérifie ce projet. Lancez-en un ici, ou laissez la CI le faire à chaque envoi."
+              : "A run verifies this project. Start one here, or let CI upload it on every push."
           }
         >
           {runs.items.length === 0 ? (
             <Empty
-              title={fr ? "Aucun run" : "No run yet"}
+              title={fr ? "Aucun run pour l'instant" : "No run yet"}
               body={
                 fr
-                  ? "Connectez le CLI avec le jeton ci-dessous, puis lancez `proofcore test`."
-                  : "Connect the CLI with the token below, then run `proofcore test`."
+                  ? "Lancez les cinq modules sur l'adresse du projet : le résultat s'ouvre déjà expliqué. Aucun logiciel à installer."
+                  : "Run the five modules on the project address: the result opens already explained. Nothing to install."
+              }
+              action={
+                <button
+                  type="button"
+                  className="app-btn app-btn-primary"
+                  onClick={() => void runModules()}
+                  disabled={running}
+                >
+                  <Play size={14} /> {fr ? "Lancer les modules" : "Run the modules"}
+                </button>
               }
             />
           ) : (
@@ -267,11 +322,11 @@ export default config;`;
 
         <div className="space-y-4">
           <Card
-            title={fr ? "Jeton du projet" : "Project token"}
+            title={fr ? "Automatiser (optionnel)" : "Automate (optional)"}
             description={
               fr
-                ? "Jeton Bearer pour le CLI et la CI. Affiché une seule fois."
-                : "Bearer token for the CLI and CI. Shown once."
+                ? "Pour la CI ou le CLI. Pas nécessaire pour lancer les modules depuis cette page."
+                : "For CI or the CLI. Not needed to run the modules from this page."
             }
           >
             <div className="space-y-3 px-5 py-4">
@@ -428,10 +483,12 @@ export default config;`;
         />
       </Card>
 
-      <Card title="CLI" className="mt-4">
+      <Card title={fr ? "CLI (facultatif)" : "CLI (optional)"} className="mt-4">
         <div className="space-y-2 px-5 py-4">
           <p className="text-xs text-muted">
-            {fr ? "Depuis la racine de votre projet :" : "From your project root:"}
+            {fr
+              ? "Rien n'est obligatoire ici : les modules se lancent depuis le bouton ci-dessus. Le CLI sert à rejouer la même chose en local ou en CI, depuis la racine du projet :"
+              : "Nothing here is mandatory: the modules run from the button above. The CLI replays the same thing locally or in CI, from your project root:"}
           </p>
           <pre className="overflow-x-auto rounded-[var(--radius)] bg-surface-alt px-3 py-2 app-mono">
             {`export PROOFCORE_PROJECT_TOKEN=<token from above>

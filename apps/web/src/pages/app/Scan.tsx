@@ -9,8 +9,8 @@ import {
   X,
 } from "lucide-react";
 import type React from "react";
-import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router";
 import { Card, ErrorState } from "../../components/app/ui.js";
 import { useI18n } from "../../i18n/index.js";
 import { PageHeader } from "../../layouts/AppLayout.js";
@@ -100,6 +100,11 @@ export function ScanPage(): React.ReactElement {
   const { locale } = useI18n();
   const fr = locale === "fr";
   const session = useSession();
+  const [params] = useSearchParams();
+  // Set by the project page: open that exact audit, and interpret it without another click.
+  const requestedAudit = params.get("audit");
+  const wantsExplanation = params.get("explain") === "1";
+  const explainedFor = useRef<string | null>(null);
   const [url, setUrl] = useState("https://");
   const [cookie, setCookie] = useState("");
   const [showAuth, setShowAuth] = useState(false);
@@ -140,12 +145,12 @@ export function ScanPage(): React.ReactElement {
 
   useEffect(() => {
     // Opening the page shows the last scan rather than an empty form: the result someone
-    // came back for is usually the one they just took.
+    // came back for is usually the one they just took. A requested audit wins over it.
     void loadHistory().then((items) => {
-      const latest = items?.[0];
-      if (!latest) return;
+      const target = requestedAudit ?? items?.[0]?.id;
+      if (!target) return;
       void apiFetch<{ id: string; result: ScanResult }>(
-        `/api/v1/audits/${latest.id}?workspaceId=${session.workspaceId}`
+        `/api/v1/audits/${target}?workspaceId=${session.workspaceId}`
       )
         .then((body) => {
           setScan(body.result);
@@ -154,7 +159,7 @@ export function ScanPage(): React.ReactElement {
         })
         .catch(() => undefined);
     });
-  }, [loadHistory, session.workspaceId]);
+  }, [loadHistory, session.workspaceId, requestedAudit]);
 
   const run = async () => {
     if (!session.workspaceId || busy) return;
@@ -235,7 +240,7 @@ export function ScanPage(): React.ReactElement {
   };
 
   /** The report the model reads: facts, counts, and what could not be measured. */
-  const reportForModel = (): string => {
+  const reportForModel = useCallback((): string => {
     if (!scan) return "";
     const lines = [
       `Scan de ${scan.finalUrl} (HTTP ${scan.status}, ${Math.round(scan.bytes / 1024)} kB, ${scan.durationMs} ms).`,
@@ -257,9 +262,9 @@ export function ScanPage(): React.ReactElement {
         : "",
     ];
     return lines.join("\n");
-  };
+  }, [scan]);
 
-  const explain = async () => {
+  const explain = useCallback(async () => {
     if (!session.workspaceId || !scan || explaining) return;
     setExplaining(true);
     setExplainError(null);
@@ -288,7 +293,16 @@ export function ScanPage(): React.ReactElement {
     } finally {
       setExplaining(false);
     }
-  };
+  }, [session.workspaceId, scan, explaining, fr, reportForModel]);
+
+  // The project page asks for the reading in the URL, so the user lands on it, not on a
+  // button. The ref keeps a re-render from sending the same report twice.
+  useEffect(() => {
+    if (!wantsExplanation || !scan || !auditId) return;
+    if (explainedFor.current === auditId) return;
+    explainedFor.current = auditId;
+    void explain();
+  }, [wantsExplanation, scan, auditId, explain]);
 
   const loadVerification = async () => {
     if (!session.workspaceId) return;
@@ -319,6 +333,25 @@ export function ScanPage(): React.ReactElement {
 
   const grouped = (module: string) =>
     (scan?.findings ?? []).filter((item) => item.module === module);
+
+  // A reading that needs no model: what is broken, how much, and what to touch first.
+  // The AI card below adds judgement; this line still says something true without a key.
+  const failing = (scan?.findings ?? []).filter((item) => item.status === "FAIL");
+  const warning = (scan?.findings ?? []).filter((item) => item.status === "WARN");
+  const plainSummary = !scan
+    ? null
+    : `${
+        fr
+          ? `${failing.length} problème${failing.length === 1 ? "" : "s"} bloquant${failing.length === 1 ? "" : "s"}, ${warning.length} avertissement${warning.length === 1 ? "" : "s"}.`
+          : `${failing.length} blocking issue${failing.length === 1 ? "" : "s"}, ${warning.length} warning${warning.length === 1 ? "" : "s"}.`
+      }${
+        failing.length > 0
+          ? ` ${fr ? "À corriger d'abord :" : "Fix first:"} ${failing
+              .slice(0, 3)
+              .map((item) => `${item.id} (${item.why})`)
+              .join(" · ")}`
+          : ""
+      }`;
 
   return (
     <div className="app-page">
@@ -604,6 +637,13 @@ export function ScanPage(): React.ReactElement {
               </div>
             ))}
           </div>
+
+          {plainSummary ? (
+            <p className="scan-notice">
+              <ScanLine size={13} aria-hidden />
+              {plainSummary}
+            </p>
+          ) : null}
 
           {explanation || explainError ? (
             <Card className="scan-ai">
