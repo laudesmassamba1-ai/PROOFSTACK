@@ -88,6 +88,33 @@ The API says `emailVerification: "not_configured"` instead of claiming an email 
 sent. The adapter boundary is documented in
 `docs/deployment/ENVIRONMENT_VARIABLES.md`.
 
+### Scanning someone else's site
+
+`POST /api/v1/audits` fetches a page and reports five families: FAIL (security), CLEAN
+(interface), FLOW (does the journey have an entry point, does it answer, how would it be
+paid), WORLD (internationalisation), EXIT (data portability). It needs no configuration,
+which is the point: `proofcore scan <url>` runs the same engine from the CLI.
+
+Two rules make this safe to offer as a public feature.
+
+**Ownership decides detail.** A localhost or private target belongs to the person running
+the command, so the report names paths and statuses. A remote site is `unverified` until its
+owner publishes a token (`<meta name="proofcore-verification">` or
+`/.well-known/proofcore-verification.txt`, minted per workspace and stored in
+`site_verifications`). An unverified report keeps the categories, the counts and the advice
+and drops every locator: a tool that lists exact paths and header values on demand is a
+target-ranking service, whether or not that was the intent. Redaction happens inside
+`scanPage`, so a caller that forgets cannot leak.
+
+**Credentials are borrowed, not kept.** For a product behind a login the caller may supply an
+account created for the audit (`login: {url, email, password}`). It is used for that one
+scan: the API posts it, keeps the cookie for the page fetch, and stores neither. A login that
+sets no cookie is reported as failed rather than as "signed in" — a scan of public pages must
+not be labelled otherwise.
+
+`FLOW` here is a page-level reading, not the engine's checkout walk: `webhook_observability`
+is `SKIPPED` with that reason, and the engine module still needs the product's endpoints.
+
 ### Membership requires consent
 
 `workspace_invitations` holds the request; `workspace_members` holds the membership, and

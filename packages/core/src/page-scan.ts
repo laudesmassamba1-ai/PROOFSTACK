@@ -62,7 +62,46 @@ export interface ScanResult {
   probes: { url: string; status: number | null }[];
   /** True when only a shell was served: client-rendered pages cannot be judged. */
   clientRendered: boolean;
+  /** Who this report is for: the machine that owns the site, or a stranger. */
+  ownership: Ownership;
+  /** True when exact locations were withheld. Set by the scan, not by the caller. */
+  redacted: boolean;
+  /** Present when the caller offered credentials; never contains them. */
+  login: ScanLoginResult | null;
+  verification: { tokenProvided: boolean; found: boolean; where: "meta" | "well-known" | null };
 }
+
+/**
+ * Whether the report may name exact locations.
+ *
+ * `local` is a scan of the machine the caller is sitting at (the CLI against localhost).
+ * `verified` means the site published the token we asked for, which is the only evidence of
+ * ownership that does not depend on trusting the caller. Everything else is `unverified`,
+ * and an unverified remote scan must not become a map of someone else's weaknesses.
+ */
+export type Ownership = "local" | "verified" | "unverified";
+
+export interface ScanLogin {
+  /** Absolute URL of the login endpoint. */
+  url: string;
+  email: string;
+  password: string;
+  emailField?: string;
+  passwordField?: string;
+}
+
+export interface ScanLoginResult {
+  attempted: boolean;
+  ok: boolean;
+  status: number | null;
+  /** Why it failed, in one line. Never the password, never the cookie value. */
+  reason?: string;
+}
+
+/** The meta tag a site can publish to prove ownership. */
+export const VERIFICATION_META_NAME = "proofcore-verification";
+/** Or this exact body at `/.well-known/proofcore-verification.txt`. */
+export const VERIFICATION_WELL_KNOWN = "/.well-known/proofcore-verification.txt";
 
 export interface ScanOptions {
   /** Extra request headers (credentials, cookies). Never logged or reported. */
@@ -76,6 +115,15 @@ export interface ScanOptions {
   fetchImpl?: typeof fetch;
   /** Skip the extra probes (exposed files, checkout entry) — one request, no more. */
   light?: boolean;
+  /** Credentials for a product behind a login. Used for this scan only. */
+  login?: ScanLogin;
+  /** The token the site owner published; its presence upgrades the report to `verified`. */
+  ownershipToken?: string;
+  /**
+   * Who is asking. `local` means the caller runs on the machine that answers the URL — the
+   * CLI against localhost — and needs no proof of ownership.
+   */
+  ownershipHint?: "local" | "remote";
 }
 
 const USER_AGENT = "PROOFCORE-Scan/1.0 (+page-level checks; respects robots intent)";
@@ -909,6 +957,173 @@ function summarise(findings: ScanFinding[], module: ScanModule): ScanModuleSumma
 }
 
 /**
+ * Strip the locators, keep the facts.
+ *
+ * A remote scan answers "is this site exposed, and how badly" — it must not answer "at which
+ * path, with which header value". A stranger could otherwise use it to rank targets, and the
+ * customer's own name would be on the request. The category, the severity and the advice are
+ * enough for an owner to know what to do next; a proven owner sees the rest.
+ */
+export function redactFindings(findings: ScanFinding[], ownership: Ownership): ScanFinding[] {
+  if (ownership !== "unverified") return findings;
+  return findings.map((item) => ({
+    ...item,
+    observed: redactObservation(item),
+  }));
+}
+
+/** Same reasoning for the probed endpoints: the host is already known, the path is not. */
+export function redactProbes(
+  probes: { url: string; status: number | null }[],
+  ownership: Ownership
+): { url: string; status: number | null }[] {
+  if (ownership !== "unverified") return probes;
+  return probes.map((probe) => {
+    try {
+      return { url: new URL(probe.url).host, status: probe.status };
+    } catch {
+      return { url: "unknown host", status: probe.status };
+    }
+  });
+}
+
+function redactObservation(item: ScanFinding): string {
+  // The categories whose observation is a locator or a value, not a measurement.
+  if (item.id === "journey_entry") {
+    return item.status === "PASS"
+      ? "an entry point to the journey was found (exact location withheld)"
+      : "no entry point to the journey was found on this page";
+  }
+  if (item.id === "journey_reachable") {
+    return item.status === "PASS"
+      ? "the entry point answers (exact location and status withheld)"
+      : "the entry point does not answer";
+  }
+  if (item.status === "SKIPPED") return item.observed;
+  // Everything else keeps its measurement but loses any URL, path or header value it
+  // happened to carry. A number is a fact; an address is a target.
+  const cleaned = item.observed
+    .replace(/\bhttps?:\/\/[^\s,;)]+/gi, "[url]")
+    // `/31/2024` is a date, not a path: a locator has to start a token, not follow a digit.
+    .replace(/(?:^|[\s"'(])\/(?!\d)[\w./?=&-]+/g, " [path]")
+    .replace(/\b(?:set-cookie|cookie|authorization)\b[^,;]*/gi, "[header]");
+  return cleaned.trim() || "withheld";
+}
+
+/** Reads the published token, either from a meta tag or from the well-known file. */
+async function verifyOwnership(
+  html: string,
+  url: URL,
+  token: string,
+  options: ScanOptions
+): Promise<{ found: boolean; where: "meta" | "well-known" | null }> {
+  const meta = attrTags(html, "meta").find(
+    (tag) => (attr(tag, "name") ?? "").toLowerCase() === VERIFICATION_META_NAME
+  );
+  if (meta && attr(meta, "content")?.trim() === token) return { found: true, where: "meta" };
+  if (meta) return { found: false, where: "meta" };
+
+  try {
+    const target = new URL(VERIFICATION_WELL_KNOWN, url);
+    const doFetch = options.fetchImpl ?? fetch;
+    const response = await doFetch(target.toString(), {
+      headers: { "user-agent": USER_AGENT },
+      signal: AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+    });
+    if (!response.ok) return { found: false, where: "well-known" };
+    const body = (await response.text()).trim();
+    return { found: body === token, where: "well-known" };
+  } catch {
+    return { found: false, where: "well-known" };
+  }
+}
+
+/**
+ * Sign in before scanning, so the report covers the product and not its front door.
+ *
+ * Two body shapes are tried because a JSON API and a classic form post are both common, and
+ * the difference is not something the caller should have to know. Success requires a cookie:
+ * a login that answers 200 and sets nothing has not authenticated anyone, and pretending
+ * otherwise would produce a scan of the public pages labelled "signed in".
+ */
+async function performLogin(
+  login: ScanLogin,
+  options: ScanOptions
+): Promise<{
+  result: ScanLoginResult;
+  cookie: string | null;
+}> {
+  const doFetch = options.fetchImpl ?? fetch;
+  const target = assertScannableUrl(login.url, { allowPrivate: options.allowPrivate });
+  const fields = {
+    [login.emailField ?? "email"]: login.email,
+    [login.passwordField ?? "password"]: login.password,
+  };
+  const attempt = async (body: string, contentType: string): Promise<Response> =>
+    doFetch(target.toString(), {
+      method: "POST",
+      redirect: "manual",
+      headers: { "user-agent": USER_AGENT, "content-type": contentType },
+      body,
+      signal: AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+    });
+
+  let status: number | null = null;
+  let cookies: string[] = [];
+  try {
+    let response = await attempt(JSON.stringify(fields), "application/json");
+    if (response.status >= 400) {
+      const form = new URLSearchParams(fields as Record<string, string>).toString();
+      response = await attempt(form, "application/x-www-form-urlencoded");
+    }
+    status = response.status;
+    cookies = collectCookies(response);
+    // A redirect after login is the normal case for a form post: the cookie is the evidence,
+    // and it is already on this response.
+    if (status >= 400) {
+      return {
+        result: { attempted: true, ok: false, status, reason: `the site answered HTTP ${status}` },
+        cookie: cookies.length > 0 ? cookies.join("; ") : null,
+      };
+    }
+    if (cookies.length === 0) {
+      return {
+        result: {
+          attempted: true,
+          ok: false,
+          status,
+          reason: "the login answered but set no cookie, so nothing was authenticated",
+        },
+        cookie: null,
+      };
+    }
+    return { result: { attempted: true, ok: true, status }, cookie: cookies.join("; ") };
+  } catch (error) {
+    return {
+      result: {
+        attempted: true,
+        ok: false,
+        status,
+        reason: `could not reach the login endpoint: ${
+          error instanceof Error ? error.message : "unknown error"
+        }`,
+      },
+      cookie: null,
+    };
+  }
+}
+
+function collectCookies(response: Response): string[] {
+  // `getSetCookie` is the only API that keeps several cookies apart; headers.get would
+  // join them into one unusable string.
+  const withGetter = response.headers as Headers & { getSetCookie?: () => string[] };
+  const raw = withGetter.getSetCookie?.() ?? [];
+  const single = response.headers.get("set-cookie");
+  const all = raw.length > 0 ? raw : single ? [single] : [];
+  return all.map((value) => value.split(";")[0] ?? "").filter((value) => value.length > 0);
+}
+
+/**
  * Scan one URL and return findings grouped by module.
  *
  * Never throws for a page that answers badly — a 500 is a result, not an exception. It
@@ -917,7 +1132,18 @@ function summarise(findings: ScanFinding[], module: ScanModule): ScanModuleSumma
 export async function scanPage(rawUrl: string, options: ScanOptions = {}): Promise<ScanResult> {
   const url = assertScannableUrl(rawUrl, { allowPrivate: options.allowPrivate });
   const started = Date.now();
-  const { response, url: finalUrl } = await fetchFollowing(url, options);
+
+  // A local target is the caller's own machine, and a login is optional: without a cookie,
+  // the scan simply sees what an anonymous visitor sees, and says so.
+  const loginAttempt = options.login ? await performLogin(options.login, options) : null;
+  const headers: Record<string, string> = { ...options.headers };
+  if (loginAttempt?.cookie) {
+    headers.cookie = headers.cookie
+      ? `${headers.cookie}; ${loginAttempt.cookie}`
+      : loginAttempt.cookie;
+  }
+  const withLogin: ScanOptions = { ...options, headers };
+  const { response, url: finalUrl } = await fetchFollowing(url, withLogin);
   const { text, bytes } = await readBody(response, options.maxBytes ?? DEFAULT_MAX_BYTES);
   const contentType = response.headers.get("content-type") ?? "";
   const html = /html|xml/i.test(contentType) || /^\s*</.test(text) ? text : "";
@@ -1003,6 +1229,24 @@ export async function scanPage(rawUrl: string, options: ScanOptions = {}): Promi
     );
   }
 
+  // Ownership decides how much of the report the caller may see. A local target needs no
+  // proof; a remote one does, and until it is proven the locations stay out of the response.
+  const isLocal = options.ownershipHint === "local";
+  let ownership: Ownership = isLocal ? "local" : "unverified";
+  let verification: ScanResult["verification"] = {
+    tokenProvided: Boolean(options.ownershipToken),
+    found: false,
+    where: null,
+  };
+  if (!isLocal && options.ownershipToken) {
+    const checked = await verifyOwnership(html, finalUrl, options.ownershipToken, withLogin);
+    verification = { tokenProvided: true, found: checked.found, where: checked.where };
+    if (checked.found) ownership = "verified";
+  }
+
+  const visibleFindings = redactFindings(findings, ownership);
+  const visibleProbes = redactProbes(probes, ownership);
+
   return {
     url: url.toString(),
     finalUrl: finalUrl.toString(),
@@ -1011,13 +1255,17 @@ export async function scanPage(rawUrl: string, options: ScanOptions = {}): Promi
     bytes,
     durationMs,
     scannedAt: new Date().toISOString(),
-    findings,
+    findings: visibleFindings,
     modules: (["fail", "clean", "flow", "world", "exit"] as ScanModule[]).map((module) =>
-      summarise(findings, module)
+      summarise(visibleFindings, module)
     ),
-    probes,
-    clientRendered: findings.some(
+    probes: visibleProbes,
+    clientRendered: visibleFindings.some(
       (item) => item.id === "rendered_dom" && item.status === "SKIPPED"
     ),
+    ownership,
+    redacted: ownership === "unverified",
+    login: loginAttempt?.result ?? null,
+    verification,
   };
 }

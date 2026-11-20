@@ -2456,6 +2456,29 @@ function printBanner(flags: GlobalFlags): void {
   );
 }
 
+/** True for the machine the command runs on: localhost, loopback, private ranges, *.local. */
+function isLocalTarget(target: string): boolean {
+  let host: string;
+  try {
+    host = new URL(target).hostname.replace(/^\[|\]$/g, "");
+  } catch {
+    return false;
+  }
+  if (/^(?:localhost|.*\.localhost|.*\.local)$/i.test(host)) return true;
+  if (host === "::1" || host === "::") return true;
+  const parts = host.split(".").map(Number);
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part))) return false;
+  const [a, b] = parts as [number, number, number, number];
+  return (
+    a === 127 ||
+    a === 10 ||
+    a === 0 ||
+    (a === 192 && b === 168) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31)
+  );
+}
+
 /**
  * `proofcore scan <url>` — the five modules, on one address, with no configuration.
  *
@@ -2474,6 +2497,8 @@ async function commandScan(flags: GlobalFlags, args: string[], only: string[]): 
   }
   const headers: Record<string, string> = {};
   let explain = false;
+  let login: { url: string; email: string; password: string } | undefined;
+  let ownershipToken: string | undefined;
   const extraOnly: string[] = [];
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
@@ -2501,7 +2526,34 @@ async function commandScan(flags: GlobalFlags, args: string[], only: string[]): 
         return 64;
       }
       headers.cookie = headers.cookie ? `${headers.cookie}; ${raw}` : raw;
+    } else if (arg === "--login-url") {
+      const raw = args[++i] ?? "";
+      if (!/^https?:\/\//i.test(raw)) {
+        err(
+          flags,
+          red(
+            flags,
+            "--login-url expects an absolute URL, e.g. https://site.example/api/auth/sign-in"
+          )
+        );
+        return 64;
+      }
+      login = { url: raw, email: login?.email ?? "", password: login?.password ?? "" };
+    } else if (arg === "--login-email") {
+      login = { url: login?.url ?? "", email: args[++i] ?? "", password: login?.password ?? "" };
+    } else if (arg === "--login-password") {
+      login = { url: login?.url ?? "", email: login?.email ?? "", password: args[++i] ?? "" };
+    } else if (arg === "--verify-token") {
+      ownershipToken = args[++i] ?? "";
+      if (!ownershipToken) {
+        err(flags, red(flags, "--verify-token expects the token shown in the app"));
+        return 64;
+      }
     }
+  }
+  if (login && (!login.url || !login.email || !login.password)) {
+    err(flags, red(flags, "--login needs all three: --login-url, --login-email, --login-password"));
+    return 64;
   }
   const wanted = new Set([...only, ...extraOnly].filter(Boolean));
   if (extraOnly.some((item) => !["fail", "clean", "flow", "world", "exit"].includes(item))) {
@@ -2515,7 +2567,12 @@ async function commandScan(flags: GlobalFlags, args: string[], only: string[]): 
       headers,
       // The CLI runs on the operator's machine: scanning their own localhost is the point.
       allowPrivate: true,
+      // Loopback and private targets belong to the person running the command, so the report
+      // may name locations. A remote URL gets the same gate as the app: proof, or redaction.
+      ownershipHint: isLocalTarget(target) ? "local" : "remote",
       timeoutMs: 15_000,
+      ...(login ? { login } : {}),
+      ...(ownershipToken ? { ownershipToken } : {}),
     });
   } catch (error) {
     err(flags, red(flags, error instanceof Error ? error.message : String(error)));
@@ -2579,6 +2636,26 @@ async function commandScan(flags: GlobalFlags, args: string[], only: string[]): 
                 : dim(flags, "–");
         out(flags, `    ${glyph} ${item.id.padEnd(22)} ${dim(flags, item.observed.slice(0, 64))}`);
       }
+    }
+    if (result.login?.attempted) {
+      out(
+        flags,
+        result.login.ok
+          ? dim(flags, "signed in: the scan covers the pages behind the login")
+          : yellow(
+              flags,
+              `login failed (${result.login.reason ?? "unknown reason"}): public pages only`
+            )
+      );
+    }
+    if (result.redacted) {
+      out(
+        flags,
+        yellow(
+          flags,
+          "remote site, ownership not proven: exact locations withheld — publish the token from /app/scan, or pass --verify-token"
+        )
+      );
     }
     const failed = findings.filter((item) => item.status === "FAIL").length;
     out(flags, "");
@@ -3668,6 +3745,10 @@ function printHelp(flags: GlobalFlags): void {
   w("check options (works on localhost and on a live site behind a login)");
   w('  --header "Name: value"   Extra request header, repeatable');
   w('  --cookie "name=value"    Cookie sent with the request, repeatable');
+  w("  --login-url <url>        Sign in before scanning (use a read-only audit account)");
+  w("  --login-email <email>    Account created for the audit");
+  w("  --login-password <pw>    Its password; used once, never stored or printed");
+  w("  --verify-token <token>   The token from /app/scan, to unlock exact locations");
   w("");
   w(bold(flags, "exit codes"));
   w("  0  all cases passed (skips allowed)");

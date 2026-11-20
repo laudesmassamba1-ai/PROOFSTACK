@@ -230,6 +230,57 @@ describe("CLI", () => {
     expect(cases.every((testCase) => testCase.id.includes("exit/csv"))).toBe(true);
   });
 
+  it("scan runs the five modules on a URL with no configuration at all", async () => {
+    // The complaint this answers: testing any of the modules required `init` and a config.
+    // `scan` must work in an empty directory, on the developer's own localhost.
+    const server = createServer((request, response) => {
+      if (request.url === "/checkout") {
+        response.writeHead(200, { "content-type": "text/html" });
+        response.end("<html><body>checkout</body></html>");
+        return;
+      }
+      response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      response.end(`<html lang="fr"><head><title>Local shop</title>
+        <meta name="viewport" content="width=device-width">
+        <script src="https://js.stripe.com/v3"></script></head>
+        <body><main><h1>Boutique</h1><a href="/checkout">Commander</a></main></body></html>`);
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = (server.address() as AddressInfo).port;
+    try {
+      const dir = await project();
+      const result = await cli(["scan", `http://127.0.0.1:${port}/`], dir);
+      // A blocking finding exits 1 — the contract, not a special case for this command.
+      expect(result.code).toBe(1);
+      for (const module of ["FAIL", "CLEAN", "FLOW", "WORLD", "EXIT"]) {
+        expect(result.stdout).toContain(module);
+      }
+      // The checkout link was actually followed, not assumed.
+      expect(result.stdout).toContain("journey_entry");
+      expect(result.stdout).toContain("/checkout");
+      expect(result.stderr).not.toContain("configuration");
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  it("scan --json stays machine-readable and never mixes prose into stdout", async () => {
+    const dir = await project();
+    const result = await cli(["scan", "http://127.0.0.1:1/", "--json"], dir);
+    // Port 1 refuses the connection: a harness failure, not a finding about the site.
+    expect(result.code).toBe(2);
+    expect(result.stdout.trim()).toBe("");
+    expect(result.stderr.length).toBeGreaterThan(0);
+  });
+
+  it("fail reuses the same engine as scan, so the two can never disagree", async () => {
+    const dir = await project();
+    const result = await cli(["fail", "http://127.0.0.1:1/"], dir);
+    expect(result.code).toBe(2);
+    // A refused connection is a harness failure: exit 2 with a real reason, not a finding.
+    expect(result.stderr.toLowerCase()).toMatch(/fetch failed|could not/);
+  });
+
   it("test --only exits 2 when nothing matches, rather than reporting a false pass", async () => {
     const dir = await project();
     await cli(["init", "--yes", "No match"], dir);

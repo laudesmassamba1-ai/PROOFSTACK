@@ -51,6 +51,10 @@ interface ScanModuleSummary {
 }
 
 interface ScanResult {
+  ownership?: "local" | "verified" | "unverified";
+  redacted?: boolean;
+  login?: { attempted: boolean; ok: boolean; status: number | null; reason?: string } | null;
+  verification?: { tokenProvided: boolean; found: boolean; where: "meta" | "well-known" | null };
   url: string;
   finalUrl: string;
   status: number;
@@ -100,6 +104,19 @@ export function ScanPage(): React.ReactElement {
   const [url, setUrl] = useState("https://");
   const [cookie, setCookie] = useState("");
   const [showAuth, setShowAuth] = useState(false);
+  /** A site usually offers an account, not a cookie jar: that is the default path. */
+  const [authMode, setAuthMode] = useState<"account" | "cookie">("account");
+  const [loginUrl, setLoginUrl] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showVerify, setShowVerify] = useState(false);
+  const [verify, setVerify] = useState<{
+    metaTag: string;
+    wellKnownContent: string;
+    wellKnownPath: string;
+    instructions: string;
+  } | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
   const [scan, setScan] = useState<ScanResult | null>(null);
   const [auditId, setAuditId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -151,6 +168,26 @@ export function ScanPage(): React.ReactElement {
       );
       return;
     }
+    if (authMode === "account" && (email.trim() || password)) {
+      if (!/^https?:\/\/\S+/i.test(loginUrl.trim())) {
+        setError(
+          new Error(
+            fr
+              ? "Donne l'adresse complète de la page de connexion du site, ou laisse les identifiants vides."
+              : "Give the full URL of the site's login endpoint, or leave the credentials empty."
+          )
+        );
+        return;
+      }
+      if (!email.includes("@") || password.length === 0) {
+        setError(
+          new Error(
+            fr ? "Email et mot de passe sont nécessaires." : "Email and password are needed."
+          )
+        );
+        return;
+      }
+    }
     setBusy(true);
     setError(null);
     setScan(null);
@@ -162,11 +199,16 @@ export function ScanPage(): React.ReactElement {
         body: {
           workspaceId: session.workspaceId,
           url: target,
-          ...(cookie.trim() ? { headers: { cookie: cookie.trim() } } : {}),
+          ...(authMode === "cookie" && cookie.trim() ? { headers: { cookie: cookie.trim() } } : {}),
+          ...(authMode === "account" && email.trim() && password
+            ? { login: { url: loginUrl.trim(), email: email.trim(), password } }
+            : {}),
         },
       });
       setScan(body.audit);
       setAuditId(body.audit.id);
+      // The password exists to be used once: it leaves the form as soon as the scan starts.
+      setPassword("");
       await loadHistory();
     } catch (caught) {
       setError(caught as ApiError);
@@ -228,7 +270,7 @@ export function ScanPage(): React.ReactElement {
         method: "POST",
         body: {
           workspaceId: session.workspaceId,
-          effort: "standard",
+          effort: "balanced",
           message: fr
             ? `Voici le résultat brut d'un scan PROOFCORE. Interprète-le pour quelqu'un qui n'est pas expert : quels sont les trois problèmes les plus coûteux, pourquoi ils comptent pour ce site précis, et dans quel ordre les corriger. Sois concret, cite les constats par leur identifiant, et dis clairement ce que le scan n'a pas pu mesurer.\n\n${reportForModel()}`
             : `Here is the raw result of a PROOFCORE scan. Interpret it for someone who is not an expert: which three problems cost the most, why they matter for this site, and in what order to fix them. Be concrete, cite findings by their id, and state clearly what the scan could not measure.\n\n${reportForModel()}`,
@@ -246,6 +288,33 @@ export function ScanPage(): React.ReactElement {
       );
     } finally {
       setExplaining(false);
+    }
+  };
+
+  const loadVerification = async () => {
+    if (!session.workspaceId) return;
+    setShowVerify(true);
+    if (verify) return;
+    try {
+      const body = await apiFetch<{
+        metaTag: string;
+        wellKnownContent: string;
+        wellKnownPath: string;
+        instructions: string;
+      }>(`/api/v1/audits/verification-token?workspaceId=${session.workspaceId}`);
+      setVerify(body);
+    } catch (caught) {
+      setError(caught as ApiError);
+    }
+  };
+
+  const copy = async (value: string, key: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(key);
+      window.setTimeout(() => setCopied((current) => (current === key ? null : current)), 1600);
+    } catch {
+      // Clipboard refused: the text stays selectable, which is enough.
     }
   };
 
@@ -307,24 +376,94 @@ export function ScanPage(): React.ReactElement {
 
       {showAuth ? (
         <Card className="scan-auth">
-          <p className="scan-auth-hint">
-            {fr
-              ? "Colle l'en-tête Cookie de ton navigateur pour scanner une page derrière un login. Il sert à la requête, n'est pas stocké et n'apparaît pas dans l'historique."
-              : "Paste your browser's Cookie header to scan a page behind a login. It is used for the request, not stored, and not shown in history."}
-          </p>
-          <label className="sr-only" htmlFor="scan-cookie">
-            {fr ? "Cookie de session" : "Session cookie"}
-          </label>
-          <input
-            id="scan-cookie"
-            type="text"
-            value={cookie}
-            onChange={(event) => setCookie(event.target.value)}
-            placeholder="session=…; other=…"
-            className="app-input"
-            spellCheck={false}
-            autoComplete="off"
-          />
+          <div
+            className="scan-auth-modes"
+            role="tablist"
+            aria-label={fr ? "Méthode de connexion" : "Sign-in method"}
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={authMode === "account"}
+              className={authMode === "account" ? "is-active" : ""}
+              onClick={() => setAuthMode("account")}
+            >
+              {fr ? "Compte du site" : "Site account"}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={authMode === "cookie"}
+              className={authMode === "cookie" ? "is-active" : ""}
+              onClick={() => setAuthMode("cookie")}
+            >
+              Cookie
+            </button>
+          </div>
+
+          {authMode === "account" ? (
+            <div className="scan-auth-grid">
+              <p className="scan-auth-hint">
+                {fr
+                  ? "Crée de préférence un compte dédié à l'audit sur le site, avec un rôle de lecture. L'app s'en sert pour voir les pages derrière le login, puis oublie tout : rien n'est stocké."
+                  : "Preferably create an account dedicated to the audit on the site, with a read-only role. The app uses it to see the pages behind the login, then forgets it: nothing is stored."}
+              </p>
+              <label className="scan-field">
+                <span>{fr ? "Adresse de connexion" : "Login endpoint"}</span>
+                <input
+                  type="url"
+                  value={loginUrl}
+                  onChange={(event) => setLoginUrl(event.target.value)}
+                  placeholder="https://ton-site.com/api/auth/sign-in"
+                  className="app-input"
+                  spellCheck={false}
+                  autoComplete="off"
+                />
+              </label>
+              <label className="scan-field">
+                <span>{fr ? "Email du compte d'audit" : "Audit account email"}</span>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="audit@ton-site.com"
+                  className="app-input"
+                  spellCheck={false}
+                  autoComplete="off"
+                />
+              </label>
+              <label className="scan-field">
+                <span>{fr ? "Mot de passe" : "Password"}</span>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  className="app-input"
+                  autoComplete="off"
+                />
+              </label>
+            </div>
+          ) : (
+            <div className="scan-auth-grid">
+              <p className="scan-auth-hint">
+                {fr
+                  ? "Colle l'en-tête Cookie de ton navigateur. Il sert à la requête, n'est pas stocké et n'apparaît pas dans l'historique."
+                  : "Paste your browser's Cookie header. It is used for the request, not stored, and not shown in history."}
+              </p>
+              <label className="scan-field">
+                <span>{fr ? "Cookie de session" : "Session cookie"}</span>
+                <input
+                  type="text"
+                  value={cookie}
+                  onChange={(event) => setCookie(event.target.value)}
+                  placeholder="session=…; other=…"
+                  className="app-input"
+                  spellCheck={false}
+                  autoComplete="off"
+                />
+              </label>
+            </div>
+          )}
         </Card>
       ) : null}
 
@@ -354,6 +493,83 @@ export function ScanPage(): React.ReactElement {
               {fr ? "Interpréter avec l'IA" : "Interpret with AI"}
             </button>
           </div>
+
+          {scan.login?.attempted && !scan.login.ok ? (
+            <p className="scan-notice">
+              <AlertTriangle size={13} aria-hidden />
+              {fr
+                ? `Le site a refusé les identifiants : le scan n'a vu que les pages publiques.${scan.login.reason ? ` (${scan.login.reason})` : ""}`
+                : `The site refused the credentials, so the scan only saw public pages.${scan.login.reason ? ` (${scan.login.reason})` : ""}`}
+            </p>
+          ) : null}
+
+          {scan.redacted ? (
+            <div className="scan-ownership-gate">
+              <p className="scan-ownership-title">
+                <Eye size={13} aria-hidden />
+                {fr ? "Failles réelles, emplacements masqués" : "Real weaknesses, hidden locations"}
+              </p>
+              <p>
+                {fr
+                  ? "Ce site n'est pas prouvé comme le tien : le scan dit ce qui ne va pas, pas où exactement. C'est ce qui empêche l'outil de servir de carte à un attaquant."
+                  : "This site is not proven to be yours: the scan says what is wrong, not exactly where. That is what stops the tool from becoming a map for an attacker."}
+              </p>
+              <button
+                type="button"
+                className="app-btn app-btn-sm"
+                onClick={() => void loadVerification()}
+              >
+                {fr ? "Prouver que ce site est le mien" : "Prove this site is mine"}
+              </button>
+              {showVerify ? (
+                verify ? (
+                  <div className="scan-verify">
+                    <p className="scan-auth-hint">{verify.instructions}</p>
+                    <div className="scan-verify-row">
+                      <code>{verify.metaTag}</code>
+                      <button
+                        type="button"
+                        className="app-btn app-btn-sm"
+                        onClick={() => void copy(verify.metaTag, "meta")}
+                      >
+                        {copied === "meta" ? (
+                          <Check size={13} aria-hidden />
+                        ) : (
+                          <Eye size={13} aria-hidden />
+                        )}
+                        {fr ? "Copier la balise" : "Copy the tag"}
+                      </button>
+                    </div>
+                    <div className="scan-verify-row">
+                      <code>{verify.wellKnownPath}</code>
+                      <code>{verify.wellKnownContent}</code>
+                      <button
+                        type="button"
+                        className="app-btn app-btn-sm"
+                        onClick={() => void copy(verify.wellKnownContent, "file")}
+                      >
+                        {copied === "file" ? (
+                          <Check size={13} aria-hidden />
+                        ) : (
+                          <Eye size={13} aria-hidden />
+                        )}
+                        {fr ? "Copier le contenu" : "Copy the content"}
+                      </button>
+                    </div>
+                    <p className="scan-auth-hint">
+                      {fr
+                        ? "Publie l'un des deux, puis relance le scan : les emplacements exacts apparaîtront."
+                        : "Publish either one, then re-run the scan: the exact locations will appear."}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="scan-auth-hint">
+                    {fr ? "Chargement du jeton…" : "Loading the token…"}
+                  </p>
+                )
+              ) : null}
+            </div>
+          ) : null}
 
           {scan.clientRendered ? (
             <p className="scan-notice">

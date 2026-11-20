@@ -1428,13 +1428,15 @@ export class AppStore {
     failed: number;
     warnings: number;
     payload: string;
+    ownership: string;
+    redacted: boolean;
   }): Promise<void> {
     await this.db
       .prepare(
         `INSERT INTO page_audits
            (id, workspace_id, created_by, url, final_url, status, duration_ms,
-            worst_verdict, failed, warnings, payload, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            worst_verdict, failed, warnings, payload, ownership, redacted, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         input.id,
@@ -1448,6 +1450,8 @@ export class AppStore {
         input.failed,
         input.warnings,
         input.payload,
+        input.ownership,
+        input.redacted ? 1 : 0,
         iso(this.clock())
       )
       .run();
@@ -1471,7 +1475,8 @@ export class AppStore {
       .first<Row>();
     const rows = await this.db
       .prepare(
-        `SELECT id, url, final_url, status, duration_ms, worst_verdict, failed, warnings, created_at
+        `SELECT id, url, final_url, status, duration_ms, worst_verdict, failed, warnings,
+                ownership, redacted, created_at
          FROM page_audits WHERE workspace_id = ?
          ORDER BY created_at DESC LIMIT ? OFFSET ?`
       )
