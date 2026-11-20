@@ -5,9 +5,6 @@ import { Section, SectionHeading } from "../layouts/BrandLayout.js";
 
 export type ModuleName = "world" | "flow" | "exit" | "fail" | "clean";
 
-/** Canonical module order — the index on the identity card comes from here. */
-const ORDER: readonly ModuleName[] = ["world", "flow", "exit", "fail", "clean"];
-
 interface ModuleContent {
   name: ModuleName;
   tag: string;
@@ -484,61 +481,22 @@ export function ModulePage({ name }: { name: ModuleName }) {
 
   return (
     <>
-      <Section className="cine-hero-mini">
-        <div className="grid items-start gap-10 lg:grid-cols-[1.3fr_0.7fr] lg:gap-16">
-          <div>
-            <p className="eyebrow" data-anim="fade">
-              {label} · {content.tag}
-            </p>
-            <h1 className="cine-module-title" data-anim="mask">
-              {content.headline}
-            </h1>
-            <p className="cine-lede mt-5" data-anim="fade">
-              {content.lede}
-            </p>
-            <p
-              className="mt-6 max-w-[58ch] border-l-2 border-white/15 pl-4 text-[0.95rem] italic leading-relaxed text-white/62"
-              data-anim="fade"
-            >
-              {t(`question.${name}` as const)}
-            </p>
-            <div className="cine-command mt-7" data-anim="fade">
-              <Terminal size={14} className="shrink-0 text-brand-mint" />
-              <code>{content.command}</code>
-            </div>
-          </div>
-
-          {/* The module's identity card: its number, its name, and the first checks
-              it runs — the same content the section below details, in one glance. */}
-          <aside
-            className={`brand-panel module-${name} relative overflow-hidden p-6 sm:p-7`}
-            data-anim="mask"
-            data-spot
-          >
-            <div className="flex items-center justify-between">
-              <p className="cine-mono">MODULE {String(ORDER.indexOf(name) + 1).padStart(2, "0")}</p>
-              <span className="bento-out">
-                <i aria-hidden="true" />
-              </span>
-            </div>
-            <p className="mt-5 font-display text-[clamp(2.6rem,7vw,4.4rem)] font-semibold leading-none tracking-[-0.05em]">
-              {label}
-            </p>
-            <p className="mt-2 text-[0.86rem] text-white/62">{content.tag}</p>
-            <ul className="mt-6 space-y-2 border-t border-white/8 pt-5">
-              {content.checks.slice(0, 4).map((check, index) => (
-                <li
-                  key={check.label}
-                  className="flex items-baseline gap-2.5 text-[0.8rem] text-white/70"
-                >
-                  <span className="font-mono text-[0.6rem] text-white/34">
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                  {check.label}
-                </li>
-              ))}
-            </ul>
-          </aside>
+      <Section>
+        <p className="eyebrow">
+          {label} · {content.tag}
+        </p>
+        <h1 className="mt-3 text-[2.2rem] leading-[1.1] tracking-tight sm:text-[3rem]">
+          {content.headline}
+        </h1>
+        <p className="mt-5 max-w-[68ch] text-[1rem] leading-relaxed text-white/58">
+          {content.lede}
+        </p>
+        <p className="mt-6 max-w-[60ch] text-[0.95rem] italic text-white/44">
+          {t(`question.${name}` as const)}
+        </p>
+        <div className="brand-panel mt-8 inline-flex items-center gap-3 px-4 py-3">
+          <Terminal size={15} className="text-brand-mint" />
+          <code className="text-[0.8rem] text-white/78">{content.command}</code>
         </div>
       </Section>
 
@@ -547,11 +505,11 @@ export function ModulePage({ name }: { name: ModuleName }) {
           eyebrow={fr ? "Ce qui est réellement vérifié" : "What it actually checks"}
           title={fr ? "Pas une liste d’intentions" : "Not a checklist of intentions"}
         />
-        <div className="cine-check-grid mt-9" data-anim="fade">
+        <div className="mt-8 grid gap-4 md:grid-cols-2">
           {content.checks.map((check) => (
-            <article key={check.label} className="cine-check" data-spot>
-              <h3>{check.label}</h3>
-              <p>{check.detail}</p>
+            <article key={check.label} className="brand-panel p-5">
+              <h3 className="text-[0.95rem] font-semibold">{check.label}</h3>
+              <p className="mt-2 text-[0.86rem] leading-relaxed text-white/52">{check.detail}</p>
             </article>
           ))}
         </div>
@@ -559,7 +517,7 @@ export function ModulePage({ name }: { name: ModuleName }) {
 
       <Section>
         <div className="grid gap-8 lg:grid-cols-[1.1fr_1fr]">
-          <figure className="brand-panel self-start overflow-hidden">
+          <figure className="brand-panel overflow-hidden">
             <figcaption className="border-b border-white/8 px-4 py-3 font-mono text-[0.74rem] text-white/48">
               {fr ? "Sortie CLI" : "CLI output"}
             </figcaption>

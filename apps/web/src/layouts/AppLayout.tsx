@@ -30,7 +30,6 @@ import { WindowControls } from "../components/app/WindowControls.js";
 import { Mark } from "../components/brand/Logo.js";
 import { useI18n } from "../i18n/index.js";
 import { API_BASE, apiFetch } from "../lib/api.js";
-import { initCinema, teardownCinema } from "../lib/cinema.js";
 import { initReveals, teardownReveals } from "../lib/reveal.js";
 import { useSession } from "../lib/session.js";
 
@@ -109,15 +108,10 @@ export function AppLayout() {
   // Scroll-choreographed reveals, re-armed per route.
   // biome-ignore lint/correctness/useExhaustiveDependencies: pathname IS the dependency
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      initReveals();
-      // Same choreography as the site: page-level fades, spring controls, pointer sheens.
-      initCinema();
-    }, 60);
+    const timer = window.setTimeout(initReveals, 60);
     return () => {
       window.clearTimeout(timer);
       teardownReveals();
-      teardownCinema();
     };
   }, [location.pathname]);
 
@@ -745,7 +739,7 @@ export function PageHeader({
   const sectionLabel =
     eyebrow ?? (locale === "fr" ? "PROOFCORE / espace de travail" : "PROOFCORE / workspace");
   return (
-    <header className="app-page-head" data-anim="fade">
+    <header className="app-page-head">
       <p className="app-eyebrow">{sectionLabel}</p>
       <div className="app-page-head-row">
         <h1 className="app-page-title">{title}</h1>

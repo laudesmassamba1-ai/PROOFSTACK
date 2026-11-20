@@ -28,8 +28,6 @@ export function Platform() {
     <>
       <Section>
         <SectionHeading
-          level={1}
-          index="01 — THE STACK"
           eyebrow={t("mkt.platform.eyebrow")}
           title={t("mkt.platform.title")}
           lede={t("mkt.platform.lede")}
@@ -38,9 +36,9 @@ export function Platform() {
           {STACK.map(({ icon: Icon, key }) => (
             <article key={key} className="brand-panel p-5">
               <Icon size={19} className="text-brand-cyan" />
-              <h2 className="mt-4 text-[0.96rem] font-semibold">
+              <h3 className="mt-4 text-[0.96rem] font-semibold">
                 {t(`mkt.platform.stack.${key}.title` as const)}
-              </h2>
+              </h3>
               <p className="mt-2 text-[0.84rem] leading-relaxed text-white/52">
                 {t(`mkt.platform.stack.${key}.body` as const)}
               </p>
@@ -51,7 +49,6 @@ export function Platform() {
 
       <Section tone="deeper">
         <SectionHeading
-          index="02 — RUNTIME"
           eyebrow={t("mkt.platform.runtime.eyebrow")}
           title={t("mkt.platform.runtime.title")}
         />

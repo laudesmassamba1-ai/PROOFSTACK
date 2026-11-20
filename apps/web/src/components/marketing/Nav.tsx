@@ -81,11 +81,11 @@ export function Nav() {
     <header
       className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
         scrolled
-          ? "border-b border-white/10 bg-[#050708]/78 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.9)] backdrop-blur-xl"
-          : "border-b border-white/6"
+          ? "border-b border-white/10 bg-[#050708]/82 backdrop-blur-xl"
+          : "border-b border-transparent"
       }`}
     >
-      <nav className="mx-auto flex max-w-[1280px] items-center gap-3 px-5 py-3.5 lg:px-10">
+      <nav className="mx-auto flex max-w-[1240px] items-center gap-3 px-5 py-3.5 lg:px-8">
         <Link to="/" aria-label={t("mkt.homeLabel")} className="shrink-0">
           <Wordmark size={15} />
         </Link>

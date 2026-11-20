@@ -7,7 +7,7 @@ export function Footer() {
   const year = new Date().getFullYear();
   return (
     <footer className="border-t border-white/8 bg-[#050708]">
-      <div className="mx-auto grid max-w-[1280px] gap-10 px-5 py-14 md:grid-cols-[1.4fr_1fr_1fr_1fr] lg:px-10">
+      <div className="mx-auto grid max-w-[1240px] gap-10 px-5 py-14 md:grid-cols-[1.4fr_1fr_1fr_1fr] lg:px-8">
         <div>
           <Wordmark size={14} />
           <p className="mt-4 max-w-[34ch] text-[0.86rem] leading-relaxed text-white/48">
@@ -47,22 +47,7 @@ export function Footer() {
           ]}
         />
       </div>
-      {/* The sign-off wordmark: poured concrete at the bottom of the page, cropped by
-          the viewport edge on purpose. Decorative — the accessible name is in the nav. */}
-      <div className="mx-auto max-w-[1280px] overflow-hidden px-5 lg:px-10" aria-hidden="true">
-        <p
-          className="wordmark select-none whitespace-nowrap pt-6 text-transparent"
-          style={{
-            fontSize: "clamp(2.6rem, 12.4vw, 11rem)",
-            lineHeight: 0.84,
-            letterSpacing: "-0.02em",
-            WebkitTextStroke: "1px rgba(255,255,255,0.13)",
-          }}
-        >
-          PROOFCORE
-        </p>
-      </div>
-      <div className="mx-auto flex max-w-[1280px] flex-col gap-2 border-t border-white/8 px-5 py-6 text-[0.76rem] text-white/52 lg:flex-row lg:items-center lg:justify-between lg:px-10">
+      <div className="mx-auto flex max-w-[1240px] flex-col gap-2 border-t border-white/8 px-5 py-6 text-[0.76rem] text-white/35 lg:flex-row lg:items-center lg:justify-between lg:px-8">
         <p>{t("footer.rights").replace("{year}", String(year))}</p>
         <p>{t("footer.notAffiliated")}</p>
       </div>
@@ -72,10 +57,8 @@ export function Footer() {
 
 function FooterColumn({ title, items }: { title: string; items: { to: string; label: string }[] }) {
   return (
-    // Navigation groups, not headings: five footer headings sit after the page's h1 on
-    // /signin, which skips a level and pads the screen-reader outline with "Produit".
-    <nav aria-label={title}>
-      <p className="text-[0.74rem] uppercase tracking-[0.18em] text-white/40">{title}</p>
+    <div>
+      <h4 className="text-[0.74rem] uppercase tracking-[0.18em] text-white/40">{title}</h4>
       <ul className="mt-4 space-y-2.5">
         {items.map((item) => (
           <li key={`${item.to}-${item.label}`}>
@@ -88,6 +71,6 @@ function FooterColumn({ title, items }: { title: string; items: { to: string; la
           </li>
         ))}
       </ul>
-    </nav>
+    </div>
   );
 }

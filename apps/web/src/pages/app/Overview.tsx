@@ -1,14 +1,13 @@
 import { ArrowRight, FolderPlus, Terminal } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import type React from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { ModulePassRates, RunsTrend, SeverityBreakdown } from "../../components/app/Insights.js";
 import { ModuleObject } from "../../components/app/ModuleObjects.js";
-import { SplitHeadline } from "../../components/app/SplitHeadline.js";
 import { Empty, ErrorState, Loading, StatusBadge } from "../../components/app/ui.js";
 import { EnhancedCard } from "../../components/common/EnhancedCard.js";
 import { useI18n } from "../../i18n/index.js";
 import { type ApiError, apiFetch } from "../../lib/api.js";
-import { revealCards } from "../../lib/choreography.js";
 import { duration, formatDate, relativeTime } from "../../lib/format.js";
 import { useSession } from "../../lib/session.js";
 
@@ -87,6 +86,7 @@ const EMPTY_TOTALS = { passed: 0, failed: 0, warnings: 0, errors: 0, skipped: 0,
 export function Overview() {
   const { workspaceId } = useSession();
   const { locale, t } = useI18n();
+  const fr = locale === "fr";
   const [data, setData] = useState<Overview | null>(null);
   const [insights, setInsights] = useState<Insights | null>(null);
   const [error, setError] = useState<ApiError | Error | null>(null);
@@ -106,30 +106,23 @@ export function Overview() {
     void load();
   }, [load]);
 
-  // Module cards rise in once the grid reaches the viewport. Keyed on data so it runs after
-  // the grid is in the DOM; revealCards is a no-op under reduced motion.
-  const gridRef = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    if (!data || !gridRef.current) return;
-    return revealCards(gridRef.current, ".app-object-card");
-  }, [data]);
-
   if (!workspaceId) {
     return (
       <Empty
-        title={t("ws.overview.noWorkspace.title")}
-        body={t("ws.overview.noWorkspace.body")}
-        tester={false}
+        title={fr ? "Aucun espace de travail" : "No workspace yet"}
+        body={fr ? "Créez un espace de travail pour commencer." : "Create a workspace to begin."}
         action={
-          <Link to="/app/workspace" className="app-btn app-btn-primary">
+          <Link to="/app/workspace" className="app-btn">
             {t("ws.overview.noWorkspace.action")}
           </Link>
         }
+        tester={false}
       />
     );
   }
   if (error) return <ErrorState error={error} onRetry={() => void load()} />;
-  if (!data) return <Loading label={t("ws.overview.loading")} />;
+  if (!data)
+    return <Loading label={fr ? "Chargement de la situation…" : "Loading the situation…"} />;
 
   const latest = data.recentRuns[0];
   const failures = data.recentFailures.length;
@@ -181,10 +174,13 @@ export function Overview() {
             <p className="app-eyebrow">
               {t("ws.overview.eyebrow")} / {data.workspace.name}
             </p>
-            <SplitHeadline text={headline} className="app-display app-situation-headline" />
+            <h1 className="app-display app-situation-headline">{headline}</h1>
             <p className="app-support">{support}</p>
           </div>
-          <aside className="app-situation-stamp" aria-label={t("ws.overview.facts.aria")}>
+          <aside
+            className="app-situation-stamp"
+            aria-label={fr ? "Faits réels du workspace" : "Real workspace facts"}
+          >
             <p className="app-eyebrow">01 / {t("ws.overview.latest")}</p>
             <div className="app-stamp-facts">
               <div>
@@ -219,7 +215,7 @@ export function Overview() {
           </h2>
         </div>
 
-        <div className="app-object-grid" ref={gridRef}>
+        <div className="app-object-grid">
           {MODULE_IDS.map((module, index) => {
             const latestModuleRun = data.recentRuns.find((run) => run.totals[module]);
             const totals = latestModuleRun?.totals[module] ?? EMPTY_TOTALS;
@@ -228,8 +224,9 @@ export function Overview() {
             return (
               <Link
                 key={module}
+                style={{ "--pk-delay": `${140 + index * 80}ms` } as React.CSSProperties}
                 to={`/app/modules/${module}`}
-                className={`app-object-card module-${module} app-object-card-${index + 1}`}
+                className={`app-object-card pk-enter module-${module} app-object-card-${index + 1}`}
               >
                 <div className="app-object-card-head">
                   <span className="app-object-index">0{index + 1}</span>
@@ -271,9 +268,9 @@ export function Overview() {
 
       <section className="app-section" data-reveal aria-labelledby="insights-title">
         <div className="app-section-head">
-          <p className="app-eyebrow">03 / {t("ws.overview.evolution")}</p>
+          <p className="app-eyebrow">03 / {fr ? "Évolution" : "Evolution"}</p>
           <h2 id="insights-title" className="app-section-title">
-            {t("ws.overview.evolution.title")}
+            {fr ? "14 derniers jours" : "Last 14 days"}
           </h2>
         </div>
         <div className="grid gap-4 lg:grid-cols-3">
@@ -281,17 +278,17 @@ export function Overview() {
             <header className="app-workbench-head">
               <div>
                 <p className="text-xs font-medium text-muted-foreground">
-                  {t("ws.overview.checksPerDay")}
+                  {fr ? "Vérifications par jour" : "Checks per day"}
                 </p>
               </div>
               <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <span className="h-2 w-2 rounded-sm bg-success/70" />
-                  {t("ws.overview.legend.passed")}
+                  {fr ? "réussis" : "passed"}
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="h-2 w-2 rounded-sm bg-danger/80" />
-                  {t("ws.overview.legend.failed")}
+                  {fr ? "échoués" : "failed"}
                 </span>
               </div>
             </header>
@@ -305,7 +302,7 @@ export function Overview() {
             <header className="app-workbench-head">
               <div>
                 <p className="text-xs font-medium text-muted-foreground">
-                  {t("ws.overview.severity")}
+                  {fr ? "Gravité des échecs" : "Failure severity"}
                 </p>
               </div>
             </header>
@@ -321,7 +318,7 @@ export function Overview() {
             <header className="app-workbench-head">
               <div>
                 <p className="text-xs font-medium text-muted-foreground">
-                  {t("ws.overview.passRate")}
+                  {fr ? "Taux de réussite par module" : "Pass rate per module"}
                 </p>
               </div>
             </header>

@@ -103,8 +103,7 @@ export function PricingTable({ currentPlanKey }: { currentPlanKey?: string }) {
                 </span>
               ) : null}
 
-              {/* h2, not h3: on /pricing the plans are the first block under the page h1. */}
-              <h2 className="text-[1.05rem] font-semibold">{plan.name}</h2>
+              <h3 className="text-[1.05rem] font-semibold">{plan.name}</h3>
               <p className="mt-1.5 min-h-[3.2rem] text-[0.84rem] leading-relaxed text-white/52">
                 {plan.description}
               </p>
@@ -224,7 +223,7 @@ export function PricingTable({ currentPlanKey }: { currentPlanKey?: string }) {
       </div>
 
       <div className="brand-panel mt-6 p-6">
-        <h3 className="text-[0.95rem] font-semibold">{t("pricing.renewal.title")}</h3>
+        <h4 className="text-[0.95rem] font-semibold">{t("pricing.renewal.title")}</h4>
         <p className="mt-2 max-w-[92ch] text-[0.86rem] leading-relaxed text-white/56">
           {t("pricing.renewal.body")}
         </p>

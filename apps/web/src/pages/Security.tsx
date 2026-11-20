@@ -37,23 +37,21 @@ export function Security() {
   return (
     <Section>
       <SectionHeading
-        level={1}
-        index="01 — CONTROLS"
         eyebrow={t("nav.security")}
         title={t("security.title")}
         lede="PROOFCORE is a testing product, so its own failure modes are mostly about trust: whose data, whose money, whose verdict. This page states the controls that exist in code today and the ones that are designed but not yet built."
       />
-      <div className="mt-10 grid gap-3 md:grid-cols-2" data-anim="fade">
+      <div className="mt-10 grid gap-4 md:grid-cols-2">
         {CONTROLS.map(([title, body]) => (
-          <article key={title} className="brand-panel p-5" data-spot>
-            <h2 className="text-[0.94rem] font-semibold">{title}</h2>
-            <p className="mt-2 text-[0.85rem] leading-relaxed text-white/66">{body}</p>
+          <article key={title} className="brand-panel p-5">
+            <h3 className="text-[0.94rem] font-semibold">{title}</h3>
+            <p className="mt-2 text-[0.85rem] leading-relaxed text-white/52">{body}</p>
           </article>
         ))}
       </div>
       <div className="brand-panel mt-8 p-6">
         <h3 className="text-[0.94rem] font-semibold">Not claimed</h3>
-        <p className="mt-2 max-w-[92ch] text-[0.85rem] leading-relaxed text-white/66">
+        <p className="mt-2 max-w-[92ch] text-[0.85rem] leading-relaxed text-white/52">
           No penetration test has been performed on this build. No formal PCI assessment exists, and
           card data is never handled — hosted provider checkout only. Security documentation in the
           repository (THREAT_MODEL, SECURITY_CONTROLS, PAYMENT_SECURITY) is written against the code

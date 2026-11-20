@@ -3,17 +3,15 @@ import { Link } from "react-router";
 import { useI18n } from "../../i18n/index.js";
 
 /**
- * The module wall, as a bento board.
+ * The module wall.
  *
- * Placement is the argument: WORLD owns the large cell because it is the module with
- * the widest surface (locale fixtures), FLOW sits beside it, and the three audits share
- * the second row at equal weight — EXIT (portability), FAIL (security), CLEAN (UI
- * quality). The engine band closes the board, so the grid reads "five readings of one
- * machine" instead of "six equal cards".
- *
- * Each card gets one accent, the technical vocabulary it actually reads (mono,
- * untranslated — it is the check vocabulary, not marketing), and the artifact it
- * leaves behind. Nothing animates in a loop; motion is reserve for the pointer.
+ * It used to be white tiles floating on a blue→violet→pink→orange gradient. Nothing else
+ * on the site uses that field, and it fought the one thing the product is: a precision
+ * instrument that reads a product and reports facts. So the wall is now dark, hairline-
+ * ruled and instrument-like — each module owns one accent, carries the technical tokens
+ * it actually examines, and moves only on hover (a lifted card, a lit edge, a filling
+ * meter). The tokens are language-neutral on purpose: they are the check vocabulary, not
+ * marketing words.
  */
 
 interface ModuleMeta {
@@ -58,91 +56,60 @@ const MODULES: readonly ModuleMeta[] = [
   },
 ];
 
-export function ModuleShowcase({ headingLevel = 3 }: { headingLevel?: 2 | 3 }) {
+export function ModuleShowcase() {
   const { t } = useI18n();
-  // /product leads with the board directly under its h1, so the cards are h2 there;
-  // on the homepage they sit under a section heading and stay h3.
-  const Title = headingLevel === 2 ? "h2" : "h3";
 
   return (
-    <div className="bento">
-      {MODULES.map((module, index) => {
-        const Icon = module.icon;
-        return (
-          <Link
-            key={module.id}
-            to={`/${module.id}`}
-            className={`bento-card module-${module.id}`}
-            data-spot
-            style={{ "--i": index } as React.CSSProperties}
-          >
-            {index === 0 ? <BentoMotif /> : null}
-            <div className="bento-head">
-              <span className="bento-icon">
-                <Icon size={17} />
-              </span>
-              <span className="bento-id">{module.id.toUpperCase()}</span>
-              <span className="bento-index">{String(index + 1).padStart(2, "0")}</span>
-              <ArrowUpRight size={15} className="bento-arrow" />
-            </div>
-            <Title className="bento-title">{t(`modules.${module.id}.name`)}</Title>
-            <p className="bento-tag">{t(`modules.${module.id}.tag`)}</p>
-            <p className="bento-q">{t(`question.${module.id}`)}</p>
-            <ul className="bento-tokens">
-              {module.tokens.map((token) => (
-                <li key={token}>{token}</li>
-              ))}
-            </ul>
-            <p className="bento-out">
-              <i aria-hidden="true" />
-              {module.output}
-            </p>
-          </Link>
-        );
-      })}
+    <div className="module-wall">
+      <div className="module-wall-grid">
+        {MODULES.map((module, index) => {
+          const Icon = module.icon;
+          return (
+            <Link
+              key={module.id}
+              to={`/${module.id}`}
+              className={`module-panel module-${module.id}`}
+              style={{ "--i": index } as React.CSSProperties}
+            >
+              <span className="module-panel-glow" aria-hidden="true" />
+              <div className="module-panel-head">
+                <span className="module-panel-icon">
+                  <Icon size={18} />
+                </span>
+                <span className="module-panel-id">{module.id.toUpperCase()}</span>
+                <ArrowUpRight size={16} className="module-panel-arrow" />
+              </div>
+              <h3 className="module-panel-title">{t(`modules.${module.id}.name`)}</h3>
+              <p className="module-panel-tag">{t(`modules.${module.id}.tag`)}</p>
+              <p className="module-panel-q">{t(`question.${module.id}`)}</p>
+              <ul className="module-panel-tokens">
+                {module.tokens.map((token) => (
+                  <li key={token}>{token}</li>
+                ))}
+              </ul>
+              <p className="module-panel-out">
+                <span className="module-panel-out-dot" aria-hidden="true" />
+                {module.output}
+              </p>
+            </Link>
+          );
+        })}
 
-      {/* The band that carries the five. */}
-      <div className="bento-card bento-engine" data-spot>
-        <div>
-          <p className="cine-mono">{t("mkt.wall.foot.kicker")}</p>
-          <p className="bento-engine-title">{t("mkt.wall.foot.title")}</p>
-          <p className="bento-engine-body">{t("mkt.wall.foot.body")}</p>
-        </div>
-        <div className="bento-states" aria-hidden="true">
-          {["PENDING", "RUNNING", "PASS", "WARN", "FAIL", "SKIPPED"].map((state) => (
-            <span key={state} className={`bento-state bento-state--${state.toLowerCase()}`}>
-              {state}
-            </span>
-          ))}
+        {/* The sixth cell: the engine that carries the five. Filling it keeps the wall a
+            complete rectangle instead of ending on a hole. */}
+        <div className="module-panel module-wall-foot">
+          <p className="module-panel-id">{t("mkt.wall.foot.kicker")}</p>
+          <p className="module-wall-foot-title">{t("mkt.wall.foot.title")}</p>
+          <p className="module-wall-foot-body">{t("mkt.wall.foot.body")}</p>
+          <div className="module-wall-states" aria-hidden="true">
+            {["PENDING", "RUNNING", "PASS", "WARN", "FAIL", "SKIPPED"].map((state) => (
+              <span key={state} className={`wall-state wall-state-${state.toLowerCase()}`}>
+                {state}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
     </div>
-  );
-}
-
-/** A small orbit drawing for the large WORLD cell: three rings, one highlighted dot. */
-function BentoMotif() {
-  return (
-    <svg className="bento-motif" viewBox="0 0 240 240" fill="none" aria-hidden="true">
-      {/* pathLength="1" makes the stroke-dash draw-in uniform on every shape. */}
-      <g stroke="currentColor" strokeOpacity="0.5" color="#78e3cb">
-        <ellipse cx="120" cy="120" rx="112" ry="52" strokeWidth="1" pathLength="1" />
-        <ellipse
-          cx="120"
-          cy="120"
-          rx="112"
-          ry="52"
-          transform="rotate(58 120 120)"
-          strokeWidth="1"
-          pathLength="1"
-        />
-        <circle cx="120" cy="120" r="74" strokeWidth="1" strokeOpacity="0.35" pathLength="1" />
-        <circle cx="120" cy="120" r="38" strokeWidth="1" strokeOpacity="0.25" pathLength="1" />
-      </g>
-      <circle cx="120" cy="120" r="6" fill="#78e3cb" />
-      <circle cx="120" cy="120" r="14" stroke="#78e3cb" strokeOpacity="0.4" />
-      <circle cx="40" cy="86" r="3" fill="#8b7bf7" />
-      <circle cx="196" cy="158" r="2.5" fill="#e967a6" />
-    </svg>
   );
 }

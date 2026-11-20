@@ -48,14 +48,5 @@ every panel with skeleton shimmer. Loading must not imply data exists.
 
 - Animate transform and opacity only.
 - No layout reads in an animation frame.
-- Runtime animation dependencies are limited to the ones listed here, each with its
-  justification. Current set (apps/web): `gsap` 3.15.1 (GSAP core and ScrollTrigger, for
-  the headline word rise and scroll-linked reveals) and `lenis` 1.3.27 (smooth scroll on the
-  marketing shell only). Chosen by the product owner over the dependency-free engine; the
-  dependency-free `lib/cinema.ts` remains for the existing `data-anim` effects. Any addition
-  needs a written reason here first.
-- Lenis never runs inside the workspace (AppLayout): its nested scroll regions (chat,
-  terminal, tables) would fight a window-level smoother. Reduced motion skips Lenis entirely
-  and keeps native scrolling.
-- GSAP animations are scoped (gsap.context) and reverted on unmount.
+- No new runtime animation dependency.
 - The workspace must remain interactive while an object animates.

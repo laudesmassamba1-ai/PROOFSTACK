@@ -155,16 +155,7 @@ export function ModulePage() {
   // lie the user cannot act on; name the real state instead.
   if (!workspaceId) {
     return (
-      <Empty
-        title={t("ws.noWorkspace.title")}
-        body={t("ws.noWorkspace.body")}
-        tester="empty"
-        action={
-          <Link to="/app/workspace" className="app-btn app-btn-primary">
-            {fr ? "Créer un espace de travail" : "Create a workspace"}
-          </Link>
-        }
-      />
+      <Empty title={t("ws.noWorkspace.title")} body={t("ws.noWorkspace.body")} tester="empty" />
     );
   }
   if (!runs)

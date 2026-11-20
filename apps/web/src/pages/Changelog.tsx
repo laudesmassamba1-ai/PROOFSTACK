@@ -48,20 +48,18 @@ export function Changelog() {
   return (
     <Section>
       <SectionHeading
-        level={1}
-        index="01 — RELEASES"
         eyebrow={t("nav.changelog")}
         title={t("changelog.title")}
         lede="Only releases that exist. Nothing here is a plan."
       />
-      <div className="mt-10 space-y-4" data-anim="fade">
+      <div className="mt-10 space-y-8">
         {RELEASES.map((release) => (
-          <article key={release.tag} className="brand-panel p-6" data-spot>
+          <article key={release.tag} className="brand-panel p-6">
             <header className="flex flex-wrap items-baseline gap-3">
-              <h2 className="font-mono text-[1.05rem] font-semibold text-brand-mint">
+              <h3 className="font-mono text-[1.05rem] font-semibold text-brand-mint">
                 {release.tag}
-              </h2>
-              <span className="text-[0.82rem] text-white/58">{release.date}</span>
+              </h3>
+              <span className="text-[0.82rem] text-white/42">{release.date}</span>
               <span className="text-[0.9rem] text-white/70">{release.title}</span>
             </header>
             <Block title="Added" items={release.added} tone="mint" />
@@ -76,11 +74,11 @@ export function Changelog() {
 function Block({ title, items, tone }: { title: string; items: string[]; tone: "mint" | "amber" }) {
   return (
     <div className="mt-5">
-      <h3
+      <h4
         className={`text-[0.74rem] uppercase tracking-[0.16em] ${tone === "mint" ? "text-brand-mint" : "text-[#e9b45a]"}`}
       >
         {title}
-      </h3>
+      </h4>
       <ul className="mt-3 space-y-2">
         {items.map((item) => (
           <li key={item} className="flex gap-3 text-[0.86rem] leading-relaxed text-white/58">

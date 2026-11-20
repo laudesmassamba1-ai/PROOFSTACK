@@ -4,8 +4,6 @@ import { WindowControls } from "../components/app/WindowControls.js";
 import { Mark } from "../components/brand/Logo.js";
 import { Footer } from "../components/marketing/Footer.js";
 import { Nav } from "../components/marketing/Nav.js";
-import { startSmoothScroll } from "../lib/choreography.js";
-import { initCinema, teardownCinema } from "../lib/cinema.js";
 import { initReveals, teardownReveals } from "../lib/reveal.js";
 
 /** Routes that exist to open a session, not to sell the product. */
@@ -27,23 +25,13 @@ export function BrandLayout() {
     window.scrollTo({ top: 0, behavior: "auto" });
   }, [pathname]);
 
-  // Lenis smooth scroll for the marketing shell only (the workspace is AppLayout and keeps
-  // native scroll). Mounted once per shell; reduced motion is handled inside startSmoothScroll.
-  useEffect(() => startSmoothScroll(), []);
-
-  // Two engines, two vocabularies: `data-reveal` for the shared blurred rise used by
-  // the workspace sections, `data-anim` for the site's choreography (character masks,
-  // wipes, springs). Both are idempotent and both re-arm per route.
+  // Scroll-choreographed reveals, re-armed per route.
   // biome-ignore lint/correctness/useExhaustiveDependencies: pathname IS the dependency
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      initReveals();
-      initCinema();
-    }, 60);
+    const timer = window.setTimeout(initReveals, 60);
     return () => {
       window.clearTimeout(timer);
       teardownReveals();
-      teardownCinema();
     };
   }, [pathname]);
 
@@ -79,7 +67,7 @@ export function BrandLayout() {
   return (
     <div className="brand-shell min-h-screen">
       <Nav />
-      <main id="main" className="pt-[4.5rem]">
+      <main id="main" className="pt-24">
         <Outlet />
       </main>
       <Footer />
@@ -98,13 +86,14 @@ export function Section({
   id?: string;
   tone?: "dark" | "deeper";
 }) {
-  // One measure for every band (1280px), one vertical rhythm per section. A "deeper"
-  // band is full-bleed so its background never reads as a floating rectangle.
-  const inner = `cine-section relative mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-10 ${className}`;
+  const inner = `mx-auto max-w-[1240px] px-5 py-14 sm:py-16 lg:px-8 lg:py-20 ${className}`;
 
+  // A "deeper" band must be full-bleed: painting the background on the max-width box
+  // left a visible inset rectangle floating on the page, which read as a rendering bug
+  // rather than as sectioning.
   if (tone === "deeper") {
     return (
-      <div className="section-deeper" data-tone="deeper">
+      <div className="section-deeper">
         <section id={id} className={inner}>
           {children}
         </section>
@@ -123,34 +112,20 @@ export function SectionHeading({
   eyebrow,
   title,
   lede,
-  index,
-  level = 2,
 }: {
   eyebrow?: string;
   title: string;
   lede?: string;
-  /** Editorial section number ("02 / MODULES"). Decorative, skipped by screen readers. */
-  index?: string;
-  /**
-   * Heading level. A page whose first block is a SectionHeading must pass 1: a document
-   * with no h1 is a real accessibility defect (screen readers announce no page title) and
-   * five marketing pages shipped that way. Inner sections keep the default.
-   */
-  level?: 1 | 2;
 }) {
-  const Heading = level === 1 ? "h1" : "h2";
   return (
-    <header className="cine-section-head" data-anim="fade">
-      <div className="min-w-0">
-        {index ? (
-          <p className="cine-section-index" aria-hidden="true">
-            {index}
-          </p>
-        ) : null}
-        {eyebrow ? <p className="eyebrow mt-4">{eyebrow}</p> : null}
-        <Heading className="cine-section-title">{title}</Heading>
-      </div>
-      {lede ? <p className="cine-section-lede">{lede}</p> : null}
+    <header className="max-w-[62ch]" data-reveal>
+      {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
+      <h2 className="mt-3 text-balance text-[1.9rem] leading-[1.12] tracking-tight sm:text-[2.4rem]">
+        {title}
+      </h2>
+      {lede ? (
+        <p className="mt-4 max-w-[64ch] text-[1rem] leading-relaxed text-white/56">{lede}</p>
+      ) : null}
     </header>
   );
 }

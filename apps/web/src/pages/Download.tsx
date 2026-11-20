@@ -82,8 +82,6 @@ export function DownloadPage() {
   return (
     <Section>
       <SectionHeading
-        level={1}
-        index="01 — INSTALL"
         eyebrow={t("download.eyebrow")}
         title={t("download.title")}
         lede={t("download.lede")}
@@ -198,7 +196,7 @@ export function DownloadPage() {
       <div className="brand-panel mt-10 flex items-start gap-4 p-5">
         <Terminal size={18} className="mt-0.5 shrink-0 text-brand-mint" />
         <div>
-          <h2 className="text-[0.96rem] font-semibold">{t("download.cli.title")}</h2>
+          <h3 className="text-[0.96rem] font-semibold">{t("download.cli.title")}</h3>
           <p className="mt-1 text-[0.86rem] leading-relaxed text-white/54">
             {t("download.cli.body")}
           </p>
@@ -247,7 +245,7 @@ function DownloadCard({
   return (
     <article className="brand-panel flex flex-col p-6">
       <Icon size={22} className="text-brand-mint" />
-      <h2 className="mt-4 text-[1.05rem] font-semibold text-white">{title}</h2>
+      <h3 className="mt-4 text-[1.05rem] font-semibold text-white">{title}</h3>
       <p className="mt-1 text-[0.86rem] text-white/54">{subtitle}</p>
       {size ? <p className="mt-1 font-mono text-[0.72rem] text-white/38">{size}</p> : null}
       <div className="mt-6">
