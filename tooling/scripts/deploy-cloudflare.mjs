@@ -86,7 +86,10 @@ function deployWeb() {
   if (!existsSync(join(dist, "index.html")))
     throw new Error("the web build produced no index.html");
   say("publishing to Cloudflare Pages");
-  const project = process.env.CF_PAGES_PROJECT ?? "proofcore";
+  // The Pages project is named after the product's public name, not the CLI binary:
+  // "proofcore" is the engine and the Worker, "proofstack" is the site. Getting this
+  // wrong fails after the build, with the site already built and nothing published.
+  const project = process.env.CF_PAGES_PROJECT ?? "proofstack";
   // Wrangler pages deploy is directory-based; the commit message ties the deploy to the code.
   run(
     [
