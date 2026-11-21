@@ -40,9 +40,12 @@ Observation manuelle : chaque capture a été regardée, pas seulement mesurée.
 
 ## Plan d'action
 
-1. **Fait dans cette passe** : #1, #2, #3, #4, #5 (commit `61b9ce8`).
-2. **Suivant** : #6 (h1 des pages marketing), #7 (état sans configuration du scan),
-   #9 (généraliser les états vides sans titre dupliqué).
+1. **Fait dans cette passe** : #1, #2, #3, #4, #5 (commit `61b9ce8`), puis #6
+   (`SectionHeading as="h1"` sur les 7 routes, commit `05f4a0f`), #7 (prévisualisation
+   des cinq lectures sous la barre d'adresse, commit `05f4a0f`), et les descriptions
+   d'offres anglaises sur la page tarifs francophone (commit `bb3241b`).
+2. **Suivant** : #9 (généraliser les états vides sans titre dupliqué aux autres
+   panneaux de l'app : exécutions récentes, etc.).
 3. **Récurrent** : re-capturer après chaque passe dans `docs/design/audit-2026-11-21/`
    et comparer avec les captures de référence.
 
