@@ -45,12 +45,12 @@ run on this checkout.
 
 ## Phase 3 — Modules without code
 
-| Item                                                           | State               | Evidence                                                                                                                                                              |
-| -------------------------------------------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Shared configuration UI for WORLD/FLOW/EXIT                    | **Not implemented** | The web still generates a `proofcore.config.ts` snippet; there is no graphical editor persisted per project. This is the largest remaining gap.                       |
-| FLOW scenario builder                                          | **Not implemented** | The engine supports configured journeys, but no UI creates them.                                                                                                      |
-| FAIL/CLEAN results explained                                   | Partial             | Findings carry `id`, `observed`, `why`; the scan page groups them and writes a plain summary. Per-finding fix instructions and documentation links are not generated. |
-| Distinct PASS / FAIL / SKIP / BLOCKED / NOT CONFIGURED / ERROR | Partial             | Engine statuses exist; the web surfaces PASS/WARN/FAIL and “not measured”. A configuration pre-check that refuses to run 189 skipped cases does not exist yet.        |
+| Item                                                           | State                                         | Evidence                                                                                                                                                              |
+| -------------------------------------------------------------- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shared configuration UI for WORLD/FLOW/EXIT                    | Available for every field the engine executes | `/app/projects/:id/config` plus `GET`/`PUT /api/v1/projects/:id/config`; FLOW journey steps stay schema-only and are not offered.                                     |
+| FLOW scenario builder                                          | **Not implemented**                           | The engine supports configured journeys, but no UI creates them.                                                                                                      |
+| FAIL/CLEAN results explained                                   | Partial                                       | Findings carry `id`, `observed`, `why`; the scan page groups them and writes a plain summary. Per-finding fix instructions and documentation links are not generated. |
+| Distinct PASS / FAIL / SKIP / BLOCKED / NOT CONFIGURED / ERROR | Partial                                       | Engine statuses exist; the web surfaces PASS/WARN/FAIL and “not measured”. A configuration pre-check that refuses to run 189 skipped cases does not exist yet.        |
 
 ## Phase 4 — Advanced surfaces
 

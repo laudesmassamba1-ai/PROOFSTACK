@@ -12,6 +12,7 @@
  * is and the deploy continues: an old real release is better than a fabricated one, and
  * the endpoint marks the answer `x-release-cache: manifest`.
  */
+import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -81,6 +82,12 @@ export const RELEASE_MANIFEST = ${JSON.stringify(body, null, 2)};
 `;
 
 writeFileSync(target, out);
+// The file is generated, but it is committed and linted like any other source file.
+try {
+  execFileSync("npx", ["biome", "format", "--write", target], { cwd: root, stdio: "ignore" });
+} catch {
+  // Formatting is cosmetic: the generated module is valid TypeScript either way.
+}
 console.log(
   `release manifest: ${body.release.tag} (${assets.length} assets) written to apps/api/src/release-manifest.ts`
 );

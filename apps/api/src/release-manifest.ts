@@ -2,63 +2,63 @@
 // Do not edit by hand: this is the last release verified from the public source, used
 // only when the live GitHub call is rate-limited. Regenerate with `pnpm releases:sync`.
 export const RELEASE_MANIFEST = {
-  "fetchedAt": "2026-11-21T11:19:26.913Z",
-  "release": {
-    "tag": "v0.5.0",
-    "name": "PROOFCORE 0.5.0 — the audit that explains, and a site that sells",
-    "url": "https://github.com/laudesmassamba1-ai/PROOFSTACK/releases/tag/v0.5.0",
-    "publishedAt": "2026-11-20T15:11:51Z",
-    "prerelease": false,
-    "assets": [
+  fetchedAt: "2026-11-21T11:19:26.913Z",
+  release: {
+    tag: "v0.5.0",
+    name: "PROOFCORE 0.5.0 — the audit that explains, and a site that sells",
+    url: "https://github.com/laudesmassamba1-ai/PROOFSTACK/releases/tag/v0.5.0",
+    publishedAt: "2026-11-20T15:11:51Z",
+    prerelease: false,
+    assets: [
       {
-        "name": "proofcore-0.5.0-installer-linux-x64.run",
-        "url": "https://github.com/laudesmassamba1-ai/PROOFSTACK/releases/download/v0.5.0/proofcore-0.5.0-installer-linux-x64.run",
-        "size": 42209119,
-        "digest": "sha256:14062c8fc04ad5c23f9d07c114839998e100619dbe03dfb657276138cac8ec4f",
-        "contentType": "application/octet-stream"
+        name: "proofcore-0.5.0-installer-linux-x64.run",
+        url: "https://github.com/laudesmassamba1-ai/PROOFSTACK/releases/download/v0.5.0/proofcore-0.5.0-installer-linux-x64.run",
+        size: 42209119,
+        digest: "sha256:14062c8fc04ad5c23f9d07c114839998e100619dbe03dfb657276138cac8ec4f",
+        contentType: "application/octet-stream",
       },
       {
-        "name": "proofcore-0.5.0-setup-win-x64.exe",
-        "url": "https://github.com/laudesmassamba1-ai/PROOFSTACK/releases/download/v0.5.0/proofcore-0.5.0-setup-win-x64.exe",
-        "size": 121740983,
-        "digest": "sha256:198c8349ffc27cd456d032a53f6f123a7b2a2c486611b31eb0c629b607d8ed74",
-        "contentType": "application/octet-stream"
+        name: "proofcore-0.5.0-setup-win-x64.exe",
+        url: "https://github.com/laudesmassamba1-ai/PROOFSTACK/releases/download/v0.5.0/proofcore-0.5.0-setup-win-x64.exe",
+        size: 121740983,
+        digest: "sha256:198c8349ffc27cd456d032a53f6f123a7b2a2c486611b31eb0c629b607d8ed74",
+        contentType: "application/octet-stream",
       },
       {
-        "name": "proofcore-linux-x64",
-        "url": "https://github.com/laudesmassamba1-ai/PROOFSTACK/releases/download/v0.5.0/proofcore-linux-x64",
-        "size": 126684352,
-        "digest": "sha256:d35a8d5d33ff3cdee047f43b92537fefd470ecefaca93baff44a7ee6cf7a3836",
-        "contentType": "application/octet-stream"
+        name: "proofcore-linux-x64",
+        url: "https://github.com/laudesmassamba1-ai/PROOFSTACK/releases/download/v0.5.0/proofcore-linux-x64",
+        size: 126684352,
+        digest: "sha256:d35a8d5d33ff3cdee047f43b92537fefd470ecefaca93baff44a7ee6cf7a3836",
+        contentType: "application/octet-stream",
       },
       {
-        "name": "proofcore-linux-x64.sha256",
-        "url": "https://github.com/laudesmassamba1-ai/PROOFSTACK/releases/download/v0.5.0/proofcore-linux-x64.sha256",
-        "size": 86,
-        "digest": "sha256:751b258c8482b770feba9ec68a2a15a8991809e68a0c56c4300cdd54bf2f1b9b",
-        "contentType": "application/octet-stream"
+        name: "proofcore-linux-x64.sha256",
+        url: "https://github.com/laudesmassamba1-ai/PROOFSTACK/releases/download/v0.5.0/proofcore-linux-x64.sha256",
+        size: 86,
+        digest: "sha256:751b258c8482b770feba9ec68a2a15a8991809e68a0c56c4300cdd54bf2f1b9b",
+        contentType: "application/octet-stream",
       },
       {
-        "name": "proofcore-win-x64.exe",
-        "url": "https://github.com/laudesmassamba1-ai/PROOFSTACK/releases/download/v0.5.0/proofcore-win-x64.exe",
-        "size": 88943616,
-        "digest": "sha256:18f710be37e41ce7d17d16d6b42296474d11719f82b15c9253d350dc5616eea8",
-        "contentType": "application/octet-stream"
+        name: "proofcore-win-x64.exe",
+        url: "https://github.com/laudesmassamba1-ai/PROOFSTACK/releases/download/v0.5.0/proofcore-win-x64.exe",
+        size: 88943616,
+        digest: "sha256:18f710be37e41ce7d17d16d6b42296474d11719f82b15c9253d350dc5616eea8",
+        contentType: "application/octet-stream",
       },
       {
-        "name": "proofcore-win-x64.exe.sha256",
-        "url": "https://github.com/laudesmassamba1-ai/PROOFSTACK/releases/download/v0.5.0/proofcore-win-x64.exe.sha256",
-        "size": 88,
-        "digest": "sha256:62f88603dd7573854db9f26ba5ed4811855796d23945c2f119798d72eb2d2d6a",
-        "contentType": "application/octet-stream"
+        name: "proofcore-win-x64.exe.sha256",
+        url: "https://github.com/laudesmassamba1-ai/PROOFSTACK/releases/download/v0.5.0/proofcore-win-x64.exe.sha256",
+        size: 88,
+        digest: "sha256:62f88603dd7573854db9f26ba5ed4811855796d23945c2f119798d72eb2d2d6a",
+        contentType: "application/octet-stream",
       },
       {
-        "name": "proofcore_0.5.0_amd64.deb",
-        "url": "https://github.com/laudesmassamba1-ai/PROOFSTACK/releases/download/v0.5.0/proofcore_0.5.0_amd64.deb",
-        "size": 31991530,
-        "digest": "sha256:15803654c3b33d8796f8aaf1204b8dd599945f2e6a38557b40d4693c531c3ea4",
-        "contentType": "application/x-debian-package"
-      }
-    ]
-  }
+        name: "proofcore_0.5.0_amd64.deb",
+        url: "https://github.com/laudesmassamba1-ai/PROOFSTACK/releases/download/v0.5.0/proofcore_0.5.0_amd64.deb",
+        size: 31991530,
+        digest: "sha256:15803654c3b33d8796f8aaf1204b8dd599945f2e6a38557b40d4693c531c3ea4",
+        contentType: "application/x-debian-package",
+      },
+    ],
+  },
 };
