@@ -153,6 +153,10 @@ export const en = {
   "pricing.guarantee":
     "Cancel anytime. Your data stays yours, and nothing is deleted when you downgrade.",
   "pricing.bestValue": "Best value",
+  "pricing.plan.free.desc": "One project, the five modules at basic depth, standard reports.",
+  "pricing.plan.developer.desc": "Full module depth, cloud sync from the CLI, AI audits at depth.",
+  "pricing.plan.studio.desc": "Team collaboration, shared configurations, CI integrations.",
+  "pricing.plan.agency.desc": "Multiple client workspaces, client-facing reports, highest limits.",
   "mkt.pricing.pending": "coming",
   currency: "Currency",
   "pricing.cta": "Choose {plan}",
@@ -408,6 +412,12 @@ export const fr: Messages = {
   "pricing.guarantee":
     "Résiliable à tout moment. Vos données restent les vôtres, rien n'est supprimé en cas de rétrogradation.",
   "pricing.bestValue": "Meilleure valeur",
+  "pricing.plan.free.desc": "Un projet, les cinq modules en profondeur de base, rapports standard.",
+  "pricing.plan.developer.desc":
+    "Profondeur complète des modules, synchronisation cloud depuis le CLI, audits IA en profondeur.",
+  "pricing.plan.studio.desc": "Collaboration d'équipe, configurations partagées, intégrations CI.",
+  "pricing.plan.agency.desc":
+    "Plusieurs espaces clients, rapports orientés client, limites les plus hautes.",
   "mkt.pricing.pending": "bientôt",
   currency: "Devise",
   "pricing.cta": "Choisir {plan}",

@@ -29,7 +29,7 @@ const NOT_YET_SHIPPED = new Set<EntitlementKey>([
  * a number that the billing layer also owns.
  */
 export function PricingTable({ currentPlanKey }: { currentPlanKey?: string }) {
-  const { t, locale } = useI18n();
+  const { t, locale, messages } = useI18n();
   const [period, setPeriod] = useState<Period>("monthly");
   const [currency, setCurrency] = useState<string>("USD");
 
@@ -104,8 +104,12 @@ export function PricingTable({ currentPlanKey }: { currentPlanKey?: string }) {
               ) : null}
 
               <h3 className="text-[1.05rem] font-semibold">{plan.name}</h3>
+              {/* The server owns the catalogue, but its descriptions are English-only;
+                  the page speaks the visitor's language via i18n and falls back to the
+                  server string for any plan that has no key yet. */}
               <p className="mt-1.5 min-h-[3.2rem] text-[0.84rem] leading-relaxed text-white/52">
-                {plan.description}
+                {(messages as Record<string, string>)[`pricing.plan.${plan.key}.desc`] ??
+                  plan.description}
               </p>
 
               <div className="mt-4 flex items-baseline gap-2">
