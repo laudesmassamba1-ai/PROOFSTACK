@@ -28,6 +28,7 @@ export function Platform() {
     <>
       <Section>
         <SectionHeading
+          as="h1"
           eyebrow={t("mkt.platform.eyebrow")}
           title={t("mkt.platform.title")}
           lede={t("mkt.platform.lede")}

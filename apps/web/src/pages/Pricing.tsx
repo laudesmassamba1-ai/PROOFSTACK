@@ -7,6 +7,7 @@ export function Pricing() {
   return (
     <Section>
       <SectionHeading
+        as="h1"
         eyebrow={t("pricing.eyebrow")}
         title={t("pricing.title")}
         lede={t("pricing.lede")}

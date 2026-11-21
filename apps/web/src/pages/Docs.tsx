@@ -63,7 +63,12 @@ export function Docs() {
   return (
     <>
       <Section>
-        <SectionHeading eyebrow={t("nav.docs")} title={t("docs.title")} lede={t("docs.lede")} />
+        <SectionHeading
+          as="h1"
+          eyebrow={t("nav.docs")}
+          title={t("docs.title")}
+          lede={t("docs.lede")}
+        />
         <div className="brand-panel mt-8 flex flex-wrap items-center gap-3 p-4">
           <Terminal size={15} className="text-brand-mint" />
           <code className="text-[0.8rem] text-white/74">

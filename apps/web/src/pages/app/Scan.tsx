@@ -735,6 +735,53 @@ export function ScanPage(): React.ReactElement {
         </Card>
       ) : null}
 
+      {!scan && steps.length === 0 ? (
+        <Card className="scan-preview">
+          <p className="scan-preview-head">
+            {fr ? "CE QUE L'ADRESSE VA SUBIR" : "WHAT THE ADDRESS GOES THROUGH"}
+          </p>
+          <ul className="scan-preview-grid">
+            {[
+              {
+                id: "fail",
+                note: fr ? "entêtes, cookies, CSP, exposition" : "headers, cookies, CSP, exposure",
+              },
+              {
+                id: "clean",
+                note: fr
+                  ? "titres, contrastes, labels, poids"
+                  : "headings, contrast, labels, weight",
+              },
+              {
+                id: "flow",
+                note: fr ? "parcours critique, bouton à bouton" : "critical journey, end to end",
+              },
+              {
+                id: "world",
+                note: fr ? "noms, montants, dates, locales" : "names, amounts, dates, locales",
+              },
+              {
+                id: "exit",
+                note: fr ? "export, aller-retour, intégrité" : "export, round-trip, integrity",
+              },
+            ].map((module) => (
+              <li key={module.id} className="scan-preview-item">
+                <span className="scan-preview-id">{module.id.toUpperCase()}</span>
+                <span className="scan-preview-name">
+                  {MODULE_LABELS[module.id]?.[fr ? "fr" : "en"]}
+                </span>
+                <span className="scan-preview-note">{module.note}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="scan-preview-foot">
+            {fr
+              ? "Chaque lecture produit un constat nommé, avec ce qui a été observé et pourquoi. Rien n'est simulé."
+              : "Each pass produces a named finding with what was observed and why. Nothing is simulated."}
+          </p>
+        </Card>
+      ) : null}
+
       {error ? <ErrorState error={error} onRetry={() => void run()} /> : null}
 
       {steps.length > 0 ? (

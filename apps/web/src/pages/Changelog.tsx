@@ -48,6 +48,7 @@ export function Changelog() {
   return (
     <Section>
       <SectionHeading
+        as="h1"
         eyebrow={t("nav.changelog")}
         title={t("changelog.title")}
         lede="Only releases that exist. Nothing here is a plan."

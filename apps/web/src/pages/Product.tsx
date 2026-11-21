@@ -33,6 +33,7 @@ export function Product() {
     <>
       <Section>
         <SectionHeading
+          as="h1"
           eyebrow={t("modules.eyebrow")}
           title="An integrated suite, not five tools in a tab bar"
           lede="PROOFCORE validates five independent properties of a product — reach, reliability, reversibility, safety and cleanliness — with shared machinery underneath and a module you can adopt alone."

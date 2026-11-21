@@ -7804,3 +7804,64 @@ p {
 .scan-progress-step.is-failed {
   color: var(--danger, #c0392b);
 }
+
+/* ---------- scan: what the address will go through ---------- */
+
+.scan-preview {
+  margin-top: 14px;
+}
+
+.scan-preview-head {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  color: var(--text-secondary);
+}
+
+.scan-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+@media (max-width: 900px) {
+  .scan-preview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.scan-preview-item {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.scan-preview-id {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  color: var(--mint);
+}
+
+.scan-preview-name {
+  font-size: 0.85rem;
+  font-weight: 560;
+  color: var(--text-primary);
+}
+
+.scan-preview-note {
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.scan-preview-foot {
+  margin-top: 10px;
+  font-size: 0.74rem;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}

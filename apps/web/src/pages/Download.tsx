@@ -83,6 +83,7 @@ export function DownloadPage() {
   return (
     <Section>
       <SectionHeading
+        as="h1"
         eyebrow={t("download.eyebrow")}
         title={t("download.title")}
         lede={t("download.lede")}

@@ -116,25 +116,30 @@ export function Section({
 }
 
 export function SectionHeading({
+  as,
   eyebrow,
   title,
   lede,
 }: {
+  /** Page-level headings must be h1 (WCAG 1.3.1): the primary SectionHeading of a
+   *  route declares `as="h1"`, every following one keeps the section default. */
+  as?: "h1";
   eyebrow?: string;
   title: string;
   lede?: string;
 }) {
+  const Heading = as ?? "h2";
   return (
     <header className="max-w-[62ch]" data-reveal>
       {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
       {/* The title is choreographed word by word: each rises out of its own mask with
           an anticipation curve, staggered asymmetrically by the motion engine. */}
-      <h2
+      <Heading
         className="mt-3 text-balance text-[1.9rem] leading-[1.12] tracking-tight sm:text-[2.4rem]"
         data-motion="words"
       >
         <SplitWords text={title} />
-      </h2>
+      </Heading>
       {lede ? (
         <p className="mt-4 max-w-[64ch] text-[1rem] leading-relaxed text-white/56">{lede}</p>
       ) : null}

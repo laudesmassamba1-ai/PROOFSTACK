@@ -37,6 +37,7 @@ export function Security() {
   return (
     <Section>
       <SectionHeading
+        as="h1"
         eyebrow={t("nav.security")}
         title={t("security.title")}
         lede="PROOFCORE is a testing product, so its own failure modes are mostly about trust: whose data, whose money, whose verdict. This page states the controls that exist in code today and the ones that are designed but not yet built."
