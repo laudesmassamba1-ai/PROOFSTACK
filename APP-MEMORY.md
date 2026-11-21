@@ -75,6 +75,21 @@ Les prix sont **lus depuis `@proofcore/billing`**, jamais recopiés dans le site
 
 ---
 
+### 2026-11-21 (nuit) — audit visuel complet + direction artistique figée
+
+La reconstruction visuelle demandée a été exécutée en trois commits (`61b9ce8`, `05f4a0f`, `bb3241b`),
+avec audit d'abord (35 pages capturées à 1440 et 390, dossier `docs/design/audit-2026-11-21/`) puis correctifs.
+Les six documents obligatoires existent : `docs/VISUAL_AUDIT.md`, `VISUAL_DIRECTION.md`, `DESIGN_SYSTEM.md`,
+`UX_ARCHITECTURE.md`, `RESPONSIVE_GUIDELINES.md`, `VISUAL_QA_REPORT.md`.
+
+Corrigé et vérifié par re-capture : débordement `/download` à 390 (empreintes sha256) ; panneau d'usage
+de l'Overview en anglais codé en dur (8 clés i18n) ; section graphiques vides avant la première exécution ;
+tableaux app à 390 (affordance de scroll) ; état vide dupliquant son titre ; h1 manquants sur 7 routes
+marketing ; `/app/scan` nu (prévisualisation des 5 lectures) ; descriptions d'offres anglaises en page FR.
+Mouvement : moteur `lib/motion.ts` (ressorts, tilt spéculaire, CTA magnétiques, parallaxe) + `SplitWords`
+**rendu par React** (un splitter impératif désynchronise au changement de langue — leçon conservée).
+653 tests au vert. Reste : #9 (autres états vides), vues tablette modules/FLOW, redeploy éventuel.
+
 ### 2026-11-20 (soir) — trois bugs signalés, et une mémoire qui se décide elle-même
 
 | Bug signalé                                                | Cause réelle (vérifiée, pas supposée)                                                                                                                                                                                                                                                                                                  | Correctif                                                                                                                                                                                                                                                                                  |
