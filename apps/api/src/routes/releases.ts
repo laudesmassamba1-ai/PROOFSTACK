@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { HttpError } from "../http/errors.js";
 import type { AppEnv } from "../http/services.js";
+import { RELEASE_MANIFEST } from "../release-manifest.js";
 
 /**
  * Published desktop/CLI releases, read by the public download page.
@@ -40,6 +41,8 @@ interface ReleaseBody {
   } | null;
 }
 
+const DEFAULT_MANIFEST: ReleaseBody = RELEASE_MANIFEST as ReleaseBody;
+
 export interface ReleaseOptions {
   /**
    * A GitHub token, read from the deployment environment on the server.
@@ -51,6 +54,8 @@ export interface ReleaseOptions {
   token?: string;
   /** Test hook: a zero TTL exercises the stale path without waiting five minutes. */
   ttlMs?: number;
+  /** Generator output, injected by tests; the module default is the checked-in manifest. */
+  manifest?: ReleaseBody;
 }
 
 let cache = new Map<string, { at: number; body: ReleaseBody }>();
@@ -153,11 +158,20 @@ export function releaseRoutes(options: ReleaseOptions = {}): Hono<AppEnv> {
       return c.json(body);
     } catch (error) {
       // A rate-limited source is not proof that the release disappeared. Serving the last
-      // real answer is more truthful than an empty page, and the header says it is stale.
+      // real answer is more truthful than an empty page, and the header says which it is.
       if (hit) {
         c.header("Cache-Control", "public, max-age=30");
         c.header("x-release-cache", "stale");
         return c.json(hit.body);
+      }
+      // Cold isolate plus a rate-limited source: the deploy-time manifest is the last
+      // release actually read from GitHub, not a guess. It is dated, and the header says
+      // it did not come from the live call.
+      const manifest = options.manifest ?? DEFAULT_MANIFEST;
+      if (manifest.release) {
+        c.header("Cache-Control", "public, max-age=30");
+        c.header("x-release-cache", "manifest");
+        return c.json(manifest);
       }
       throw error;
     }

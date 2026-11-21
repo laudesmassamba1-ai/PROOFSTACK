@@ -13,7 +13,9 @@ import { releaseRoutes, resetReleaseCache } from "../src/routes/releases.js";
  * would make an outage look like "nothing was ever published".
  */
 
-const app = releaseRoutes();
+// No manifest here: this app is used for the cold-start failure case. The fallback test
+// below constructs its own app with an explicit manifest.
+const app = releaseRoutes({ manifest: { release: null } });
 
 // The production app maps HttpError through `onError`; this standalone app needs the same
 // mapping so the test asserts the status a client actually receives.
@@ -119,6 +121,29 @@ describe("releases", () => {
     expect(response.status).toBe(200);
     expect(((await response.json()) as { release: { tag: string } }).release.tag).toBe("v0.6.0");
     await db.close();
+  });
+
+  it("falls back to the deploy-time manifest when GitHub refuses a cold call", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => json({ message: "rate limited" }, 403))
+    );
+    const withManifest = releaseRoutes({
+      manifest: {
+        release: {
+          tag: "v9.9.9",
+          name: "Manifest release",
+          url: "https://example.test/release",
+          publishedAt: "2026-11-20T00:00:00Z",
+          prerelease: false,
+          assets: [],
+        },
+      },
+    });
+    const response = await withManifest.request("http://localhost/releases/latest");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-release-cache")).toBe("manifest");
+    expect(((await response.json()) as { release: { tag: string } }).release.tag).toBe("v9.9.9");
   });
 
   it("sends the optional GitHub token from the server, never from the client", async () => {

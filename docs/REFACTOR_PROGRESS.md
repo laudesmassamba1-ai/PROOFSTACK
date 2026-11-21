@@ -78,7 +78,7 @@ Run on 2026-11-21, from this checkout:
 - `npx biome check .` — 0 error, 389 files checked.
 - `pnpm typecheck` — passed after deleting every `dist/` and every `*.tsbuildinfo`, which
   proves the typecheck no longer depends on a previous build.
-- `pnpm test` — 49 files, 630 tests passed (including four release-proxy tests and one
+- `pnpm test` — 49 files, 633 tests passed (including four release-proxy tests and one
   integration test proving the release endpoint is reachable without a session).
 - `pnpm --filter @proofcore/web build` — passed.
 - Browser (Chrome, 1440×950): new account lands on the four-choice first screen; Simple
@@ -98,3 +98,16 @@ Not run here: desktop installers, npm publish, real e-mail delivery, live paymen
 4. Legal pages: legal entity and address.
 5. npm publication / package ownership: `npm whoami`, then `pnpm cli:publish` with the
    owner's explicit approval.
+
+## Update — 2026-11-21, release feed hardening
+
+The public release endpoint is now deterministic on a cold Worker. It still prefers the
+live GitHub call (with an optional server-side `GITHUB_TOKEN`), then a per-isolate cached
+answer, then the deploy-time snapshot in `apps/api/src/release-manifest.ts`, marked
+`x-release-cache: manifest`. `pnpm cloud:deploy` refreshes that snapshot from GitHub; a
+failed refresh keeps the previous real release rather than inventing one. The page now
+says “versions momentanément indisponibles” during an outage instead of “aucune version
+publiée”.
+
+Verified after deployment: `GET /api/v1/releases/latest` answers 200 without a session on
+both hosts (see the deployment section of the final report).

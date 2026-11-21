@@ -72,6 +72,15 @@ function preflight() {
 function deployApi() {
   say("deploying the API (Workers + D1 migrations)");
   if (dry) return say("dry-run: skipped");
+  // Refresh the release snapshot bundled with the Worker. A cold isolate can then answer
+  // the public download page from the last release actually read from GitHub, even when
+  // GitHub rate-limits the Worker's shared egress IP. The script keeps the previous
+  // snapshot on failure, so an outage never blocks a deploy or invents a version.
+  try {
+    run(["node", "tooling/scripts/sync-release-manifest.mjs"], { cwd: root });
+  } catch {
+    say("release manifest: refresh skipped, keeping the committed snapshot");
+  }
   // Local development uses the same SQL through node:sqlite; `wrangler d1 migrations apply`
   // before deploy keeps production ahead of the code that expects its tables.
   run(["npx", "wrangler", "d1", "migrations", "apply", "proofcore", "--remote"], { cwd: api });

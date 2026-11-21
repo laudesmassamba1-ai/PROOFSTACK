@@ -40,7 +40,8 @@
     "cloud:deploy": "node tooling/scripts/deploy-cloudflare.mjs",
     "cloud:deploy:api": "node tooling/scripts/deploy-cloudflare.mjs --only api",
     "cloud:deploy:web": "node tooling/scripts/deploy-cloudflare.mjs --only web",
-    "smoke:deploy": "node tooling/scripts/smoke-deploy.mjs"
+    "smoke:deploy": "node tooling/scripts/smoke-deploy.mjs",
+    "releases:sync": "node tooling/scripts/sync-release-manifest.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",
