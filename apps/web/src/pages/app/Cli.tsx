@@ -23,7 +23,7 @@ const STEPS = [
     titleKey: "ws.cli.install",
     bodyKey: "ws.cli.step.install.body",
     command:
-      "git clone https://github.com/laudesmassamba1-ai/PROOFSTACK.git\ncd PROOFSTACK && pnpm install\npnpm cli:install",
+      "git clone https://github.com/laudesmassamba1-ai/PROOFSTACK.git\ncd PROOFCORE && pnpm install\npnpm cli:install",
   },
   {
     titleKey: "ws.cli.configure",
@@ -208,12 +208,12 @@ export function Cli() {
           <p>
             <span className="font-medium text-ink">{t("ws.cli.trouble.sync.title")}</span>{" "}
             {t("ws.cli.trouble.sync.body")}{" "}
-            <code className="app-mono">PROOFSTACK_PROJECT_TOKEN</code>.
+            <code className="app-mono">PROOFCORE_PROJECT_TOKEN</code>.
           </p>
           <p>
             <span className="font-medium text-ink">{t("ws.cli.trouble.api.title")}</span>{" "}
             {t("ws.cli.trouble.api.body")} <code className="app-mono">VITE_API_URL</code>{" "}
-            {t("ws.cli.trouble.api.body2")} <code className="app-mono">PROOFSTACK_API_URL</code>{" "}
+            {t("ws.cli.trouble.api.body2")} <code className="app-mono">PROOFCORE_API_URL</code>{" "}
             {t("ws.cli.trouble.api.body3")}
           </p>
           <p>

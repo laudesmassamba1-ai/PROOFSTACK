@@ -580,7 +580,150 @@ export function Admin() {
         </Card>
       </div>
 
+      <SupportQueue />
+
       <p className="mt-6 text-xs leading-relaxed text-muted">{t("admin.footer")}</p>
     </>
+  );
+}
+
+interface SupportRow {
+  id: string;
+  from: string;
+  subject: string;
+  body: string;
+  status: string;
+  reply: string | null;
+  repliedAt: string | null;
+  createdAt: string;
+}
+
+/**
+ * The customer queue, with the reply that closes the loop.
+ *
+ * The customer reads the answer with the reference and the address that wrote the
+ * message; sending it from here is the only write this console performs.
+ */
+function SupportQueue() {
+  const [items, setItems] = useState<SupportRow[] | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [reply, setReply] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const data = await apiFetch<{ items: SupportRow[] }>("/api/v1/admin/support");
+      setItems(data.items);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Support queue unavailable.");
+      setItems([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const send = async (reference: string) => {
+    setSending(true);
+    setError(null);
+    try {
+      await apiFetch(`/api/v1/admin/support/${encodeURIComponent(reference)}/reply`, {
+        method: "POST",
+        body: { reply, status: "resolved" },
+      });
+      setOpenId(null);
+      setReply("");
+      await load();
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Reply not sent.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (!items) return null;
+
+  return (
+    <Card
+      title="Assistance client"
+      description="Chaque message a une référence. La réponse est lue par le client avec cette référence et son adresse."
+      className="mt-6"
+    >
+      {error ? <p className="px-5 pt-3 text-xs text-danger">{error}</p> : null}
+      {items.length === 0 ? (
+        <Empty
+          title="Aucun message"
+          body="Les demandes arrivent ici, même sans fournisseur d'e-mail."
+        />
+      ) : (
+        <ul className="divide-y divide-border">
+          {items.map((item) => (
+            <li key={item.id} className="px-5 py-3 text-xs">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="app-mono text-[11px]">{item.id}</span>
+                <span
+                  className={`app-badge ${item.status === "resolved" ? "app-badge-success" : item.status === "in_progress" ? "app-badge-warning" : "app-badge-danger"}`}
+                >
+                  {item.status}
+                </span>
+                <span className="text-muted">{relativeTime(item.createdAt)}</span>
+                <span className="ml-auto text-muted">{item.from}</span>
+              </div>
+              <p className="mt-1 font-medium">{item.subject}</p>
+              <p className="mt-1 whitespace-pre-wrap text-muted">{item.body}</p>
+              {item.reply ? (
+                <p className="mt-2 rounded bg-surface-alt px-2 py-1.5 whitespace-pre-wrap">
+                  <strong>Réponse envoyée :</strong> {item.reply}
+                </p>
+              ) : null}
+              {openId === item.id ? (
+                <div className="mt-2 space-y-2">
+                  <textarea
+                    value={reply}
+                    onChange={(event) => setReply(event.target.value)}
+                    rows={4}
+                    className="app-input w-full"
+                    placeholder="Réponse au client…"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="app-btn app-btn-primary app-btn-sm"
+                      disabled={sending || reply.trim().length === 0}
+                      onClick={() => void send(item.id)}
+                    >
+                      {sending ? "Envoi…" : "Envoyer la réponse"}
+                    </button>
+                    <button
+                      type="button"
+                      className="app-btn app-btn-sm"
+                      onClick={() => {
+                        setOpenId(null);
+                        setReply("");
+                      }}
+                    >
+                      Annuler
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="app-btn app-btn-sm mt-2"
+                  onClick={() => {
+                    setOpenId(item.id);
+                    setReply(item.reply ?? "");
+                  }}
+                >
+                  {item.reply ? "Modifier la réponse" : "Répondre"}
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   );
 }

@@ -277,6 +277,62 @@ describe("support", () => {
   });
 });
 
+describe("support status and reply", () => {
+  it("shows the reply only to the reference and the address that wrote it", async () => {
+    const created = await harness.request("/api/account/support", {
+      method: "POST",
+      body: JSON.stringify({
+        email: "customer@example.com",
+        subject: "Paiement bloqué",
+        body: "Le paiement reste en attente depuis hier.",
+      }),
+    });
+    expect(created.status).toBe(200);
+    const { reference } = (await created.json()) as { reference: string };
+
+    const wrong = await harness.request(
+      `/api/account/support/${reference}?email=someone-else@example.com`
+    );
+    expect(wrong.status).toBe(404);
+
+    await harness.store.replyToSupportMessage(
+      reference,
+      "Le paiement a été vérifié et crédité.",
+      "resolved"
+    );
+    const found = await harness.request(
+      `/api/account/support/${reference}?email=customer@example.com`
+    );
+    expect(found.status).toBe(200);
+    const body = (await found.json()) as { status: string; reply: string | null };
+    expect(body.status).toBe("resolved");
+    expect(body.reply).toContain("vérifié");
+  });
+
+  it("lets an operator reply from the console route", async () => {
+    const created = await harness.request("/api/account/support", {
+      method: "POST",
+      body: JSON.stringify({
+        email: "customer@example.com",
+        subject: "Export incomplet",
+        body: "Il manque les commandes de la semaine dernière.",
+      }),
+    });
+    const { reference } = (await created.json()) as { reference: string };
+    const cookie = await signUp(harness, "ops@example.com");
+    const replied = await harness.request(`/api/v1/admin/support/${reference}/reply`, {
+      method: "POST",
+      headers: { cookie },
+      body: JSON.stringify({ reply: "Le correctif est en place.", status: "resolved" }),
+    });
+    expect(replied.status).toBe(200);
+    const read = (await (
+      await harness.request(`/api/account/support/${reference}?email=customer@example.com`)
+    ).json()) as { status: string; reply: string | null };
+    expect(read).toMatchObject({ status: "resolved", reply: "Le correctif est en place." });
+  });
+});
+
 describe("email delivery", () => {
   it("records a failed delivery as failed when the provider refuses", async () => {
     const server = createServer((_req, res) => {

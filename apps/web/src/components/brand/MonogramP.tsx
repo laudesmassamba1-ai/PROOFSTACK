@@ -1,6 +1,6 @@
 import type React from "react";
 
-// Simple stylized PROOFSTACK monogram, designed to be recognizable at small sizes.
+// Simple stylized PROOFCORE monogram, designed to be recognizable at small sizes.
 // This is intentionally minimal and scalable via viewBox.
 export const MonogramP: React.FC<{ color?: string; stroke?: string; size?: number }> = ({
   // `color` stays in the prop type for API compatibility but the mark is drawn

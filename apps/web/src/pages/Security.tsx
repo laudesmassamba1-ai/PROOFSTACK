@@ -39,7 +39,7 @@ export function Security() {
       <SectionHeading
         eyebrow={t("nav.security")}
         title={t("security.title")}
-        lede="PROOFSTACK is a testing product, so its own failure modes are mostly about trust: whose data, whose money, whose verdict. This page states the controls that exist in code today and the ones that are designed but not yet built."
+        lede="PROOFCORE is a testing product, so its own failure modes are mostly about trust: whose data, whose money, whose verdict. This page states the controls that exist in code today and the ones that are designed but not yet built."
       />
       <div className="mt-10 grid gap-4 md:grid-cols-2">
         {CONTROLS.map(([title, body]) => (

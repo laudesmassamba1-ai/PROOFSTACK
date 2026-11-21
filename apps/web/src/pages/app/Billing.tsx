@@ -884,7 +884,7 @@ export function Billing() {
  */
 function downloadReceipt(invoice: BillingData["invoices"][number], planName: string): void {
   const lines = [
-    "PROOFSTACK — PAYMENT RECEIPT",
+    "PROOFCORE — PAYMENT RECEIPT",
     "",
     `Receipt number : ${invoice.number}`,
     `Issued         : ${formatDate(invoice.issuedAt)}`,

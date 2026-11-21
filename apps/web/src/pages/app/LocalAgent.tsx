@@ -451,7 +451,7 @@ export function LocalAgentPage() {
                   return (
                     <article key={entry.id} className="local-agent-message is-assistant">
                       <span className="local-agent-role">
-                        <Bot size={12} /> PROOFSTACK
+                        <Bot size={12} /> PROOFCORE
                         {entry.streaming ? <Loader2 size={11} className="app-spin" /> : null}
                       </span>
                       <div className="local-agent-markdown">

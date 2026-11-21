@@ -8,7 +8,7 @@
  * The bubbles contain **real test-like strings** (a Beninese name with accents, a
  * Japanese name, a currency total, an export filename), not jokes about the product.
  * That is the point: the humour is technical, and the strings are the kind of value
- * PROOFSTACK actually breaks software with.
+ * PROOFCORE actually breaks software with.
  *
  * Each character is one inline SVG under ~2KB, single stroke weight, no fills except the
  * bubble. Reduced motion renders them static — the pose carries the meaning, not the

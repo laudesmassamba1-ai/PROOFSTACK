@@ -7,7 +7,7 @@ export function AppNotFound() {
   const { t } = useI18n();
   return (
     <div className="app-page">
-      <p className="app-eyebrow">404 / PROOFSTACK</p>
+      <p className="app-eyebrow">404 / PROOFCORE</p>
       <h1 className="app-display mt-3 text-[clamp(2rem,5vw,3.4rem)]">{t("notfound.title")}</h1>
       <p className="mt-3 max-w-[560px] text-sm leading-relaxed text-muted">{t("notfound.body")}</p>
       <div className="mt-6 flex flex-wrap gap-2">

@@ -280,7 +280,7 @@ export function Overview() {
             >
               <span className="app-eyebrow">04</span>
               <h3 className="mt-1 text-base font-semibold">
-                {fr ? "Découvrir PROOFSTACK" : "Discover PROOFSTACK"}
+                {fr ? "Découvrir PROOFCORE" : "Discover PROOFCORE"}
               </h3>
               <p className="mt-1 text-sm text-muted">
                 {fr

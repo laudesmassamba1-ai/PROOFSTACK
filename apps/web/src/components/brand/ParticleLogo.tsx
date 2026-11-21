@@ -4,7 +4,7 @@ import { Mark } from "./Logo.js";
 import { LOGO_LAYERS, LOGO_PATH, LOGO_VIEWBOX } from "./logoGeometry.js";
 
 /**
- * PROOFSTACK's signature motion: a field of particles drifts as a wave, converges
+ * PROOFCORE's signature motion: a field of particles drifts as a wave, converges
  * into the three-layer P, holds its integrity, then dissolves back into the wave.
  *
  * Canvas 2D is deliberate. The field is a few thousand points, not a 3D scene:

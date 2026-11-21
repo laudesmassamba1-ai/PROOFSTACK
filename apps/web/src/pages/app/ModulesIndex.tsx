@@ -124,7 +124,7 @@ export function ModulesIndexPage() {
   return (
     <div className="app-page">
       <PageHeader
-        eyebrow="PROOFSTACK / MODULES"
+        eyebrow="PROOFCORE / MODULES"
         title={fr ? "LES CINQ MODULES." : "THE FIVE MODULES."}
         description={
           fr

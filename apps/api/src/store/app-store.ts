@@ -493,6 +493,64 @@ export class AppStore {
       .run();
   }
 
+  /** One support message, for the reference the customer kept. */
+  async getSupportMessage(id: string): Promise<{
+    id: string;
+    fromAddress: string;
+    subject: string;
+    body: string;
+    status: string;
+    reply: string | null;
+    repliedAt: string | null;
+    createdAt: string;
+    updatedAt: string | null;
+  } | null> {
+    const row = await this.db
+      .prepare("SELECT * FROM support_messages WHERE id = ?")
+      .bind(id)
+      .first<Row>();
+    if (!row) return null;
+    return {
+      id: str(row, "id"),
+      fromAddress: str(row, "from_address"),
+      subject: str(row, "subject"),
+      body: str(row, "body"),
+      status: str(row, "status"),
+      reply: nullableStr(row, "reply_body"),
+      repliedAt: nullableStr(row, "replied_at"),
+      createdAt: str(row, "created_at"),
+      updatedAt: nullableStr(row, "updated_at"),
+    };
+  }
+
+  async replyToSupportMessage(
+    id: string,
+    reply: string,
+    status: "open" | "in_progress" | "resolved"
+  ): Promise<void> {
+    const now = iso(this.clock());
+    await this.db
+      .prepare(
+        `UPDATE support_messages
+         SET reply_body = ?, replied_at = ?, status = ?, updated_at = ?
+         WHERE id = ?`
+      )
+      .bind(reply, now, status, now, id)
+      .run();
+  }
+
+  /** The operator's queue, newest first. Only the console calls this. */
+  async listSupportMessages(limit = 50): Promise<Row[]> {
+    return this.db
+      .prepare(
+        `SELECT id, from_address, subject, body, status, reply_body, replied_at, created_at,
+                updated_at
+         FROM support_messages ORDER BY created_at DESC LIMIT ?`
+      )
+      .bind(limit)
+      .all<Row>();
+  }
+
   // --------------------------------------------------------------- sessions
 
   async createSession(input: {
@@ -1597,6 +1655,57 @@ export class AppStore {
       .bind(...args, options.limit, options.offset)
       .all<Row>();
     return { rows, total: total ? num(total, "count") : 0 };
+  }
+
+  /**
+   * The most recent scans of one project, newest first.
+   *
+   * Two rows are enough to compare a re-control: the latest scan and the one before it.
+   * The payload is included because the finding ids live there, not in a separate table.
+   */
+  async latestPageAudits(workspaceId: string, projectId: string, limit = 2): Promise<Row[]> {
+    return this.db
+      .prepare(
+        `SELECT * FROM page_audits WHERE workspace_id = ? AND project_id = ?
+         ORDER BY created_at DESC LIMIT ?`
+      )
+      .bind(workspaceId, projectId, limit)
+      .all<Row>();
+  }
+
+  /** Correction states for one project, keyed by the caller. */
+  async listAuditFindingStates(workspaceId: string, projectId: string): Promise<Row[]> {
+    return this.db
+      .prepare("SELECT * FROM audit_finding_states WHERE workspace_id = ? AND project_id = ?")
+      .bind(workspaceId, projectId)
+      .all<Row>();
+  }
+
+  async setAuditFindingState(input: {
+    workspaceId: string;
+    projectId: string;
+    findingKey: string;
+    state: "todo" | "in_progress" | "fixed" | "verify";
+    note?: string | null;
+  }): Promise<void> {
+    await this.db
+      .prepare(
+        `INSERT INTO audit_finding_states
+           (workspace_id, project_id, finding_key, state, note, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(workspace_id, project_id, finding_key)
+         DO UPDATE SET state = excluded.state, note = excluded.note,
+                       updated_at = excluded.updated_at`
+      )
+      .bind(
+        input.workspaceId,
+        input.projectId,
+        input.findingKey,
+        input.state,
+        input.note ?? null,
+        iso(this.clock())
+      )
+      .run();
   }
 
   // --------------------------------------------------------------- projects

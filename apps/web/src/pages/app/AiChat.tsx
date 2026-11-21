@@ -222,7 +222,7 @@ function BrowserView({
   );
 }
 
-/** MCP connection recipes: PROOFSTACK tools inside the user's coding agent. */
+/** MCP connection recipes: PROOFCORE tools inside the user's coding agent. */
 const MCP_RECIPES = [
   {
     id: "claude-code",
@@ -1481,7 +1481,7 @@ export function AiChatPage(): React.ReactElement {
           )}
           <div className="chat-topbar-title">
             <Brain size={15} className="text-accent" />
-            {fr ? "Assistant PROOFSTACK" : "PROOFSTACK Assistant"}
+            {fr ? "Assistant PROOFCORE" : "PROOFCORE Assistant"}
           </div>
           {activeWorkspace && <span className="chat-workspace-chip">{activeWorkspace.name}</span>}
           <button
@@ -1501,8 +1501,8 @@ export function AiChatPage(): React.ReactElement {
                 activeWorkspace
                   ? `${fr ? "Conversation" : "Conversation"} · ${activeWorkspace.name}`
                   : fr
-                    ? "Conversation PROOFSTACK"
-                    : "PROOFSTACK conversation"
+                    ? "Conversation PROOFCORE"
+                    : "PROOFCORE conversation"
               )
             }
             disabled={messages.length === 0}
@@ -1780,8 +1780,8 @@ export function AiChatPage(): React.ReactElement {
                     />
                     <p className="chat-key-hint">
                       {fr
-                        ? "Créée chez le fournisseur, jamais stockée en clair ici. PROOFSTACK lit la liste des modèles de la clé et choisit le meilleur modèle de conversation — tu n'as rien à connaître."
-                        : "Created at the provider, never stored in clear here. PROOFSTACK reads the key's model list and picks the best chat model — nothing to know on your side."}
+                        ? "Créée chez le fournisseur, jamais stockée en clair ici. PROOFCORE lit la liste des modèles de la clé et choisit le meilleur modèle de conversation — tu n'as rien à connaître."
+                        : "Created at the provider, never stored in clear here. PROOFCORE reads the key's model list and picks the best chat model — nothing to know on your side."}
                     </p>
                   </div>
                 </>
@@ -1979,7 +1979,7 @@ export function AiChatPage(): React.ReactElement {
               </div>
             </div>
 
-            {/* MCP connect: use PROOFSTACK tools inside any coding agent */}
+            {/* MCP connect: use PROOFCORE tools inside any coding agent */}
             <div className="mt-4 border-t border-line pt-3">
               <button
                 type="button"
@@ -2002,8 +2002,8 @@ export function AiChatPage(): React.ReactElement {
                 <div className="mt-3">
                   <p className="text-[11px] leading-relaxed text-muted">
                     {fr
-                      ? "Donne les outils PROOFSTACK (WORLD, FLOW, EXIT, FAIL, CLEAN) à ton agent de code préféré : il lance les audits directement dans ton terminal, sur ton app locale."
-                      : "Give PROOFSTACK's tools (WORLD, FLOW, EXIT, FAIL, CLEAN) to your favorite coding agent: it runs the audits in your terminal, on your local app."}
+                      ? "Donne les outils PROOFCORE (WORLD, FLOW, EXIT, FAIL, CLEAN) à ton agent de code préféré : il lance les audits directement dans ton terminal, sur ton app locale."
+                      : "Give PROOFCORE's tools (WORLD, FLOW, EXIT, FAIL, CLEAN) to your favorite coding agent: it runs the audits in your terminal, on your local app."}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {MCP_RECIPES.map((recipe) => (

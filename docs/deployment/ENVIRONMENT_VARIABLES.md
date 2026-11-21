@@ -42,7 +42,7 @@ real values live in the host's secret store (Worker secrets) or a local, ignored
 | `SASPAY_FEE_CHARGE_MODE` | optional    | `ADD_ON` (payer covers fees) or `DEDUCTED` (fees taken from the net). Default `ADD_ON`.                                                                                                                                         |
 | `GITHUB_TOKEN`           | recommended | Read-only token for the public release feed (`GET /api/v1/releases/latest`). Anonymous GitHub calls are capped at 60/hour per IP and Workers share egress addresses; a token raises it to 5000/hour. Never sent to the browser. |
 | `RESEND_API_KEY`         | optional    | Transactional e-mail through Resend. Without it, messages are journalled with status `unconfigured` and the API says so.                                                                                                        |
-| `MAIL_FROM`              | optional    | Verified sender for Resend, e.g. `PROOFSTACK <no-reply@example.com>`. Required with the key.                                                                                                                                    |
+| `MAIL_FROM`              | optional    | Verified sender for Resend, e.g. `PROOFCORE <no-reply@example.com>`. Required with the key.                                                                                                                                     |
 | `SUPPORT_EMAIL`          | optional    | Address shown to customers and notified of support requests. Default `support@proofcore.dev`.                                                                                                                                   |
 
 On Cloudflare, the database is a binding, not a variable:

@@ -14,7 +14,7 @@ import { Link, useSearchParams } from "react-router";
 import { Card, ErrorState } from "../../components/app/ui.js";
 import { useI18n } from "../../i18n/index.js";
 import { PageHeader } from "../../layouts/AppLayout.js";
-import { type ApiError, apiFetch } from "../../lib/api.js";
+import { API_BASE, ApiError, apiFetch } from "../../lib/api.js";
 import { useSession } from "../../lib/session.js";
 
 /**
@@ -50,6 +50,8 @@ interface ScanModuleSummary {
 }
 
 interface ScanResult {
+  id?: string;
+  projectId?: string | null;
   ownership?: "local" | "verified" | "unverified";
   redacted?: boolean;
   login?: { attempted: boolean; ok: boolean; status: number | null; reason?: string } | null;
@@ -63,6 +65,145 @@ interface ScanResult {
   findings: ScanFinding[];
   modules: ScanModuleSummary[];
   clientRendered: boolean;
+}
+
+type CorrectionState = "todo" | "in_progress" | "fixed" | "verify";
+
+interface CorrectionItem extends ScanFinding {
+  key: string;
+  /** False when the finding disappeared from the latest scan of the project. */
+  present: boolean;
+  state: CorrectionState;
+  note: string | null;
+  updatedAt: string | null;
+}
+
+interface ScanComparison {
+  before: string;
+  after: string;
+  resolved: { key: string; module: string; id: string; status: string; observed: string }[];
+  persisting: { key: string; module: string; id: string; status: string; observed: string }[];
+  appeared: { key: string; module: string; id: string; status: string; observed: string }[];
+  counts: { resolved: number; persisting: number; appeared: number };
+}
+
+interface CorrectionsResponse {
+  auditId: string | null;
+  scannedAt?: string;
+  items: CorrectionItem[];
+  comparison: ScanComparison | null;
+}
+
+const CORRECTION_LABELS: Record<CorrectionState, { fr: string; en: string }> = {
+  todo: { fr: "À traiter", en: "To fix" },
+  in_progress: { fr: "En cours", en: "In progress" },
+  fixed: { fr: "Corrigé", en: "Fixed" },
+  verify: { fr: "À vérifier", en: "To verify" },
+};
+
+interface ScanStep {
+  id: string;
+  label: string;
+  status: "pending" | "running" | "done" | "failed";
+  detail?: string;
+}
+
+type StreamMessage = {
+  type?: string;
+  id?: string;
+  label?: string;
+  status?: ScanStep["status"] | number;
+  detail?: string;
+  message?: string;
+  code?: string;
+  audit?: ScanResult & { id: string; projectId?: string | null };
+  comparison?: ScanComparison | null;
+};
+
+/**
+ * The scan's real phases arrive as server-sent events.
+ *
+ * Each event is written by the server after the phase it names has started or finished,
+ * so the list cannot advance on its own while the server is idle. A refused scan still
+ * throws an ApiError with the server's exact code and message.
+ */
+async function streamScan(
+  payload: unknown,
+  onStep: (step: ScanStep) => void
+): Promise<{
+  audit: ScanResult & { id: string; projectId?: string | null };
+  comparison: ScanComparison | null;
+}> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 60_000);
+  try {
+    const response = await fetch(`${API_BASE}/api/v1/audits/stream`, {
+      method: "POST",
+      headers: { accept: "text/event-stream", "content-type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      let parsed: { error?: { message?: string; code?: string } } | null = null;
+      try {
+        parsed = JSON.parse(text) as { error?: { message?: string; code?: string } };
+      } catch {
+        // A non-JSON refusal is still a refusal; the status is the reliable part.
+      }
+      throw new ApiError(
+        parsed?.error?.message ?? `HTTP ${response.status}`,
+        response.status,
+        parsed?.error?.code ?? `http_${response.status}`
+      );
+    }
+    if (!response.body) throw new ApiError("The scan stream is unavailable.", 502, "no_stream");
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let final: StreamMessage | null = null;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const chunks = buffer.split("\n\n");
+      buffer = chunks.pop() ?? "";
+      for (const chunk of chunks) {
+        const line = chunk.split("\n").find((entry) => entry.startsWith("data:"));
+        if (!line) continue;
+        let message: StreamMessage;
+        try {
+          message = JSON.parse(line.slice(5).trim()) as StreamMessage;
+        } catch {
+          continue;
+        }
+        if (message.type === "step" && message.id && message.label) {
+          onStep({
+            id: message.id,
+            label: message.label,
+            status: typeof message.status === "string" ? message.status : "running",
+            ...(message.detail ? { detail: message.detail } : {}),
+          });
+        } else if (message.type === "error") {
+          throw new ApiError(
+            message.message ?? "The scan could not run.",
+            typeof message.status === "number" ? message.status : 502,
+            message.code ?? "scan_failed"
+          );
+        } else if (message.type === "result" && message.audit) {
+          final = message;
+        }
+      }
+    }
+    if (!final?.audit) {
+      throw new ApiError("The scan stream ended without a result.", 502, "stream_incomplete");
+    }
+    return { audit: final.audit, comparison: final.comparison ?? null };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 interface AuditSummary {
@@ -103,6 +244,7 @@ export function ScanPage(): React.ReactElement {
   const [params] = useSearchParams();
   // Set by the project page: open that exact audit, and interpret it without another click.
   const requestedAudit = params.get("audit");
+  const requestedProject = params.get("project");
   const wantsExplanation = params.get("explain") === "1";
   const explainedFor = useRef<string | null>(null);
   const [url, setUrl] = useState("https://");
@@ -123,12 +265,69 @@ export function ScanPage(): React.ReactElement {
   const [copied, setCopied] = useState<string | null>(null);
   const [scan, setScan] = useState<ScanResult | null>(null);
   const [auditId, setAuditId] = useState<string | null>(null);
+  // A scan belongs to a project only when it was started from one. Tracking, comparison
+  // and re-control are project features: a pasted URL has no baseline to compare to.
+  const [scanProjectId, setScanProjectId] = useState<string | null>(requestedProject);
+  const [corrections, setCorrections] = useState<CorrectionsResponse | null>(null);
+  const [correctionsError, setCorrectionsError] = useState<string | null>(null);
+  const [savingCorrection, setSavingCorrection] = useState<string | null>(null);
+  const [steps, setSteps] = useState<ScanStep[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | Error | null>(null);
   const [history, setHistory] = useState<AuditSummary[]>([]);
   const [explanation, setExplanation] = useState<string | null>(null);
   const [explaining, setExplaining] = useState(false);
   const [explainError, setExplainError] = useState<string | null>(null);
+
+  const loadCorrections = useCallback(
+    async (project: string | null = scanProjectId) => {
+      if (!session.workspaceId || !project) {
+        setCorrections(null);
+        return;
+      }
+      try {
+        const body = await apiFetch<CorrectionsResponse>(
+          `/api/v1/projects/${project}/corrections?workspaceId=${session.workspaceId}`
+        );
+        setCorrections(body);
+        setCorrectionsError(null);
+      } catch (caught) {
+        // The board is an addition to the report, never a reason to hide it.
+        setCorrectionsError(
+          (caught as ApiError).message || (fr ? "Suivi indisponible." : "Tracking unavailable.")
+        );
+      }
+    },
+    [session.workspaceId, scanProjectId, fr]
+  );
+
+  const setCorrection = async (key: string, state: CorrectionState) => {
+    if (!session.workspaceId || !scanProjectId) return;
+    setSavingCorrection(key);
+    setCorrectionsError(null);
+    try {
+      await apiFetch(
+        `/api/v1/projects/${scanProjectId}/corrections/${encodeURIComponent(key)}?workspaceId=${session.workspaceId}`,
+        { method: "PATCH", body: { state } }
+      );
+      setCorrections((current) =>
+        current
+          ? {
+              ...current,
+              items: current.items.map((item) =>
+                item.key === key ? { ...item, state, updatedAt: new Date().toISOString() } : item
+              ),
+            }
+          : current
+      );
+    } catch (caught) {
+      setCorrectionsError(
+        (caught as ApiError).message || (fr ? "État non enregistré." : "State not saved.")
+      );
+    } finally {
+      setSavingCorrection(null);
+    }
+  };
 
   const loadHistory = useCallback(async () => {
     if (!session.workspaceId) return;
@@ -149,17 +348,20 @@ export function ScanPage(): React.ReactElement {
     void loadHistory().then((items) => {
       const target = requestedAudit ?? items?.[0]?.id;
       if (!target) return;
-      void apiFetch<{ id: string; result: ScanResult }>(
+      void apiFetch<{ id: string; projectId: string | null; result: ScanResult }>(
         `/api/v1/audits/${target}?workspaceId=${session.workspaceId}`
       )
         .then((body) => {
           setScan(body.result);
           setAuditId(body.id);
           setUrl(body.result.url);
+          const project = body.projectId ?? requestedProject;
+          setScanProjectId(project ?? null);
+          void loadCorrections(project ?? null);
         })
         .catch(() => undefined);
     });
-  }, [loadHistory, session.workspaceId, requestedAudit]);
+  }, [loadHistory, session.workspaceId, requestedAudit, requestedProject, loadCorrections]);
 
   const run = async () => {
     if (!session.workspaceId || busy) return;
@@ -197,25 +399,56 @@ export function ScanPage(): React.ReactElement {
     setScan(null);
     setExplanation(null);
     setExplainError(null);
+    setSteps([
+      {
+        id: "request",
+        label: fr ? "Validation et quota" : "Validation and quota",
+        status: "pending",
+      },
+      {
+        id: "fetch",
+        label: fr ? "Lecture de la page et analyse" : "Page read and analysis",
+        status: "pending",
+      },
+      { id: "verdict", label: fr ? "Calcul du verdict" : "Verdict calculation", status: "pending" },
+      {
+        id: "save",
+        label: fr ? "Enregistrement et comparaison" : "Storing and comparison",
+        status: "pending",
+      },
+    ]);
     try {
-      const body = await apiFetch<{ audit: ScanResult & { id: string } }>("/api/v1/audits", {
-        method: "POST",
-        body: {
+      const body = await streamScan(
+        {
           workspaceId: session.workspaceId,
           url: target,
+          ...(scanProjectId ? { projectId: scanProjectId } : {}),
           ...(authMode === "cookie" && cookie.trim() ? { headers: { cookie: cookie.trim() } } : {}),
           ...(authMode === "account" && email.trim() && password
             ? { login: { url: loginUrl.trim(), email: email.trim(), password } }
             : {}),
         },
-      });
+        (step) =>
+          setSteps((current) => {
+            const index = current.findIndex((entry) => entry.id === step.id);
+            if (index === -1) return [...current, step];
+            return current.map((entry, position) => (position === index ? step : entry));
+          })
+      );
       setScan(body.audit);
       setAuditId(body.audit.id);
+      const project = body.audit.projectId ?? scanProjectId;
+      if (project) setScanProjectId(project);
       // The password exists to be used once: it leaves the form as soon as the scan starts.
       setPassword("");
-      await loadHistory();
+      // The server already compared this scan to the previous one; reloading the board
+      // shows the same comparison next to the four workflow states.
+      await Promise.all([loadHistory(), loadCorrections(project)]);
     } catch (caught) {
       setError(caught as ApiError);
+      setSteps((current) =>
+        current.map((step) => (step.status === "running" ? { ...step, status: "failed" } : step))
+      );
     } finally {
       setBusy(false);
     }
@@ -227,11 +460,14 @@ export function ScanPage(): React.ReactElement {
     setError(null);
     setExplanation(null);
     try {
-      const body = await apiFetch<{ id: string; result: ScanResult }>(
+      const body = await apiFetch<{ id: string; projectId: string | null; result: ScanResult }>(
         `/api/v1/audits/${id}?workspaceId=${session.workspaceId}`
       );
       setScan(body.result);
       setAuditId(body.id);
+      const project = body.projectId ?? scanProjectId;
+      if (project) setScanProjectId(project);
+      await loadCorrections(project);
     } catch (caught) {
       setError(caught as ApiError);
     } finally {
@@ -276,8 +512,8 @@ export function ScanPage(): React.ReactElement {
           workspaceId: session.workspaceId,
           effort: "balanced",
           message: fr
-            ? `Voici le résultat brut d'un scan PROOFSTACK. Interprète-le pour quelqu'un qui n'est pas expert : quels sont les trois problèmes les plus coûteux, pourquoi ils comptent pour ce site précis, et dans quel ordre les corriger. Sois concret, cite les constats par leur identifiant, et dis clairement ce que le scan n'a pas pu mesurer.\n\n${reportForModel()}`
-            : `Here is the raw result of a PROOFSTACK scan. Interpret it for someone who is not an expert: which three problems cost the most, why they matter for this site, and in what order to fix them. Be concrete, cite findings by their id, and state clearly what the scan could not measure.\n\n${reportForModel()}`,
+            ? `Voici le résultat brut d'un scan PROOFCORE. Interprète-le pour quelqu'un qui n'est pas expert : quels sont les trois problèmes les plus coûteux, pourquoi ils comptent pour ce site précis, et dans quel ordre les corriger. Sois concret, cite les constats par leur identifiant, et dis clairement ce que le scan n'a pas pu mesurer.\n\n${reportForModel()}`
+            : `Here is the raw result of a PROOFCORE scan. Interpret it for someone who is not an expert: which three problems cost the most, why they matter for this site, and in what order to fix them. Be concrete, cite findings by their id, and state clearly what the scan could not measure.\n\n${reportForModel()}`,
         },
       });
       setExplanation(body.message);
@@ -501,6 +737,36 @@ export function ScanPage(): React.ReactElement {
 
       {error ? <ErrorState error={error} onRetry={() => void run()} /> : null}
 
+      {steps.length > 0 ? (
+        <Card className="scan-progress-card">
+          <p className="scan-findings-head">
+            {fr ? "DÉROULÉ RÉEL" : "REAL RUN"}{" "}
+            <span>
+              {fr ? "écrit par le serveur, pas animé" : "written by the server, not animated"}
+            </span>
+          </p>
+          <ol className="scan-progress-list">
+            {steps.map((step) => (
+              <li key={step.id} className={`scan-progress-step is-${step.status}`}>
+                <span className="scan-progress-mark" aria-hidden>
+                  {step.status === "done" ? (
+                    <Check size={12} />
+                  ) : step.status === "failed" ? (
+                    <X size={12} />
+                  ) : step.status === "running" ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    <span className="scan-progress-dot" />
+                  )}
+                </span>
+                <span className="scan-progress-label">{step.label}</span>
+                {step.detail ? <span className="scan-progress-detail">{step.detail}</span> : null}
+              </li>
+            ))}
+          </ol>
+        </Card>
+      ) : null}
+
       {scan ? (
         <>
           <div className="scan-verdict-row">
@@ -662,6 +928,138 @@ export function ScanPage(): React.ReactElement {
               ) : null}
             </Card>
           ) : null}
+
+          {scanProjectId ? (
+            <Card className="scan-corrections">
+              <div className="flex flex-wrap items-start justify-between gap-3 px-5 pt-4">
+                <div>
+                  <p className="scan-findings-head">
+                    {fr ? "SUIVI DES CORRECTIONS" : "CORRECTION TRACKING"}{" "}
+                    <span>
+                      {fr ? "quatre états, et un re-contrôle" : "four states, and a re-check"}
+                    </span>
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">
+                    {fr
+                      ? "Un état décrit votre travail, pas le verdict du site. Seul un nouveau scan dit si le problème a disparu : « Re-contrôler » relance la même adresse et compare par identifiant de constat."
+                      : "A state describes your work, not the site's verdict. Only a new scan says whether the problem is gone: “Re-check” runs the same address again and compares by finding id."}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="app-btn app-btn-sm"
+                  onClick={() => void run()}
+                  disabled={busy}
+                >
+                  <RefreshCw size={13} className={busy ? "animate-spin" : undefined} />{" "}
+                  {busy ? (fr ? "Re-contrôle…" : "Re-checking…") : fr ? "Re-contrôler" : "Re-check"}
+                </button>
+              </div>
+
+              {corrections?.comparison ? (
+                <div className="mx-5 mt-3 rounded-[var(--radius)] bg-surface-alt px-3 py-2 text-xs">
+                  <p className="font-medium">
+                    {fr ? "Comparaison avec le scan précédent" : "Compared with the previous scan"}:{" "}
+                    <span className="text-success">
+                      {corrections.comparison.counts.resolved} {fr ? "corrigés" : "resolved"}
+                    </span>
+                    {" · "}
+                    <span className="text-warning">
+                      {corrections.comparison.counts.persisting}{" "}
+                      {fr ? "toujours présents" : "still present"}
+                    </span>
+                    {" · "}
+                    <span className="text-danger">
+                      {corrections.comparison.counts.appeared} {fr ? "nouveaux" : "new"}
+                    </span>
+                  </p>
+                  {corrections.comparison.resolved.length > 0 ? (
+                    <p className="mt-1 text-muted">
+                      {fr ? "Disparus :" : "Gone:"}{" "}
+                      {corrections.comparison.resolved.map((item) => item.id).join(" · ")}
+                    </p>
+                  ) : null}
+                  {corrections.comparison.appeared.length > 0 ? (
+                    <p className="mt-1 text-muted">
+                      {fr ? "Apparus :" : "New:"}{" "}
+                      {corrections.comparison.appeared.map((item) => item.id).join(" · ")}
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="mx-5 mt-3 text-xs text-muted">
+                  {fr
+                    ? "Aucune comparaison encore : ce scan est le premier de ce projet. Le prochain re-contrôle en produira une."
+                    : "No comparison yet: this is the project's first scan. The next re-check will produce one."}
+                </p>
+              )}
+
+              {correctionsError ? (
+                <p className="mx-5 mt-2 text-xs text-danger">{correctionsError}</p>
+              ) : null}
+
+              {corrections && corrections.items.length > 0 ? (
+                <ul className="mt-3 divide-y divide-border">
+                  {corrections.items.map((item) => (
+                    <li
+                      key={item.key}
+                      className="flex flex-wrap items-center gap-3 px-5 py-2.5 text-sm"
+                    >
+                      <span
+                        className={`scan-finding-status ${STATUS_STYLE[item.status as ScanStatus] ?? ""}`}
+                      >
+                        {statusIcon(item.status as ScanStatus)}
+                        {item.status}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="app-mono text-xs">{item.id}</p>
+                        <p className="truncate text-xs text-muted">{item.observed}</p>
+                        {!item.present ? (
+                          <p className="text-xs text-success">
+                            {fr
+                              ? "Absent du dernier scan — confirmez s'il est réellement corrigé."
+                              : "Absent from the latest scan — confirm it is actually fixed."}
+                          </p>
+                        ) : null}
+                      </div>
+                      <label className="text-xs text-muted">
+                        <span className="sr-only">
+                          {fr ? `État de ${item.id}` : `State of ${item.id}`}
+                        </span>
+                        <select
+                          className="app-input"
+                          value={item.state}
+                          disabled={savingCorrection === item.key}
+                          onChange={(event) =>
+                            void setCorrection(item.key, event.target.value as CorrectionState)
+                          }
+                        >
+                          {(Object.keys(CORRECTION_LABELS) as CorrectionState[]).map((state) => (
+                            <option key={state} value={state}>
+                              {CORRECTION_LABELS[state][fr ? "fr" : "en"]}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="px-5 py-3 text-xs text-muted">
+                  {fr
+                    ? "Aucun constat à suivre sur le dernier scan de ce projet."
+                    : "No finding to track on this project's latest scan."}
+                </p>
+              )}
+            </Card>
+          ) : (
+            <p className="scan-notice">
+              <ScanLine size={13} aria-hidden />
+              {fr
+                ? "Ce scan n'est rattaché à aucun projet : il n'a pas de baseline pour un re-contrôle. Lancez-le depuis la page d'un projet pour suivre ses corrections."
+                : "This scan is not attached to a project, so there is no baseline to compare against. Start it from a project page to track corrections."}
+            </p>
+          )}
 
           {(["fail", "clean", "flow", "world", "exit"] as const).map((module) => {
             const items = grouped(module);

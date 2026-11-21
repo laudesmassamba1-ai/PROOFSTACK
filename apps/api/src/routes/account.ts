@@ -361,6 +361,38 @@ export function accountRoutes(services: Services): Hono<AppEnv> {
     });
   });
 
+  /**
+   * What happened to a support message.
+   *
+   * The reference alone is not enough to read a conversation: whoever knows the address
+   * that wrote it must also present that address. The answer never reveals the message of
+   * a reference whose address does not match, and the lookup is constant in shape.
+   */
+  const supportLookup = async (reference: string, address: string) => {
+    const message = await services.store.getSupportMessage(reference);
+    if (!message || normalizeEmail(message.fromAddress) !== normalizeEmail(address)) {
+      throw new HttpError(404, "support_not_found", "No message with this reference and address.");
+    }
+    return message;
+  };
+
+  app.get("/support/:reference", async (c) => {
+    const address = c.req.query("email") ?? "";
+    if (!address.includes("@")) {
+      throw new HttpError(400, "invalid_email", "Add the address that wrote the message.");
+    }
+    const message = await supportLookup(c.req.param("reference"), address);
+    return c.json({
+      reference: message.id,
+      subject: message.subject,
+      status: message.status,
+      reply: message.reply,
+      repliedAt: message.repliedAt,
+      createdAt: message.createdAt,
+      updatedAt: message.updatedAt,
+    });
+  });
+
   // ---------------------------------------------------------- invitations
 
   /**

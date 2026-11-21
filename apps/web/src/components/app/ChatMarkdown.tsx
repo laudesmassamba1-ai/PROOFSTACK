@@ -562,7 +562,7 @@ export function printConversation(
   }
 </style></head><body>
 <header class="print-head">
-  <p class="mark">PROOFSTACK</p>
+  <p class="mark">PROOFCORE</p>
   <h1>${esc(title)}</h1>
   <p class="meta">${new Date().toLocaleString("fr-FR")}</p>
 </header>

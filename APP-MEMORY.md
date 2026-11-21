@@ -1,4 +1,4 @@
-# MÉMOIRE DU PROJET — PROOFSTACK / PROOFCORE
+# MÉMOIRE DU PROJET — PROOFCORE / PROOFCORE
 
 > Ce fichier est la mémoire de travail de l'application. Chaque agent (humain ou IA) le lit
 > **avant** de toucher au code et le met à jour **après** chaque changement notable.
@@ -212,7 +212,7 @@ pnpm cloud:deploy --dry-run
 
 ## 2026-11-21 — passe de refonte (phase 1 + début phase 2)
 
-- Identité : le web parle de **PROOFSTACK** (le nom public), les identifiants `proofcore` restent techniques. Pas de validation juridique effectuée.
+- Identité : le web parle de **PROOFCORE** (le nom public), les identifiants `proofcore` restent techniques. Pas de validation juridique effectuée.
 - Téléchargements : `GET /api/v1/releases/latest` (proxy GitHub côté Worker, cache 5 min, digest quand publié) remplace l'appel navigateur à `api.github.com` — bloqué par la CSP. Monté **avant** `workspaceRoutes`, dont le garde `*` renvoyait 401 aux visiteurs anonymes (couvert par un test d'intégration).
 - CI/typecheck : CI ne fige plus pnpm 10 (lit `packageManager`), `pnpm typecheck` construit les paquets internes avant le check. Vérifié en supprimant tous les `dist/` et `*.tsbuildinfo` : 0 erreur.
 - UX : mode Simple par défaut (Vue d'ensemble, Projets, Démarrer) ; bascule Studio dans l'en-tête, persistée par navigateur (`proofcore.ui-mode.v1`) sans toucher aux données. Accueil sans projet : « Que souhaitez-vous faire aujourd'hui ? » avec 4 portes réelles.
@@ -226,3 +226,13 @@ pnpm cloud:deploy --dry-run
 - CORS : `PUT` manquait dans `Access-Control-Allow-Methods`, ce qui faisait passer chaque sauvegarde pour une API injoignable ; corrigé et couvert par un test de préflight.
 - Limites assumées : les `journeys` FLOW sont dans le schéma mais aucun moteur ne les exécute → pas de constructeur factice. Pas de `config pull` : l'utilisateur télécharge le JSON, le place à la racine et lance `proofcore test`. Aucun secret stocké.
 - Vérifié : biome 0, typecheck 0, tests 50 fichiers / 639, build web 0 ; Chrome : sauvegarde, rechargement, téléchargement et lecture serveur cohérents.
+
+## 2026-11-21 (corrections, progression, support, identité)
+
+- Identité : **PROOFCORE** partout dans le web. Les noms techniques historiques restent : dépôt GitHub `PROOFSTACK`, domaines `proofstack-*`, projet Cloudflare `proofstack`. Les renommer casserait releases, liens et CORS.
+- Corrections : migration `0017_corrections_and_support.sql`, table `audit_finding_states` (workspace, projet, clé `module:id`, état `todo|in_progress|fixed|verify`). `GET/PATCH /api/v1/projects/:id/corrections` ; le board fusionne le dernier scan et les constats suivis disparus ; comparaison avec le scan précédent (résolus / persistants / nouveaux). Un constat suivi qui disparaît passe à `verify`, jamais à `fixed` automatiquement.
+- Progression réelle : `POST /api/v1/audits/stream` (SSE) émet `request`, `fetch`, `verdict`, `save` au moment où chaque phase s'exécute, avec durée/HTTP réels et comparaison. `/app/scan` affiche ces événements, sans animation. POST classique conservé.
+- Pré-contrôle : `GET /projects/:id/config` renvoie `precheck` = `NOT_CONFIGURED` / `BLOCKED` / `READY` ; la page projet affiche deux bannières distinctes.
+- CLI : aide groupée, `init` guidé (modules + cibles WORLD/FLOW/EXIT), `config pull`, mot de passe refusé en argument (`PROOFCORE_LOGIN_PASSWORD` ou saisie masquée).
+- Support : `GET /api/account/support/:reference?email=` renvoie statut + réponse seulement si l'adresse correspond ; file opérateur `GET/POST /api/v1/admin/support` avec réponse.
+- Vérifié : biome 0 (394 fichiers), typecheck 0, 51 fichiers / 643 tests, build web 0. E2E local : SSE 200 avec 8 événements et 4 étapes réelles, 43 constats, `precheck=NOT_CONFIGURED`, PATCH `in_progress` persisté, support 200.

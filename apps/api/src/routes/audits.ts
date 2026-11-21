@@ -6,6 +6,7 @@ import {
   VERIFICATION_WELL_KNOWN,
 } from "@proofcore/core";
 import { Hono } from "hono";
+import { streamSSE } from "hono/streaming";
 import { z } from "zod";
 import type { AppConfig } from "../env.js";
 import { quotaErrorFromDecision, quotaErrorFromMeter } from "../http/entitlement-http.js";
@@ -82,6 +83,84 @@ const scanSchema = z
 
 const MAX_SCANS_PER_HOUR = 20;
 
+const correctionSchema = z
+  .object({
+    state: z.enum(["todo", "in_progress", "fixed", "verify"]),
+    note: z.string().max(1000).nullable().optional(),
+  })
+  .strict();
+
+type PageFinding = {
+  module: string;
+  id: string;
+  status: string;
+  observed: string;
+  why: string;
+};
+
+const CORRECTION_STATES = new Set(["todo", "in_progress", "fixed", "verify"]);
+
+function scanFindings(payload: unknown): PageFinding[] {
+  const raw = (payload as { findings?: unknown })?.findings;
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (item): item is PageFinding =>
+      typeof item === "object" &&
+      item !== null &&
+      typeof (item as PageFinding).module === "string" &&
+      typeof (item as PageFinding).id === "string"
+  );
+}
+
+function findingKey(item: Pick<PageFinding, "module" | "id">): string {
+  return `${item.module}:${item.id}`;
+}
+
+/**
+ * What changed between two scans of the same project.
+ *
+ * The comparison is by `module:id`, the identity the scanner itself uses. Nothing is
+ * inferred: a finding is "resolved" only when the later scan no longer reports it, and
+ * "persisting" only when it still does. A caller cannot turn this into a green verdict.
+ */
+function compareScans(
+  beforeId: string,
+  beforePayload: unknown,
+  afterId: string,
+  afterPayload: unknown
+) {
+  const before = new Map(scanFindings(beforePayload).map((item) => [findingKey(item), item]));
+  const after = new Map(scanFindings(afterPayload).map((item) => [findingKey(item), item]));
+  const brief = (item: PageFinding) => ({
+    key: findingKey(item),
+    module: item.module,
+    id: item.id,
+    status: item.status,
+    observed: item.observed,
+  });
+  const resolved = [...before.entries()]
+    .filter(([key]) => !after.has(key))
+    .map(([, item]) => brief(item));
+  const persisting = [...after.entries()]
+    .filter(([key]) => before.has(key))
+    .map(([, item]) => brief(item));
+  const appeared = [...after.entries()]
+    .filter(([key]) => !before.has(key))
+    .map(([, item]) => brief(item));
+  return {
+    before: beforeId,
+    after: afterId,
+    resolved,
+    persisting,
+    appeared,
+    counts: {
+      resolved: resolved.length,
+      persisting: persisting.length,
+      appeared: appeared.length,
+    },
+  };
+}
+
 /**
  * The token an owner publishes to prove a site is theirs.
  *
@@ -143,6 +222,10 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
     if (body.projectId && !(await services.store.getProject(workspace.id, body.projectId))) {
       throw new HttpError(404, "project_not_found", "No project with this id in this workspace.");
     }
+    // Read before the new row exists: this scan is the baseline of the re-control.
+    const previous = body.projectId
+      ? (await services.store.latestPageAudits(workspace.id, body.projectId, 1))[0]
+      : undefined;
 
     // The scan id is minted before the gate so gate and meter name the same subject:
     // the gate is a pure check (nothing recorded), and the meter below only writes
@@ -233,7 +316,38 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
       projectId: body.projectId ?? null,
     });
 
-    return c.json({ audit: { id, ...result } }, 201);
+    // The comparison is computed from two stored scans, not from a promise: a finding is
+    // "fixed" only once a later scan no longer reports it.
+    let comparison: ReturnType<typeof compareScans> | null = null;
+    if (body.projectId && previous) {
+      comparison = compareScans(
+        String(previous.id),
+        JSON.parse(String(previous.payload)),
+        id,
+        result
+      );
+      // A tracked finding that disappears becomes "to verify": the person who fixed it
+      // confirms the result, the tool does not declare victory on its own.
+      const tracked = new Map(
+        (await services.store.listAuditFindingStates(workspace.id, body.projectId)).map((row) => [
+          String(row.finding_key),
+          String(row.state),
+        ])
+      );
+      for (const item of comparison.resolved) {
+        const current = tracked.get(item.key);
+        if (current === "todo" || current === "in_progress") {
+          await services.store.setAuditFindingState({
+            workspaceId: workspace.id,
+            projectId: body.projectId,
+            findingKey: item.key,
+            state: "verify",
+          });
+        }
+      }
+    }
+
+    return c.json({ audit: { id, projectId: body.projectId ?? null, ...result }, comparison }, 201);
   });
 
   /**
@@ -243,6 +357,191 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
    * scanner. It is the only proof that does not depend on believing the caller, which is why
    * it is what unlocks the exact locations of a finding.
    */
+  /**
+   * The same scan, with the phases the server actually performs.
+   *
+   * The regular POST is one request and one response; this route exists because "reading
+   * the page" and "comparing with the previous scan" are real, separable steps. Each
+   * event is emitted after the work it describes has started or finished — there is no
+   * timer pretending a phase is running. The final event carries the scan and comparison.
+   */
+  app.post("/audits/stream", async (c) => {
+    const user = c.get("user");
+    const limited = limiter.check(user.id);
+    if (!limited.allowed) {
+      c.header("Retry-After", String(limited.retryAfterSeconds));
+      const minutes = Math.max(1, Math.ceil(limited.retryAfterSeconds / 60));
+      throw new HttpError(
+        429,
+        "scan_rate_limited",
+        `Trop de scans sur cette heure. Réessaie dans ${minutes} min.`,
+        { retryAfterSeconds: limited.retryAfterSeconds }
+      );
+    }
+    const body = await readBody(c, scanSchema);
+    const { workspace, role } = await requireWorkspace(c, services, body.workspaceId);
+    if (role === "viewer") {
+      throw new HttpError(
+        403,
+        "insufficient_role",
+        "Viewers cannot start a scan. Ask for member rights."
+      );
+    }
+    if (body.projectId && !(await services.store.getProject(workspace.id, body.projectId))) {
+      throw new HttpError(404, "project_not_found", "No project with this id in this workspace.");
+    }
+    const previous = body.projectId
+      ? (await services.store.latestPageAudits(workspace.id, body.projectId, 1))[0]
+      : undefined;
+
+    const auditId = `aud_${crypto.randomUUID().replaceAll("-", "").slice(0, 20)}`;
+    const gate = await services.meter.authorize({
+      workspaceId: workspace.id,
+      check: { key: "monthly_ai_audits", requested: 1 },
+      subjectId: auditId,
+      quantity: 0,
+    });
+    if (!gate.allowed) throw quotaErrorFromDecision(gate.decision, "AI-audit");
+
+    let target: URL;
+    try {
+      target = assertScannableUrl(body.url.trim());
+    } catch (error) {
+      throw new HttpError(
+        400,
+        "url_not_scannable",
+        error instanceof Error ? error.message : "This URL cannot be scanned."
+      );
+    }
+
+    return streamSSE(c, async (stream) => {
+      const emit = async (payload: unknown) => {
+        await stream.writeSSE({ data: JSON.stringify(payload) });
+      };
+      const step = async (
+        id: string,
+        label: string,
+        status: "running" | "done" | "failed",
+        detail?: string
+      ) => emit({ type: "step", id, label, status, ...(detail ? { detail } : {}) });
+
+      try {
+        await step("request", "Demande validée et quota réservé", "done");
+        const fetchLabel = `Lecture de ${target.hostname} et analyse des cinq familles`;
+        await step("fetch", fetchLabel, "running");
+        const result = await scanPage(target.toString(), {
+          headers: body.headers,
+          allowPrivate: false,
+          maxBytes: 1_500_000,
+          timeoutMs: 15_000,
+          ownershipHint: "remote",
+          ...(body.login ? { login: body.login } : {}),
+          ...(body.ownershipToken ? { ownershipToken: body.ownershipToken } : {}),
+        });
+        await step(
+          "fetch",
+          fetchLabel,
+          "done",
+          "HTTP " +
+            result.status +
+            " · " +
+            Math.round(result.bytes / 1024) +
+            " kB · " +
+            result.durationMs +
+            " ms"
+        );
+
+        await step("verdict", "Calcul du verdict et des scores", "running");
+        const failed = result.findings.filter((item) => item.status === "FAIL").length;
+        const warnings = result.findings.filter((item) => item.status === "WARN").length;
+        const worstVerdict = failed > 0 ? "fail" : warnings > 0 ? "warnings" : "pass";
+        await step(
+          "verdict",
+          "Calcul du verdict et des scores",
+          "done",
+          `${failed} échec(s) · ${warnings} avertissement(s)`
+        );
+
+        await step("save", "Enregistrement du scan et comparaison", "running");
+        const metered = await services.meter.meter({
+          workspaceId: workspace.id,
+          kind: "ai_audit",
+          subjectId: auditId,
+          quantity: 1,
+          at: services.clock(),
+        });
+        if (metered.reason === "quota_exhausted") {
+          throw quotaErrorFromMeter(metered, "AI-audit");
+        }
+        const id = auditId;
+        await services.store.createPageAudit({
+          id,
+          workspaceId: workspace.id,
+          createdBy: user.id,
+          url: result.url,
+          finalUrl: result.finalUrl,
+          status: result.status,
+          durationMs: result.durationMs,
+          worstVerdict,
+          failed,
+          warnings,
+          payload: JSON.stringify(result),
+          ownership: result.ownership,
+          redacted: result.redacted,
+          projectId: body.projectId ?? null,
+        });
+
+        let comparison: ReturnType<typeof compareScans> | null = null;
+        if (body.projectId && previous) {
+          comparison = compareScans(
+            String(previous.id),
+            JSON.parse(String(previous.payload)),
+            id,
+            result
+          );
+          const tracked = new Map(
+            (await services.store.listAuditFindingStates(workspace.id, body.projectId)).map(
+              (row) => [String(row.finding_key), String(row.state)]
+            )
+          );
+          for (const item of comparison.resolved) {
+            const current = tracked.get(item.key);
+            if (current === "todo" || current === "in_progress") {
+              await services.store.setAuditFindingState({
+                workspaceId: workspace.id,
+                projectId: body.projectId,
+                findingKey: item.key,
+                state: "verify",
+              });
+            }
+          }
+        }
+        await step(
+          "save",
+          "Enregistrement du scan et comparaison",
+          "done",
+          comparison
+            ? `${comparison.counts.resolved} corrigé(s) · ${comparison.counts.persisting} toujours présent(s) · ${comparison.counts.appeared} nouveau(x)`
+            : "Premier scan de ce projet : aucune baseline à comparer"
+        );
+        await emit({
+          type: "result",
+          audit: { id, projectId: body.projectId ?? null, ...result },
+          comparison,
+        });
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status : 502;
+        const code = error instanceof HttpError ? error.code : "scan_failed";
+        await emit({
+          type: "error",
+          status,
+          code,
+          message: error instanceof Error ? error.message : "The scan could not run.",
+        });
+      }
+    });
+  });
+
   app.get("/audits/verification-token", async (c) => {
     const { workspace, role } = await requireWorkspace(c, services, c.req.query("workspaceId"));
     if (role === "viewer") {
@@ -319,6 +618,121 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
       projectId: row.project_id ? String(row.project_id) : null,
       result: JSON.parse(String(row.payload)),
     });
+  });
+
+  /**
+   * The correction board of a project: the findings of its latest scan, each with the
+   * workflow state a person gave it, plus findings that disappeared since the scan before.
+   */
+  app.get("/projects/:projectId/corrections", async (c) => {
+    const { workspace } = await requireWorkspace(c, services, c.req.query("workspaceId"));
+    const project = await services.store.getProject(workspace.id, c.req.param("projectId"));
+    if (!project) throw new HttpError(404, "project_not_found", "Project not found.");
+
+    const audits = await services.store.latestPageAudits(workspace.id, project.id, 2);
+    const stateRows = await services.store.listAuditFindingStates(workspace.id, project.id);
+    const states = new Map(stateRows.map((row) => [String(row.finding_key), row]));
+    const latest = audits[0];
+    if (!latest) {
+      return c.json({ auditId: null, items: [], comparison: null });
+    }
+
+    const latestPayload = JSON.parse(String(latest.payload));
+    const latestFindings = scanFindings(latestPayload);
+    const latestKeys = new Set(latestFindings.map(findingKey));
+    const items = latestFindings.map((item) => {
+      const key = findingKey(item);
+      const state = states.get(key);
+      return {
+        ...item,
+        key,
+        present: true,
+        state: state ? String(state.state) : "todo",
+        note: state?.note ? String(state.note) : null,
+        updatedAt: state?.updated_at ? String(state.updated_at) : null,
+      };
+    });
+
+    // A finding that vanished is still part of the correction board when someone tracked
+    // it. Showing it is what lets them confirm "fixed" instead of guessing.
+    const previous = audits[1];
+    if (previous) {
+      for (const item of scanFindings(JSON.parse(String(previous.payload)))) {
+        const key = findingKey(item);
+        if (latestKeys.has(key)) continue;
+        const state = states.get(key);
+        if (!state) continue;
+        items.push({
+          ...item,
+          key,
+          present: false,
+          state: String(state.state),
+          note: state.note ? String(state.note) : null,
+          updatedAt: state.updated_at ? String(state.updated_at) : null,
+        });
+      }
+    }
+
+    return c.json({
+      auditId: String(latest.id),
+      scannedAt: String(latest.created_at),
+      items,
+      comparison: previous
+        ? compareScans(
+            String(previous.id),
+            JSON.parse(String(previous.payload)),
+            String(latest.id),
+            latestPayload
+          )
+        : null,
+    });
+  });
+
+  /** Set the workflow state of one finding on the project's latest scan. */
+  app.patch("/projects/:projectId/corrections/:key", async (c) => {
+    const { workspace, role } = await requireWorkspace(c, services, c.req.query("workspaceId"));
+    if (role === "viewer") {
+      throw new HttpError(
+        403,
+        "insufficient_role",
+        "Viewers cannot change correction states. Ask for member rights."
+      );
+    }
+    const project = await services.store.getProject(workspace.id, c.req.param("projectId"));
+    if (!project) throw new HttpError(404, "project_not_found", "Project not found.");
+    const body = await readBody(c, correctionSchema);
+    const key = c.req.param("key");
+    if (!CORRECTION_STATES.has(body.state)) {
+      throw new HttpError(400, "invalid_state", "Unknown correction state.");
+    }
+
+    const audits = await services.store.latestPageAudits(workspace.id, project.id, 2);
+    const known = new Set(
+      audits.flatMap((row) =>
+        scanFindings(JSON.parse(String(row.payload))).map((item) => findingKey(item))
+      )
+    );
+    if (!known.has(key)) {
+      throw new HttpError(
+        404,
+        "finding_not_current",
+        "This finding is not part of the project's last two scans. Re-scan the project first."
+      );
+    }
+
+    const existing = (await services.store.listAuditFindingStates(workspace.id, project.id)).find(
+      (row) => String(row.finding_key) === key
+    );
+    const note =
+      body.note === undefined ? (existing?.note ? String(existing.note) : null) : body.note;
+    await services.store.setAuditFindingState({
+      workspaceId: workspace.id,
+      projectId: project.id,
+      findingKey: key,
+      state: body.state,
+      note,
+    });
+    return c.json({ ok: true, key, state: body.state, note });
   });
 
   return app;

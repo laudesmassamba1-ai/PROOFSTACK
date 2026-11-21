@@ -7,7 +7,7 @@ import {
 } from "./logoGeometry.js";
 
 /**
- * PROOFSTACK identity.
+ * PROOFCORE identity.
  *
  * One geometric P, three offset plates. The three layers are the three modules
  * converging into one proof: WORLD at the back, FLOW in the middle, EXIT in front.
@@ -43,7 +43,7 @@ export function Mark({ size = 34, variant = "default", className, title }: MarkP
       viewBox={`0 0 ${LOGO_VIEWBOX} ${LOGO_VIEWBOX}`}
       fill="none"
       role="img"
-      aria-label={title ?? "PROOFSTACK"}
+      aria-label={title ?? "PROOFCORE"}
       className={className}
     >
       {title ? <title>{title}</title> : null}
@@ -88,8 +88,8 @@ export function Wordmark({
           color: variant === "onLight" ? "#142033" : "#F2F6FA",
         }}
       >
-        {/* The mark supplies the first P; printing it again reads “PPROOFSTACK”. */}
-        {showMark ? "ROOFCORE" : "PROOFSTACK"}
+        {/* The mark supplies the first P; printing it again reads “PPROOFCORE”. */}
+        {showMark ? "ROOFCORE" : "PROOFCORE"}
       </span>
     </span>
   );

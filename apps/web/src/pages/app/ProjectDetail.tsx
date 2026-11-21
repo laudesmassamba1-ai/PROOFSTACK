@@ -1,4 +1,4 @@
-import { ArrowLeft, FileJson, KeyRound, Play, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, FileJson, KeyRound, Play, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { LoadMore } from "../../components/app/LoadMore.js";
@@ -79,6 +79,10 @@ export function ProjectDetail() {
   // Scans started from this page carry the project id, so this list is the project's own
   // history — not the workspace's scans, and not only what CI uploaded.
   const [scans, setScans] = useState<WebScan[] | null>(null);
+  // Three different pre-check states, not one banner: a project nobody configured yet
+  // is not a project whose saved settings the engine refuses to run.
+  const [precheck, setPrecheck] = useState<"NOT_CONFIGURED" | "BLOCKED" | "READY" | null>(null);
+  const [precheckIssues, setPrecheckIssues] = useState<{ path: string; message: string }[]>([]);
 
   const load = useCallback(async () => {
     if (!workspaceId || !projectId) return;
@@ -90,6 +94,18 @@ export function ProjectDetail() {
       setProject(body.project);
     } catch (caught) {
       setError(caught as ApiError);
+    }
+    try {
+      const config = await apiFetch<{
+        precheck: "NOT_CONFIGURED" | "BLOCKED" | "READY";
+        issues: { path: string; message: string }[];
+      }>(`/api/v1/projects/${projectId}/config?workspaceId=${workspaceId}`);
+      setPrecheck(config.precheck);
+      setPrecheckIssues(config.issues);
+    } catch {
+      // The pre-check is an explanation, not the project itself: its absence must not
+      // replace the page with an error.
+      setPrecheck(null);
     }
     await Promise.all([runs.reload(), findings.reload()]);
   }, [projectId, workspaceId, runs.reload, findings.reload]);
@@ -151,7 +167,7 @@ export function ProjectDetail() {
         method: "POST",
         body: { workspaceId, url: project.baseUrl, projectId: project.id },
       });
-      navigate(`/app/scan?audit=${body.audit.id}&explain=1`);
+      navigate(`/app/scan?audit=${body.audit.id}&project=${project.id}&explain=1`);
     } catch (caught) {
       setRunError(caught as ApiError);
     } finally {
@@ -242,6 +258,61 @@ export default config;`;
           </>
         }
       />
+
+      {precheck === "NOT_CONFIGURED" ? (
+        <Card className="mb-4 border-warning/40">
+          <div className="flex flex-wrap items-start gap-3 px-5 py-4">
+            <AlertTriangle size={16} className="mt-0.5 text-warning" aria-hidden />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">
+                {fr ? "PROJET NON CONFIGURÉ" : "PROJECT NOT CONFIGURED"}
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-muted">
+                {fr
+                  ? "Aucune configuration n'a encore été enregistrée. Le scan de page reste possible, mais les modules qui ont besoin d'une cible (WORLD, FLOW, EXIT) produiront des cas ignorés — pas des succès."
+                  : "No configuration has been saved yet. The page scan still works, but modules that need a target (WORLD, FLOW, EXIT) will produce skipped cases — not passes."}
+              </p>
+            </div>
+            <Link
+              to={`/app/projects/${projectId}/config`}
+              className="app-btn app-btn-primary app-btn-sm"
+            >
+              {fr ? "Configurer" : "Configure"}
+            </Link>
+          </div>
+        </Card>
+      ) : precheck === "BLOCKED" ? (
+        <Card className="mb-4 border-danger/40">
+          <div className="flex flex-wrap items-start gap-3 px-5 py-4">
+            <AlertTriangle size={16} className="mt-0.5 text-danger" aria-hidden />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">
+                {fr ? "CONFIGURATION BLOQUÉE" : "CONFIGURATION BLOCKED"}
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-muted">
+                {fr
+                  ? "La configuration enregistrée contient un réglage que le moteur refuse d'exécuter automatiquement. Corrigez-le avant de lancer les modules."
+                  : "The saved configuration contains a setting the engine refuses to run automatically. Fix it before running the modules."}
+              </p>
+              {precheckIssues.length > 0 ? (
+                <ul className="mt-2 space-y-1 text-xs text-muted">
+                  {precheckIssues.slice(0, 3).map((issue) => (
+                    <li key={`${issue.path}-${issue.message}`}>
+                      <code className="app-mono">{issue.path}</code> — {issue.message}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+            <Link
+              to={`/app/projects/${projectId}/config`}
+              className="app-btn app-btn-primary app-btn-sm"
+            >
+              {fr ? "Corriger" : "Fix it"}
+            </Link>
+          </div>
+        </Card>
+      ) : null}
 
       {runError ? <ErrorState error={runError} onRetry={() => void runModules()} /> : null}
 
@@ -583,7 +654,7 @@ export default config;`;
               : "Nothing here is mandatory: the modules run from the button above. The CLI replays the same thing locally or in CI, from your project root:"}
           </p>
           <pre className="overflow-x-auto rounded-[var(--radius)] bg-surface-alt px-3 py-2 app-mono">
-            {`export PROOFSTACK_PROJECT_TOKEN=<token from above>
+            {`export PROOFCORE_PROJECT_TOKEN=<token from above>
 pnpm proofcore doctor
 pnpm proofcore test --module ${project.enabledModules.join(",") || "world"}
 pnpm proofcore sync`}

@@ -1,7 +1,7 @@
 import { CircleAlert, CircleCheck, LoaderCircle, Mail } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { ApiError, postJson } from "../lib/api.js";
+import { ApiError, apiFetch, postJson } from "../lib/api.js";
 
 /**
  * Account recovery pages.
@@ -299,12 +299,51 @@ export function VerifyEmail() {
   );
 }
 
+interface Ticket {
+  reference: string;
+  subject: string;
+  status: "open" | "in_progress" | "resolved" | string;
+  reply: string | null;
+  repliedAt: string | null;
+  createdAt: string;
+}
+
+const TICKET_STATUS: Record<string, string> = {
+  open: "Reçu, en attente de lecture",
+  in_progress: "En cours de traitement",
+  resolved: "Réponse disponible",
+};
+
 export function Support() {
   const [form, setForm] = useState({ email: "", subject: "", body: "" });
   const [state, setState] = useState<"idle" | "sending" | "done">("idle");
   const [reference, setReference] = useState<string | null>(null);
   const [message, setMessage] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
+  const [lookup, setLookup] = useState({ reference: "", email: "" });
+  const [ticket, setTicket] = useState<Ticket | null>(null);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [lookingUp, setLookingUp] = useState(false);
+
+  async function lookupTicket(ticketReference: string, email: string) {
+    setLookingUp(true);
+    setLookupError(null);
+    try {
+      const data = await apiFetch<Ticket>(
+        `/api/account/support/${encodeURIComponent(ticketReference)}?email=${encodeURIComponent(email)}`
+      );
+      setTicket(data);
+    } catch (failure) {
+      setTicket(null);
+      setLookupError(
+        failure instanceof ApiError
+          ? failure.message
+          : "Aucun message ne correspond à cette référence et à cette adresse."
+      );
+    } finally {
+      setLookingUp(false);
+    }
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -334,6 +373,21 @@ export function Support() {
           <Notice kind="ok">
             Référence <span className="font-mono">{reference}</span>. {message}
           </Notice>
+          <button
+            type="button"
+            className="w-full rounded-xl border border-border px-4 py-2 text-sm font-medium hover:bg-surface-2"
+            onClick={() => {
+              if (reference) {
+                setLookup({ reference, email: form.email });
+                void lookupTicket(reference, form.email);
+              }
+            }}
+            disabled={lookingUp || !reference}
+          >
+            {lookingUp ? "Vérification…" : "Voir l'état et la réponse"}
+          </button>
+          {lookupError && <Notice kind="warn">{lookupError}</Notice>}
+          {ticket && <TicketView ticket={ticket} />}
         </div>
       </Panel>
     );
@@ -388,6 +442,81 @@ export function Support() {
           {state === "sending" ? "Envoi…" : "Envoyer le message"}
         </button>
       </form>
+
+      <div className="mt-6 border-t border-border pt-4">
+        <p className="text-xs font-semibold">Suivre un message</p>
+        <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+          La référence a été affichée à l'envoi. L'adresse doit être celle qui a écrit : elle prouve
+          que la conversation vous appartient.
+        </p>
+        <form
+          className="mt-3 space-y-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void lookupTicket(lookup.reference.trim(), lookup.email.trim());
+          }}
+        >
+          <input
+            required
+            value={lookup.reference}
+            onChange={(event) => setLookup({ ...lookup, reference: event.target.value })}
+            placeholder="sup_…"
+            className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary/60"
+            autoComplete="off"
+          />
+          <input
+            type="email"
+            required
+            value={lookup.email}
+            onChange={(event) => setLookup({ ...lookup, email: event.target.value })}
+            placeholder="toi@exemple.com"
+            className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary/60"
+            autoComplete="email"
+          />
+          <button
+            type="submit"
+            disabled={lookingUp}
+            className="w-full rounded-xl border border-border px-4 py-2 text-sm font-medium hover:bg-surface-2 disabled:opacity-60"
+          >
+            {lookingUp ? "Recherche…" : "Afficher l'état"}
+          </button>
+        </form>
+        {lookupError && (
+          <div className="mt-3">
+            <Notice kind="warn">{lookupError}</Notice>
+          </div>
+        )}
+        {ticket && (
+          <div className="mt-3">
+            <TicketView ticket={ticket} />
+          </div>
+        )}
+      </div>
     </Panel>
+  );
+}
+
+function TicketView({ ticket }: { ticket: Ticket }) {
+  return (
+    <div className="space-y-2 rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs">
+      <p className="font-mono text-[11px] text-muted-foreground">{ticket.reference}</p>
+      <p>
+        <strong>Statut :</strong> {TICKET_STATUS[ticket.status] ?? ticket.status}
+      </p>
+      <p className="text-muted-foreground">Sujet : {ticket.subject}</p>
+      {ticket.reply ? (
+        <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-2 py-1.5">
+          <p className="font-medium">Réponse</p>
+          <p className="mt-1 whitespace-pre-wrap leading-relaxed">{ticket.reply}</p>
+          {ticket.repliedAt && (
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              {new Date(ticket.repliedAt).toLocaleString("fr-FR")}
+            </p>
+          )}
+        </div>
+      ) : (
+        <p className="text-muted-foreground">Aucune réponse pour l'instant.</p>
+      )}
+    </div>
   );
 }

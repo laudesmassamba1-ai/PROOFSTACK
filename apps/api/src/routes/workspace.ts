@@ -66,6 +66,18 @@ const createWebhookSchema = z
   .strict();
 
 export function workspaceRoutes(services: Services): Hono<AppEnv> {
+  /** Project pre-check: unconfigured and blocked are different states, not one warning. */
+  const precheck = (
+    stored: ReturnType<typeof readStoredProjectConfig>,
+    config: ReturnType<typeof buildProjectConfig>
+  ): "NOT_CONFIGURED" | "BLOCKED" | "READY" => {
+    // "Never configured" is a first-run state, not a broken configuration. "Blocked"
+    // means something was saved that the engine must not execute: a real charge or an
+    // unacknowledged production export. Showing one label for both hid the second.
+    if (!stored) return "NOT_CONFIGURED";
+    if (blockingIssues(projectConfigIssues(config)).length > 0) return "BLOCKED";
+    return "READY";
+  };
   const app = new Hono<AppEnv>();
 
   app.use("*", async (c, next) => {
@@ -401,9 +413,12 @@ export function workspaceRoutes(services: Services): Hono<AppEnv> {
     if (!project) throw new HttpError(404, "project_not_found", "Project not found.");
     const stored = readStoredProjectConfig(project.moduleConfig);
     const config = buildProjectConfig(project, stored);
+    const issues = projectConfigIssues(config);
     return c.json({
       config,
-      issues: projectConfigIssues(config),
+      issues,
+      blocking: blockingIssues(issues),
+      precheck: precheck(stored, config),
       savedAt: stored?.savedAt ?? null,
       source: stored ? "saved" : "defaults",
     });

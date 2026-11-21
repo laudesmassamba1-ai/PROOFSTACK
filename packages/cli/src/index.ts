@@ -257,6 +257,7 @@ async function main(argv: string[]): Promise<number> {
     "serve",
     "exec",
     "complete",
+    "config",
     "hub",
   ]);
   if (command && cwdCommands.has(command) && flags.cwdExplicit && !isDirectory(flags.cwd)) {
@@ -357,6 +358,8 @@ async function main(argv: string[]): Promise<number> {
       return commandAuth(flags, command, args);
     case "sync":
       return commandSync(flags, args);
+    case "config":
+      return commandConfig(flags, args);
     case "ai":
       return commandAi(flags, args);
     case "mcp":
@@ -422,6 +425,10 @@ async function commandInit(flags: GlobalFlags, args: string[]): Promise<number> 
   const interactive = stdin.isTTY && !args.includes("--yes");
   let projectName = args.find((a) => !a.startsWith("-")) ?? "";
   let baseUrl = "http://localhost:3000";
+  let moduleAnswer = "";
+  let worldTarget = "";
+  let flowBaseUrl = "";
+  let exitExport = "";
 
   if (interactive) {
     const rl = createInterface({ input: stdin, output: stdout });
@@ -431,6 +438,12 @@ async function commandInit(flags: GlobalFlags, args: string[]): Promise<number> 
         projectName ||
         "My project";
       baseUrl = (await rl.question(`Base URL under test (${baseUrl}): `)).trim() || baseUrl;
+      moduleAnswer = (
+        await rl.question("Modules to enable, comma separated (world,flow,exit): ")
+      ).trim();
+      worldTarget = (await rl.question("WORLD: URL that accepts a record, empty to skip: ")).trim();
+      flowBaseUrl = (await rl.question("FLOW: base URL of the checkout, empty to skip: ")).trim();
+      exitExport = (await rl.question("EXIT: export URL or file path, empty to skip: ")).trim();
     } finally {
       rl.close();
     }
@@ -439,6 +452,48 @@ async function commandInit(flags: GlobalFlags, args: string[]): Promise<number> 
   }
 
   const config = starterConfig(projectName, baseUrl);
+  // The guided answers only fill fields the schema already has. An empty answer keeps the
+  // starter value, so `proofcore init` never pretends a module is wired when it is not.
+  const wanted = moduleAnswer
+    .split(/[\s,]+/)
+    .map((item) => item.trim().toLowerCase())
+    .filter(
+      (item): item is "world" | "flow" | "exit" =>
+        item === "world" || item === "flow" || item === "exit"
+    );
+  if (wanted.length > 0) {
+    config.enabledModules = wanted;
+    config.modules.world.enabled = wanted.includes("world");
+    config.modules.flow.enabled = wanted.includes("flow");
+    config.modules.exit.enabled = wanted.includes("exit");
+  }
+  if (/^https?:\/\/\S+$/i.test(worldTarget)) {
+    config.modules.world.target = {
+      kind: "http",
+      submitUrl: worldTarget,
+      method: "POST",
+      headers: {},
+      timeoutMs: 15_000,
+      errorField: "error",
+      tokenEnvVar: "PROOFCORE_WORLD_TOKEN",
+    };
+  } else if (worldTarget) {
+    err(flags, yellow(flags, `WORLD target ignored: ${worldTarget} is not an http(s) URL.`));
+  }
+  if (/^https?:\/\/\S+$/i.test(flowBaseUrl)) {
+    config.modules.flow.baseUrl = flowBaseUrl;
+    config.modules.flow.webhookEndpoint = `${flowBaseUrl.replace(/\/+$/, "")}/webhooks/proofcore`;
+  } else if (flowBaseUrl) {
+    err(flags, yellow(flags, `FLOW base URL ignored: ${flowBaseUrl} is not an http(s) URL.`));
+  }
+  if (exitExport) {
+    config.modules.exit.exportSource = {
+      kind: /^https?:\/\//i.test(exitExport) ? "http" : "file",
+      value: exitExport,
+      method: "GET",
+      headers: {},
+    };
+  }
   const path = join(root, "proofcore.config.ts");
   try {
     await writeFile(path, renderConfigFile(config), "utf8");
@@ -2508,7 +2563,15 @@ async function commandScan(flags: GlobalFlags, args: string[], only: string[]): 
     } else if (arg === "--login-email") {
       login = { url: login?.url ?? "", email: args[++i] ?? "", password: login?.password ?? "" };
     } else if (arg === "--login-password") {
-      login = { url: login?.url ?? "", email: login?.email ?? "", password: args[++i] ?? "" };
+      // A password in argv is visible in the process list, shell history and CI logs.
+      err(
+        flags,
+        red(
+          flags,
+          "--login-password is not accepted. Set PROOFCORE_LOGIN_PASSWORD, or omit it and let the CLI prompt."
+        )
+      );
+      return 64;
     } else if (arg === "--verify-token") {
       ownershipToken = args[++i] ?? "";
       if (!ownershipToken) {
@@ -2517,9 +2580,30 @@ async function commandScan(flags: GlobalFlags, args: string[], only: string[]): 
       }
     }
   }
-  if (login && (!login.url || !login.email || !login.password)) {
-    err(flags, red(flags, "--login needs all three: --login-url, --login-email, --login-password"));
+  if (login && (!login.url || !login.email)) {
+    err(flags, red(flags, "--login needs --login-url and --login-email."));
     return 64;
+  }
+  if (login && !login.password) {
+    const fromEnv = process.env.PROOFCORE_LOGIN_PASSWORD;
+    if (fromEnv) {
+      login.password = fromEnv;
+    } else if (stdin.isTTY) {
+      login.password = await readSecret(`Password for ${login.email}: `);
+      if (!login.password) {
+        err(flags, red(flags, "No password entered."));
+        return 64;
+      }
+    } else {
+      err(
+        flags,
+        red(
+          flags,
+          "No password. Set PROOFCORE_LOGIN_PASSWORD (never pass it as an argument) or run in a terminal so the CLI can prompt."
+        )
+      );
+      return 64;
+    }
   }
   const wanted = new Set([...only, ...extraOnly].filter(Boolean));
   if (extraOnly.some((item) => !["fail", "clean", "flow", "world", "exit"].includes(item))) {
@@ -3827,6 +3911,152 @@ async function commandAgentTools(
   }
 }
 
+interface CloudProjectRow {
+  id: string;
+  name: string;
+  baseUrl: string;
+}
+
+/**
+ * `proofcore config pull` — the web configuration, in the repository, without typing it.
+ *
+ * The API already stores and validates the module subtree; downloading it uses the same
+ * session as `proofcore status`. Nothing secret is written: the file holds targets and
+ * variable names, and tokens stay in the environment.
+ */
+async function commandConfig(flags: GlobalFlags, args: string[]): Promise<number> {
+  if (args[0] !== "pull") {
+    err(
+      flags,
+      red(
+        flags,
+        "Usage: proofcore config pull [--project <id|name>] [--workspace <id>] [--out <file>] [--force]"
+      )
+    );
+    return 64;
+  }
+  const apiUrl = resolveApiUrl(flagValue(args, "--api"));
+  const session = await loadStoredSession(apiUrl);
+  if (!session) {
+    err(
+      flags,
+      red(
+        flags,
+        "Not signed in. Run `proofcore login` first: config pull reads the project through your account."
+      )
+    );
+    return 2;
+  }
+  try {
+    const auth = await apiGet<SessionPayload>(session, "/api/auth/session");
+    const workspaceId = flagValue(args, "--workspace") ?? auth.workspaces?.[0]?.id;
+    if (!workspaceId) {
+      err(flags, red(flags, "This account has no workspace yet."));
+      return 2;
+    }
+    const listed = await apiGet<{ items?: CloudProjectRow[]; projects?: CloudProjectRow[] }>(
+      session,
+      `/api/v1/projects?workspaceId=${encodeURIComponent(workspaceId)}&limit=200`
+    );
+    const projects = listed.items ?? listed.projects ?? [];
+    if (projects.length === 0) {
+      err(flags, red(flags, "No project in this workspace."));
+      return 2;
+    }
+    const wanted =
+      flagValue(args, "--project") ?? args.slice(1).find((arg) => !arg.startsWith("-"));
+    const project = wanted
+      ? projects.find((item) => item.id === wanted || item.name === wanted)
+      : projects.length === 1
+        ? projects[0]
+        : undefined;
+    if (!project) {
+      err(flags, red(flags, "Name the project with --project; this workspace has several:"));
+      for (const item of projects) err(flags, `  ${item.id}  ${item.name}`);
+      return 2;
+    }
+    const body = await apiGet<{
+      config: unknown;
+      source: string;
+      precheck: string;
+      issues: { path: string; message: string }[];
+    }>(
+      session,
+      `/api/v1/projects/${encodeURIComponent(project.id)}/config?workspaceId=${encodeURIComponent(workspaceId)}`
+    );
+    const outPath = resolve(flags.cwd, flagValue(args, "--out") ?? "proofcore.config.json");
+    if (existsSync(outPath) && !args.includes("--force")) {
+      err(flags, red(flags, `${outPath} already exists. Add --force to replace it.`));
+      return 2;
+    }
+    await writeFile(outPath, `${JSON.stringify(body.config, null, 2)}\n`, "utf8");
+    if (flags.json) {
+      stdout.write(
+        `${JSON.stringify({ path: outPath, project: project.id, source: body.source, precheck: body.precheck }, null, 2)}\n`
+      );
+      return 0;
+    }
+    out(flags, green(flags, `Wrote ${outPath}`));
+    out(flags, dim(flags, `project ${project.name} · source ${body.source} · ${body.precheck}`));
+    if (body.precheck !== "READY") {
+      out(
+        flags,
+        yellow(
+          flags,
+          body.precheck === "NOT_CONFIGURED"
+            ? "This project has no saved configuration yet: modules without a target will be SKIPPED."
+            : "This configuration is BLOCKED: fix the listed settings in the web before running it."
+        )
+      );
+      for (const issue of body.issues.slice(0, 5)) {
+        out(flags, dim(flags, `  ${issue.path} — ${issue.message}`));
+      }
+    }
+    return 0;
+  } catch (error) {
+    err(flags, red(flags, describeError(error).message));
+    return 2;
+  }
+}
+
+/** Read a password without echoing it; never used for anything stored. */
+function readSecret(prompt: string): Promise<string> {
+  if (!stdin.isTTY) return Promise.resolve("");
+  return new Promise((resolvePromise) => {
+    stdout.write(prompt);
+    const terminal = stdin as typeof stdin & { setRawMode?: (mode: boolean) => void };
+    terminal.setRawMode?.(true);
+    stdin.resume();
+    stdin.setEncoding("utf8");
+    let value = "";
+    const finish = (result: string) => {
+      terminal.setRawMode?.(false);
+      stdin.pause();
+      stdin.off("data", onData);
+      stdout.write("\n");
+      resolvePromise(result);
+    };
+    const onData = (chunk: string) => {
+      for (const char of chunk) {
+        if (char === "\r" || char === "\n") {
+          finish(value);
+          return;
+        }
+        if (char === "\u0003") {
+          finish("");
+          return;
+        }
+        if (char === "\u007f" || char === "\b") {
+          value = value.slice(0, -1);
+          continue;
+        }
+        value += char;
+      }
+    };
+    stdin.on("data", onData);
+  });
+}
+
 function printHelp(flags: GlobalFlags): void {
   const w = (text: string): void => {
     stdout.write(`${text}\n`);
@@ -3834,17 +4064,20 @@ function printHelp(flags: GlobalFlags): void {
   printBanner(flags);
   w("Usage: proofcore <command> [options]");
   w("");
-  w(bold(flags, "Commands"));
-  w("  init                     Create proofcore.config.ts in this directory");
+  w(bold(flags, "Start here"));
+  w("  init                     Create proofcore.config.ts, guided in a terminal");
   w("  doctor                   Check the runtime, config and module wiring");
   w("  validate                 Validate the configuration and exit");
   w("  test                     Run the enabled modules");
+  w(bold(flags, "\nModules and scans"));
   w("  world | flow | exit      Run one core module locally in this repository");
   w("  module <id> [args]       Run world, flow, exit or an audit module");
   w("  modules                  Show local module wiring and run commands");
   w("  fail | clean <url>       Run one audit module locally");
   w("  report [json|junit|html|text]   Render the last run");
+  w(bold(flags, "\nAccount and cloud"));
   w("  projects                 List projects");
+  w("  config pull              Download the project configuration from the web");
   w(
     "  ui, dashboard            Full-screen terminal console (login, projects, runs, billing, admin)"
   );
@@ -3852,6 +4085,7 @@ function printHelp(flags: GlobalFlags): void {
   w("  login | logout           Sign in interactively / remove the stored session");
   w("  sync                     Upload the last run to the API");
   w("  ai <status|tools|ask|agent>  MCP servers, AI providers and external agents");
+  w(bold(flags, "\nAd-hoc scans"));
   w("  audit fail|clean <url>       FAIL: security scan · CLEAN: UI quality score");
   w("  check <url>                  both of the above, in one run");
   w("  map [dir]                   architecture as a Mermaid dependency diagram");
@@ -3861,6 +4095,7 @@ function printHelp(flags: GlobalFlags): void {
   w("  debug <file> --line <n>     breakpoints and real variable scopes");
   w("  svg <name> [--out file]     deterministic SVG icon");
   w("  tools                       list every agent tool and where it lives");
+  w(bold(flags, "\nLocal tools and agent"));
   w("  app                         the application, in its own window (what the icon runs)");
   w('  agent ["prompt"] [--yes]     local coding agent: reads, edits, runs, with diffs');
   w("  agent --effort low|medium|high   how many reviewers and how far a turn may run");
@@ -3870,6 +4105,7 @@ function printHelp(flags: GlobalFlags): void {
   w("  serve [--port 7317]         local agent + web page, synced to the account");
   w('  exec "<cmd>" [--writable]   run a command in a container, or refuse');
   w("  complete <file> --line <n>  inline completion, for an editor integration");
+  w(bold(flags, "\nIntegrations"));
   w("  mcp                      Serve PROOFCORE as an MCP server over stdio");
   w("");
   w(bold(flags, "test options"));
@@ -3894,7 +4130,7 @@ function printHelp(flags: GlobalFlags): void {
   w('  --cookie "name=value"    Cookie sent with the request, repeatable');
   w("  --login-url <url>        Sign in before scanning (use a read-only audit account)");
   w("  --login-email <email>    Account created for the audit");
-  w("  --login-password <pw>    Its password; used once, never stored or printed");
+  w("                           Password: PROOFCORE_LOGIN_PASSWORD or a hidden prompt");
   w("  --verify-token <token>   The token from /app/scan, to unlock exact locations");
   w("");
   w(bold(flags, "exit codes"));

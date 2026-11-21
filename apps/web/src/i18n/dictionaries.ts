@@ -1,5 +1,5 @@
 /**
- * PROOFSTACK UI strings. English is the source; French is a real translation, not a
+ * PROOFCORE UI strings. English is the source; French is a real translation, not a
  * machine echo. Keys are flat so a missing string is obvious in a diff.
  */
 export const en = {
@@ -20,7 +20,7 @@ export const en = {
   "hero.eyebrow": "Integrated software quality suite",
   "hero.title": "Make Software Work Everywhere.",
   "hero.lede":
-    "Your software has to work for a user in Abidjan, one in Paris and one in Montréal, on a phone as much as on a desktop. PROOFSTACK tests what they actually live through: locale formats, checkout journeys, exports, security headers, interface quality. It runs on your machine; the report is yours.",
+    "Your software has to work for a user in Abidjan, one in Paris and one in Montréal, on a phone as much as on a desktop. PROOFCORE tests what they actually live through: locale formats, checkout journeys, exports, security headers, interface quality. It runs on your machine; the report is yours.",
   "hero.cta.primary": "Start for free",
   "hero.cta.explore": "See how it works",
   "hero.cta.docs": "Read the docs",
@@ -42,7 +42,7 @@ export const en = {
     "Decisions, conventions and past lessons live with the workspace, so a new assistant starts already knowing your product.",
   "home.ai.cta": "Run a first audit",
   "home.ai.docs": "How the audit works",
-  "home.ai.sample.bar": "PROOFSTACK ASSISTANT",
+  "home.ai.sample.bar": "PROOFCORE ASSISTANT",
   "home.ai.sample.effort": "effort: medium · 2 sub-agents",
   "home.ai.sample.recorded": "recorded example",
   "home.ai.sample.title": "EXIT — export round trip, 3 findings",
@@ -172,10 +172,10 @@ export const en = {
   "footer.developers": "Developers",
   "footer.company": "Company",
   "footer.status": "Status",
-  "footer.rights": "© {year} PROOFSTACK. All rights reserved.",
+  "footer.rights": "© {year} PROOFCORE. All rights reserved.",
   "footer.notAffiliated":
     "Five modules, one engine: global compatibility, journey reliability, export integrity, security and interface quality.",
-  "auth.signin.title": "Sign in to PROOFSTACK",
+  "auth.signin.title": "Sign in to PROOFCORE",
   "auth.signup.title": "Create your account",
   "auth.email": "Email",
   "auth.password": "Password",
@@ -192,7 +192,7 @@ export const en = {
   "auth.haveAccount": "Already have an account?",
   "auth.noAccount": "No account yet?",
   "download.eyebrow": "Application",
-  "download.title": "Download PROOFSTACK",
+  "download.title": "Download PROOFCORE",
   "download.lede":
     "The desktop app for Windows and Linux, with the embedded browser, terminal and assistant tools.",
   "download.cta": "Download",
@@ -225,11 +225,11 @@ export const en = {
   "ws.status.unavailable": "unavailable",
   "device.signinRequired": "Sign in to approve a device login",
   "device.signinHint":
-    "A PROOFSTACK CLI asked for access with a short code. Approval happens in a signed-in browser.",
+    "A PROOFCORE CLI asked for access with a short code. Approval happens in a signed-in browser.",
   "device.goSignin": "Sign in first",
   "device.title": "Device login request",
   "device.description":
-    "A device is asking to sign in to PROOFSTACK as {email}. Approve only if you started this yourself with `proofcore login --device`.",
+    "A device is asking to sign in to PROOFCORE as {email}. Approve only if you started this yourself with `proofcore login --device`.",
   "device.codeLabel": "CODE SHOWN IN THE TERMINAL",
   "device.approve": "Approve",
   "device.deny": "Deny",
@@ -269,7 +269,7 @@ export const fr: Messages = {
   "hero.eyebrow": "Suite intégrée de qualité logicielle",
   "hero.title": "Faites fonctionner vos logiciels partout.",
   "hero.lede":
-    "Votre logiciel doit marcher pour un utilisateur à Abidjan, un à Paris et un à Montréal, sur mobile comme sur ordinateur. PROOFSTACK teste ce qu'ils vivent vraiment : formats locaux, parcours de paiement, exports, en-têtes de sécurité, qualité d'interface. Tout tourne sur votre machine ; le rapport vous appartient.",
+    "Votre logiciel doit marcher pour un utilisateur à Abidjan, un à Paris et un à Montréal, sur mobile comme sur ordinateur. PROOFCORE teste ce qu'ils vivent vraiment : formats locaux, parcours de paiement, exports, en-têtes de sécurité, qualité d'interface. Tout tourne sur votre machine ; le rapport vous appartient.",
   "hero.cta.primary": "Commencer gratuitement",
   "hero.cta.explore": "Voir comment ça marche",
   "hero.cta.docs": "Lire la documentation",
@@ -291,7 +291,7 @@ export const fr: Messages = {
     "Décisions, conventions et leçons passées vivent avec l'espace de travail : un nouvel assistant démarre en connaissant déjà votre produit.",
   "home.ai.cta": "Lancer un premier audit",
   "home.ai.docs": "Comment l'audit fonctionne",
-  "home.ai.sample.bar": "ASSISTANT PROOFSTACK",
+  "home.ai.sample.bar": "ASSISTANT PROOFCORE",
   "home.ai.sample.effort": "effort : moyen · 2 sous-agents",
   "home.ai.sample.recorded": "exemple enregistré",
   "home.ai.sample.title": "EXIT — aller-retour d'export, 3 constats",
@@ -426,10 +426,10 @@ export const fr: Messages = {
   "footer.developers": "Développeurs",
   "footer.company": "Entreprise",
   "footer.status": "Statut",
-  "footer.rights": "© {year} PROOFSTACK. Tous droits réservés.",
+  "footer.rights": "© {year} PROOFCORE. Tous droits réservés.",
   "footer.notAffiliated":
     "Cinq modules, un moteur : compatibilité mondiale, fiabilité des parcours, intégrité des exports, sécurité et qualité d'interface.",
-  "auth.signin.title": "Connectez-vous à PROOFSTACK",
+  "auth.signin.title": "Connectez-vous à PROOFCORE",
   "auth.signup.title": "Créez votre compte",
   "auth.email": "E-mail",
   "auth.password": "Mot de passe",
@@ -446,7 +446,7 @@ export const fr: Messages = {
   "auth.haveAccount": "Vous avez déjà un compte ?",
   "auth.noAccount": "Pas encore de compte ?",
   "download.eyebrow": "Application",
-  "download.title": "Télécharger PROOFSTACK",
+  "download.title": "Télécharger PROOFCORE",
   "download.lede":
     "L’application de bureau pour Windows et Linux, avec le navigateur intégré, le terminal et les outils de l’assistant.",
   "download.cta": "Télécharger",
@@ -479,11 +479,11 @@ export const fr: Messages = {
   "ws.status.unavailable": "indisponible",
   "device.signinRequired": "Connectez-vous pour approuver une connexion d'appareil",
   "device.signinHint":
-    "Un CLI PROOFSTACK demande l'accès avec un code à durée de vie courte. L'approbation se fait ici, session ouverte.",
+    "Un CLI PROOFCORE demande l'accès avec un code à durée de vie courte. L'approbation se fait ici, session ouverte.",
   "device.goSignin": "Se connecter d'abord",
   "device.title": "Demande de connexion d'appareil",
   "device.description":
-    "Un appareil demande à se connecter à PROOFSTACK en tant que {email}. N'approuvez que si vous avez lancé `proofcore login --device` vous-même.",
+    "Un appareil demande à se connecter à PROOFCORE en tant que {email}. N'approuvez que si vous avez lancé `proofcore login --device` vous-même.",
   "device.codeLabel": "CODE AFFICHÉ DANS LE TERMINAL",
   "device.approve": "Approuver",
   "device.deny": "Refuser",

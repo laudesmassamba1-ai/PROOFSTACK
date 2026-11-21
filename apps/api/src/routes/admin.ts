@@ -1,9 +1,10 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import type { Database } from "../db/types.js";
 import { nullableStr, num, parseJson, type Row, str } from "../db/types.js";
 import { isAdminEmail } from "../env.js";
 import { HttpError } from "../http/errors.js";
-import { requireUser } from "../http/guards.js";
+import { readBody, requireUser } from "../http/guards.js";
 import type { AppEnv, Services } from "../http/services.js";
 
 /**
@@ -288,6 +289,45 @@ export function adminRoutes(services: Services): Hono<AppEnv> {
         error: nullableStr(row, "error"),
       })),
     });
+  });
+
+  /**
+   * Customer messages, with their current workflow state.
+   *
+   * Read-only apart from the reply below: the creator answers a message, and the customer
+   * can then read that answer with the reference and the address they wrote from.
+   */
+  app.get("/support", async (c) => {
+    const rows = await services.store.listSupportMessages(50);
+    return c.json({
+      items: rows.map((row) => ({
+        id: str(row, "id"),
+        from: str(row, "from_address"),
+        subject: str(row, "subject"),
+        body: str(row, "body"),
+        status: str(row, "status"),
+        reply: nullableStr(row, "reply_body"),
+        repliedAt: nullableStr(row, "replied_at"),
+        createdAt: str(row, "created_at"),
+        updatedAt: nullableStr(row, "updated_at"),
+      })),
+    });
+  });
+
+  app.post("/support/:reference/reply", async (c) => {
+    const body = await readBody(
+      c,
+      z
+        .object({
+          reply: z.string().min(1).max(6000),
+          status: z.enum(["open", "in_progress", "resolved"]).default("resolved"),
+        })
+        .strict()
+    );
+    const message = await services.store.getSupportMessage(c.req.param("reference"));
+    if (!message) throw new HttpError(404, "support_not_found", "No message with this reference.");
+    await services.store.replyToSupportMessage(message.id, body.reply, body.status);
+    return c.json({ ok: true, reference: message.id, status: body.status });
   });
 
   return app;

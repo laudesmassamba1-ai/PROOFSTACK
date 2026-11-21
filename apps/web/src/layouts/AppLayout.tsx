@@ -323,7 +323,7 @@ export function AppLayout() {
       <div className="app-shell">
         <div className="app-frame">
           <header className="app-topbar">
-            <NavLink to="/app" className="app-brand-lockup" aria-label="PROOFSTACK workspace">
+            <NavLink to="/app" className="app-brand-lockup" aria-label="PROOFCORE workspace">
               <Mark size={34} variant="onLight" />
               <span className="wordmark app-brand-word">ROOFCORE</span>
               <span className="app-beta">{t("ws.shell.beta")}</span>
@@ -358,7 +358,7 @@ export function AppLayout() {
           <div className="app-service-mark" aria-hidden>
             <CloudOff size={34} strokeWidth={1.35} />
           </div>
-          <p className="app-eyebrow">PROOFSTACK / OFFLINE</p>
+          <p className="app-eyebrow">PROOFCORE / OFFLINE</p>
           <h1 className="app-display app-service-title">{t("ws.service.title")}</h1>
           <p className="app-support">{t("ws.service.body")}</p>
           <div className="app-service-actions">
@@ -406,7 +406,7 @@ export function AppLayout() {
     <div className="app-shell">
       <div className="app-frame">
         <header className="app-topbar">
-          <NavLink to="/app" className="app-brand-lockup" aria-label="PROOFSTACK workspace">
+          <NavLink to="/app" className="app-brand-lockup" aria-label="PROOFCORE workspace">
             <Mark size={34} variant="onLight" />
             <span className="wordmark app-brand-word">ROOFCORE</span>
             <span className="app-beta">{t("ws.shell.beta")}</span>
@@ -653,7 +653,7 @@ export function AppLayout() {
         </main>
 
         <footer className="app-footer">
-          <span>PROOFSTACK / {workspace?.name ?? "workspace"}</span>
+          <span>PROOFCORE / {workspace?.name ?? "workspace"}</span>
           <span>WORLD · FLOW · EXIT · FAIL · CLEAN</span>
         </footer>
       </div>
@@ -802,7 +802,7 @@ export function PageHeader({
 }) {
   const { locale } = useI18n();
   const sectionLabel =
-    eyebrow ?? (locale === "fr" ? "PROOFSTACK / espace de travail" : "PROOFSTACK / workspace");
+    eyebrow ?? (locale === "fr" ? "PROOFCORE / espace de travail" : "PROOFCORE / workspace");
   return (
     <header className="app-page-head">
       <p className="app-eyebrow">{sectionLabel}</p>

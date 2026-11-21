@@ -7682,3 +7682,54 @@ p {
   margin-top: 1px;
   color: var(--accent);
 }
+
+/* Real scan phases: the server writes each line; nothing advances on a timer. */
+.scan-progress-card {
+  margin-top: 1rem;
+}
+.scan-progress-list {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.9rem 1.25rem 1.1rem;
+}
+.scan-progress-step {
+  display: grid;
+  grid-template-columns: 1.1rem minmax(0, 1fr);
+  gap: 0.15rem 0.5rem;
+  align-items: start;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.scan-progress-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1rem;
+}
+.scan-progress-dot {
+  width: 0.36rem;
+  height: 0.36rem;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.45;
+}
+.scan-progress-label {
+  min-width: 0;
+}
+.scan-progress-detail {
+  grid-column: 2;
+  font-size: 0.72rem;
+  opacity: 0.8;
+}
+.scan-progress-step.is-running {
+  color: var(--text);
+}
+.scan-progress-step.is-done {
+  color: var(--muted);
+}
+.scan-progress-step.is-done .scan-progress-mark {
+  color: var(--success, #2f9e6d);
+}
+.scan-progress-step.is-failed {
+  color: var(--danger, #c0392b);
+}
