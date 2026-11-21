@@ -35,6 +35,9 @@ export function webhookRoutes(services: Services): Hono<AppEnv> {
       throw new HttpError(413, "payload_too_large", "Webhook payload exceeds 256 KB.");
 
     const body = await c.req.text();
+    // `content-length` is optional on a chunked request, so check the actual body too.
+    if (body.length > 256_000)
+      throw new HttpError(413, "payload_too_large", "Webhook payload exceeds 256 KB.");
     const headers: Record<string, string> = {};
     for (const [key, value] of Object.entries(c.req.header())) {
       if (value !== undefined) headers[key.toLowerCase()] = value;

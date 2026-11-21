@@ -331,17 +331,23 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
       const tracked = new Map(
         (await services.store.listAuditFindingStates(workspace.id, body.projectId)).map((row) => [
           String(row.finding_key),
-          String(row.state),
+          {
+            state: String(row.state),
+            note: row.note ? String(row.note) : null,
+          },
         ])
       );
       for (const item of comparison.resolved) {
         const current = tracked.get(item.key);
-        if (current === "todo" || current === "in_progress") {
+        if (current?.state === "todo" || current?.state === "in_progress") {
           await services.store.setAuditFindingState({
             workspaceId: workspace.id,
             projectId: body.projectId,
             findingKey: item.key,
             state: "verify",
+            // The automatic transition is about the code disappearing; it must not
+            // erase the human note attached to the finding.
+            note: current.note,
           });
         }
       }
@@ -501,17 +507,24 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
           );
           const tracked = new Map(
             (await services.store.listAuditFindingStates(workspace.id, body.projectId)).map(
-              (row) => [String(row.finding_key), String(row.state)]
+              (row) => [
+                String(row.finding_key),
+                {
+                  state: String(row.state),
+                  note: row.note ? String(row.note) : null,
+                },
+              ]
             )
           );
           for (const item of comparison.resolved) {
             const current = tracked.get(item.key);
-            if (current === "todo" || current === "in_progress") {
+            if (current?.state === "todo" || current?.state === "in_progress") {
               await services.store.setAuditFindingState({
                 workspaceId: workspace.id,
                 projectId: body.projectId,
                 findingKey: item.key,
                 state: "verify",
+                note: current.note,
               });
             }
           }

@@ -18,7 +18,7 @@ const RELEASES = [
     known: [
       "Desktop installers are built for Linux and Windows; macOS remains CLI-only",
       "On Windows the terminal runs in line mode: a PTY is a POSIX facility, and shipping one would mean a native module per Electron ABI",
-      "The world and flow modules still drive HTTP targets; browser journeys are an assistant tool, not a module yet",
+      "FLOW browser journeys run from the local CLI; a server-side audit reports them skipped because it has no browser",
     ],
   },
   {
@@ -36,7 +36,7 @@ const RELEASES = [
     ],
     known: [
       "Web and API are live on Vercel and Cloudflare Workers with a provisioned D1 database; a production sign-up → session → overview path is verified",
-      "WORLD and FLOW drive HTTP targets; Playwright browser journeys are not implemented yet",
+      "WORLD and FLOW drive HTTP targets; FLOW browser journeys are executed locally by the CLI",
       "SasPay live payments are untested without credentials; the sandbox provider exercises the lifecycle",
       "No email provider is configured, so verification and password-reset messages are reported as unsent rather than faked; workspace invitations reach the person inside the app",
     ],

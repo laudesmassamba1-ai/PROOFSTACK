@@ -333,6 +333,28 @@ describe("support status and reply", () => {
   });
 });
 
+describe("operator surface", () => {
+  it("does not grant delivery status to a self-registered @proofcore.dev address", async () => {
+    // Regression: the domain used to be the only proof. Anyone could sign up as
+    // ceo@proofcore.dev and read the whole outbox, including reset links.
+    const cookie = await signUp(harness, "intruder@proofcore.dev");
+    const response = await harness.request("/api/account/delivery-status", {
+      headers: { cookie },
+    });
+    expect(response.status).toBe(403);
+    const body = (await response.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("forbidden");
+  });
+
+  it("keeps the surface available to an explicit admin", async () => {
+    const cookie = await signUp(harness, "ops@example.com");
+    const response = await harness.request("/api/account/delivery-status", {
+      headers: { cookie },
+    });
+    expect(response.status).toBe(200);
+  });
+});
+
 describe("email delivery", () => {
   it("records a failed delivery as failed when the provider refuses", async () => {
     const server = createServer((_req, res) => {

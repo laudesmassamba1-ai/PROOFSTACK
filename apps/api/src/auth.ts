@@ -26,7 +26,10 @@ const PBKDF2_ITERATIONS = 100_000;
 const SALT_BYTES = 16;
 const KEY_BITS = 256;
 export const SESSION_COOKIE = "ps_session";
-export const SESSION_TTL_DAYS = 30;
+// A stolen cookie is usable until it expires. Seven days bounds that window without
+// forcing a working session to re-authenticate every day; password change and reset
+// revoke every session immediately.
+export const SESSION_TTL_DAYS = 7;
 
 function subtle() {
   const crypto = globalThis.crypto;

@@ -2,6 +2,7 @@ import { runUploadRequestSchema } from "@proofcore/contracts";
 import { type Context, Hono } from "hono";
 import { hashToken } from "../auth.js";
 import { HttpError } from "../http/errors.js";
+import { readBody } from "../http/guards.js";
 import type { AppEnv, Services } from "../http/services.js";
 import { deliverWorkspaceEvent } from "../outbound.js";
 import type { ApiKeyRecord, RunTotals } from "../store/app-store.js";
@@ -72,27 +73,10 @@ export function machineRoutes(services: Services): Hono<AppEnv> {
     );
     if (existing) return c.json({ ...(existing as object), recorded: false }, 200);
 
-    let raw: unknown;
-    try {
-      raw = await c.req.json();
-    } catch {
-      throw new HttpError(400, "invalid_json", "Request body must be JSON.");
-    }
-    const parsed = runUploadRequestSchema.safeParse(raw);
-    if (!parsed.success) {
-      throw new HttpError(
-        400,
-        "invalid_run",
-        "The run payload does not match the report contract.",
-        {
-          issues: parsed.error.issues.slice(0, 20).map((issue) => ({
-            path: issue.path.join(".") || "(root)",
-            message: issue.message,
-          })),
-        }
-      );
-    }
-    const { run } = parsed.data;
+    // `c.req.json()` has no size limit: an authenticated key could stream an
+    // arbitrarily large report into a Worker and exhaust its memory. The shared
+    // reader enforces the declared length and the parsed size.
+    const { run } = await readBody(c, runUploadRequestSchema);
 
     // Tenant authority comes from the key, not the payload.
     if (run.workspaceId !== key.workspaceId) {

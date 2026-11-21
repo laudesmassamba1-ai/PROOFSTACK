@@ -47,8 +47,8 @@ run on this checkout.
 
 | Item                                                           | State                                         | Evidence                                                                                                                                                                                                                                               |
 | -------------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Shared configuration UI for WORLD/FLOW/EXIT                    | Available for every field the engine executes | `/app/projects/:id/config` plus `GET`/`PUT /api/v1/projects/:id/config`; FLOW journey steps stay schema-only and are not offered.                                                                                                                      |
-| FLOW scenario builder                                          | **Not implemented**                           | The engine supports configured journeys, but no UI creates them.                                                                                                                                                                                       |
+| Shared configuration UI for WORLD/FLOW/EXIT                    | Available for every field the engine executes | `/app/projects/:id/config` plus `GET`/`PUT /api/v1/projects/:id/config`; FLOW journeys and their steps are editable and saved with the project.                                                                                                        |
+| FLOW scenario builder                                          | **Available (local runs)**                    | `/app/projects/:id/config` composes journeys; `proofcore test --module flow` executes them in the local browser. A server-side audit skips them with a reason, because it has no browser.                                                              |
 | FAIL/CLEAN results explained                                   | Partial                                       | Findings carry `id`, `observed`, `why`; the scan page groups them and writes a plain summary. Per-finding fix instructions and documentation links are not generated.                                                                                  |
 | Distinct PASS / FAIL / SKIP / BLOCKED / NOT CONFIGURED / ERROR | Available for the pre-check                   | `GET /projects/:id/config` returns `precheck: NOT_CONFIGURED \| BLOCKED \| READY`; the project page shows a distinct banner for an unconfigured project and for a saved-but-refused configuration. Module verdicts remain PASS/WARN/FAIL/not measured. |
 
@@ -131,10 +131,11 @@ the same schema as the CLI, and persisted per project:
 - CORS now allows `PUT`; without it every save was blocked by the browser as a fake
   “API unreachable” error.
 
-**Explicit limits.** FLOW step-by-step `journeys` exist in the schema but no engine path
-executes them, so no builder is offered. There is no `proofcore config pull` command yet:
-the user downloads the JSON and places it at the repository root, then runs
-`proofcore test`. The editor does not store secrets; tokens stay in environment variables.
+**Explicit limits.** FLOW step-by-step `journeys` are composed in the editor and executed
+by the local CLI browser; the server-side audit cannot run a browser and reports them as
+skipped. There is no `proofcore config pull` command yet: the user downloads the JSON and
+places it at the repository root, then runs `proofcore test`. The editor does not store
+secrets; tokens stay in environment variables.
 
 Verified in Chrome: project page → “Configurer sans code” → change profiles and WORLD
 submit URL → save → reload → values persist → download contains the same values; server

@@ -224,7 +224,7 @@ pnpm cloud:deploy --dry-run
 - `projects.module_config` (migration 0016) + `GET/PUT /api/v1/projects/:id/config`. Validation avec les schémas `@proofcore/contracts` ; `422 config_unsafe` pour `live_charge` et export production non acquitté. Les avertissements ordinaires sont renvoyés avec la config enregistrée.
 - Page `/app/projects/:id/config` : WORLD (profils, catégories, cible HTTP, variable de jeton), FLOW (mode de paiement, scénarios, URLs), EXIT (formats, type de données, source, max, aller-retour), avertissements, sauvegarde, téléchargement `proofcore.config.json`.
 - CORS : `PUT` manquait dans `Access-Control-Allow-Methods`, ce qui faisait passer chaque sauvegarde pour une API injoignable ; corrigé et couvert par un test de préflight.
-- Limites assumées : les `journeys` FLOW sont dans le schéma mais aucun moteur ne les exécute → pas de constructeur factice. Pas de `config pull` : l'utilisateur télécharge le JSON, le place à la racine et lance `proofcore test`. Aucun secret stocké.
+- Les `journeys` FLOW sont désormais exécutés par `proofcore test` via Chromium local (`packages/cli/src/journey-runner.ts`) et éditables dans la page de configuration. Un audit serveur les marque `SKIPPED` (pas de navigateur), jamais PASS. Pas de `config pull` : l'utilisateur télécharge le JSON, le place à la racine et lance `proofcore test`. Aucun secret stocké.
 - Vérifié : biome 0, typecheck 0, tests 50 fichiers / 639, build web 0 ; Chrome : sauvegarde, rechargement, téléchargement et lecture serveur cohérents.
 
 ## 2026-11-21 (corrections, progression, support, identité)
@@ -236,3 +236,10 @@ pnpm cloud:deploy --dry-run
 - CLI : aide groupée, `init` guidé (modules + cibles WORLD/FLOW/EXIT), `config pull`, mot de passe refusé en argument (`PROOFCORE_LOGIN_PASSWORD` ou saisie masquée).
 - Support : `GET /api/account/support/:reference?email=` renvoie statut + réponse seulement si l'adresse correspond ; file opérateur `GET/POST /api/v1/admin/support` avec réponse.
 - Vérifié : biome 0 (394 fichiers), typecheck 0, 51 fichiers / 643 tests, build web 0. E2E local : SSE 200 avec 8 événements et 4 étapes réelles, 43 constats, `precheck=NOT_CONFIGURED`, PATCH `in_progress` persisté, support 200.
+
+## 2026-11-21 (audit sécurité, journeys FLOW, double scan production)
+
+- Audit écrit dans `Docs/security/AUDIT_2026-11-21.md`. Corrigés : escalade opérateur `@proofcore.dev` sur `/delivery-status` (allow-list seule), upload machine sans limite (413 via `readBody`), SSRF des redirections IA et des bases fournisseur, disjonction de contrôle d'hôte dans `fail_scan`. La note d'un constat est préservée lors du passage automatique à `verify`.
+- FLOW : `packages/modules/flow/src/journeys.ts` exécute réellement les étapes ; `packages/cli/src/journey-runner.ts` les pilote avec Chromium local ; l'éditeur `/app/projects/:id/config` compose parcours et étapes. Un audit serveur les marque `SKIPPED` (pas de navigateur), jamais PASS.
+- Production, compte QA neuf : deux scans de la page donnent 43 constats identiques (comparaison stable). Puis scan HTML (43) → PATCH `clean:headings` en `in_progress` → scan non-HTML (1 constat) : 43 résolus, le constat suivi devient `verify` avec `present:false`. Le 4ᵉ scan d'un compte gratuit répond 403 quota, comportement attendu.
+- Vérifié localement : suite complète 51 fichiers / 647 tests, typecheck 14 paquets + apps, Biome 0 sur les fichiers touchés. Les correctifs de sécurité ne sont pas encore déployés.

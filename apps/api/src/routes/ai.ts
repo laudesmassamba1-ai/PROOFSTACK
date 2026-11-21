@@ -215,7 +215,44 @@ function resolveProvider(
       );
     }
   }
+  assertProviderBaseUrl(resolvedBase);
   return provider.baseUrl === resolvedBase ? provider : { ...provider, baseUrl: resolvedBase };
+}
+
+/**
+ * A custom provider URL is fetched by the API with the user's key attached.
+ * Allowing loopback, link-local or private ranges would turn that form into an
+ * authenticated SSRF primitive against the deployment's own network. Only HTTPS,
+ * and only a public-looking host, is accepted for any provider base URL.
+ */
+function assertProviderBaseUrl(raw: string): void {
+  // The real-provider tests run a local HTTP upstream. This exception exists only
+  // under the test runner; a deployed Worker never satisfies it.
+  const testRuntime = process.env.VITEST === "true" || process.env.NODE_ENV === "test";
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new HttpError(400, "invalid_base_url", "The provider base URL is not a valid URL.");
+  }
+  if (parsed.protocol !== "https:" && !testRuntime) {
+    throw new HttpError(400, "insecure_base_url", "The provider base URL must use HTTPS.");
+  }
+  const host = parsed.hostname.toLowerCase();
+  if (
+    !testRuntime &&
+    (host === "localhost" ||
+      host.endsWith(".localhost") ||
+      host.endsWith(".internal") ||
+      host.endsWith(".local") ||
+      /^(127\.|10\.|192\.168\.|169\.254\.|0\.0\.0\.0|\[::1\]|\[?f[cd][0-9a-f]{2}:)/i.test(host))
+  ) {
+    throw new HttpError(
+      400,
+      "private_base_url",
+      "The provider base URL must be a public address, not a local or private host."
+    );
+  }
 }
 
 /**
@@ -337,6 +374,7 @@ async function callUpstream(input: {
     method: "POST",
     headers,
     body: JSON.stringify(payload),
+    redirect: "error",
     signal: AbortSignal.timeout(input.timeoutMs),
   }).catch((error: unknown) => {
     throw new HttpError(
@@ -1735,6 +1773,7 @@ function assertPublicUrl(raw: string): URL {
   }
   if (
     BLOCKED_HOSTS.test(parsed.hostname) ||
+    /^\[?(fc|fd|fe80|::ffff:127|::1)/i.test(parsed.hostname) ||
     BLOCKED_SUFFIXES.some((suffix) => parsed.hostname.endsWith(suffix))
   ) {
     throw new ProofCoreError({
@@ -1753,16 +1792,53 @@ function assertPublicUrl(raw: string): URL {
   return parsed;
 }
 
+async function readLimitedText(response: Response, maxBytes = 2_000_000): Promise<string> {
+  const reader = response.body?.getReader();
+  if (!reader) return (await response.text()).slice(0, maxBytes);
+  const chunks: Uint8Array[] = [];
+  let bytes = 0;
+  while (bytes < maxBytes) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const remaining = maxBytes - bytes;
+    const chunk = value.length > remaining ? value.slice(0, remaining) : value;
+    chunks.push(chunk);
+    bytes += chunk.length;
+    if (chunk.length < value.length) break;
+  }
+  await reader.cancel().catch(() => undefined);
+  const merged = new Uint8Array(bytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return new TextDecoder("utf-8", { fatal: false }).decode(merged);
+}
+
 async function fetchFrom(url: string): Promise<{ response: Response; text: string; ms: number }> {
-  assertPublicUrl(url);
+  // Redirects are followed one hop at a time: a public URL that redirects to
+  // 169.254.169.254 would otherwise bypass the initial check entirely.
   const started = Date.now();
-  const response = await fetch(url, {
-    redirect: "follow",
-    headers: { "user-agent": "PROOFCORE-Assistant/0.2 (+analysis; respects robots intent)" },
-    signal: AbortSignal.timeout(12_000),
+  let current = assertPublicUrl(url);
+  for (let hop = 0; hop <= 5; hop += 1) {
+    const response = await fetch(current, {
+      redirect: "manual",
+      headers: { "user-agent": "PROOFCORE-Assistant/0.2 (+analysis; respects robots intent)" },
+      signal: AbortSignal.timeout(12_000),
+    });
+    const location = response.headers.get("location");
+    if (response.status >= 300 && response.status < 400 && location) {
+      current = assertPublicUrl(new URL(location, current).toString());
+      continue;
+    }
+    return { response, text: await readLimitedText(response), ms: Date.now() - started };
+  }
+  throw new ProofCoreError({
+    message: "too many redirects",
+    category: "NETWORK",
+    code: "too_many_redirects",
   });
-  const text = await response.text();
-  return { response, text, ms: Date.now() - started };
 }
 
 async function fetchWeb(args: Record<string, unknown>, maxFetchChars: number) {
@@ -1984,7 +2060,9 @@ async function failScan(args: Record<string, unknown>, workspaceId: string, serv
     try {
       const base = new URL(project.baseUrl);
       const target = new URL(url);
-      return target.protocol === base.protocol || target.hostname === base.hostname;
+      // Both conditions, not either: `target.protocol === base.protocol` alone
+      // allowed a workspace whose base is http to scan any http host on the internet.
+      return target.hostname === base.hostname;
     } catch {
       return false;
     }

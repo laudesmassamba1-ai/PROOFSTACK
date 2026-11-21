@@ -7,6 +7,8 @@ import {
   type CheckoutRequest,
   type CheckoutResponse,
   createFlowProvider,
+  executeJourney,
+  type JourneyPage,
   looksPaid,
   type OrderState,
   type PaymentUnderTest,
@@ -287,6 +289,83 @@ describe("FLOW against a correct product", () => {
     const testCase = caseFor(run, "flow/checkout_success");
     expect(testCase.status).toBe("SKIPPED");
     expect(testCase.skippedReason).toContain("no payment target configured");
+  });
+});
+
+describe("FLOW browser journeys", () => {
+  it("executes steps in order and stops at a failed assertion", async () => {
+    const calls: string[] = [];
+    const page: JourneyPage = {
+      navigate: async (url) => void calls.push(`navigate:${url}`),
+      click: async (selector) => void calls.push(`click:${selector}`),
+      fill: async (selector, value) => void calls.push(`fill:${selector}=${value}`),
+      select: async (selector, value) => void calls.push(`select:${selector}=${value}`),
+      submit: async (selector) => void calls.push(`submit:${selector ?? "enter"}`),
+      waitFor: async (input) =>
+        void calls.push(`wait:${input.selector ?? input.text ?? input.url}`),
+      text: async () => "Commande confirmée",
+      url: async () => "https://shop.example/confirmation",
+      screenshot: async () => new Uint8Array([1, 2, 3]),
+      api: async () => 200,
+    };
+    const journey = {
+      id: "checkout",
+      name: "Checkout",
+      startUrl: "https://shop.example/cart",
+      destructive: false,
+      steps: [
+        { id: "s1", action: "click" as const, target: "#pay", timeoutMs: 5000, optional: false },
+        {
+          id: "s2",
+          action: "assertText" as const,
+          value: "confirmée",
+          timeoutMs: 5000,
+          optional: false,
+        },
+      ],
+    };
+    const result = await executeJourney(journey, page, {
+      baseUrl: "https://shop.example",
+      runId: "run_test",
+    });
+    expect(result.steps).toBe(2);
+    expect(calls).toEqual(["navigate:https://shop.example/cart", "click:#pay"]);
+  });
+
+  it("reports the failing step instead of passing silently", async () => {
+    const page = {
+      navigate: async () => undefined,
+      click: async () => undefined,
+      fill: async () => undefined,
+      select: async () => undefined,
+      submit: async () => undefined,
+      waitFor: async () => undefined,
+      text: async () => "page sans confirmation",
+      url: async () => "https://shop.example/cart",
+      screenshot: async () => new Uint8Array(),
+      api: async () => 200,
+    } satisfies JourneyPage;
+    await expect(
+      executeJourney(
+        {
+          id: "failing",
+          name: "Failing",
+          startUrl: "https://shop.example/cart",
+          destructive: false,
+          steps: [
+            {
+              id: "confirm",
+              action: "assertText" as const,
+              value: "Merci",
+              timeoutMs: 5000,
+              optional: false,
+            },
+          ],
+        },
+        page,
+        { baseUrl: "https://shop.example", runId: "run_test" }
+      )
+    ).rejects.toThrow(/confirm/);
   });
 });
 

@@ -73,8 +73,9 @@ The full, evidence-based list lives in `docs/AUDIT_2026-11.md`. The short versio
 - The CLI is distributable as a self-contained global tarball (`pnpm cli:install`), but
   `@proofcore/cli` is not published on the npm registry yet.
 - SasPay live path is untested without credentials; sandbox payments are tested.
-- Browser journeys for WORLD/FLOW remain HTTP/fixture based. The assistant has a real
-  Chromium over CDP; that is a tool, not a module driver.
+- FLOW browser journeys now run through the local Chromium over CDP (`proofcore test`);
+  server-side audits skip them because the Worker has no browser. WORLD remains
+  HTTP/fixture based.
 - The Windows desktop installer is built by the release workflow and checked for its
   packaged files, not launched on a Windows runner in this environment. It is unsigned,
   so Windows SmartScreen may warn until a code-signing certificate is configured. macOS

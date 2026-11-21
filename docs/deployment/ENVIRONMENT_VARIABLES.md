@@ -3,12 +3,13 @@
 ## Operations console
 
 `ADMIN_EMAILS` is a comma-separated allowlist of account emails allowed to read
-`/api/v1/admin/overview` and the `/app/admin` page. It is an authorization list, not a
-secret. An empty value disables the console (503 `admin_not_configured`); there is no
-"first user becomes admin" fallback. Set it in `apps/api/wrangler.toml` under `[vars]`
-for the Worker, or in the local environment for `pnpm api:dev`:
+`/api/v1/admin/overview` and the `/app/admin` page. An empty value disables the console
+(503 `admin_not_configured`); there is no "first user becomes admin" fallback. On the
+Worker it is stored as a secret so the repository does not publish the operator's
+address; locally it is an environment variable:
 
 ```bash
+wrangler secret put ADMIN_EMAILS     # production
 ADMIN_EMAILS="you@example.com" pnpm api:dev
 ```
 

@@ -726,8 +726,8 @@ curl -sS -X POST \
         <div class="label">À fournir</div>
         <div class="value">L’email du compte administrateur</div>
         <p class="small muted" style="margin-top: 4px">
-          Ce n’est pas un mot de passe et ce n’est pas un secret. Il sera ajouté à
-          <code>ADMIN_EMAILS</code> dans <code>apps/api/wrangler.toml</code>, puis le Worker sera
+          Ce n’est pas un mot de passe, mais il n’est plus publié dans le dépôt : il sera
+          enregistré dans le secret Worker <code>ADMIN_EMAILS</code>, puis le Worker sera
           redéployé.
         </p>
       </div>

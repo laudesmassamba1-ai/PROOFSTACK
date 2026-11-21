@@ -129,7 +129,13 @@ export async function fetchCatalogue(
 
   let response: Response;
   try {
-    response = await fetch(`${root}${path}`, { headers, signal: AbortSignal.timeout(15_000) });
+    // A provider endpoint never needs a redirect; following one would let a
+    // configured base URL pivot the request to an internal address.
+    response = await fetch(`${root}${path}`, {
+      headers,
+      redirect: "error",
+      signal: AbortSignal.timeout(15_000),
+    });
   } catch (error) {
     return {
       ok: false,

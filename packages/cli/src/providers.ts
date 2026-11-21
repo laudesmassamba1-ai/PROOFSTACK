@@ -6,6 +6,7 @@ import { createExitProvider, defaultExportSource } from "@proofcore/module-exit"
 import { createFlowProvider, defaultFlowTarget } from "@proofcore/module-flow";
 import * as worldProfiles from "@proofcore/module-world";
 import { createWorldProvider, HttpProductUnderTest } from "@proofcore/module-world";
+import { createBrowserJourneyRunner } from "./journey-runner.js";
 
 /**
  * Shared module provider assembly for every entry surface that runs the engine:
@@ -82,6 +83,10 @@ export async function assembleProviders(
         ...(flowTarget === undefined ? {} : { target: flowTarget }),
         ...(webhookSecretVar && process.env[webhookSecretVar]
           ? { webhookSecret: process.env[webhookSecretVar] }
+          : {}),
+        ...(config.modules.flow.browser.driver === "playwright" &&
+        config.modules.flow.journeys.length > 0
+          ? { journeyRunner: createBrowserJourneyRunner(config) }
           : {}),
       })
     );

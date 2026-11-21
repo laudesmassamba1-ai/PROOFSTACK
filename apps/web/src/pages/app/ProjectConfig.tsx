@@ -1,4 +1,4 @@
-import { ArrowLeft, Download, Loader2, Save } from "lucide-react";
+import { ArrowLeft, Download, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import type React from "react";
 import {
   Children,
@@ -25,9 +25,9 @@ import { useSession } from "../../lib/session.js";
  * and refuses a real charge; the saved result is a complete `proofcore.config.json` the
  * user can download and run with `proofcore test`.
  *
- * FLOW journeys are deliberately not editable: the schema accepts them, but no engine
- * path executes a step list yet. Showing a builder that produces unexecuted steps would
- * be a lie about what was verified.
+ * FLOW journeys are editable because the CLI now executes them with the local browser
+ * (`createBrowserJourneyRunner`). The server-side audit has no browser, so it reports
+ * those journeys as skipped instead of pretending they ran.
  */
 
 interface Issue {
@@ -51,10 +51,40 @@ interface WorldConfig {
   [key: string]: unknown;
 }
 
+type JourneyAction =
+  | "navigate"
+  | "click"
+  | "fill"
+  | "select"
+  | "submit"
+  | "waitFor"
+  | "assertText"
+  | "assertUrl"
+  | "screenshot"
+  | "api";
+
+interface JourneyStep {
+  id: string;
+  action: JourneyAction;
+  target?: string;
+  value?: string;
+  timeoutMs: number;
+  optional: boolean;
+}
+
+interface Journey {
+  id: string;
+  name: string;
+  startUrl?: string;
+  steps: JourneyStep[];
+  destructive: boolean;
+}
+
 interface FlowConfig {
   enabled: boolean;
   paymentMode: "simulated" | "sandbox" | "live_charge";
   scenarios: string[];
+  journeys: Journey[];
   baseUrl?: string;
   webhookEndpoint?: string;
   [key: string]: unknown;
@@ -112,6 +142,23 @@ const SCENARIOS = [
 ] as const;
 
 const FORMATS = ["json", "csv", "zip"] as const;
+
+const JOURNEY_ACTIONS: JourneyAction[] = [
+  "navigate",
+  "click",
+  "fill",
+  "select",
+  "submit",
+  "waitFor",
+  "assertText",
+  "assertUrl",
+  "screenshot",
+  "api",
+];
+
+function localId(prefix: string): string {
+  return `${prefix}_${crypto.randomUUID().replaceAll("-", "").slice(0, 8)}`;
+}
 
 function Field({
   label,
@@ -213,9 +260,24 @@ export function ProjectConfigPage(): React.ReactElement {
     setError(null);
     setSavedFlash(false);
     try {
+      // An empty optional URL is the absence of a value, not an invalid one: the
+      // schema validates `startUrl` as a URL when present.
+      const payload = {
+        ...config,
+        modules: {
+          ...config.modules,
+          flow: {
+            ...config.modules.flow,
+            journeys: (config.modules.flow.journeys ?? []).map((journey) => ({
+              ...journey,
+              ...(journey.startUrl?.trim() ? {} : { startUrl: undefined }),
+            })),
+          },
+        },
+      };
       const body = await apiFetch<ConfigResponse>(
         `/api/v1/projects/${projectId}/config?workspaceId=${session.workspaceId}`,
-        { method: "PUT", body: config }
+        { method: "PUT", body: payload }
       );
       setConfig({
         modules: body.config.modules,
@@ -271,6 +333,60 @@ export function ProjectConfigPage(): React.ReactElement {
 
   const toggleIn = (list: string[], value: string) =>
     list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
+
+  const journeys = flow.journeys ?? [];
+  const updateJourney = (id: string, patch: Partial<Journey>) =>
+    updateFlow({
+      journeys: journeys.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+    });
+  const addJourney = () => {
+    const id = localId("journey");
+    updateFlow({
+      journeys: [
+        ...journeys,
+        {
+          id,
+          name: fr ? "Parcours de connexion" : "Sign-in journey",
+          startUrl: flow.baseUrl ?? "",
+          destructive: false,
+          steps: [
+            {
+              id: localId("step"),
+              action: "navigate",
+              target: "/",
+              value: "",
+              timeoutMs: 15_000,
+              optional: false,
+            },
+          ],
+        },
+      ],
+    });
+  };
+  const addStep = (journeyId: string) => {
+    const journey = journeys.find((item) => item.id === journeyId);
+    if (!journey) return;
+    updateJourney(journeyId, {
+      steps: [
+        ...journey.steps,
+        {
+          id: localId("step"),
+          action: "click",
+          target: "",
+          value: "",
+          timeoutMs: 15_000,
+          optional: false,
+        },
+      ],
+    });
+  };
+  const updateStep = (journeyId: string, stepId: string, patch: Partial<JourneyStep>) => {
+    const journey = journeys.find((item) => item.id === journeyId);
+    if (!journey) return;
+    updateJourney(journeyId, {
+      steps: journey.steps.map((step) => (step.id === stepId ? { ...step, ...patch } : step)),
+    });
+  };
 
   return (
     <div className="app-page">
@@ -553,11 +669,179 @@ export function ProjectConfigPage(): React.ReactElement {
               />
             </Field>
           </div>
-          <p className="text-xs text-muted">
-            {fr
-              ? "Les parcours pas à pas (cliquer, saisir) sont acceptés par le schéma mais aucun moteur ne les exécute encore : ils ne sont donc pas proposés ici."
-              : "Step-by-step journeys (click, fill) are accepted by the schema but no engine executes them yet, so they are not offered here."}
-          </p>
+          <div className="border-t border-[var(--border)] pt-4">
+            <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-medium">
+                  {fr ? "Parcours navigateur" : "Browser journeys"}
+                </p>
+                <p className="text-xs text-muted">
+                  {fr
+                    ? "Exécutés par `proofcore test` avec le navigateur de votre machine, étape par étape. Un audit lancé depuis le serveur les marque comme ignorés : il n'a pas de navigateur."
+                    : "Executed by `proofcore test` with your machine's browser, step by step. A server-side audit marks them skipped because it has no browser."}
+                </p>
+              </div>
+              <button type="button" className="app-btn" onClick={addJourney}>
+                <Plus size={14} /> {fr ? "Ajouter un parcours" : "Add a journey"}
+              </button>
+            </div>
+            {journeys.length === 0 ? (
+              <p className="mt-3 text-xs text-muted">
+                {fr
+                  ? "Aucun parcours configuré. Les scénarios de paiement ci-dessus restent vérifiés sans navigateur."
+                  : "No journey configured. The payment scenarios above are still verified without a browser."}
+              </p>
+            ) : (
+              <div className="mt-3 space-y-3">
+                {journeys.map((journey) => (
+                  <div
+                    key={journey.id}
+                    className="rounded-[var(--radius)] border border-[var(--border)] p-3"
+                  >
+                    <div className="flex flex-wrap items-end gap-2">
+                      <div className="min-w-[180px] flex-1">
+                        <Field label={fr ? "Nom du parcours" : "Journey name"}>
+                          <input
+                            className="app-input"
+                            value={journey.name}
+                            onChange={(event) =>
+                              updateJourney(journey.id, { name: event.target.value })
+                            }
+                          />
+                        </Field>
+                      </div>
+                      <div className="min-w-[200px] flex-1">
+                        <Field label={fr ? "URL de départ" : "Start URL"}>
+                          <input
+                            className="app-input"
+                            value={journey.startUrl ?? ""}
+                            placeholder={flow.baseUrl ?? "https://exemple.com/connexion"}
+                            onChange={(event) =>
+                              updateJourney(journey.id, { startUrl: event.target.value })
+                            }
+                          />
+                        </Field>
+                      </div>
+                      <button
+                        type="button"
+                        className="app-btn"
+                        aria-label={fr ? "Supprimer le parcours" : "Remove journey"}
+                        onClick={() =>
+                          updateFlow({
+                            journeys: journeys.filter((item) => item.id !== journey.id),
+                          })
+                        }
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                    <div className="mt-2">
+                      <Toggle
+                        checked={journey.destructive}
+                        onChange={(destructive) => updateJourney(journey.id, { destructive })}
+                        label={
+                          fr
+                            ? "Parcours destructif (commande réelle, refusé en production)"
+                            : "Destructive journey (real order, refused in production)"
+                        }
+                      />
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {journey.steps.map((step, stepIndex) => (
+                        <div
+                          key={step.id}
+                          className="grid gap-2 rounded-[var(--radius)] bg-[var(--surface-2)] p-2 sm:grid-cols-[130px_1fr_1fr_90px_auto]"
+                        >
+                          <select
+                            className="app-input"
+                            aria-label={`${fr ? "Action" : "Action"} ${stepIndex + 1}`}
+                            value={step.action}
+                            onChange={(event) =>
+                              updateStep(journey.id, step.id, {
+                                action: event.target.value as JourneyAction,
+                              })
+                            }
+                          >
+                            {JOURNEY_ACTIONS.map((action) => (
+                              <option key={action} value={action}>
+                                {action}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            className="app-input"
+                            aria-label={`${fr ? "Cible" : "Target"} ${stepIndex + 1}`}
+                            value={step.target ?? ""}
+                            placeholder={fr ? "sélecteur CSS ou URL" : "CSS selector or URL"}
+                            onChange={(event) =>
+                              updateStep(journey.id, step.id, { target: event.target.value })
+                            }
+                          />
+                          <input
+                            className="app-input"
+                            aria-label={`${fr ? "Valeur" : "Value"} ${stepIndex + 1}`}
+                            value={step.value ?? ""}
+                            placeholder={fr ? "texte saisi ou attendu" : "text to type or expect"}
+                            onChange={(event) =>
+                              updateStep(journey.id, step.id, { value: event.target.value })
+                            }
+                          />
+                          <input
+                            className="app-input"
+                            type="number"
+                            min={1000}
+                            max={120000}
+                            step={1000}
+                            aria-label={`${fr ? "Délai" : "Timeout"} ${stepIndex + 1}`}
+                            value={step.timeoutMs}
+                            onChange={(event) =>
+                              updateStep(journey.id, step.id, {
+                                timeoutMs: Number(event.target.value) || 15_000,
+                              })
+                            }
+                          />
+                          <div className="flex items-center gap-1">
+                            <label className="flex items-center gap-1 text-xs">
+                              <input
+                                type="checkbox"
+                                checked={step.optional}
+                                onChange={(event) =>
+                                  updateStep(journey.id, step.id, {
+                                    optional: event.target.checked,
+                                  })
+                                }
+                              />
+                              {fr ? "facultatif" : "optional"}
+                            </label>
+                            <button
+                              type="button"
+                              className="app-btn"
+                              aria-label={fr ? "Supprimer l'étape" : "Remove step"}
+                              disabled={journey.steps.length <= 1}
+                              onClick={() =>
+                                updateJourney(journey.id, {
+                                  steps: journey.steps.filter((item) => item.id !== step.id),
+                                })
+                              }
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      className="app-btn mt-2"
+                      onClick={() => addStep(journey.id)}
+                    >
+                      <Plus size={13} /> {fr ? "Ajouter une étape" : "Add a step"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </Card>
 

@@ -36,10 +36,10 @@ WEB_ORIGIN = "https://proofstack-iota.vercel.app,https://proofstack-01z.pages.de
 API_ORIGIN = "https://proofcore-api.laudesmassamba1.workers.dev"
 
 # Comma-separated allowlist for the read-only /app/admin operations console.
-# This is an authorization list, not a secret. Empty disables the console; there is
-# no "first user is admin" fallback. Set it to the creator's own account email:
-#   ADMIN_EMAILS = "you@example.com"
-ADMIN_EMAILS = "extends08@gmail.com"
+# It is set as a Worker secret, never committed: publishing the operator's address
+# in the repository gives phishing a target. Empty disables the console; there is no
+# "first user is admin" fallback:
+#   wrangler secret put ADMIN_EMAILS
 
 # Assistant requests per hour, per account and address. High on purpose: a person working
 # with their own assistant must never meet it; it stops a runaway loop, not a conversation.

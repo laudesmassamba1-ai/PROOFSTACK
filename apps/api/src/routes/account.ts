@@ -377,6 +377,16 @@ export function accountRoutes(services: Services): Hono<AppEnv> {
   };
 
   app.get("/support/:reference", async (c) => {
+    // The reference is long, but this endpoint is public: a durable per-address
+    // counter keeps a distributed caller from turning it into a free oracle.
+    const ip = clientAddress({ get: (name) => c.req.header(name) });
+    const scope = `support:lookup:${ip}`;
+    const since = new Date(services.clock().getTime() - 60 * 60_000);
+    if ((await services.store.countAuthAttempts(scope, since)) >= 30) {
+      c.header("Retry-After", "3600");
+      throw new HttpError(429, "too_many_attempts", "Trop de recherches. Réessaie dans une heure.");
+    }
+    await services.store.recordAuthAttempt(scope);
     const address = c.req.query("email") ?? "";
     if (!address.includes("@")) {
       throw new HttpError(400, "invalid_email", "Add the address that wrote the message.");
@@ -589,10 +599,11 @@ export function accountRoutes(services: Services): Hono<AppEnv> {
       ? await services.store.findSessionByTokenHash(await hashToken(token))
       : undefined;
     if (!found) throw new HttpError(401, "not_authenticated", "Connecte-toi d'abord.");
-    const isOperator =
-      found.user.email === services.config.supportEmail ||
-      found.user.email.endsWith("@proofcore.dev");
-    if (!isOperator && !isAdmin(services, found.user.email)) {
+    // An address ending in the product's domain is not a proof of anything: anyone
+    // can sign up as `anything@proofcore.dev` and would otherwise read the whole
+    // outbox, including reset links. Operator status comes only from the explicit
+    // allow-list, exactly like `/outbox/:id`.
+    if (!isAdmin(services, found.user.email)) {
       throw new HttpError(403, "forbidden", "Réservé à l'opérateur.");
     }
     return c.json({

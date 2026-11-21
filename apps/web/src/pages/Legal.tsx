@@ -204,16 +204,14 @@ export function Cookies() {
 
       <H>Cookie de session</H>
       <p>
-        <code className="rounded bg-white/10 px-1 py-0.5 text-[12px] text-white">
-          proofcore_session
-        </code>{" "}
-        — jeton opaque,{" "}
+        <code className="rounded bg-white/10 px-1 py-0.5 text-[12px] text-white">ps_session</code> —
+        jeton opaque,{" "}
         <code className="rounded bg-white/10 px-1 py-0.5 text-[12px] text-white">HttpOnly</code>,{" "}
         <code className="rounded bg-white/10 px-1 py-0.5 text-[12px] text-white">Secure</code> en
         HTTPS,{" "}
         <code className="rounded bg-white/10 px-1 py-0.5 text-[12px] text-white">SameSite=Lax</code>
-        . Le serveur ne stocke que son empreinte SHA-256. Durée : 30 jours, renouvelée à chaque
-        connexion.
+        . Le serveur ne stocke que son empreinte SHA-256. Durée : 7 jours à partir de la connexion ;
+        un changement ou une réinitialisation de mot de passe révoque les autres sessions.
       </p>
 
       <H>Stockage local</H>

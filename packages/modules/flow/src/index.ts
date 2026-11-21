@@ -2,6 +2,7 @@ import type { ModuleId, ProofCoreConfig } from "@proofcore/contracts";
 import type { ModuleProvider, SuiteInput, TestSuiteDef } from "@proofcore/engine";
 import { buildFlowSuites, type FlowCheckOptions } from "./checks.js";
 import type { FlowScenario, PaymentUnderTest } from "./harness.js";
+import { buildJourneySuites, type JourneyRunner } from "./journeys.js";
 import { HttpPaymentTarget } from "./target.js";
 
 export const FLOW_VERSION = "0.1.0";
@@ -12,6 +13,8 @@ export interface FlowProviderOptions {
   scenarios?: readonly FlowScenario[];
   /** Resolved from `modules.flow.webhookSecretEnvVar` by the caller. Never persisted. */
   webhookSecret?: string;
+  /** Browser-backed journey executor. Present only in a runtime with a browser. */
+  journeyRunner?: JourneyRunner;
 }
 
 /**
@@ -36,7 +39,10 @@ export function createFlowProvider(options: FlowProviderOptions = {}): ModulePro
         ...(options.scenarios === undefined ? {} : { scenarios: options.scenarios }),
         ...(options.webhookSecret === undefined ? {} : { webhookSecret: options.webhookSecret }),
       };
-      return buildFlowSuites(checkOptions);
+      return [
+        ...buildFlowSuites(checkOptions),
+        ...buildJourneySuites(input.config, runId, options.journeyRunner),
+      ];
     },
   };
 }
@@ -62,4 +68,5 @@ export function defaultFlowTarget(
 
 export * from "./checks.js";
 export * from "./harness.js";
+export * from "./journeys.js";
 export * from "./target.js";
