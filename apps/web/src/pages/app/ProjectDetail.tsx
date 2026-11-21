@@ -400,10 +400,15 @@ export default config;`;
             title="Configuration"
             description={
               fr
-                ? "À copier dans proofcore.config.ts à la racine du projet."
-                : "Copy into proofcore.config.ts at your project root."
+                ? "Modifiez les réglages dans le formulaire, ou copiez le fichier ci-dessous si vous préférez la version experte."
+                : "Edit the settings in the form, or copy the file below if you prefer the expert version."
             }
           >
+            <div className="px-5 pt-4">
+              <Link to={`/app/projects/${projectId}/config`} className="app-btn app-btn-primary">
+                {fr ? "Configurer sans code" : "Configure without code"}
+              </Link>
+            </div>
             <pre className="overflow-x-auto px-5 py-4 app-mono leading-relaxed text-muted">
               {config}
             </pre>

@@ -218,3 +218,11 @@ pnpm cloud:deploy --dry-run
 - UX : mode Simple par défaut (Vue d'ensemble, Projets, Démarrer) ; bascule Studio dans l'en-tête, persistée par navigateur (`proofcore.ui-mode.v1`) sans toucher aux données. Accueil sans projet : « Que souhaitez-vous faire aujourd'hui ? » avec 4 portes réelles.
 - Docs : compte de tests figé retiré du README, promesse SDK retirée, contradiction MCP résolue (API hébergée ≠ serveur MCP ; `proofcore mcp` est un serveur stdio local). `docs/REFACTOR_PROGRESS.md` liste honnêtement ce qui reste.
 - Vérifié : biome 0 (389 fichiers), typecheck propre 0, tests 49 fichiers / 630, build web 0 ; Chrome : accueil 4 choix, bascule Simple/Studio persistante, `/app/start` OK, `/download` sans appel GitHub.
+
+## 2026-11-21 (suite) — configuration des modules sans TypeScript
+
+- `projects.module_config` (migration 0016) + `GET/PUT /api/v1/projects/:id/config`. Validation avec les schémas `@proofcore/contracts` ; `422 config_unsafe` pour `live_charge` et export production non acquitté. Les avertissements ordinaires sont renvoyés avec la config enregistrée.
+- Page `/app/projects/:id/config` : WORLD (profils, catégories, cible HTTP, variable de jeton), FLOW (mode de paiement, scénarios, URLs), EXIT (formats, type de données, source, max, aller-retour), avertissements, sauvegarde, téléchargement `proofcore.config.json`.
+- CORS : `PUT` manquait dans `Access-Control-Allow-Methods`, ce qui faisait passer chaque sauvegarde pour une API injoignable ; corrigé et couvert par un test de préflight.
+- Limites assumées : les `journeys` FLOW sont dans le schéma mais aucun moteur ne les exécute → pas de constructeur factice. Pas de `config pull` : l'utilisateur télécharge le JSON, le place à la racine et lance `proofcore test`. Aucun secret stocké.
+- Vérifié : biome 0, typecheck 0, tests 50 fichiers / 639, build web 0 ; Chrome : sauvegarde, rechargement, téléchargement et lecture serveur cohérents.

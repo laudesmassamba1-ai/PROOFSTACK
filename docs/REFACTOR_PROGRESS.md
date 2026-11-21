@@ -111,3 +111,32 @@ publiée”.
 
 Verified after deployment: `GET /api/v1/releases/latest` answers 200 without a session on
 both hosts (see the deployment section of the final report).
+
+## Update — 2026-11-21, module configuration without code
+
+WORLD, FLOW and EXIT now have a configuration that is edited in the web, validated with
+the same schema as the CLI, and persisted per project:
+
+- `projects.module_config` (migration `0016_project_module_config.sql`), exposed by
+  `GET`/`PUT /api/v1/projects/:id/config`. The GET returns a complete `ProofCoreConfig`
+  built from the project's own fields plus the saved module subtree.
+- A save that would let a real charge or an unacknowledged production export run is
+  refused with `422 config_unsafe`, carrying the exact issue paths. Ordinary advice (for
+  example “WORLD has no target yet”) is returned with the saved configuration instead of
+  being hidden.
+- The editor at `/app/projects/:id/config` only offers fields the engine reads: WORLD
+  profiles/categories/HTTP target/token variable, FLOW payment mode/scenarios/base and
+  webhook URLs, EXIT formats/data type/export source/max records/round-trip. It shows the
+  validation warnings, saves, and downloads `proofcore.config.json` — no TypeScript file.
+- CORS now allows `PUT`; without it every save was blocked by the browser as a fake
+  “API unreachable” error.
+
+**Explicit limits.** FLOW step-by-step `journeys` exist in the schema but no engine path
+executes them, so no builder is offered. There is no `proofcore config pull` command yet:
+the user downloads the JSON and places it at the repository root, then runs
+`proofcore test`. The editor does not store secrets; tokens stay in environment variables.
+
+Verified in Chrome: project page → “Configurer sans code” → change profiles and WORLD
+submit URL → save → reload → values persist → download contains the same values; server
+`GET` reports `source: "saved"` and zero issues. API suite covers default config, save/read
+round trip, live-charge refusal, malformed URL, unknown project and the CORS preflight.

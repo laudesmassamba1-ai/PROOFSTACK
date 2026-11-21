@@ -58,6 +58,9 @@ const ProjectDetail = lazy(() =>
 const AppModulePage = lazy(() =>
   import("./pages/app/ModulePage.js").then((m) => ({ default: m.ModulePage }))
 );
+const ProjectConfigPage = lazy(() =>
+  import("./pages/app/ProjectConfig.js").then((m) => ({ default: m.ProjectConfigPage }))
+);
 const ScanPage = lazy(() =>
   import("./pages/app/Scan.js").then((module) => ({ default: module.ScanPage }))
 );
@@ -138,6 +141,7 @@ export function App() {
           <Route index element={<Overview />} />
           <Route path="projects" element={<Projects />} />
           <Route path="projects/:projectId" element={<ProjectDetail />} />
+          <Route path="projects/:projectId/config" element={<ProjectConfigPage />} />
           <Route path="workspace" element={<WorkspacePage />} />
           <Route path="modules" element={<ModulesIndex />} />
           <Route path="scan" element={<ScanPage />} />

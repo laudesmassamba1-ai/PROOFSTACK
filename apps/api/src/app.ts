@@ -82,7 +82,12 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
       c.header("Vary", "Origin");
     }
     if (c.req.method === "OPTIONS") {
-      c.header("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
+      c.header(
+        // PUT is used by the project module configuration; omitting it made every save
+        // fail in the browser as a CORS error before the request ever reached a route.
+        "Access-Control-Allow-Methods",
+        "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+      );
       c.header(
         "Access-Control-Allow-Headers",
         "content-type, authorization, idempotency-key, x-request-id"

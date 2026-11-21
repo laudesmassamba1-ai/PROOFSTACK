@@ -145,6 +145,8 @@ export interface ProjectRecord {
   stack: string | null;
   environment: EnvironmentKind;
   enabledModules: ModuleId[];
+  /** JSON subtree saved by the web configuration editor; null means "not configured". */
+  moduleConfig: string | null;
   createdAt: string;
   updatedAt: string;
   lastRunAt: string | null;
@@ -1616,6 +1618,7 @@ export class AppStore {
       stack: input.stack ?? null,
       environment: input.environment,
       enabledModules: input.enabledModules,
+      moduleConfig: null,
       createdAt: now,
       updatedAt: now,
       lastRunAt: null,
@@ -1640,6 +1643,25 @@ export class AppStore {
       )
       .run();
     return project;
+  }
+
+  /**
+   * Saves the validated module subtree. The route validates it first; this method only
+   * persists, so a half-validated object can never reach the column.
+   */
+  async setProjectModuleConfig(
+    workspaceId: string,
+    projectId: string,
+    moduleConfig: string
+  ): Promise<boolean> {
+    const result = await this.db
+      .prepare(
+        `UPDATE projects SET module_config = ?, updated_at = ?
+         WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`
+      )
+      .bind(moduleConfig, iso(this.clock()), projectId, workspaceId)
+      .run();
+    return result.changes > 0;
   }
 
   async listProjects(workspaceId: string): Promise<ProjectRecord[]> {
@@ -2302,6 +2324,7 @@ function mapProject(row: Row): ProjectRecord {
     stack: nullableStr(row, "stack"),
     environment: str(row, "environment") as EnvironmentKind,
     enabledModules: parseJson<ModuleId[]>(row.enabled_modules, []),
+    moduleConfig: nullableStr(row, "module_config"),
     createdAt: str(row, "created_at"),
     updatedAt: str(row, "updated_at"),
     lastRunAt: nullableStr(row, "last_run_at"),

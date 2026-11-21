@@ -16,6 +16,13 @@ import { readBody, requireUser, requireWorkspace } from "../http/guards.js";
 import { pageBody, readPage } from "../http/pagination.js";
 import type { AppEnv, Services } from "../http/services.js";
 import { isValidWebhookUrl, WEBHOOK_EVENTS } from "../outbound.js";
+import {
+  blockingIssues,
+  buildProjectConfig,
+  projectConfigInputSchema,
+  projectConfigIssues,
+  readStoredProjectConfig,
+} from "../project-config.js";
 
 const createWorkspaceSchema = z.object({ name: z.string().min(2).max(80) }).strict();
 
@@ -379,6 +386,66 @@ export function workspaceRoutes(services: Services): Hono<AppEnv> {
     const project = await services.store.getProject(workspace.id, c.req.param("projectId"));
     if (!project) throw new HttpError(404, "project_not_found", "Project not found.");
     return c.json({ project: projectDto(project) });
+  });
+
+  /**
+   * The effective module configuration for a project.
+   *
+   * Built from the project's own fields plus the saved module subtree, so the answer is
+   * always a complete, parseable `ProofCoreConfig` — exactly what the CLI would load.
+   * `issues` are returned, not hidden: a missing target is information, not a failure.
+   */
+  app.get("/projects/:projectId/config", async (c) => {
+    const { workspace } = await requireWorkspace(c, services, c.req.query("workspaceId"));
+    const project = await services.store.getProject(workspace.id, c.req.param("projectId"));
+    if (!project) throw new HttpError(404, "project_not_found", "Project not found.");
+    const stored = readStoredProjectConfig(project.moduleConfig);
+    const config = buildProjectConfig(project, stored);
+    return c.json({
+      config,
+      issues: projectConfigIssues(config),
+      savedAt: stored?.savedAt ?? null,
+      source: stored ? "saved" : "defaults",
+    });
+  });
+
+  app.put("/projects/:projectId/config", async (c) => {
+    const { workspace } = await requireWorkspace(c, services, c.req.query("workspaceId"), [
+      "owner",
+      "admin",
+      "member",
+    ]);
+    const body = await readBody(c, projectConfigInputSchema);
+    const project = await services.store.getProject(workspace.id, c.req.param("projectId"));
+    if (!project) throw new HttpError(404, "project_not_found", "Project not found.");
+
+    const savedAt = new Date(services.clock()).toISOString();
+    const stored = { ...body, savedAt };
+    const config = buildProjectConfig(project, stored);
+    const issues = projectConfigIssues(config);
+    const blocking = blockingIssues(issues);
+    if (blocking.length > 0) {
+      throw new HttpError(
+        422,
+        "config_unsafe",
+        "This configuration cannot be run automatically. Fix the listed settings and save again.",
+        { issues: blocking }
+      );
+    }
+
+    const saved = await services.store.setProjectModuleConfig(
+      workspace.id,
+      project.id,
+      JSON.stringify(stored)
+    );
+    if (!saved) throw new HttpError(404, "project_not_found", "Project not found.");
+    await services.store.appendAudit({
+      workspaceId: workspace.id,
+      actor: c.get("user").id,
+      action: "project.config_updated",
+      detail: { projectId: project.id },
+    });
+    return c.json({ config, issues, savedAt, source: "saved" });
   });
 
   app.patch("/projects/:projectId", async (c) => {
