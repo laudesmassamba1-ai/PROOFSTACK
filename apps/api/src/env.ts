@@ -46,6 +46,13 @@ export interface AppConfig {
    */
   resendApiKey: string | undefined;
   mailFrom: string | undefined;
+  /** EmailJS server-side delivery. All four values are required together. */
+  emailjsServiceId: string | undefined;
+  emailjsTemplateId: string | undefined;
+  emailjsPublicKey: string | undefined;
+  emailjsPrivateKey: string | undefined;
+  /** Neon Postgres holding uploaded project files and AI code-audit results. */
+  neonDatabaseUrl: string | undefined;
   /** Address shown to customers for support, and recipient of support notifications. */
   supportEmail: string;
   /**
@@ -111,6 +118,11 @@ export function readConfig(env: Env): AppConfig {
     aiKeysSecret: env.AI_KEYS_SECRET,
     resendApiKey: env.RESEND_API_KEY,
     mailFrom: env.MAIL_FROM,
+    emailjsServiceId: env.EMAILJS_SERVICE_ID?.trim() || undefined,
+    emailjsTemplateId: env.EMAILJS_TEMPLATE_ID?.trim() || undefined,
+    emailjsPublicKey: env.EMAILJS_PUBLIC_KEY?.trim() || undefined,
+    emailjsPrivateKey: env.EMAILJS_PRIVATE_KEY?.trim() || undefined,
+    neonDatabaseUrl: env.NEON_DATABASE_URL?.trim() || undefined,
     supportEmail: env.SUPPORT_EMAIL ?? "support@proofcore.dev",
     cfAccountId: env.CF_ACCOUNT_ID?.trim() || undefined,
     aiRateLimitPerHour: positiveInt(env.AI_RATE_LIMIT_PER_HOUR, 5000),

@@ -1,0 +1,38 @@
+# Copy to apps/api/.dev.vars for `wrangler dev`, and to .env for the Node dev server.
+# Never commit real values.
+
+# Origin of the web app. Cookies are only issued/checked against this origin.
+WEB_ORIGIN=http://localhost:5173
+API_ORIGIN=http://localhost:8787
+
+# --- SasPay (optional in development) ---------------------------------------
+# Without both values the API uses the deterministic sandbox provider, which moves
+# no money. With both values, checkout calls the real SasPay test API.
+# Dev key must start with sk_test_. The webhook secret is shown once when the
+# webhook is created in the SasPay dashboard.
+SASPAY_API_KEY=
+SASPAY_WEBHOOK_SECRET=
+# SASPAY_BASE_URL=https://sandbox-api.saspay.me/api/v1
+# SASPAY_FEE_CHARGE_MODE=ADD_ON
+
+# --- Project intelligence (optional) ---------------------------------------
+# Pooled PostgreSQL URL from Neon. Stores imported source files and AI code audits.
+# Auth, billing and runs stay in D1. Never commit the real value.
+NEON_DATABASE_URL=
+
+# --- AI provider key encryption --------------------------------------------
+# 32-byte hex value: openssl rand -hex 32. Required for /app/ai and AI audits.
+AI_KEYS_SECRET=
+
+# --- EmailJS (optional, preferred over Resend) ------------------------------
+# Enable "Allow EmailJS API for non-browser applications" in the EmailJS account.
+# The template must bind to_email, subject, message, html, from_name, reply_to.
+EMAILJS_SERVICE_ID=
+EMAILJS_TEMPLATE_ID=
+EMAILJS_PUBLIC_KEY=
+EMAILJS_PRIVATE_KEY=
+# MAIL_FROM=PROOFCORE <no-reply@example.com>
+# RESEND_API_KEY=
+
+# Local Node dev database (ignored by the Worker, which uses the D1 binding).
+DATA_PATH=.proofstack/api.db

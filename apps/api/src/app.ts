@@ -16,6 +16,7 @@ import { billingRoutes, planRoutes } from "./routes/billing.js";
 import { browserRoutes } from "./routes/browser.js";
 import { deviceRoutes } from "./routes/device.js";
 import { machineRoutes } from "./routes/machine.js";
+import { projectIntelligenceRoutes } from "./routes/project-intelligence.js";
 import { releaseRoutes } from "./routes/releases.js";
 import { webhookRoutes } from "./routes/webhooks.js";
 import { workspaceRoutes } from "./routes/workspace.js";
@@ -158,6 +159,7 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
   // The download page is public by design and must describe releases before sign-in.
   app.route("/api/v1", releaseRoutes({ token: services.config.githubToken }));
   app.route("/api/v1", workspaceRoutes(services));
+  app.route("/api/v1", projectIntelligenceRoutes(services));
   app.route("/api/v1/ai", aiRoutes(services));
   app.route("/api/v1", auditRoutes(services));
   app.route("/api/v1/browser", browserRoutes(services));

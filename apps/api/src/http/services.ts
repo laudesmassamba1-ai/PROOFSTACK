@@ -5,6 +5,7 @@ import type { Database } from "../db/types.js";
 import type { EmailSender } from "../email.js";
 import { createEmailSender } from "../email.js";
 import type { AppConfig } from "../env.js";
+import { createProjectKnowledge, type ProjectKnowledge } from "../project-knowledge.js";
 import {
   type ApiKeyRecord,
   AppStore,
@@ -31,6 +32,8 @@ export interface Services {
   webhooks: WebhookProcessor;
   meter: UsageMeter;
   email: EmailSender;
+  /** Absent when NEON_DATABASE_URL is not configured: file audits then answer 503. */
+  projectKnowledge: ProjectKnowledge | null;
   clock: () => Date;
 }
 
@@ -47,7 +50,16 @@ export function createServices(input: {
   const email = createEmailSender(store, {
     ...(input.config.resendApiKey ? { RESEND_API_KEY: input.config.resendApiKey } : {}),
     ...(input.config.mailFrom ? { MAIL_FROM: input.config.mailFrom } : {}),
+    ...(input.config.emailjsServiceId ? { EMAILJS_SERVICE_ID: input.config.emailjsServiceId } : {}),
+    ...(input.config.emailjsTemplateId
+      ? { EMAILJS_TEMPLATE_ID: input.config.emailjsTemplateId }
+      : {}),
+    ...(input.config.emailjsPublicKey ? { EMAILJS_PUBLIC_KEY: input.config.emailjsPublicKey } : {}),
+    ...(input.config.emailjsPrivateKey
+      ? { EMAILJS_PRIVATE_KEY: input.config.emailjsPrivateKey }
+      : {}),
   });
+  const projectKnowledge = createProjectKnowledge(input.config.neonDatabaseUrl);
   const meter = new UsageMeter(billing, {
     now: () => clock().getTime(),
     iso: () => clock().toISOString(),
@@ -63,6 +75,7 @@ export function createServices(input: {
     webhooks,
     meter,
     email,
+    projectKnowledge,
     clock,
   };
 }

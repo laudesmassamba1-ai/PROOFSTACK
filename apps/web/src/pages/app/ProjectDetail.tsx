@@ -1,14 +1,22 @@
-import { AlertTriangle, ArrowLeft, FileJson, KeyRound, Play, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Brain,
+  FileJson,
+  KeyRound,
+  Play,
+  Settings2,
+  Trash2,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router";
-import { LoadMore } from "../../components/app/LoadMore.js";
-import { Card, Empty, ErrorState, Loading, StatusBadge } from "../../components/app/ui.js";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
+import { ProjectAiPanel, ProjectMetricsPanel } from "../../components/app/ProjectIntelligence.js";
+import { Empty, ErrorState, Loading, StatusBadge } from "../../components/app/ui.js";
 import { useI18n } from "../../i18n/index.js";
 import { PageHeader } from "../../layouts/AppLayout.js";
 import { API_BASE, type ApiError, apiFetch } from "../../lib/api.js";
 import { duration, formatDate, relativeTime } from "../../lib/format.js";
 import { useSession } from "../../lib/session.js";
-import { usePagedList } from "../../lib/usePagedList.js";
 
 interface Project {
   id: string;
@@ -17,8 +25,8 @@ interface Project {
   environment: string;
   stack?: string;
   enabledModules: string[];
-  createdAt: string;
 }
+
 interface Run {
   id: string;
   reportId?: string;
@@ -27,16 +35,7 @@ interface Run {
   durationMs: number;
   findingCount: number;
 }
-interface Finding {
-  id: string;
-  title: string;
-  module: string;
-  severity: string;
-  status: string;
-  code: string | null;
-  fingerprint: string | null;
-  detectedAt: string;
-}
+
 interface WebScan {
   id: string;
   url: string;
@@ -46,118 +45,66 @@ interface WebScan {
   createdAt: string;
 }
 
+type Tab = "ai" | "metrics" | "runs";
+
 export function ProjectDetail() {
   const { projectId } = useParams();
   const { workspaceId } = useSession();
   const { locale } = useI18n();
   const fr = locale === "fr";
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const initialTab = params.get("tab");
+  const [tab, setTab] = useState<Tab>(
+    initialTab === "metrics" || initialTab === "runs" ? initialTab : "ai"
+  );
   const [project, setProject] = useState<Project | null>(null);
-  const [expandedFinding, setExpandedFinding] = useState<string | null>(null);
+  const [runs, setRuns] = useState<Run[] | null>(null);
+  const [scans, setScans] = useState<WebScan[] | null>(null);
   const [error, setError] = useState<ApiError | Error | null>(null);
-
-  // Both lists are paged by the same hook, so "load more", the counter and the failure
-  // behaviour cannot drift between the runs table and the findings table.
-  const runsUrl = useCallback(
-    ({ limit, offset }: { limit: number; offset: number }) =>
-      `/api/v1/projects/${projectId}/runs?workspaceId=${workspaceId}&limit=${limit}&offset=${offset}`,
-    [projectId, workspaceId]
-  );
-  const findingsUrl = useCallback(
-    ({ limit, offset }: { limit: number; offset: number }) =>
-      `/api/v1/projects/${projectId}/findings?workspaceId=${workspaceId}&limit=${limit}&offset=${offset}`,
-    [projectId, workspaceId]
-  );
-  const runs = usePagedList<Run>({ url: runsUrl, uniqueBy: (run) => run.id });
-  const findings = usePagedList<Finding>({ url: findingsUrl, uniqueBy: (finding) => finding.id });
-  const [token, setToken] = useState<string | null>(null);
-  const [keyError, setKeyError] = useState<ApiError | Error | null>(null);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState<ApiError | Error | null>(null);
-  // Scans started from this page carry the project id, so this list is the project's own
-  // history — not the workspace's scans, and not only what CI uploaded.
-  const [scans, setScans] = useState<WebScan[] | null>(null);
-  // Three different pre-check states, not one banner: a project nobody configured yet
-  // is not a project whose saved settings the engine refuses to run.
-  const [precheck, setPrecheck] = useState<"NOT_CONFIGURED" | "BLOCKED" | "READY" | null>(null);
-  const [precheckIssues, setPrecheckIssues] = useState<{ path: string; message: string }[]>([]);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
+  const [tokenError, setTokenError] = useState<ApiError | Error | null>(null);
+  const [notConfigured, setNotConfigured] = useState(false);
 
   const load = useCallback(async () => {
     if (!workspaceId || !projectId) return;
     setError(null);
     try {
-      const body = await apiFetch<{ project: Project }>(
-        `/api/v1/projects/${projectId}?workspaceId=${workspaceId}`
-      );
-      setProject(body.project);
+      const [projectBody, runBody, scanBody] = await Promise.all([
+        apiFetch<{ project: Project }>(`/api/v1/projects/${projectId}?workspaceId=${workspaceId}`),
+        apiFetch<{ items: Run[] }>(
+          `/api/v1/projects/${projectId}/runs?workspaceId=${workspaceId}&limit=20`
+        ),
+        apiFetch<{ items: WebScan[] }>(
+          `/api/v1/audits?workspaceId=${workspaceId}&projectId=${projectId}&limit=10`
+        ),
+      ]);
+      setProject(projectBody.project);
+      setRuns(runBody.items);
+      setScans(scanBody.items);
+      void apiFetch<{ precheck: string }>(
+        `/api/v1/projects/${projectId}/config?workspaceId=${workspaceId}`
+      )
+        .then((config) => setNotConfigured(config.precheck === "NOT_CONFIGURED"))
+        .catch(() => setNotConfigured(false));
     } catch (caught) {
       setError(caught as ApiError);
     }
-    try {
-      const config = await apiFetch<{
-        precheck: "NOT_CONFIGURED" | "BLOCKED" | "READY";
-        issues: { path: string; message: string }[];
-      }>(`/api/v1/projects/${projectId}/config?workspaceId=${workspaceId}`);
-      setPrecheck(config.precheck);
-      setPrecheckIssues(config.issues);
-    } catch {
-      // The pre-check is an explanation, not the project itself: its absence must not
-      // replace the page with an error.
-      setPrecheck(null);
-    }
-    await Promise.all([runs.reload(), findings.reload()]);
-  }, [projectId, workspaceId, runs.reload, findings.reload]);
+  }, [projectId, workspaceId]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  useEffect(() => {
-    if (!workspaceId || !projectId) return;
-    let alive = true;
-    void apiFetch<{ items: WebScan[] }>(
-      `/api/v1/audits?workspaceId=${workspaceId}&projectId=${projectId}&limit=10`
-    )
-      .then((body) => {
-        if (alive) setScans(body.items);
-      })
-      .catch(() => {
-        // The history is a convenience: a failure here must not hide the project.
-        if (alive) setScans([]);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [workspaceId, projectId]);
-
-  const createKey = async () => {
-    if (!workspaceId || !projectId) return;
-    setKeyError(null);
-    setBusy(true);
-    try {
-      const body = await apiFetch<{ token: string }>("/api/v1/api-keys", {
-        method: "POST",
-        body: {
-          workspaceId,
-          projectId,
-          label: `${project?.name ?? "Project"} CI`,
-          scopes: ["runs:write", "reports:read"],
-        },
-      });
-      setToken(body.token);
-    } catch (caught) {
-      setKeyError(caught as ApiError);
-    } finally {
-      setBusy(false);
-    }
+  const chooseTab = (next: Tab) => {
+    setTab(next);
+    setParams(next === "ai" ? {} : { tab: next }, { replace: true });
   };
 
-  /**
-   * The five modules, from the browser: the project's own address is scanned server-side
-   * and the result opens already interpreted. No CLI, no token, no install step.
-   */
   const runModules = async () => {
     if (!workspaceId || !project || running) return;
     setRunning(true);
@@ -172,6 +119,28 @@ export function ProjectDetail() {
       setRunError(caught as ApiError);
     } finally {
       setRunning(false);
+    }
+  };
+
+  const createKey = async () => {
+    if (!workspaceId || !projectId) return;
+    setTokenError(null);
+    setBusy(true);
+    try {
+      const body = await apiFetch<{ token: string }>("/api/v1/api-keys", {
+        method: "POST",
+        body: {
+          workspaceId,
+          projectId,
+          label: `${project?.name ?? "Project"} CI`,
+          scopes: ["runs:write", "reports:read"],
+        },
+      });
+      setToken(body.token);
+    } catch (caught) {
+      setTokenError(caught as ApiError);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -192,31 +161,6 @@ export function ProjectDetail() {
 
   if (error) return <ErrorState error={error} onRetry={() => void load()} />;
   if (!project) return <Loading label={fr ? "Chargement du projet…" : "Loading project…"} />;
-
-  // FAIL and CLEAN are audits, not engine modules: they have no block in the config.
-  // Mapping them through a fallback used to emit `exit` three times, which silently
-  // overloaded the key in the generated TypeScript.
-  const moduleBlocks: Record<string, string> = {
-    world: `    world: { enabled: true, profiles: ["en-US", "fr-FR", "fr-BJ"] },`,
-    flow: `    flow: { enabled: true, paymentMode: "simulated" },`,
-    exit: `    exit: { enabled: true, formats: ["json", "csv"] },`,
-  };
-  const config = `import type { ProofCoreConfig } from "@proofcore/contracts";
-
-const config: ProofCoreConfig = {
-  schemaVersion: 1,
-  project: { name: ${JSON.stringify(project.name)}, baseUrl: ${JSON.stringify(project.baseUrl)} },
-  environment: ${JSON.stringify(project.environment)},
-  modules: {
-${project.enabledModules
-  .map((module) => moduleBlocks[module])
-  .filter((block): block is string => Boolean(block))
-  .join("\n")}
-  },
-  sync: { enabled: true, apiUrl: ${JSON.stringify(API_BASE)} },
-};
-
-export default config;`;
 
   return (
     <>
@@ -241,426 +185,243 @@ export default config;`;
               <Play size={14} />{" "}
               {running
                 ? fr
-                  ? "Modules en cours…"
-                  : "Running modules…"
+                  ? "Scan en cours…"
+                  : "Scanning…"
                 : fr
-                  ? "Lancer les modules"
-                  : "Run the modules"}
+                  ? "Scanner le site"
+                  : "Scan the site"}
             </button>
+            <Link to={`/app/projects/${project.id}/config`} className="app-btn">
+              <Settings2 size={14} /> {fr ? "Configurer" : "Configure"}
+            </Link>
             <button
               type="button"
               className="app-btn app-btn-danger"
               onClick={() => setConfirmingDelete(true)}
               disabled={busy}
             >
-              <Trash2 size={14} /> {fr ? "Supprimer" : "Delete"}
+              <Trash2 size={14} />
             </button>
           </>
         }
       />
 
-      {precheck === "NOT_CONFIGURED" ? (
-        <Card className="mb-4 border-warning/40">
-          <div className="flex flex-wrap items-start gap-3 px-5 py-4">
-            <AlertTriangle size={16} className="mt-0.5 text-warning" aria-hidden />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">
-                {fr ? "PROJET NON CONFIGURÉ" : "PROJECT NOT CONFIGURED"}
-              </p>
-              <p className="mt-1 text-xs leading-relaxed text-muted">
-                {fr
-                  ? "Aucune configuration n'a encore été enregistrée. Le scan de page reste possible, mais les modules qui ont besoin d'une cible (WORLD, FLOW, EXIT) produiront des cas ignorés — pas des succès."
-                  : "No configuration has been saved yet. The page scan still works, but modules that need a target (WORLD, FLOW, EXIT) will produce skipped cases — not passes."}
-              </p>
-            </div>
-            <Link
-              to={`/app/projects/${projectId}/config`}
-              className="app-btn app-btn-primary app-btn-sm"
-            >
-              {fr ? "Configurer" : "Configure"}
-            </Link>
-          </div>
-        </Card>
-      ) : precheck === "BLOCKED" ? (
-        <Card className="mb-4 border-danger/40">
-          <div className="flex flex-wrap items-start gap-3 px-5 py-4">
-            <AlertTriangle size={16} className="mt-0.5 text-danger" aria-hidden />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">
-                {fr ? "CONFIGURATION BLOQUÉE" : "CONFIGURATION BLOCKED"}
-              </p>
-              <p className="mt-1 text-xs leading-relaxed text-muted">
-                {fr
-                  ? "La configuration enregistrée contient un réglage que le moteur refuse d'exécuter automatiquement. Corrigez-le avant de lancer les modules."
-                  : "The saved configuration contains a setting the engine refuses to run automatically. Fix it before running the modules."}
-              </p>
-              {precheckIssues.length > 0 ? (
-                <ul className="mt-2 space-y-1 text-xs text-muted">
-                  {precheckIssues.slice(0, 3).map((issue) => (
-                    <li key={`${issue.path}-${issue.message}`}>
-                      <code className="app-mono">{issue.path}</code> — {issue.message}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-            <Link
-              to={`/app/projects/${projectId}/config`}
-              className="app-btn app-btn-primary app-btn-sm"
-            >
-              {fr ? "Corriger" : "Fix it"}
-            </Link>
-          </div>
-        </Card>
+      {notConfigured ? (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-[var(--radius)] border border-warning/40 bg-warning/5 px-4 py-3 text-xs">
+          <span className="min-w-0 flex-1">
+            {fr
+              ? "Les modules WORLD, FLOW et EXIT n'ont pas encore de cible enregistrée. L'audit IA fonctionne déjà sur les fichiers importés."
+              : "WORLD, FLOW and EXIT have no saved target yet. AI audit already works on imported files."}
+          </span>
+          <Link to={`/app/projects/${project.id}/config`} className="app-text-link">
+            {fr ? "Configurer" : "Configure"} <ArrowRight size={12} />
+          </Link>
+        </div>
       ) : null}
 
       {runError ? <ErrorState error={runError} onRetry={() => void runModules()} /> : null}
 
       {confirmingDelete ? (
-        <Card className="mb-5 border-danger/40">
-          <div className="px-5 py-4">
-            <p className="text-sm font-medium">
-              {fr ? "Supprimer ce projet ?" : "Delete this project?"}
-            </p>
-            <p className="mt-1 text-xs leading-relaxed text-muted">
-              {fr
-                ? "Le projet disparaît du workspace. Ses runs restent en base pour l'audit mais ne sont plus accessibles depuis cette page. Cela n'annule aucun paiement."
-                : "The project disappears from the dashboard. Its stored runs are kept in the database for audit but are no longer reachable from this page. This does not cancel anything you paid for."}
-            </p>
-            <div className="mt-3 flex gap-2">
-              <button
-                type="button"
-                className="app-btn app-btn-danger"
-                onClick={() => void remove()}
-                disabled={busy}
-              >
-                {fr ? "Supprimer le projet" : "Delete project"}
-              </button>
-              <button type="button" className="app-btn" onClick={() => setConfirmingDelete(false)}>
-                {fr ? "Le conserver" : "Keep it"}
-              </button>
-            </div>
+        <div className="mb-4 rounded-[var(--radius)] border border-danger/40 px-4 py-3">
+          <p className="text-sm font-medium">
+            {fr ? "Supprimer ce projet ?" : "Delete this project?"}
+          </p>
+          <p className="mt-1 text-xs text-muted">
+            {fr
+              ? "Le projet et son accès depuis cette page disparaissent. Les runs restent en base pour l'audit."
+              : "The project and its access from this page disappear. Runs stay stored for audit."}
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              className="app-btn app-btn-danger"
+              onClick={() => void remove()}
+              disabled={busy}
+            >
+              {fr ? "Supprimer" : "Delete"}
+            </button>
+            <button type="button" className="app-btn" onClick={() => setConfirmingDelete(false)}>
+              {fr ? "Conserver" : "Keep"}
+            </button>
           </div>
-        </Card>
+        </div>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[1.35fr_1fr]">
-        <Card
-          title={fr ? "Runs" : "Runs"}
-          description={
-            fr
-              ? "Un run vérifie ce projet. Lancez-en un ici, ou laissez la CI le faire à chaque envoi."
-              : "A run verifies this project. Start one here, or let CI upload it on every push."
-          }
-        >
-          {runs.items.length === 0 ? (
-            <Empty
-              title={fr ? "Aucun run pour l'instant" : "No run yet"}
-              body={
-                fr
-                  ? "Lancez les cinq modules sur l'adresse du projet : le résultat s'ouvre déjà expliqué. Aucun logiciel à installer."
-                  : "Run the five modules on the project address: the result opens already explained. Nothing to install."
-              }
-              action={
-                <button
-                  type="button"
-                  className="app-btn app-btn-primary"
-                  onClick={() => void runModules()}
-                  disabled={running}
-                >
-                  <Play size={14} /> {fr ? "Lancer les modules" : "Run the modules"}
-                </button>
-              }
-            />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="app-table">
-                <thead>
-                  <tr>
-                    <th>{fr ? "État" : "Status"}</th>
-                    <th>{fr ? "Démarré" : "Started"}</th>
-                    <th>{fr ? "Durée" : "Duration"}</th>
-                    <th>{fr ? "Constats" : "Findings"}</th>
-                    <th>{fr ? "Rapport" : "Report"}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {runs.items.map((run) => (
-                    <tr key={run.id}>
-                      <td>
-                        <StatusBadge status={run.status} />
-                      </td>
-                      <td className="text-muted">{formatDate(run.startedAt)}</td>
-                      <td className="text-muted">{duration(run.durationMs)}</td>
-                      <td>{run.findingCount}</td>
-                      <td>
-                        <a
-                          className="inline-flex items-center gap-1 text-primary hover:underline"
-                          href={`${API_BASE}/api/v1/reports/${run.reportId ?? ""}?workspaceId=${workspaceId}&format=html`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          <FileJson size={13} /> {fr ? "ouvrir" : "open"}
-                        </a>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          <LoadMore
-            shown={runs.items.length}
-            total={runs.total}
-            loading={runs.loadingMore}
-            onLoad={() => void runs.loadMore()}
-            fr={fr}
-            noun={fr ? "exécutions" : "runs"}
-            label={fr ? "Charger 25 de plus" : "Load 25 more"}
-          />
-        </Card>
-
-        <div className="space-y-4">
-          <Card
-            title={fr ? "Automatiser (optionnel)" : "Automate (optional)"}
-            description={
-              fr
-                ? "Pour la CI ou le CLI. Pas nécessaire pour lancer les modules depuis cette page."
-                : "For CI or the CLI. Not needed to run the modules from this page."
-            }
+      {/* Three doors, not a wall. The AI view is the default because it is the one that
+          turns a verdict into a file, a line and a correction. */}
+      <div
+        className="project-tabs mb-4 flex flex-wrap gap-2"
+        role="tablist"
+        aria-label="Project views"
+      >
+        {(
+          [
+            ["ai", <Brain key="ai" size={14} />, fr ? "Audit IA" : "AI audit"],
+            ["metrics", <FileJson key="metrics" size={14} />, fr ? "Métriques" : "Metrics"],
+            ["runs", <Play key="runs" size={14} />, fr ? "Exécutions" : "Runs"],
+          ] as const
+        ).map(([id, icon, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={tab === id}
+            className={`app-btn ${tab === id ? "app-btn-primary" : ""}`}
+            onClick={() => chooseTab(id)}
           >
-            <div className="space-y-3 px-5 py-4">
-              {token ? (
-                <>
-                  <pre className="overflow-x-auto rounded-[var(--radius)] bg-surface-alt px-3 py-2 app-mono">
-                    {token}
-                  </pre>
-                  <p className="text-xs text-muted">
-                    {fr
-                      ? "Copiez-le maintenant. Seul un hash est stocké : il ne pourra plus être affiché. Placez-le dans les secrets CI, jamais dans le dépôt."
-                      : "Copy it now. Only a hash is stored, so it cannot be shown again. Put it in CI secrets, never in the repo."}
-                  </p>
-                </>
-              ) : (
-                <p className="text-xs leading-relaxed text-muted">
-                  {fr
-                    ? "Les jetons exigent une offre avec accès API. Le jeton est limité à ce projet et ne peut qu'envoyer des runs et lire les rapports."
-                    : "Tokens require a plan with API access. The token is scoped to this project and can only upload runs and read reports."}
-                </p>
-              )}
-              <button
-                type="button"
-                className="app-btn"
-                onClick={() => void createKey()}
-                disabled={busy}
-              >
-                <KeyRound size={14} />{" "}
-                {token
-                  ? fr
-                    ? "Créer un autre jeton"
-                    : "Create another token"
-                  : fr
-                    ? "Créer le jeton du projet"
-                    : "Create project token"}
-              </button>
-              {keyError ? <ErrorState error={keyError} /> : null}
-            </div>
-          </Card>
-
-          <Card
-            title="Configuration"
-            description={
-              fr
-                ? "Modifiez les réglages dans le formulaire, ou copiez le fichier ci-dessous si vous préférez la version experte."
-                : "Edit the settings in the form, or copy the file below if you prefer the expert version."
-            }
-          >
-            <div className="px-5 pt-4">
-              <Link to={`/app/projects/${projectId}/config`} className="app-btn app-btn-primary">
-                {fr ? "Configurer sans code" : "Configure without code"}
-              </Link>
-            </div>
-            <pre className="overflow-x-auto px-5 py-4 app-mono leading-relaxed text-muted">
-              {config}
-            </pre>
-          </Card>
-        </div>
+            {icon} {label}
+          </button>
+        ))}
       </div>
 
-      <Card
-        title={fr ? "Scans de ce site" : "Scans of this site"}
-        description={
-          fr
-            ? "Lancés depuis cette page, sur l'adresse du projet. Le plus récent en haut."
-            : "Started from this page against the project address, newest first."
-        }
-        className="mt-4"
-      >
-        {scans === null ? (
-          <Loading label={fr ? "Chargement des scans…" : "Loading scans…"} />
-        ) : scans.length === 0 ? (
-          <Empty
-            title={fr ? "Aucun scan de ce site" : "No scan of this site yet"}
-            body={
-              fr
-                ? "Le bouton « Lancer les modules » en haut lance un scan et le garde ici, rattaché à ce projet."
-                : "The “Run the modules” button above starts a scan and keeps it here, attached to this project."
-            }
-            tester={false}
-          />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="app-table">
-              <thead>
-                <tr>
-                  <th>{fr ? "Verdict" : "Verdict"}</th>
-                  <th>{fr ? "Échecs" : "Failures"}</th>
-                  <th>{fr ? "Avertissements" : "Warnings"}</th>
-                  <th>{fr ? "Quand" : "When"}</th>
-                  <th>{fr ? "Résultat" : "Result"}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {scans.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      <StatusBadge status={item.worstVerdict === "fail" ? "failed" : "passed"} />
-                    </td>
-                    <td className="tabular-nums">{item.failed}</td>
-                    <td className="tabular-nums">{item.warnings}</td>
-                    <td className="text-muted">{relativeTime(item.createdAt)}</td>
-                    <td>
-                      <Link
-                        to={`/app/scan?audit=${item.id}&explain=1`}
-                        className="inline-flex items-center gap-1 text-primary hover:underline"
-                      >
-                        <Play size={13} /> {fr ? "ouvrir" : "open"}
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
+      {tab === "ai" ? <ProjectAiPanel projectId={project.id} /> : null}
+      {tab === "metrics" ? <ProjectMetricsPanel projectId={project.id} /> : null}
 
-      <Card
-        title={fr ? "Constats" : "Findings"}
-        description={
-          fr
-            ? "Vérifications en échec avec l'identifiant du cas reproductible."
-            : "Failed checks with the reproducing case id."
-        }
-        className="mt-4"
-      >
-        {findings.items.length === 0 ? (
-          <Empty
-            title={fr ? "Aucun constat" : "No finding"}
-            body={
-              fr
-                ? "Aucune vérification en échec n'a été enregistrée pour ce projet."
-                : "No failed check has been recorded for this project."
-            }
-          />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="app-table">
-              <thead>
-                <tr>
-                  <th>{fr ? "Constat" : "Finding"}</th>
-                  <th>Module</th>
-                  <th>{fr ? "Gravité" : "Severity"}</th>
-                  <th>Code</th>
-                  <th>{fr ? "Détecté" : "Detected"}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {findings.items.map((finding) => (
-                  <tr key={finding.id} className="align-top">
-                    <td className="font-medium">
-                      <button
-                        type="button"
-                        className="text-left"
-                        onClick={() =>
-                          setExpandedFinding((value) => (value === finding.id ? null : finding.id))
-                        }
-                        aria-expanded={expandedFinding === finding.id}
-                      >
-                        {finding.title}
-                      </button>
-                      {expandedFinding === finding.id ? (
-                        <dl className="mt-2 space-y-1 rounded-[var(--radius)] bg-surface-alt px-3 py-2 text-xs">
-                          <div className="flex gap-2">
-                            <dt className="text-muted">{fr ? "Code" : "Code"} :</dt>
-                            <dd className="app-mono">{finding.code ?? "—"}</dd>
-                          </div>
-                          <div className="flex gap-2">
-                            <dt className="text-muted">{fr ? "Empreinte" : "Fingerprint"} :</dt>
-                            <dd
-                              className="app-mono truncate"
-                              title={finding.fingerprint ?? undefined}
-                            >
-                              {finding.fingerprint ? `${finding.fingerprint.slice(0, 18)}…` : "—"}
-                            </dd>
-                          </div>
-                          <div className="flex gap-2">
-                            <dt className="text-muted">{fr ? "Détecté le" : "Detected on"} :</dt>
-                            <dd>{formatDate(finding.detectedAt)}</dd>
-                          </div>
-                          <div className="flex gap-2">
-                            <dt className="text-muted">
-                              {fr ? "Détail complet" : "Full detail"} :
-                            </dt>
-                            <dd>
-                              {fr
-                                ? "Dans la charge du rapport : /api/v1/reports — visible dans le run correspondant."
-                                : "Inside the report payload: /api/v1/reports — visible from the matching run."}
-                            </dd>
-                          </div>
-                        </dl>
-                      ) : null}
-                    </td>
-                    <td className="uppercase text-muted">{finding.module}</td>
-                    <td>
-                      <span className="app-badge app-badge-danger">
-                        {finding.severity.toLowerCase()}
-                      </span>
-                    </td>
-                    <td className="app-mono text-muted">{finding.code ?? "—"}</td>
-                    <td className="text-muted">{relativeTime(finding.detectedAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        <LoadMore
-          shown={findings.items.length}
-          total={findings.total}
-          loading={findings.loadingMore}
-          onLoad={() => void findings.loadMore()}
-          fr={fr}
-          noun={fr ? "constats" : "findings"}
-          label={fr ? "Charger 25 de plus" : "Load 25 more"}
-        />
-      </Card>
+      {tab === "runs" ? (
+        <div className="space-y-4">
+          <section className="app-workbench">
+            <header className="app-workbench-head">
+              <div>
+                <p className="app-eyebrow">01 / RUNS</p>
+                <h2 className="app-workbench-title">
+                  {fr ? "Vérifications déterministes" : "Deterministic checks"}
+                </h2>
+              </div>
+              <button
+                type="button"
+                className="app-btn app-btn-sm"
+                onClick={() => void runModules()}
+                disabled={running}
+              >
+                <Play size={13} /> {fr ? "Relancer" : "Run again"}
+              </button>
+            </header>
+            {runs === null ? (
+              <Loading label={fr ? "Chargement…" : "Loading…"} />
+            ) : runs.length === 0 ? (
+              <Empty
+                title={fr ? "Aucun run" : "No run"}
+                body={
+                  fr
+                    ? "Lance un scan depuis cette page. L'IA ne remplace pas ce résultat : elle lit ensuite le code pour expliquer comment corriger."
+                    : "Run a scan from this page. AI does not replace this result: it reads the code to explain how to fix it."
+                }
+                tester={false}
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="app-table">
+                  <thead>
+                    <tr>
+                      <th>{fr ? "État" : "Status"}</th>
+                      <th>{fr ? "Démarré" : "Started"}</th>
+                      <th>{fr ? "Durée" : "Duration"}</th>
+                      <th>{fr ? "Constats" : "Findings"}</th>
+                      <th>{fr ? "Rapport" : "Report"}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {runs.map((run) => (
+                      <tr key={run.id}>
+                        <td>
+                          <StatusBadge status={run.status} />
+                        </td>
+                        <td className="text-muted">{formatDate(run.startedAt)}</td>
+                        <td className="text-muted">{duration(run.durationMs)}</td>
+                        <td className="tabular-nums">{run.findingCount}</td>
+                        <td>
+                          <a
+                            className="inline-flex items-center gap-1 text-primary hover:underline"
+                            href={`${API_BASE}/api/v1/reports/${run.reportId ?? ""}?workspaceId=${workspaceId}&format=html`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            <FileJson size={13} /> {fr ? "ouvrir" : "open"}
+                          </a>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
 
-      <Card title={fr ? "CLI (facultatif)" : "CLI (optional)"} className="mt-4">
-        <div className="space-y-2 px-5 py-4">
-          <p className="text-xs text-muted">
-            {fr
-              ? "Rien n'est obligatoire ici : les modules se lancent depuis le bouton ci-dessus. Le CLI sert à rejouer la même chose en local ou en CI, depuis la racine du projet :"
-              : "Nothing here is mandatory: the modules run from the button above. The CLI replays the same thing locally or in CI, from your project root:"}
-          </p>
-          <pre className="overflow-x-auto rounded-[var(--radius)] bg-surface-alt px-3 py-2 app-mono">
-            {`export PROOFCORE_PROJECT_TOKEN=<token from above>
-pnpm proofcore doctor
-pnpm proofcore test --module ${project.enabledModules.join(",") || "world"}
-pnpm proofcore sync`}
-          </pre>
+          <section className="app-workbench">
+            <header className="app-workbench-head">
+              <div>
+                <p className="app-eyebrow">02 / SCANS</p>
+                <h2 className="app-workbench-title">{fr ? "Scans du site" : "Site scans"}</h2>
+              </div>
+            </header>
+            {scans === null ? (
+              <Loading label={fr ? "Chargement…" : "Loading…"} />
+            ) : scans.length === 0 ? (
+              <p className="px-5 py-4 text-xs text-muted">
+                {fr ? "Aucun scan de ce site pour l'instant." : "No scan of this site yet."}
+              </p>
+            ) : (
+              <div className="divide-y divide-black/5">
+                {scans.map((scan) => (
+                  <Link
+                    key={scan.id}
+                    to={`/app/scan?audit=${scan.id}&explain=1`}
+                    className="flex items-center gap-3 px-5 py-3 text-xs hover:bg-surface-alt"
+                  >
+                    <StatusBadge status={scan.worstVerdict === "fail" ? "failed" : "passed"} />
+                    <span className="min-w-0 flex-1 truncate app-mono">{scan.url}</span>
+                    <span className="text-muted">
+                      {scan.failed} fail · {scan.warnings} warn
+                    </span>
+                    <span className="shrink-0 text-muted">{relativeTime(scan.createdAt)}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <details className="app-sheet">
+            <summary className="cursor-pointer px-5 py-3 text-xs font-medium">
+              {fr
+                ? "Avancé : jeton CI et configuration experte"
+                : "Advanced: CI token and expert config"}
+            </summary>
+            <div className="space-y-3 border-t border-black/10 px-5 py-4">
+              <p className="text-xs leading-relaxed text-muted">
+                {fr
+                  ? "Utile seulement pour la CI. Le scan depuis cette page ne demande aucun jeton."
+                  : "Useful only for CI. Scanning from this page needs no token."}
+              </p>
+              {token ? (
+                <pre className="overflow-x-auto rounded-[var(--radius)] bg-surface-alt px-3 py-2 app-mono">
+                  {token}
+                </pre>
+              ) : null}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="app-btn app-btn-sm"
+                  onClick={() => void createKey()}
+                  disabled={busy}
+                >
+                  <KeyRound size={13} />{" "}
+                  {token
+                    ? fr
+                      ? "Créer un autre jeton"
+                      : "Create another token"
+                    : fr
+                      ? "Créer un jeton CI"
+                      : "Create CI token"}
+                </button>
+                <Link to={`/app/projects/${project.id}/config`} className="app-btn app-btn-sm">
+                  <Settings2 size={13} /> {fr ? "Configuration complète" : "Full configuration"}
+                </Link>
+              </div>
+              {tokenError ? <ErrorState error={tokenError} /> : null}
+            </div>
+          </details>
         </div>
-      </Card>
+      ) : null}
     </>
   );
 }

@@ -42,7 +42,13 @@ real values live in the host's secret store (Worker secrets) or a local, ignored
 | `SASPAY_BASE_URL`        | optional    | Override the API base URL. Defaults to the sandbox URL for `sk_test_` keys and the live URL otherwise.                                                                                                                          |
 | `SASPAY_FEE_CHARGE_MODE` | optional    | `ADD_ON` (payer covers fees) or `DEDUCTED` (fees taken from the net). Default `ADD_ON`.                                                                                                                                         |
 | `GITHUB_TOKEN`           | recommended | Read-only token for the public release feed (`GET /api/v1/releases/latest`). Anonymous GitHub calls are capped at 60/hour per IP and Workers share egress addresses; a token raises it to 5000/hour. Never sent to the browser. |
-| `RESEND_API_KEY`         | optional    | Transactional e-mail through Resend. Without it, messages are journalled with status `unconfigured` and the API says so.                                                                                                        |
+| `NEON_DATABASE_URL`      | optional    | Pooled PostgreSQL URL for imported project files and AI code audits. Without it, those routes return `503 neon_not_configured`; auth, billing and runs stay on D1. Never expose it to the web app.                              |
+| `AI_KEYS_SECRET`         | AI          | 32-byte secret (hex) used to encrypt provider API keys at rest. Required for `/app/ai` and for AI code audits.                                                                                                                  |
+| `EMAILJS_SERVICE_ID`     | optional    | EmailJS service id. All four EmailJS values are required together; EmailJS is preferred over Resend.                                                                                                                            |
+| `EMAILJS_TEMPLATE_ID`    | optional    | EmailJS template id. The template must bind `to_email`, `subject`, `message`, `html`, `from_name` and `reply_to`.                                                                                                               |
+| `EMAILJS_PUBLIC_KEY`     | optional    | EmailJS public key (`user_id`). Safe to expose in the vendor dashboard, still kept server-side here.                                                                                                                            |
+| `EMAILJS_PRIVATE_KEY`    | optional    | EmailJS private key (`accessToken`). Requires “Allow EmailJS API for non-browser applications”. Never sent to the browser.                                                                                                      |
+| `RESEND_API_KEY`         | optional    | Fallback transactional e-mail through Resend, used only when EmailJS is incomplete. Without either provider, messages are journalled with status `unconfigured`.                                                                |
 | `MAIL_FROM`              | optional    | Verified sender for Resend, e.g. `PROOFCORE <no-reply@example.com>`. Required with the key.                                                                                                                                     |
 | `SUPPORT_EMAIL`          | optional    | Address shown to customers and notified of support requests. Default `support@proofcore.dev`.                                                                                                                                   |
 
@@ -82,11 +88,18 @@ mode `0600`; the password is never persisted. `proofcore logout` removes it.
 
 ## Email delivery
 
-The API has a Resend adapter. It reads `RESEND_API_KEY` and `MAIL_FROM` at call time; when
-neither is set, every message is written to `email_outbox` with status `unconfigured` and
-the API reports it instead of pretending the mail was sent. Delivery was **not** verified in
-this pass (no key available): treat verification and password-reset e-mails as
-"available with configuration", not as tested production behaviour.
+The API prefers EmailJS. It reads all four `EMAILJS_*` values at call time and sends the
+rendered text and HTML to `https://api.emailjs.com/api/v1.0/email/send`. The account must
+enable "Allow EmailJS API for non-browser applications" and the template must use
+`to_email`, `subject`, `message`, `html`, `from_name` and `reply_to`. The private key stays
+server-side.
+
+Resend remains a fallback when `RESEND_API_KEY` is set and EmailJS is incomplete. When
+neither provider is configured, every message is written to `email_outbox` with status
+`unconfigured` and the API reports it instead of pretending the mail was sent. Real
+EmailJS delivery was **not** verified in this pass because no account credentials were
+provided; the code path and configuration are ready. See
+`Docs/guides/ZERO_COST_OPERATIONS.md` for the account and template setup.
 
 ## Free-tier notes
 

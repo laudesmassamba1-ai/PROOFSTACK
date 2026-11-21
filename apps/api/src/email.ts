@@ -6,11 +6,12 @@ import type { AppStore } from "./store/app-store.js";
  *
  * There is exactly one rule here: what the user is told must match what happened.
  *
- *  - With `RESEND_API_KEY` set, the message is sent through Resend's HTTP API and the
- *    outbox row records the provider id.
- *  - Without it, the message is journalled with status `unconfigured` — never silently
- *    dropped, and the API says so — and an operator can deliver it by hand from the
- *    outbox. The UI never claims "we sent you an email" in that case.
+ *  - With the four `EMAILJS_*` values set, the message is sent through EmailJS and the
+ *    outbox row records the provider.
+ *  - Otherwise, with `RESEND_API_KEY` set, it falls back to Resend's HTTP API.
+ *  - Without either, the message is journalled with status `unconfigured` — never
+ *    silently dropped, and the API says so — and an operator can deliver it by hand
+ *    from the outbox. The UI never claims "we sent you an email" in that case.
  */
 
 export interface EmailMessage {
@@ -37,10 +38,30 @@ export interface EmailSender {
 
 export function createEmailSender(
   store: AppStore,
-  env: { RESEND_API_KEY?: string; MAIL_FROM?: string }
+  env: {
+    RESEND_API_KEY?: string;
+    MAIL_FROM?: string;
+    EMAILJS_SERVICE_ID?: string;
+    EMAILJS_TEMPLATE_ID?: string;
+    EMAILJS_PUBLIC_KEY?: string;
+    EMAILJS_PRIVATE_KEY?: string;
+  }
 ): EmailSender {
   const apiKey = env.RESEND_API_KEY?.trim();
   const from = env.MAIL_FROM?.trim() || "PROOFCORE <notifications@proofcore.dev>";
+  const emailjs = {
+    serviceId: env.EMAILJS_SERVICE_ID?.trim() ?? "",
+    templateId: env.EMAILJS_TEMPLATE_ID?.trim() ?? "",
+    publicKey: env.EMAILJS_PUBLIC_KEY?.trim() ?? "",
+    privateKey: env.EMAILJS_PRIVATE_KEY?.trim() ?? "",
+  };
+  // EmailJS disables its REST API for non-browser clients by default, and the private
+  // key is what proves this call comes from the account owner. All four values are
+  // required together; a public key alone would fail at runtime instead of at startup.
+  const emailjsReady = Boolean(
+    emailjs.serviceId && emailjs.templateId && emailjs.publicKey && emailjs.privateKey
+  );
+  const providerName = emailjsReady ? "emailjs" : apiKey ? "resend" : null;
 
   const journal = async (
     message: EmailMessage,
@@ -65,65 +86,127 @@ export function createEmailSender(
   };
 
   return {
-    configured: Boolean(apiKey),
+    configured: providerName !== null,
     async send(message: EmailMessage): Promise<EmailDelivery> {
-      if (!apiKey) {
-        await journal(message, "unconfigured", null, null, "RESEND_API_KEY is not set");
-        return {
-          delivered: false,
-          status: "unconfigured",
-          provider: null,
-          message:
-            "E-mail delivery is not configured on this deployment. An operator can read and deliver the message from the outbox.",
-        };
+      if (emailjsReady) {
+        try {
+          const response = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              service_id: emailjs.serviceId,
+              template_id: emailjs.templateId,
+              user_id: emailjs.publicKey,
+              accessToken: emailjs.privateKey,
+              // The EmailJS template must bind these names. `to_email` is the recipient;
+              // the others are the content this backend already rendered.
+              template_params: {
+                to_email: message.to,
+                to_name: message.to.split("@")[0] ?? message.to,
+                subject: message.subject,
+                message: message.text,
+                html: message.html ?? message.text,
+                from_name: "PROOFCORE",
+                reply_to: from,
+                kind: message.kind,
+              },
+            }),
+            signal: AbortSignal.timeout(10_000),
+          });
+
+          if (!response.ok) {
+            const detail = (await response.text().catch(() => "")).slice(0, 300);
+            await journal(message, "failed", "emailjs", null, `HTTP ${response.status}: ${detail}`);
+            return {
+              delivered: false,
+              status: "failed",
+              provider: "emailjs",
+              message: `EmailJS a refusé le message (HTTP ${response.status}). ${detail}`,
+            };
+          }
+
+          await journal(message, "sent", "emailjs", null, null);
+          return {
+            delivered: true,
+            status: "sent",
+            provider: "emailjs",
+            message: "Message accepté par EmailJS.",
+          };
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : "network error";
+          await journal(message, "failed", "emailjs", null, detail);
+          return {
+            delivered: false,
+            status: "failed",
+            provider: "emailjs",
+            message: `EmailJS est injoignable : ${detail}`,
+          };
+        }
       }
 
-      try {
-        const response = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${apiKey}`,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            from,
-            to: [message.to],
-            subject: message.subject,
-            text: message.text,
-            ...(message.html ? { html: message.html } : {}),
-          }),
-          signal: AbortSignal.timeout(10_000),
-        });
+      if (apiKey) {
+        try {
+          const response = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              authorization: `Bearer ${apiKey}`,
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({
+              from,
+              to: [message.to],
+              subject: message.subject,
+              text: message.text,
+              ...(message.html ? { html: message.html } : {}),
+            }),
+            signal: AbortSignal.timeout(10_000),
+          });
 
-        if (!response.ok) {
-          const detail = (await response.text().catch(() => "")).slice(0, 300);
-          await journal(message, "failed", "resend", null, `HTTP ${response.status}: ${detail}`);
+          if (!response.ok) {
+            const detail = (await response.text().catch(() => "")).slice(0, 300);
+            await journal(message, "failed", "resend", null, `HTTP ${response.status}: ${detail}`);
+            return {
+              delivered: false,
+              status: "failed",
+              provider: "resend",
+              message: `The mail provider refused the message (HTTP ${response.status}).`,
+            };
+          }
+
+          const payload = (await response.json().catch(() => ({}))) as { id?: string };
+          await journal(message, "sent", "resend", payload.id ?? null, null);
+          return {
+            delivered: true,
+            status: "sent",
+            provider: "resend",
+            message: "Message accepted by the mail provider.",
+          };
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : "network error";
+          await journal(message, "failed", "resend", null, detail);
           return {
             delivered: false,
             status: "failed",
             provider: "resend",
-            message: `The mail provider refused the message (HTTP ${response.status}).`,
+            message: `The mail provider could not be reached: ${detail}`,
           };
         }
-
-        const payload = (await response.json().catch(() => ({}))) as { id?: string };
-        await journal(message, "sent", "resend", payload.id ?? null, null);
-        return {
-          delivered: true,
-          status: "sent",
-          provider: "resend",
-          message: "Message accepted by the mail provider.",
-        };
-      } catch (error) {
-        const detail = error instanceof Error ? error.message : "network error";
-        await journal(message, "failed", "resend", null, detail);
-        return {
-          delivered: false,
-          status: "failed",
-          provider: "resend",
-          message: `The mail provider could not be reached: ${detail}`,
-        };
       }
+
+      await journal(
+        message,
+        "unconfigured",
+        null,
+        null,
+        "EmailJS and RESEND_API_KEY are not configured"
+      );
+      return {
+        delivered: false,
+        status: "unconfigured",
+        provider: null,
+        message:
+          "E-mail delivery is not configured on this deployment. An operator can read and deliver the message from the outbox.",
+      };
     },
   };
 }

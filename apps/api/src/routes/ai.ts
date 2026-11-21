@@ -374,7 +374,9 @@ async function callUpstream(input: {
     method: "POST",
     headers,
     body: JSON.stringify(payload),
-    redirect: "error",
+    // Workers reject redirect:"error". Manual keeps a 3xx visible and the !ok block
+    // below refuses it instead of following a redirect to an unconfigured host.
+    redirect: "manual",
     signal: AbortSignal.timeout(input.timeoutMs),
   }).catch((error: unknown) => {
     throw new HttpError(

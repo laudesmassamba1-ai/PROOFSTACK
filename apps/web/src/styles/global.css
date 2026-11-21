@@ -3903,8 +3903,25 @@ p {
   }
 
   .app-beta,
-  .app-project-pill {
+  .app-project-pill,
+  .app-topbar .app-shell-select-wrap,
+  .app-topbar .app-mode-toggle {
     display: none;
+  }
+
+  .app-top-actions {
+    gap: 5px;
+  }
+
+  .project-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .project-tabs .app-btn {
+    justify-content: center;
+    padding-inline: 6px;
+    white-space: nowrap;
   }
 
   .app-shell-pill {

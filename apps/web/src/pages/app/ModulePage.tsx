@@ -1,6 +1,7 @@
 import {
   ArrowRight,
   BadgeCheck,
+  Brain,
   Globe2,
   PackageOpen,
   Route as RouteIcon,
@@ -240,6 +241,30 @@ export function ModulePage() {
           </span>
           {latest ? <StatusBadge status={latest.status} /> : null}
         </div>
+      </section>
+
+      {/* The module says what was measured. The AI reads the code and says where and how
+          to change it. That link is the difference between a dashboard and a fix. */}
+      <section className="mt-4 flex flex-wrap items-center gap-3 rounded-[var(--radius)] border border-black/10 px-4 py-3">
+        <Brain size={18} className="shrink-0 text-primary" aria-hidden />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium">
+            {fr ? "Passer du verdict à la correction" : "From verdict to correction"}
+          </p>
+          <p className="mt-0.5 text-xs leading-relaxed text-muted">
+            {fr
+              ? `L'IA lit les fichiers du projet, cite la ligne et propose le changement. Le résultat ${meta.name} reste la mesure de référence.`
+              : `AI reads the project files, names the line and proposes the change. The ${meta.name} result stays the measurement of record.`}
+          </p>
+        </div>
+        <Link
+          to={latest?.projectId ? `/app/projects/${latest.projectId}?tab=ai` : "/app/projects"}
+          className="app-btn app-btn-primary app-btn-sm"
+        >
+          <Brain size={13} />
+          {fr ? "Auditer le code avec l'IA" : "Audit the code with AI"}
+          <ArrowRight size={13} />
+        </Link>
       </section>
 
       <div className="app-module-body-grid">

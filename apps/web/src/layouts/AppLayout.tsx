@@ -689,6 +689,15 @@ export function AppLayout() {
             ))}
           </nav>
           <div className="app-mobile-foot">
+            <button type="button" className="app-btn app-btn-sm" onClick={toggleMode}>
+              {uiMode === "simple"
+                ? locale === "fr"
+                  ? "Afficher le mode Studio"
+                  : "Show Studio mode"
+                : locale === "fr"
+                  ? "Revenir au mode simple"
+                  : "Return to simple mode"}
+            </button>
             <div className="app-mobile-select-wrap">
               <label className="app-eyebrow" htmlFor="mobile-workspace">
                 {t("ws.shell.workspace")}
