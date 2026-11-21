@@ -1,5 +1,5 @@
 /**
- * The PROOFCORE monogram is one P cut into three offset plates.
+ * The PROOFSTACK monogram is one P cut into three offset plates.
  *
  * The silhouette is a single P path with an even-odd bowl cutout. Three copies,
  * offset down and to the right, read as WORLD (back), FLOW (middle) and EXIT

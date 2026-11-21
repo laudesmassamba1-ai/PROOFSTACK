@@ -209,3 +209,12 @@ pnpm cloud:deploy --dry-run
 - Page projet : « Lancer les modules » envoie le `projectId` ; nouvelle carte « Scans de ce site » (10 derniers, lien vers `/app/scan?audit=…&explain=1`).
 - Nouvelle page `/app/start` : un seul champ (l'adresse) → scan + verdicts + résumé + lecture IA sur le même écran, sans navigation. Entrée depuis l'état vide de la vue d'ensemble (« Analyser mon site maintenant »).
 - Vérifié : biome 0, typecheck 0, build 0, `pnpm test` 625/625 (nouveau test : rattachement, filtre, 404 pour projet inconnu et pour projet d'un autre espace) ; Playwright local : projet → scan → la carte liste l'audit créé ; `/app/start` reste sur la même page et affiche verdicts, résumé et message IA sans clé.
+
+## 2026-11-21 — passe de refonte (phase 1 + début phase 2)
+
+- Identité : le web parle de **PROOFSTACK** (le nom public), les identifiants `proofcore` restent techniques. Pas de validation juridique effectuée.
+- Téléchargements : `GET /api/v1/releases/latest` (proxy GitHub côté Worker, cache 5 min, digest quand publié) remplace l'appel navigateur à `api.github.com` — bloqué par la CSP. Monté **avant** `workspaceRoutes`, dont le garde `*` renvoyait 401 aux visiteurs anonymes (couvert par un test d'intégration).
+- CI/typecheck : CI ne fige plus pnpm 10 (lit `packageManager`), `pnpm typecheck` construit les paquets internes avant le check. Vérifié en supprimant tous les `dist/` et `*.tsbuildinfo` : 0 erreur.
+- UX : mode Simple par défaut (Vue d'ensemble, Projets, Démarrer) ; bascule Studio dans l'en-tête, persistée par navigateur (`proofcore.ui-mode.v1`) sans toucher aux données. Accueil sans projet : « Que souhaitez-vous faire aujourd'hui ? » avec 4 portes réelles.
+- Docs : compte de tests figé retiré du README, promesse SDK retirée, contradiction MCP résolue (API hébergée ≠ serveur MCP ; `proofcore mcp` est un serveur stdio local). `docs/REFACTOR_PROGRESS.md` liste honnêtement ce qui reste.
+- Vérifié : biome 0 (389 fichiers), typecheck propre 0, tests 49 fichiers / 630, build web 0 ; Chrome : accueil 4 choix, bascule Simple/Studio persistante, `/app/start` OK, `/download` sans appel GitHub.

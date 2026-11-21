@@ -276,8 +276,8 @@ export function ScanPage(): React.ReactElement {
           workspaceId: session.workspaceId,
           effort: "balanced",
           message: fr
-            ? `Voici le résultat brut d'un scan PROOFCORE. Interprète-le pour quelqu'un qui n'est pas expert : quels sont les trois problèmes les plus coûteux, pourquoi ils comptent pour ce site précis, et dans quel ordre les corriger. Sois concret, cite les constats par leur identifiant, et dis clairement ce que le scan n'a pas pu mesurer.\n\n${reportForModel()}`
-            : `Here is the raw result of a PROOFCORE scan. Interpret it for someone who is not an expert: which three problems cost the most, why they matter for this site, and in what order to fix them. Be concrete, cite findings by their id, and state clearly what the scan could not measure.\n\n${reportForModel()}`,
+            ? `Voici le résultat brut d'un scan PROOFSTACK. Interprète-le pour quelqu'un qui n'est pas expert : quels sont les trois problèmes les plus coûteux, pourquoi ils comptent pour ce site précis, et dans quel ordre les corriger. Sois concret, cite les constats par leur identifiant, et dis clairement ce que le scan n'a pas pu mesurer.\n\n${reportForModel()}`
+            : `Here is the raw result of a PROOFSTACK scan. Interpret it for someone who is not an expert: which three problems cost the most, why they matter for this site, and in what order to fix them. Be concrete, cite findings by their id, and state clearly what the scan could not measure.\n\n${reportForModel()}`,
         },
       });
       setExplanation(body.message);

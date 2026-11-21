@@ -23,7 +23,7 @@ are not implemented yet — see the status file.
 Implemented and tested: the shared engine and all three modules, the CLI with JSON/
 JUnit/HTML reports, the SaaS API (auth, workspaces, projects, run ingestion, API keys,
 billing, webhooks), the authenticated workspace and the terminal console. `pnpm test`
-runs 516 tests; `pnpm lint`, `pnpm typecheck` and `pnpm build` pass.
+runs the full Vitest suite; `pnpm lint`, `pnpm typecheck` and `pnpm build` pass.
 
 The creator's read-only operations console lives at `/app/admin`: users, workspaces,
 subscriptions, payments, runs and webhook delivery. It is gated by the API's
@@ -104,7 +104,7 @@ To build the tarball locally instead (same bytes, no registry needed):
 
 ```bash
 pnpm cli:package
-npm install -g ./artifacts/proofcore-0.1.0.tgz
+npm install -g ./artifacts/proofcore-<version>.tgz
 proofcore --version
 ```
 
@@ -286,7 +286,7 @@ packages/adapters/payments  SasPay + sandbox provider adapters
 packages/adapters/reporting JSON / JUnit / HTML / text renderers
 packages/adapters/ai        MCP / AI provider configuration (optional)
 packages/billing plans, entitlements, usage, state machines, checkout
-packages/cli | sdk | config developer surface
+packages/cli | cli | developer surface (no SDK package is published)
 Docs/ + docs/ research, guides and operational documentation
 ```
 

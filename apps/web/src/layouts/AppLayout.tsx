@@ -212,10 +212,33 @@ export function AppLayout() {
     };
   }, [mobileOpen]);
 
+  // Simple is the default: a first-time user gets three doors, not the whole expert shell.
+  // The choice is remembered per browser; the account, projects and results are untouched,
+  // so switching never moves or hides any data.
+  const [uiMode, setUiMode] = useState<"simple" | "studio">(() => {
+    try {
+      return window.localStorage.getItem("proofcore.ui-mode.v1") === "studio" ? "studio" : "simple";
+    } catch {
+      return "simple";
+    }
+  });
+  const toggleMode = useCallback(() => {
+    setUiMode((current) => {
+      const next = current === "simple" ? "studio" : "simple";
+      try {
+        window.localStorage.setItem("proofcore.ui-mode.v1", next);
+      } catch {
+        /* private mode: the choice applies for this visit */
+      }
+      return next;
+    });
+  }, []);
+
   const routes = useMemo<CommandEntry[]>(() => {
     const list: Array<[string, string, ReactNode]> = [
       [t("ws.nav.overview"), "/app", <LayoutDashboard key="overview" size={15} />],
       [t("ws.nav.projects"), "/app/projects", <FolderKanban key="projects" size={15} />],
+      [locale === "fr" ? "Démarrer" : "Start", "/app/start", <Search key="start" size={15} />],
       [t("ws.nav.workspace"), "/app/workspace", <Boxes key="workspace" size={15} />],
       ["WORLD", "/app/modules/world", <Globe2 key="world" size={15} />],
       ["FLOW", "/app/modules/flow", <RouteIcon key="flow" size={15} />],
@@ -233,8 +256,12 @@ export function AppLayout() {
     if (session.isAdmin) {
       list.push([t("ws.nav.operations"), "/app/admin", <ShieldCheck key="admin" size={15} />]);
     }
-    return list.map(([label, to, icon]) => ({ label, to, icon, group: "routes" as const }));
-  }, [session.isAdmin, t]);
+    const visible =
+      uiMode === "simple"
+        ? list.filter(([, to]) => to === "/app" || to === "/app/projects" || to === "/app/start")
+        : list;
+    return visible.map(([label, to, icon]) => ({ label, to, icon, group: "routes" as const }));
+  }, [session.isAdmin, t, uiMode, locale]);
 
   const commands = useMemo<CommandEntry[]>(
     () => [
@@ -296,7 +323,7 @@ export function AppLayout() {
       <div className="app-shell">
         <div className="app-frame">
           <header className="app-topbar">
-            <NavLink to="/app" className="app-brand-lockup" aria-label="PROOFCORE workspace">
+            <NavLink to="/app" className="app-brand-lockup" aria-label="PROOFSTACK workspace">
               <Mark size={34} variant="onLight" />
               <span className="wordmark app-brand-word">ROOFCORE</span>
               <span className="app-beta">{t("ws.shell.beta")}</span>
@@ -331,7 +358,7 @@ export function AppLayout() {
           <div className="app-service-mark" aria-hidden>
             <CloudOff size={34} strokeWidth={1.35} />
           </div>
-          <p className="app-eyebrow">PROOFCORE / OFFLINE</p>
+          <p className="app-eyebrow">PROOFSTACK / OFFLINE</p>
           <h1 className="app-display app-service-title">{t("ws.service.title")}</h1>
           <p className="app-support">{t("ws.service.body")}</p>
           <div className="app-service-actions">
@@ -379,7 +406,7 @@ export function AppLayout() {
     <div className="app-shell">
       <div className="app-frame">
         <header className="app-topbar">
-          <NavLink to="/app" className="app-brand-lockup" aria-label="PROOFCORE workspace">
+          <NavLink to="/app" className="app-brand-lockup" aria-label="PROOFSTACK workspace">
             <Mark size={34} variant="onLight" />
             <span className="wordmark app-brand-word">ROOFCORE</span>
             <span className="app-beta">{t("ws.shell.beta")}</span>
@@ -392,55 +419,69 @@ export function AppLayout() {
             <NavLink to="/app/projects" className="app-toplink">
               {t("ws.nav.projects")}
             </NavLink>
-            <NavLink
-              to="/app/workspace"
-              className={({ isActive }) => `app-toplink ${isActive ? "is-active" : ""}`}
-            >
-              {t("ws.nav.workspace")}
+            <NavLink to="/app/start" className="app-toplink">
+              {locale === "fr" ? "Démarrer" : "Start"}
             </NavLink>
-            <div className="app-engines">
-              <button
-                type="button"
-                className={`app-toplink app-engines-trigger ${enginesActive ? "is-active" : ""}`}
-                aria-expanded={enginesOpen}
-                aria-haspopup="true"
-                onClick={() => setEnginesOpen((value) => !value)}
-              >
-                {t("ws.nav.engines")} <ChevronDown size={13} />
-              </button>
-              {enginesOpen ? (
-                <div className="app-nav-popover" role="menu">
-                  {[
-                    ["WORLD", "/app/modules/world", <Globe2 key="world" size={14} />],
-                    ["FLOW", "/app/modules/flow", <RouteIcon key="flow" size={14} />],
-                    ["EXIT", "/app/modules/exit", <PackageOpen key="exit" size={14} />],
-                    ["FAIL", "/app/modules/fail", <ShieldAlert key="fail" size={14} />],
-                    ["CLEAN", "/app/modules/clean", <BadgeCheck key="clean" size={14} />],
-                  ].map(([label, to, icon]) => (
-                    <NavLink
-                      key={String(label)}
-                      to={String(to)}
-                      className="app-nav-popover-link"
-                      role="menuitem"
-                    >
-                      {icon} {label}
-                    </NavLink>
-                  ))}
-                  <NavLink to="/app/modules" end className="app-nav-popover-link" role="menuitem">
-                    {locale === "fr" ? "Vue d’ensemble" : "Overview"}
-                  </NavLink>
-                  <NavLink to="/app/scan" className="app-nav-popover-link" role="menuitem">
-                    {locale === "fr" ? "Scanner une adresse" : "Scan an address"}
-                  </NavLink>
+            {/* Simple mode hides the expert surfaces from the menu; every route stays
+                reachable, and Studio restores the full navigation without a page reload. */}
+            {uiMode === "studio" ? (
+              <>
+                <NavLink
+                  to="/app/workspace"
+                  className={({ isActive }) => `app-toplink ${isActive ? "is-active" : ""}`}
+                >
+                  {t("ws.nav.workspace")}
+                </NavLink>
+                <div className="app-engines">
+                  <button
+                    type="button"
+                    className={`app-toplink app-engines-trigger ${enginesActive ? "is-active" : ""}`}
+                    aria-expanded={enginesOpen}
+                    aria-haspopup="true"
+                    onClick={() => setEnginesOpen((value) => !value)}
+                  >
+                    {t("ws.nav.engines")} <ChevronDown size={13} />
+                  </button>
+                  {enginesOpen ? (
+                    <div className="app-nav-popover" role="menu">
+                      {[
+                        ["WORLD", "/app/modules/world", <Globe2 key="world" size={14} />],
+                        ["FLOW", "/app/modules/flow", <RouteIcon key="flow" size={14} />],
+                        ["EXIT", "/app/modules/exit", <PackageOpen key="exit" size={14} />],
+                        ["FAIL", "/app/modules/fail", <ShieldAlert key="fail" size={14} />],
+                        ["CLEAN", "/app/modules/clean", <BadgeCheck key="clean" size={14} />],
+                      ].map(([label, to, icon]) => (
+                        <NavLink
+                          key={String(label)}
+                          to={String(to)}
+                          className="app-nav-popover-link"
+                          role="menuitem"
+                        >
+                          {icon} {label}
+                        </NavLink>
+                      ))}
+                      <NavLink
+                        to="/app/modules"
+                        end
+                        className="app-nav-popover-link"
+                        role="menuitem"
+                      >
+                        {locale === "fr" ? "Vue d’ensemble" : "Overview"}
+                      </NavLink>
+                      <NavLink to="/app/scan" className="app-nav-popover-link" role="menuitem">
+                        {locale === "fr" ? "Scanner une adresse" : "Scan an address"}
+                      </NavLink>
+                    </div>
+                  ) : null}
                 </div>
-              ) : null}
-            </div>
-            <NavLink to="/app/cli" className="app-toplink">
-              {t("ws.nav.cli")}
-            </NavLink>
-            <NavLink to="/app/ai" className="app-toplink">
-              {t("ws.nav.ai")}
-            </NavLink>
+                <NavLink to="/app/cli" className="app-toplink">
+                  {t("ws.nav.cli")}
+                </NavLink>
+                <NavLink to="/app/ai" className="app-toplink">
+                  {t("ws.nav.ai")}
+                </NavLink>
+              </>
+            ) : null}
           </nav>
 
           <div className="app-top-actions">
@@ -499,6 +540,30 @@ export function AppLayout() {
               <Search size={14} />
               <span>{t("ws.shell.command")}</span>
               <kbd>⌘K</kbd>
+            </button>
+
+            <button
+              type="button"
+              className="app-shell-pill app-mode-toggle"
+              onClick={toggleMode}
+              aria-pressed={uiMode === "studio"}
+              title={
+                uiMode === "simple"
+                  ? locale === "fr"
+                    ? "Afficher les outils avancés (modules, CLI, IA)"
+                    : "Show advanced tools (modules, CLI, AI)"
+                  : locale === "fr"
+                    ? "Revenir à l'interface simplifiée"
+                    : "Return to the simplified interface"
+              }
+            >
+              {uiMode === "simple"
+                ? locale === "fr"
+                  ? "Mode Studio"
+                  : "Studio mode"
+                : locale === "fr"
+                  ? "Mode simple"
+                  : "Simple mode"}
             </button>
 
             <DesktopTools />
@@ -588,7 +653,7 @@ export function AppLayout() {
         </main>
 
         <footer className="app-footer">
-          <span>PROOFCORE / {workspace?.name ?? "workspace"}</span>
+          <span>PROOFSTACK / {workspace?.name ?? "workspace"}</span>
           <span>WORLD · FLOW · EXIT · FAIL · CLEAN</span>
         </footer>
       </div>
@@ -737,7 +802,7 @@ export function PageHeader({
 }) {
   const { locale } = useI18n();
   const sectionLabel =
-    eyebrow ?? (locale === "fr" ? "PROOFCORE / espace de travail" : "PROOFCORE / workspace");
+    eyebrow ?? (locale === "fr" ? "PROOFSTACK / espace de travail" : "PROOFSTACK / workspace");
   return (
     <header className="app-page-head">
       <p className="app-eyebrow">{sectionLabel}</p>

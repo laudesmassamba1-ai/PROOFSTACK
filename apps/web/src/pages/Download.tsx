@@ -2,19 +2,23 @@ import { Download as DownloadIcon, Monitor, Package, Terminal } from "lucide-rea
 import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "../i18n/index.js";
 import { Section, SectionHeading } from "../layouts/BrandLayout.js";
+import { apiFetch } from "../lib/api.js";
 
 const REPO = "laudesmassamba1-ai/PROOFSTACK";
 const RELEASES_PAGE = `https://github.com/${REPO}/releases/latest`;
 
 interface Asset {
   name: string;
-  browser_download_url: string;
+  url: string;
   size: number;
+  digest: string | null;
 }
 
 interface Release {
-  tag_name: string;
-  html_url: string;
+  tag: string;
+  url: string;
+  publishedAt: string;
+  prerelease: boolean;
   assets: Asset[];
 }
 
@@ -50,21 +54,18 @@ export function DownloadPage() {
   const { t, locale } = useI18n();
   const fr = locale === "fr";
   const [release, setRelease] = useState<Release | null>(null);
-  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [state, setState] = useState<"loading" | "ready" | "empty" | "error">("loading");
 
+  // Read through our own API: the CSV/CSP audit found this page calling api.github.com
+  // from the browser, which production blocks and which exposes every visitor to GitHub's
+  // unauthenticated rate limit. The Worker caches one answer for everyone.
   useEffect(() => {
     let alive = true;
-    fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
-      headers: { Accept: "application/vnd.github+json" },
-    })
-      .then(async (res) => {
-        if (!res.ok) throw new Error(String(res.status));
-        return (await res.json()) as Release;
-      })
+    apiFetch<{ release: Release | null }>("/api/v1/releases/latest", { timeoutMs: 12_000 })
       .then((data) => {
         if (!alive) return;
-        setRelease(data);
-        setState("ready");
+        setRelease(data.release);
+        setState(data.release ? "ready" : "empty");
       })
       .catch(() => {
         if (alive) setState("error");
@@ -77,7 +78,7 @@ export function DownloadPage() {
   const picks = useMemo(() => (release ? pickAssets(release.assets) : null), [release]);
   // No hard-coded fallback version: a number that lives in the page drifts from the
   // release it claims to describe. Without a release we say so and link to the page.
-  const version = release?.tag_name?.replace(/^v/, "") ?? null;
+  const version = release?.tag?.replace(/^v/, "") ?? null;
 
   return (
     <Section>
@@ -161,7 +162,7 @@ export function DownloadPage() {
           ].map(({ label, asset }) => (
             <a
               key={label}
-              href={asset?.browser_download_url ?? RELEASES_PAGE}
+              href={asset?.url ?? RELEASES_PAGE}
               className="flex items-center justify-between gap-3 rounded-lg border border-white/10 px-3 py-2 font-mono text-[0.72rem] text-white/70 transition-colors hover:border-brand-mint/40 hover:text-white"
               target="_blank"
               rel="noreferrer"
@@ -175,7 +176,7 @@ export function DownloadPage() {
 
       <div className="mt-8 flex flex-wrap items-center gap-4">
         <a
-          href={release?.html_url ?? RELEASES_PAGE}
+          href={release?.url ?? RELEASES_PAGE}
           className="btn btn-ghost"
           target="_blank"
           rel="noreferrer"
@@ -240,7 +241,7 @@ function DownloadCard({
   cta: string;
   note?: string;
 }) {
-  const href = asset?.browser_download_url ?? fallback;
+  const href = asset?.url ?? fallback;
   const size = asset ? formatSize(asset.size) : null;
   return (
     <article className="brand-panel flex flex-col p-6">
@@ -262,9 +263,16 @@ function DownloadCard({
       </div>
       {note ? <p className="mt-3 text-[0.74rem] leading-relaxed text-white/38">{note}</p> : null}
       {asset ? (
-        <p className="mt-2 truncate font-mono text-[0.68rem] text-white/30" title={asset.name}>
-          {asset.name}
-        </p>
+        <div className="mt-2 min-w-0">
+          <p className="truncate font-mono text-[0.68rem] text-white/30" title={asset.name}>
+            {asset.name}
+          </p>
+          {asset.digest ? (
+            <p className="truncate font-mono text-[0.64rem] text-white/26" title={asset.digest}>
+              {asset.digest}
+            </p>
+          ) : null}
+        </div>
       ) : null}
     </article>
   );

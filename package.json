@@ -13,7 +13,7 @@
   "scripts": {
     "build": "node tooling/scripts/build.mjs && pnpm -r --filter ./apps/web build",
     "build:packages": "node tooling/scripts/build.mjs",
-    "typecheck": "node tooling/scripts/build.mjs --noEmit",
+    "typecheck": "pnpm build:packages && node tooling/scripts/build.mjs --noEmit",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "test": "vitest run",

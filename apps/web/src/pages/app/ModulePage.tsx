@@ -140,8 +140,8 @@ export function ModulePage() {
         title={fr ? "Module inconnu" : "Unknown module"}
         body={
           fr
-            ? "PROOFCORE a cinq modules : WORLD, FLOW, EXIT, FAIL et CLEAN."
-            : "PROOFCORE has five modules: WORLD, FLOW, EXIT, FAIL and CLEAN."
+            ? "PROOFSTACK a cinq modules : WORLD, FLOW, EXIT, FAIL et CLEAN."
+            : "PROOFSTACK has five modules: WORLD, FLOW, EXIT, FAIL and CLEAN."
         }
         tester="lost"
       />

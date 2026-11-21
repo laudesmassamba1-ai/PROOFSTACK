@@ -226,7 +226,7 @@ export function DesktopTools() {
           ) : null}
 
           <footer className="app-desktop-foot">
-            <span>{version ? `v${version}` : "PROOFCORE"}</span>
+            <span>{version ? `v${version}` : "PROOFSTACK"}</span>
             <button
               type="button"
               onClick={() => {

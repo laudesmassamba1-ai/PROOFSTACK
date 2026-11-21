@@ -207,6 +207,94 @@ export function Overview() {
         </section>
       </EnhancedCard>
 
+      {/* The beginner's first screen: four real doors, not a wall of statistics. It only
+          appears while the workspace has no project, so it never hides real work. */}
+      {!hasProjects ? (
+        <section className="app-section" aria-labelledby="start-choices-title">
+          <div className="app-section-head">
+            <p className="app-eyebrow">01 / {fr ? "PREMIER PAS" : "FIRST STEP"}</p>
+            <h2 id="start-choices-title" className="app-section-title">
+              {fr ? "Que souhaitez-vous faire aujourd'hui ?" : "What would you like to do today?"}
+            </h2>
+            <p className="app-support">
+              {fr
+                ? "Choisissez une entrée. Tout se fait depuis cette page, sans commande ni fichier de configuration."
+                : "Pick an entry point. Everything happens here, with no command and no configuration file."}
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Link
+              to="/app/start"
+              className="rounded-[var(--radius)] border border-black/10 bg-surface-alt px-5 py-4 transition-colors hover:border-black/30"
+            >
+              <span className="app-eyebrow">01</span>
+              <h3 className="mt-1 text-base font-semibold">
+                {fr ? "Analyser mon site Internet" : "Analyse my website"}
+              </h3>
+              <p className="mt-1 text-sm text-muted">
+                {fr
+                  ? "Une adresse suffit : sécurité, contenu, international. Le résultat arrive expliqué."
+                  : "One address is enough: security, content, global readiness. The result comes explained."}
+              </p>
+              <span className="app-btn app-btn-primary mt-3 inline-flex">
+                {fr ? "Analyser mon site" : "Analyse my site"} <ArrowRight size={13} />
+              </span>
+            </Link>
+            <Link
+              to="/app/modules/flow"
+              className="rounded-[var(--radius)] border border-black/10 px-5 py-4 transition-colors hover:border-black/30"
+            >
+              <span className="app-eyebrow">02</span>
+              <h3 className="mt-1 text-base font-semibold">
+                {fr ? "Vérifier une application Web" : "Check a web application"}
+              </h3>
+              <p className="mt-1 text-sm text-muted">
+                {fr
+                  ? "Parcours de connexion, de commande et de paiement : ce que l'utilisateur traverse réellement."
+                  : "Sign-in, checkout and payment journeys: what the user actually goes through."}
+              </p>
+              <span className="app-text-link mt-3 inline-flex">
+                {fr ? "Voir le module FLOW" : "See the FLOW module"} <ArrowRight size={13} />
+              </span>
+            </Link>
+            <Link
+              to="/app/cli"
+              className="rounded-[var(--radius)] border border-black/10 px-5 py-4 transition-colors hover:border-black/30"
+            >
+              <span className="app-eyebrow">03</span>
+              <h3 className="mt-1 text-base font-semibold">
+                {fr ? "Tester un projet de développement" : "Test a development project"}
+              </h3>
+              <p className="mt-1 text-sm text-muted">
+                {fr
+                  ? "Les cinq modules sur une base de code : en local ou dans la CI, sans rien installer ici."
+                  : "The five modules against a codebase: locally or in CI, nothing to install here."}
+              </p>
+              <span className="app-text-link mt-3 inline-flex">
+                {fr ? "Ouvrir le guide CLI" : "Open the CLI guide"} <ArrowRight size={13} />
+              </span>
+            </Link>
+            <Link
+              to="/app/modules"
+              className="rounded-[var(--radius)] border border-black/10 px-5 py-4 transition-colors hover:border-black/30"
+            >
+              <span className="app-eyebrow">04</span>
+              <h3 className="mt-1 text-base font-semibold">
+                {fr ? "Découvrir PROOFSTACK" : "Discover PROOFSTACK"}
+              </h3>
+              <p className="mt-1 text-sm text-muted">
+                {fr
+                  ? "Ce que chaque module vérifie, et ce qu'il ne vérifie pas. Aucune donnée de démonstration n'est inventée."
+                  : "What each module checks, and what it does not. No demonstration data is invented."}
+              </p>
+              <span className="app-text-link mt-3 inline-flex">
+                {fr ? "Voir les modules" : "See the modules"} <ArrowRight size={13} />
+              </span>
+            </Link>
+          </div>
+        </section>
+      ) : null}
+
       <section className="app-section" data-reveal aria-labelledby="module-objects-title">
         <div className="app-section-head">
           <p className="app-eyebrow">02 / {t("ws.overview.modules")}</p>

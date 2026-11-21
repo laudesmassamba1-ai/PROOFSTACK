@@ -637,8 +637,8 @@ export function Settings() {
           <Cannot
             reason={
               fr
-                ? "Une invitation se lance depuis la page Espace. Elle ne donne aucun accès : la personne reçoit une notification dans l'application et doit accepter. L'adresse doit déjà avoir un compte PROOFCORE ; un e-mail part si un fournisseur est configuré."
-                : "An invitation starts on the Workspace page. It grants nothing: the person is notified in the app and has to accept. The address must already have a PROOFCORE account; an email is sent when a provider is configured."
+                ? "Une invitation se lance depuis la page Espace. Elle ne donne aucun accès : la personne reçoit une notification dans l'application et doit accepter. L'adresse doit déjà avoir un compte PROOFSTACK ; un e-mail part si un fournisseur est configuré."
+                : "An invitation starts on the Workspace page. It grants nothing: the person is notified in the app and has to accept. The address must already have a PROOFSTACK account; an email is sent when a provider is configured."
             }
           />
         </Card>

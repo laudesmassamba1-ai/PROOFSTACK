@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router";
+import { useI18n } from "./i18n/index.js";
 import { BrandLayout } from "./layouts/BrandLayout.js";
 
 /** Route-level splitting keeps marketing, docs, the workspace and admin apart. */
@@ -82,25 +83,27 @@ const LocalAgent = lazy(() =>
 );
 
 function RouteFallback() {
+  const { t } = useI18n();
   return (
     <div
       className="grid min-h-screen place-items-center bg-brand-black"
       role="status"
       aria-live="polite"
     >
-      <span className="eyebrow">Loading…</span>
+      <span className="eyebrow">{t("ws.loading")}</span>
     </div>
   );
 }
 
 export function App() {
+  const { t } = useI18n();
   return (
     <Suspense fallback={<RouteFallback />}>
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-white focus:px-3 focus:py-2 focus:text-black"
       >
-        Skip to content
+        {t("mkt.skip")}
       </a>
       <Routes>
         <Route element={<BrandLayout />}>

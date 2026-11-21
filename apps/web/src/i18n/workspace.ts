@@ -257,7 +257,7 @@ export const workspaceEn = {
   "ai.apiKey": "API key",
   "ai.keyStored":
     "Examples: https://api.openai.com/v1, https://generativelanguage.googleapis.com/v1beta/openai, https://openrouter.ai/api/v1, a local Ollama.",
-  "ai.needKey": "Add your API key first. The AI is yours; PROOFCORE does not provide one.",
+  "ai.needKey": "Add your API key first. The AI is yours; PROOFSTACK does not provide one.",
   "ai.empty": "Ask about your quality data.",
   "ai.emptyHint":
     '"What did the last run find on FLOW?" · "Summarize the failed findings." · "Which project is behind on EXIT?"',
@@ -272,7 +272,7 @@ export const workspaceEn = {
     "The AI answers from your workspace's stored runs and findings. It cannot decide a payment, write to your project, or see another workspace. For an AI that runs checks against your app itself, use `proofcore mcp` with Claude Code or the Gemini CLI (docs/guides/AI_INTEGRATION.md).",
   "wh.title": "Outbound webhooks",
   "wh.description":
-    "Your automations receive signed events after each committed run. PROOFCORE signs deliveries with HMAC-SHA256 over timestamp.body (x-proofcore-signature); receivers reject unsigned or stale calls.",
+    "Your automations receive signed events after each committed run. PROOFSTACK signs deliveries with HMAC-SHA256 over timestamp.body (x-proofcore-signature); receivers reject unsigned or stale calls.",
   "wh.events": "Events",
   "wh.event.run.completed": "run.completed — a test run was committed",
   "wh.event.findings.failed": "findings.failed — a committed run has failed findings",
@@ -647,7 +647,7 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
   "ai.apiKey": "Clé API",
   "ai.keyStored":
     "Exemples : https://api.openai.com/v1, https://generativelanguage.googleapis.com/v1beta/openai, https://openrouter.ai/api/v1, un Ollama local.",
-  "ai.needKey": "Ajoutez d'abord votre clé API. L'IA est la vôtre ; PROOFCORE n'en fournit pas.",
+  "ai.needKey": "Ajoutez d'abord votre clé API. L'IA est la vôtre ; PROOFSTACK n'en fournit pas.",
   "ai.empty": "Posez une question sur vos données qualité.",
   "ai.emptyHint":
     '"Qu\'a trouvé la dernière exécution sur FLOW ?" · "Résume les constats en échec." · "Quel projet est en retard sur EXIT ?"',
@@ -662,7 +662,7 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
     "L'IA répond à partir des exécutions et constats stockés de votre espace. Elle ne peut ni décider un paiement, ni écrire dans votre projet, ni voir un autre espace. Pour une IA qui exécute les vérifications sur votre app elle-même, utilisez `proofcore mcp` avec Claude Code ou Gemini CLI (docs/guides/AI_INTEGRATION.md).",
   "wh.title": "Webhooks sortants",
   "wh.description":
-    "Vos automatisations reçoivent des événements signés après chaque exécution enregistrée. PROOFCORE signe les livraisons avec HMAC-SHA256 sur timestamp.body (x-proofcore-signature) ; les récepteurs rejettent les appels non signés ou périmés.",
+    "Vos automatisations reçoivent des événements signés après chaque exécution enregistrée. PROOFSTACK signe les livraisons avec HMAC-SHA256 sur timestamp.body (x-proofcore-signature) ; les récepteurs rejettent les appels non signés ou périmés.",
   "wh.events": "Événements",
   "wh.event.run.completed": "run.completed — une exécution a été enregistrée",
   "wh.event.findings.failed": "findings.failed — une exécution contient des constats en échec",

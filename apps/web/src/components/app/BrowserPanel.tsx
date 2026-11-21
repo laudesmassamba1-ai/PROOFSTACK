@@ -79,7 +79,7 @@ function startPage(fr: boolean): string {
   const title = fr ? "Nouvel onglet" : "New tab";
   const hint = fr ? "Saisissez une adresse pour commencer." : "Type an address to begin.";
   const links = [
-    { label: "PROOFCORE", href: "https://proofstack-iota.vercel.app/" },
+    { label: "PROOFSTACK", href: "https://proofstack-iota.vercel.app/" },
     {
       label: fr ? "Documentation" : "Documentation",
       href: "https://proofstack-iota.vercel.app/docs",

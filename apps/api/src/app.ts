@@ -16,6 +16,7 @@ import { billingRoutes, planRoutes } from "./routes/billing.js";
 import { browserRoutes } from "./routes/browser.js";
 import { deviceRoutes } from "./routes/device.js";
 import { machineRoutes } from "./routes/machine.js";
+import { releaseRoutes } from "./routes/releases.js";
 import { webhookRoutes } from "./routes/webhooks.js";
 import { workspaceRoutes } from "./routes/workspace.js";
 
@@ -147,6 +148,10 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
   app.route("/api/account", accountRoutes(services));
   app.route("/api/auth/device", deviceRoutes(services));
   app.route("/api/v1", planRoutes(services));
+  // Registered before the workspace router: that router mounts a session guard on
+  // `/api/v1/*`, so anything mounted after it would answer 401 to an anonymous visitor.
+  // The download page is public by design and must describe releases before sign-in.
+  app.route("/api/v1", releaseRoutes());
   app.route("/api/v1", workspaceRoutes(services));
   app.route("/api/v1/ai", aiRoutes(services));
   app.route("/api/v1", auditRoutes(services));

@@ -216,8 +216,10 @@ Deliberate behaviours:
 
 ### Not implemented
 
-- PROOFCORE is **not an MCP server**. It consumes MCP servers; it does not expose its
-  own tools to other clients.
+- The hosted PROOFSTACK API is **not an MCP server**, and it exposes no tools to other
+  clients. The CLI ships an optional **local** stdio server (`proofcore mcp`) for developer
+  tooling on your own machine; it is not part of the hosted service and needs no cloud
+  credentials. Contributors: `packages/cli/src/mcp-server.ts` is that local server.
 - Sampling and roots are not implemented (they are answered with `-32601`).
 - OAuth flows for remote MCP servers are not implemented. Use a bearer token in
   `headers` with `${ENV_VAR}` expansion.
@@ -355,7 +357,8 @@ the wrong field is the mistake that leaks a secret into git.
 Stated plainly, because a capability list without limits is marketing:
 
 - PROOFCORE does not host a model. It calls one you configure.
-- PROOFCORE is not an MCP server. It consumes MCP servers.
+- The hosted PROOFSTACK API is not an MCP server. The optional `proofcore mcp` command is
+  a local stdio server for developer tooling, not a hosted capability.
 - There is no built-in chat UI. `ai ask` and `ai agent` are CLI commands; the dashboard
   does not yet embed an agent.
 - No OAuth flow for remote MCP servers.

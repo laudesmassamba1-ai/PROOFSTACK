@@ -5,7 +5,7 @@
  */
 export const marketingEn = {
   "mkt.skip": "Skip to content",
-  "mkt.homeLabel": "PROOFCORE home",
+  "mkt.homeLabel": "PROOFSTACK home",
   "mkt.menu.open": "Open menu",
   "mkt.menu.close": "Close menu",
   "mkt.footer.trust": "Trust",
@@ -114,7 +114,7 @@ export const marketingEn = {
   "home.cta.primary": "Create a free workspace",
   "home.cta.pricing": "See pricing",
 
-  "hero.artifact.title": "PROOFCORE · REPORT",
+  "hero.artifact.title": "PROOFSTACK · REPORT",
   "hero.artifact.note": "example · not live",
   "home.stats.label": "The engine in numbers",
   "home.stats.modules": "modules, one engine",
@@ -127,7 +127,7 @@ export type MarketingKey = keyof typeof marketingEn;
 
 export const marketingFr: Record<MarketingKey, string> = {
   "mkt.skip": "Aller au contenu",
-  "mkt.homeLabel": "Accueil PROOFCORE",
+  "mkt.homeLabel": "Accueil PROOFSTACK",
   "mkt.menu.open": "Ouvrir le menu",
   "mkt.menu.close": "Fermer le menu",
   "mkt.footer.trust": "Confiance",
@@ -236,7 +236,7 @@ export const marketingFr: Record<MarketingKey, string> = {
   "home.cta.primary": "Créer un espace gratuit",
   "home.cta.pricing": "Voir les tarifs",
 
-  "hero.artifact.title": "PROOFCORE · RAPPORT",
+  "hero.artifact.title": "PROOFSTACK · RAPPORT",
   "hero.artifact.note": "exemple · pas en direct",
   "home.stats.label": "Le moteur en chiffres",
   "home.stats.modules": "modules, un seul moteur",

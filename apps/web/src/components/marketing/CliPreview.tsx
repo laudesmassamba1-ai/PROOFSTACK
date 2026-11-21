@@ -3,7 +3,7 @@ import { useState } from "react";
 
 const COMMAND = "proofcore test --module world,flow,exit";
 
-const OUTPUT = `PROOFCORE / EXECUTION
+const OUTPUT = `PROOFSTACK / EXECUTION
 
 WORLD   ▰▰▰▰▰▰▰▰▱▱  80%
 FLOW    ▰▰▰▰▱▱▱▱▱▱  40%

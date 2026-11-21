@@ -57,7 +57,7 @@ export function errorText(error: unknown, fr: boolean): string {
     case "forbidden":
       return "Action réservée au propriétaire ou aux administrateurs.";
     case "user_not_found":
-      return "Aucun compte PROOFCORE n'utilise cette adresse.";
+      return "Aucun compte PROOFSTACK n'utilise cette adresse.";
     case "already_member":
       return "Cette personne fait déjà partie de l'espace.";
     case "last_owner":

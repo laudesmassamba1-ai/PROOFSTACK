@@ -35,7 +35,7 @@ export class ErrorBoundary extends Component<Props, State> {
     return (
       <div className="app-shell app-centered-shell">
         <div className="app-frame app-service-frame">
-          <p className="app-eyebrow">PROOFCORE / ERREUR D'AFFICHAGE</p>
+          <p className="app-eyebrow">PROOFSTACK / ERREUR D'AFFICHAGE</p>
           <h1 className="app-display app-service-title">{"L'écran a perdu le fil"}</h1>
           <p className="app-support">
             {

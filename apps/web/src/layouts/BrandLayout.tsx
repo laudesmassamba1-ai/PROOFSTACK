@@ -57,7 +57,7 @@ export function BrandLayout() {
           <Outlet />
         </main>
         <footer className="desktop-auth-foot">
-          <span>PROOFCORE / accès sécurisé</span>
+          <span>PROOFSTACK / accès sécurisé</span>
           <span>WORLD · FLOW · EXIT · FAIL · CLEAN</span>
         </footer>
       </div>

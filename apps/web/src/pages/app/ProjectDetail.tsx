@@ -578,7 +578,7 @@ export default config;`;
               : "Nothing here is mandatory: the modules run from the button above. The CLI replays the same thing locally or in CI, from your project root:"}
           </p>
           <pre className="overflow-x-auto rounded-[var(--radius)] bg-surface-alt px-3 py-2 app-mono">
-            {`export PROOFCORE_PROJECT_TOKEN=<token from above>
+            {`export PROOFSTACK_PROJECT_TOKEN=<token from above>
 pnpm proofcore doctor
 pnpm proofcore test --module ${project.enabledModules.join(",") || "world"}
 pnpm proofcore sync`}
