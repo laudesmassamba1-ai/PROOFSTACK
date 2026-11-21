@@ -12,6 +12,7 @@ import {
 import { Link } from "react-router";
 import { HeroLockup } from "../components/brand/Logo.js";
 import { ParticleLogo } from "../components/brand/ParticleLogo.js";
+import { SplitWords } from "../components/brand/SplitWords.js";
 import { CliPreview } from "../components/marketing/CliPreview.js";
 import { EngineDiagram } from "../components/marketing/EngineDiagram.js";
 import { ModuleShowcase } from "../components/marketing/ModuleShowcase.js";
@@ -57,14 +58,22 @@ export function Home() {
             <div className="min-w-0 max-w-[640px]">
               <HeroLockup size={46} />
               <p className="eyebrow mt-7 text-white/78">{t("hero.eyebrow")}</p>
-              <h1 className="rise rise-2 hero-title mt-3 max-w-[13ch] text-balance text-white">
-                {t("hero.title")}
+              {/* The promise, one masked word at a time; the last phrase carries the
+                  brand's mint so the eye lands on what the product does. */}
+              <h1
+                data-motion="words"
+                className="hero-title mt-3 max-w-[14ch] text-balance text-white"
+              >
+                <SplitWords text={t("hero.title.pre")} />{" "}
+                <em className="hero-title-accent">
+                  <SplitWords text={t("hero.title.accent")} />
+                </em>
               </h1>
               <p className="rise rise-3 mt-5 max-w-[55ch] text-[0.98rem] leading-relaxed text-white/62">
                 {t("hero.lede")}
               </p>
               <div className="rise rise-3 mt-7 flex flex-wrap items-center gap-2.5">
-                <Link to="/download" className="btn btn-primary">
+                <Link to="/download" data-magnet className="btn btn-primary">
                   {t("hero.cta.download")} <ArrowRight size={16} />
                 </Link>
                 <Link to="/signup" className="btn btn-ghost">
@@ -126,7 +135,7 @@ export function Home() {
           <ModuleShowcase />
         </div>
         <div data-reveal className="mt-8 flex flex-wrap items-center gap-3">
-          <Link to="/pricing" className="btn btn-ghost">
+          <Link to="/pricing" data-magnet className="btn btn-ghost">
             {t("home.cta.pricing")} <ArrowRight size={16} />
           </Link>
         </div>

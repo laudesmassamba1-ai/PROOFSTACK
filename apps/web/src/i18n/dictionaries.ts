@@ -18,7 +18,8 @@ export const en = {
   "nav.theme": "Theme",
   "nav.language": "Language",
   "hero.eyebrow": "Integrated software quality suite",
-  "hero.title": "Make Software Work Everywhere.",
+  "hero.title.pre": "Make software",
+  "hero.title.accent": "work everywhere.",
   "hero.lede":
     "Your software has to work for a user in Abidjan, one in Paris and one in Montréal, on a phone as much as on a desktop. PROOFCORE tests what they actually live through: locale formats, checkout journeys, exports, security headers, interface quality. It runs on your machine; the report is yours.",
   "hero.cta.primary": "Start for free",
@@ -267,7 +268,8 @@ export const fr: Messages = {
   "nav.theme": "Thème",
   "nav.language": "Langue",
   "hero.eyebrow": "Suite intégrée de qualité logicielle",
-  "hero.title": "Faites fonctionner vos logiciels partout.",
+  "hero.title.pre": "Faites fonctionner",
+  "hero.title.accent": "vos logiciels partout.",
   "hero.lede":
     "Votre logiciel doit marcher pour un utilisateur à Abidjan, un à Paris et un à Montréal, sur mobile comme sur ordinateur. PROOFCORE teste ce qu'ils vivent vraiment : formats locaux, parcours de paiement, exports, en-têtes de sécurité, qualité d'interface. Tout tourne sur votre machine ; le rapport vous appartient.",
   "hero.cta.primary": "Commencer gratuitement",

@@ -278,6 +278,14 @@ p {
   text-wrap: balance;
 }
 
+/* The accent phrase inside the headline: the brand mint, no glow. Colour is the
+   only emphasis — the words move like every other word, so the choreography
+   stays one continuous sentence. */
+.hero-title-accent {
+  font-style: normal;
+  color: var(--brand-mint);
+}
+
 .hero-section {
   /* Room for the fixed header, then the content decides the height — no forced 86vh
      that manufactured dead space on tall screens. */
@@ -908,6 +916,52 @@ p {
 /* A narrow viewport scrolls the table, not the whole page. */
 .overflow-x-auto > .app-table {
   min-width: 32rem;
+}
+
+/* Controlled scroll must be *discoverable*: on a phone, the cut column is the
+   affordance only if the edge shows there is more. A soft fade plus a snapping
+   scroll does that without extra chrome. */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+}
+
+.overflow-x-auto > .app-table th,
+.overflow-x-auto > .app-table td {
+  scroll-snap-align: start;
+}
+
+@media (max-width: 640px) {
+  .overflow-x-auto {
+    position: relative;
+    border-radius: var(--radius);
+    box-shadow:
+      inset 0 -1px 0 var(--border),
+      inset 0 1px 0 var(--border);
+  }
+
+  .overflow-x-auto::after {
+    content: "";
+    position: sticky;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    display: block;
+    width: 2.5rem;
+    flex: none;
+    background: linear-gradient(90deg, transparent, var(--surface));
+    pointer-events: none;
+  }
+
+  .overflow-x-auto > .app-table {
+    min-width: 27rem;
+  }
+
+  .app-table th,
+  .app-table td {
+    padding-inline: 0.55rem;
+  }
 }
 
 .app-table th {

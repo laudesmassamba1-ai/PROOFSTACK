@@ -354,72 +354,78 @@ export function Overview() {
         </div>
       </section>
 
-      <section className="app-section" data-reveal aria-labelledby="insights-title">
-        <div className="app-section-head">
-          <p className="app-eyebrow">03 / {fr ? "Évolution" : "Evolution"}</p>
-          <h2 id="insights-title" className="app-section-title">
-            {fr ? "14 derniers jours" : "Last 14 days"}
-          </h2>
-        </div>
-        <div className="grid gap-4 lg:grid-cols-3">
-          <div className="app-workbench lg:col-span-2">
-            <header className="app-workbench-head">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground">
-                  {fr ? "Vérifications par jour" : "Checks per day"}
-                </p>
-              </div>
-              <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-sm bg-success/70" />
-                  {fr ? "réussis" : "passed"}
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-sm bg-danger/80" />
-                  {fr ? "échoués" : "failed"}
-                </span>
-              </div>
-            </header>
-            {insights ? (
-              <RunsTrend runs={insights.runsPerDay} locale={locale} />
-            ) : (
-              <p className="p-4 text-xs text-muted-foreground">…</p>
-            )}
+      {/* The trend panels are the page's most expensive real estate. Before the first
+          run they would render three near-empty boxes of "…", half a viewport of paper
+          that answers nothing — so the whole section waits for the data that gives it a
+          reason to exist. */}
+      {!hasRuns ? null : (
+        <section className="app-section" data-reveal aria-labelledby="insights-title">
+          <div className="app-section-head">
+            <p className="app-eyebrow">03 / {fr ? "Évolution" : "Evolution"}</p>
+            <h2 id="insights-title" className="app-section-title">
+              {fr ? "14 derniers jours" : "Last 14 days"}
+            </h2>
           </div>
-          <div className="app-workbench">
-            <header className="app-workbench-head">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground">
-                  {fr ? "Gravité des échecs" : "Failure severity"}
-                </p>
-              </div>
-            </header>
-            <div className="p-4">
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div className="app-workbench lg:col-span-2">
+              <header className="app-workbench-head">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    {fr ? "Vérifications par jour" : "Checks per day"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <span className="h-2 w-2 rounded-sm bg-success/70" />
+                    {fr ? "réussis" : "passed"}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="h-2 w-2 rounded-sm bg-danger/80" />
+                    {fr ? "échoués" : "failed"}
+                  </span>
+                </div>
+              </header>
               {insights ? (
-                <SeverityBreakdown counts={insights.severityCounts} locale={locale} />
+                <RunsTrend runs={insights.runsPerDay} locale={locale} />
               ) : (
-                <p className="text-xs text-muted-foreground">…</p>
+                <p className="p-4 text-xs text-muted-foreground">…</p>
               )}
             </div>
-          </div>
-          <div className="app-workbench lg:col-span-3">
-            <header className="app-workbench-head">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground">
-                  {fr ? "Taux de réussite par module" : "Pass rate per module"}
-                </p>
+            <div className="app-workbench">
+              <header className="app-workbench-head">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    {fr ? "Gravité des échecs" : "Failure severity"}
+                  </p>
+                </div>
+              </header>
+              <div className="p-4">
+                {insights ? (
+                  <SeverityBreakdown counts={insights.severityCounts} locale={locale} />
+                ) : (
+                  <p className="text-xs text-muted-foreground">…</p>
+                )}
               </div>
-            </header>
-            <div className="p-4">
-              {insights ? (
-                <ModulePassRates modules={insights.moduleTotals} />
-              ) : (
-                <p className="text-xs text-muted-foreground">…</p>
-              )}
+            </div>
+            <div className="app-workbench lg:col-span-3">
+              <header className="app-workbench-head">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    {fr ? "Taux de réussite par module" : "Pass rate per module"}
+                  </p>
+                </div>
+              </header>
+              <div className="p-4">
+                {insights ? (
+                  <ModulePassRates modules={insights.moduleTotals} />
+                ) : (
+                  <p className="text-xs text-muted-foreground">…</p>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       <section className="app-next-action">
         <div>
@@ -536,10 +542,9 @@ export function Overview() {
               <span className="app-count-mark">{failures}</span>
             </header>
             {failures === 0 ? (
-              <Empty
-                title={t("ws.overview.failures.title")}
-                body={t("ws.overview.failures.empty")}
-              />
+              /* The panel already carries its title; repeating it inside the empty state
+                 made the panel say its own name twice. */
+              <Empty title={null} body={t("ws.overview.failures.empty")} />
             ) : (
               <ul className="app-failure-list">
                 {data.recentFailures.slice(0, 5).map((finding) => (
@@ -586,20 +591,25 @@ export function Overview() {
               </div>
               <p>
                 {quota === -1
-                  ? "Unlimited on this plan."
-                  : `${Math.max(0, quota - used)} run(s) left. Retries of the same run id are not billed twice.`}
+                  ? t("ws.overview.usage.unlimited")
+                  : t("ws.overview.usage.left").replace("{n}", String(Math.max(0, quota - used)))}
               </p>
               {!data.subscription.entitled ? (
                 <p className="app-usage-note">
                   {data.subscription.reason === "period_ended_awaiting_renewal"
-                    ? `The paid period ended on ${formatDate(data.subscription.currentPeriodEnd)}.`
-                    : "No verified paid subscription is active."}{" "}
-                  Nothing was deleted; paid access is not switched on until a provider confirms a
-                  payment.
+                    ? t("ws.overview.usage.periodEnded").replace(
+                        "{date}",
+                        formatDate(data.subscription.currentPeriodEnd)
+                      )
+                    : t("ws.overview.usage.noSub")}{" "}
+                  {t("ws.overview.usage.noSubNote")}
                 </p>
               ) : null}
               <Link to="/app/billing" className="app-text-link">
-                {data.subscription.entitled ? "Manage plan" : "View plans"} <ArrowRight size={13} />
+                {data.subscription.entitled
+                  ? t("ws.overview.usage.manage")
+                  : t("ws.overview.usage.viewPlans")}{" "}
+                <ArrowRight size={13} />
               </Link>
             </div>
           </section>

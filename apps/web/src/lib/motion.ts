@@ -86,45 +86,6 @@ class Spring {
   }
 }
 
-/* ------------------------------------------------------------- split words */
-
-/** Wrap each word in a masked, individually-delayed span. Returns the undo. */
-function splitWords(root: HTMLElement): () => void {
-  if (root.dataset.split === "done") return () => undefined;
-  const original = root.textContent ?? "";
-  const words = original.split(/\s+/).filter(Boolean);
-  if (words.length === 0) return () => undefined;
-  root.dataset.split = "done";
-  root.setAttribute("aria-label", original);
-
-  const fragment = document.createDocumentFragment();
-  words.forEach((word, index) => {
-    const mask = document.createElement("span");
-    mask.className = "m-word";
-    // Words breathe: the stagger is prime-hashed, not uniform, so a line of
-    // eight words reveals as a ripple instead of a metronome.
-    mask.style.setProperty("--wi", String(index));
-    mask.style.setProperty(
-      "--w-delay",
-      `${Math.round((index * 55 + ((index * 2654435761) % 90)) * 10) / 10}ms`
-    );
-    const inner = document.createElement("span");
-    inner.className = "m-word-inner";
-    inner.textContent = word;
-    mask.appendChild(inner);
-    fragment.appendChild(mask);
-    if (index < words.length - 1) fragment.appendChild(document.createTextNode(" "));
-  });
-  root.textContent = "";
-  root.appendChild(fragment);
-
-  return () => {
-    root.textContent = original;
-    root.removeAttribute("aria-label");
-    delete root.dataset.split;
-  };
-}
-
 /* ------------------------------------------------------------------- tilt */
 
 function attachTilt(root: HTMLElement): () => void {
@@ -302,15 +263,11 @@ function armNode(node: HTMLElement): void {
 
   node.dataset.motionArmed = "1";
 
-  let undoSplit: () => void = () => undefined;
-  if (motion === "words") undoSplit = splitWords(node);
-
   const io = ensureIntersectionObserver();
   const observer = new MutationObserver(() => undefined);
   observer.disconnect();
 
   register(node, () => {
-    undoSplit();
     io.unobserve(node);
   });
 }

@@ -68,7 +68,8 @@ export function ModuleShowcase() {
             <Link
               key={module.id}
               to={`/${module.id}`}
-              className={`module-panel module-${module.id}`}
+              className={`module-panel module-${module.id} spot-card`}
+              data-tilt
               style={{ "--i": index } as React.CSSProperties}
             >
               <span className="module-panel-glow" aria-hidden="true" />

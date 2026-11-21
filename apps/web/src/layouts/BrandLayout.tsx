@@ -2,8 +2,10 @@ import { useEffect } from "react";
 import { Outlet, useLocation } from "react-router";
 import { WindowControls } from "../components/app/WindowControls.js";
 import { Mark } from "../components/brand/Logo.js";
+import { SplitWords } from "../components/brand/SplitWords.js";
 import { Footer } from "../components/marketing/Footer.js";
 import { Nav } from "../components/marketing/Nav.js";
+import { initMotion, teardownMotion } from "../lib/motion.js";
 import { initReveals, teardownReveals } from "../lib/reveal.js";
 
 /** Routes that exist to open a session, not to sell the product. */
@@ -25,13 +27,18 @@ export function BrandLayout() {
     window.scrollTo({ top: 0, behavior: "auto" });
   }, [pathname]);
 
-  // Scroll-choreographed reveals, re-armed per route.
+  // Scroll-choreographed reveals, re-armed per route. The motion engine adds the
+  // split-word masks, spring tilts, magnetic controls and scroll drift on top.
   // biome-ignore lint/correctness/useExhaustiveDependencies: pathname IS the dependency
   useEffect(() => {
-    const timer = window.setTimeout(initReveals, 60);
+    const timer = window.setTimeout(() => {
+      initReveals();
+      initMotion();
+    }, 60);
     return () => {
       window.clearTimeout(timer);
       teardownReveals();
+      teardownMotion();
     };
   }, [pathname]);
 
@@ -120,8 +127,13 @@ export function SectionHeading({
   return (
     <header className="max-w-[62ch]" data-reveal>
       {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
-      <h2 className="mt-3 text-balance text-[1.9rem] leading-[1.12] tracking-tight sm:text-[2.4rem]">
-        {title}
+      {/* The title is choreographed word by word: each rises out of its own mask with
+          an anticipation curve, staggered asymmetrically by the motion engine. */}
+      <h2
+        className="mt-3 text-balance text-[1.9rem] leading-[1.12] tracking-tight sm:text-[2.4rem]"
+        data-motion="words"
+      >
+        <SplitWords text={title} />
       </h2>
       {lede ? (
         <p className="mt-4 max-w-[64ch] text-[1rem] leading-relaxed text-white/56">{lede}</p>

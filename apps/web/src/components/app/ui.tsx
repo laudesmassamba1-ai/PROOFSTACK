@@ -150,7 +150,9 @@ export function Empty({
   action,
   tester = "empty",
 }: {
-  title: string;
+  /** Panels that already carry their own heading pass null: repeating it here made
+   *  some empty states say their name twice. */
+  title?: string | null;
   body: string;
   action?: ReactNode;
   tester?: TesterVariant | false;
@@ -158,7 +160,7 @@ export function Empty({
   return (
     <div className="app-empty">
       {tester ? <TesterScene variant={tester} /> : null}
-      <p className="app-empty-title">{title}</p>
+      {title ? <p className="app-empty-title">{title}</p> : null}
       <p className="app-empty-body">{body}</p>
       {action ? <div className="app-empty-action">{action}</div> : null}
     </div>

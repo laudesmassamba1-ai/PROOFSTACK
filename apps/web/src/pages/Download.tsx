@@ -88,7 +88,9 @@ export function DownloadPage() {
         lede={t("download.lede")}
       />
 
-      <div className="mt-10 grid gap-5 lg:grid-cols-3">
+      {/* minmax(0,1fr): the sha256 names are unbreakable mono strings, and a plain
+          1fr track lets the widest child push the column past the viewport. */}
+      <div className="mt-10 grid gap-5 lg:grid-cols-[repeat(3,minmax(0,1fr))]">
         <DownloadCard
           icon={Monitor}
           title="Windows"
@@ -248,7 +250,7 @@ function DownloadCard({
   const href = asset?.url ?? fallback;
   const size = asset ? formatSize(asset.size) : null;
   return (
-    <article className="brand-panel flex flex-col p-6">
+    <article className="brand-panel flex min-w-0 flex-col p-6">
       <Icon size={22} className="text-brand-mint" />
       <h3 className="mt-4 text-[1.05rem] font-semibold text-white">{title}</h3>
       <p className="mt-1 text-[0.86rem] text-white/54">{subtitle}</p>

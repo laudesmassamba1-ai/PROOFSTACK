@@ -42,11 +42,14 @@ function Stat({
     }
     let raf = 0;
     const start = performance.now();
-    const duration = 900;
+    // Spring-eased count-up, not linear: the value arrives fast, overshoots a
+    // fraction and settles — the number feels weighed, not clocked.
     const tick = (now: number): void => {
-      const progress = Math.min(1, (now - start) / duration);
-      setDisplay(Math.round(value * progress));
-      if (progress < 1) raf = requestAnimationFrame(tick);
+      const t = Math.min(1, (now - start) / 1100);
+      const eased = 1 - 2 ** (-11 * t) * Math.cos((t * Math.PI) / 0.9);
+      setDisplay(Math.round(value * eased));
+      if (t < 1) raf = requestAnimationFrame(tick);
+      else setDisplay(value);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
