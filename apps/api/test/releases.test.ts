@@ -121,6 +121,33 @@ describe("releases", () => {
     await db.close();
   });
 
+  it("sends the optional GitHub token from the server, never from the client", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      json(RELEASE)
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const withToken = releaseRoutes({ token: "gh_test_token" });
+    await withToken.request("http://localhost/releases/latest");
+    const init = fetchMock.mock.calls[0]?.[1];
+    const headers = (init?.headers ?? {}) as Record<string, string>;
+    expect(headers.authorization).toBe("Bearer gh_test_token");
+  });
+
+  it("serves the last known release when the source is rate-limited", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(json(RELEASE))
+      .mockResolvedValueOnce(json({ message: "rate limited" }, 403));
+    vi.stubGlobal("fetch", fetchMock);
+    // ttlMs 0 makes the second request revalidate, as it would after five minutes.
+    const flaky = releaseRoutes({ ttlMs: 0 });
+    await flaky.request("http://localhost/releases/latest");
+    const second = await flaky.request("http://localhost/releases/latest");
+    expect(second.status).toBe(200);
+    expect(second.headers.get("x-release-cache")).toBe("stale");
+    expect(((await second.json()) as { release: { tag: string } }).release.tag).toBe("v0.6.0");
+  });
+
   it("serves the cached answer without calling the source twice", async () => {
     const fetchMock = vi.fn(async () => json(RELEASE));
     vi.stubGlobal("fetch", fetchMock);

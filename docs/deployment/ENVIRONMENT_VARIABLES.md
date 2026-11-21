@@ -17,7 +17,7 @@ delivery. It never selects password hashes or session tokens.
 
 ## Current deployment
 
-- Web: `https://proofcore-iota.vercel.app`; `vercel.json` proxies `/api/*`, `/v1/*`
+- Web: `https://proofstack-iota.vercel.app`; `vercel.json` proxies `/api/*`, `/v1/*`
   and `/health` to the API, so `VITE_API_URL` is built as `/` (empty base URL) and the
   session cookie remains same-origin.
 - API: `https://proofcore-api.laudesmassamba1.workers.dev`; `WEB_ORIGIN` and
@@ -29,17 +29,21 @@ real values live in the host's secret store (Worker secrets) or a local, ignored
 
 ## API (`apps/api`)
 
-| Variable                 | Required    | Purpose                                                                                                                                                  |
-| ------------------------ | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `WEB_ORIGIN`             | production  | Public origin of the web app. Cookies are issued against it, CORS allows only it, and cross-origin writes are rejected. Default `http://localhost:5173`. |
-| `API_ORIGIN`             | recommended | Public origin of the API, used for documentation and callbacks. Default `http://localhost:8787`.                                                         |
-| `NODE_ENV`               | production  | `production` forces `Secure` cookies.                                                                                                                    |
-| `PORT`, `HOST`           | local only  | Node dev server bind. Default `8787`, `127.0.0.1`.                                                                                                       |
-| `DATA_PATH`              | local only  | SQLite file for the Node dev server. Default `.proofcore/api.db` (git-ignored).                                                                          |
-| `SASPAY_API_KEY`         | optional    | `sk_test_…` in development, `sk_live_…` in production. Without it the API uses the sandbox provider.                                                     |
-| `SASPAY_WEBHOOK_SECRET`  | optional    | Signing secret shown once when the webhook is created in the SasPay dashboard. Required together with the key.                                           |
-| `SASPAY_BASE_URL`        | optional    | Override the API base URL. Defaults to the sandbox URL for `sk_test_` keys and the live URL otherwise.                                                   |
-| `SASPAY_FEE_CHARGE_MODE` | optional    | `ADD_ON` (payer covers fees) or `DEDUCTED` (fees taken from the net). Default `ADD_ON`.                                                                  |
+| Variable                 | Required    | Purpose                                                                                                                                                                                                                         |
+| ------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `WEB_ORIGIN`             | production  | Public origin of the web app. Cookies are issued against it, CORS allows only it, and cross-origin writes are rejected. Default `http://localhost:5173`.                                                                        |
+| `API_ORIGIN`             | recommended | Public origin of the API, used for documentation and callbacks. Default `http://localhost:8787`.                                                                                                                                |
+| `NODE_ENV`               | production  | `production` forces `Secure` cookies.                                                                                                                                                                                           |
+| `PORT`, `HOST`           | local only  | Node dev server bind. Default `8787`, `127.0.0.1`.                                                                                                                                                                              |
+| `DATA_PATH`              | local only  | SQLite file for the Node dev server. Default `.proofcore/api.db` (git-ignored).                                                                                                                                                 |
+| `SASPAY_API_KEY`         | optional    | `sk_test_…` in development, `sk_live_…` in production. Without it the API uses the sandbox provider.                                                                                                                            |
+| `SASPAY_WEBHOOK_SECRET`  | optional    | Signing secret shown once when the webhook is created in the SasPay dashboard. Required together with the key.                                                                                                                  |
+| `SASPAY_BASE_URL`        | optional    | Override the API base URL. Defaults to the sandbox URL for `sk_test_` keys and the live URL otherwise.                                                                                                                          |
+| `SASPAY_FEE_CHARGE_MODE` | optional    | `ADD_ON` (payer covers fees) or `DEDUCTED` (fees taken from the net). Default `ADD_ON`.                                                                                                                                         |
+| `GITHUB_TOKEN`           | recommended | Read-only token for the public release feed (`GET /api/v1/releases/latest`). Anonymous GitHub calls are capped at 60/hour per IP and Workers share egress addresses; a token raises it to 5000/hour. Never sent to the browser. |
+| `RESEND_API_KEY`         | optional    | Transactional e-mail through Resend. Without it, messages are journalled with status `unconfigured` and the API says so.                                                                                                        |
+| `MAIL_FROM`              | optional    | Verified sender for Resend, e.g. `PROOFSTACK <no-reply@example.com>`. Required with the key.                                                                                                                                    |
+| `SUPPORT_EMAIL`          | optional    | Address shown to customers and notified of support requests. Default `support@proofcore.dev`.                                                                                                                                   |
 
 On Cloudflare, the database is a binding, not a variable:
 
@@ -75,12 +79,13 @@ Set secrets with `wrangler secret put SASPAY_API_KEY` and
 `proofcore login` is interactive and stores only the HttpOnly session cookie, with
 mode `0600`; the password is never persisted. `proofcore logout` removes it.
 
-## Email delivery (not configured)
+## Email delivery
 
-There is no email provider in this build, so the API reports
-`emailVerification: "not_configured"` rather than pretending to send mail. When one
-is added, it must live behind an adapter and read its key from the environment, e.g.
-`EMAIL_API_KEY` + `EMAIL_FROM`. Until then, do not claim verification emails work.
+The API has a Resend adapter. It reads `RESEND_API_KEY` and `MAIL_FROM` at call time; when
+neither is set, every message is written to `email_outbox` with status `unconfigured` and
+the API reports it instead of pretending the mail was sent. Delivery was **not** verified in
+this pass (no key available): treat verification and password-reset e-mails as
+"available with configuration", not as tested production behaviour.
 
 ## Free-tier notes
 

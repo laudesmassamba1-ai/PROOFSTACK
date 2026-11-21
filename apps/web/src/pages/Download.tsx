@@ -188,9 +188,13 @@ export function DownloadPage() {
             ? `v${version}`
             : state === "loading"
               ? "…"
-              : fr
-                ? "Aucune version publiée pour l'instant"
-                : t("download.fallback")}
+              : state === "error"
+                ? fr
+                  ? "Versions momentanément indisponibles — la page GitHub reste accessible ci-dessus."
+                  : "Versions temporarily unavailable — the GitHub page above still works."
+                : fr
+                  ? "Aucune version publiée pour l'instant"
+                  : t("download.fallback")}
         </span>
       </div>
 

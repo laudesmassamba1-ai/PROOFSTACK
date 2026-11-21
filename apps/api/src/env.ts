@@ -67,6 +67,14 @@ export interface AppConfig {
    */
   aiRateLimitPerHour: number;
   cfBrowserToken: string | undefined;
+  /**
+   * Optional GitHub token for the public release feed.
+   *
+   * Anonymous GitHub API calls are capped at 60/hour per IP and Workers share egress
+   * addresses, so production occasionally gets a 403. With a token the limit is 5000/hour.
+   * Read-only use; never sent to the browser.
+   */
+  githubToken: string | undefined;
 }
 
 export type Env = Record<string, string | undefined>;
@@ -107,6 +115,7 @@ export function readConfig(env: Env): AppConfig {
     cfAccountId: env.CF_ACCOUNT_ID?.trim() || undefined,
     aiRateLimitPerHour: positiveInt(env.AI_RATE_LIMIT_PER_HOUR, 5000),
     cfBrowserToken: env.CF_BROWSER_TOKEN?.trim() || undefined,
+    githubToken: env.GITHUB_TOKEN?.trim() || undefined,
   };
 }
 

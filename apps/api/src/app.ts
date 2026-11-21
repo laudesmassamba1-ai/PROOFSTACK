@@ -151,7 +151,7 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
   // Registered before the workspace router: that router mounts a session guard on
   // `/api/v1/*`, so anything mounted after it would answer 401 to an anonymous visitor.
   // The download page is public by design and must describe releases before sign-in.
-  app.route("/api/v1", releaseRoutes());
+  app.route("/api/v1", releaseRoutes({ token: services.config.githubToken }));
   app.route("/api/v1", workspaceRoutes(services));
   app.route("/api/v1/ai", aiRoutes(services));
   app.route("/api/v1", auditRoutes(services));
