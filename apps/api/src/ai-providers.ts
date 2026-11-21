@@ -130,10 +130,12 @@ export async function fetchCatalogue(
   let response: Response;
   try {
     // A provider endpoint never needs a redirect; following one would let a
-    // configured base URL pivot the request to an internal address.
+    // configured base URL pivot the request to an internal address. Workers reject
+    // `redirect: "error"`, so `manual` keeps the response visible and the status is
+    // refused below like any other non-2xx answer.
     response = await fetch(`${root}${path}`, {
       headers,
-      redirect: "error",
+      redirect: "manual",
       signal: AbortSignal.timeout(15_000),
     });
   } catch (error) {
