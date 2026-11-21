@@ -55,3 +55,6 @@ artifacts/desktop/
 
 # Design reference packs dropped in the repo root are read-only inputs, not sources.
 anti-ai-design-main/
+
+# Local editor/agent config: contains machine-specific absolute paths, not source.
+.perch/

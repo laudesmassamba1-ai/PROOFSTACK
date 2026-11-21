@@ -90,6 +90,58 @@ interface PlanOption {
   }[];
 }
 
+/**
+ * Billing usage rows, in the reader's language.
+ *
+ * The API labels its counters in English because the CLI, the webhook payloads and the
+ * operator console all read them; the billing page is the only bilingual surface that
+ * prints them. Mapping by key keeps a new counter from silently leaking English into a
+ * French table — which is exactly what happened to `monthly_ai_audits`.
+ */
+const USAGE_COPY: Record<
+  string,
+  { fr: { label: string; counted: string }; en: { label: string; counted: string } }
+> = {
+  monthly_test_runs: {
+    fr: {
+      label: "Tests exécutés cette période",
+      counted:
+        "Un par identifiant de run ; les réessais et échecs d'envoi ne comptent pas deux fois.",
+    },
+    en: {
+      label: "Test runs this period",
+      counted: "One per run id; retries and failed uploads are not double-billed.",
+    },
+  },
+  monthly_ai_audits: {
+    fr: {
+      label: "Audits IA cette période",
+      counted:
+        "Un par identifiant d'audit ; un scan ou un tour de conversation réessayé n'est compté qu'une fois.",
+    },
+    en: {
+      label: "AI audits this period",
+      counted: "One per audit id; a retried scan or chat turn is metered once.",
+    },
+  },
+  project_limit: {
+    fr: { label: "Projets", counted: "Comptage en direct" },
+    en: { label: "Projects", counted: "Live count" },
+  },
+};
+
+function usageCopy(
+  key: string,
+  fallbackCounted: string,
+  fr: boolean
+): { label: string; counted: string } {
+  const entry = USAGE_COPY[key];
+  if (entry) return fr ? entry.fr : entry.en;
+  // Unknown counter (added server-side, not yet translated): keep the API's own words
+  // rather than inventing a French sentence that might say the wrong thing.
+  return { label: key, counted: fallbackCounted };
+}
+
 export function Billing() {
   const { workspaceId } = useSession();
   const { locale, t } = useI18n();
@@ -551,36 +603,22 @@ export function Billing() {
               </tr>
             </thead>
             <tbody>
-              {data.usage.map((counter) => (
-                <tr key={counter.key}>
-                  <td>
-                    {fr
-                      ? ((
-                          {
-                            monthly_test_runs: "Tests exécutés cette période",
-                            projects: "Projets",
-                          } as Record<string, string>
-                        )[counter.key] ??
-                        (counter.key.includes("project") || counter.label === "Projects"
-                          ? "Projets"
-                          : counter.label))
-                      : counter.label}
-                  </td>
-                  <td className="text-right tabular-nums">{counter.used}</td>
-                  <td className="text-right tabular-nums">
-                    {counter.limit === -1 ? (fr ? "illimité" : "unlimited") : counter.limit}
-                  </td>
-                  <td className="text-xs text-muted">
-                    {fr
-                      ? counter.key === "monthly_test_runs"
-                        ? "Un par identifiant de run ; les réessais et échecs d'envoi ne comptent pas deux fois."
-                        : counter.key.includes("project") || counter.counted === "Live count"
-                          ? "Comptage en direct"
-                          : counter.counted.replaceAll("_", " ")
-                      : counter.counted.replaceAll("_", " ")}
-                  </td>
-                </tr>
-              ))}
+              {data.usage.map((counter) => {
+                // Localisation **par clé**, jamais par comparaison de libellé : l'API
+                // répond en anglais, et chercher `label === "Projects"` laissait passer
+                // la ligne « AI audits this period » telle quelle dans une page française.
+                const text = usageCopy(counter.key, counter.counted, fr);
+                return (
+                  <tr key={counter.key}>
+                    <td>{text.label}</td>
+                    <td className="text-right tabular-nums">{counter.used}</td>
+                    <td className="text-right tabular-nums">
+                      {counter.limit === -1 ? (fr ? "illimité" : "unlimited") : counter.limit}
+                    </td>
+                    <td className="text-xs text-muted">{text.counted}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
