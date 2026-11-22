@@ -85,6 +85,32 @@ export function DownloadPage() {
   const release = releases.find((item) => item.tag === selected) ?? releases[0] ?? null;
   const version = release?.tag?.replace(/^v/, "") ?? null;
 
+  // A version from before releases described their files arrives with none, so that the
+  // selector still lists it. Choosing it asks for that version by name — one small call,
+  // made when it is chosen rather than eight of them for every visitor.
+  useEffect(() => {
+    if (selected === null) return;
+    const known = releases.find((item) => item.tag === selected);
+    if (!known || known.assets.length > 0) return;
+    let alive = true;
+    apiFetch<{ release: Release | null }>(
+      `/api/v1/releases/latest?version=${encodeURIComponent(selected)}`,
+      { timeoutMs: 12_000 }
+    )
+      .then((data) => {
+        if (!alive || !data.release) return;
+        const loaded = data.release;
+        setReleases((current) => current.map((item) => (item.tag === loaded.tag ? loaded : item)));
+      })
+      .catch(() => {
+        // The card then shows what it knows: the version exists, its files do not answer.
+        // Inventing a link here would be worse than an empty column.
+      });
+    return () => {
+      alive = false;
+    };
+  }, [selected, releases]);
+
   const platforms = useMemo(() => {
     const assets = release?.assets ?? [];
     return {

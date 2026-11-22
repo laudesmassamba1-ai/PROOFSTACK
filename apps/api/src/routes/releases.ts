@@ -240,20 +240,24 @@ async function releaseFromIndex(tag: string): Promise<ReleaseBody["release"]> {
 }
 
 /** Recent tags, read from the public feed (no API quota, no HTML scraping). */
-async function tagsFromAtom(): Promise<string[]> {
+async function tagsFromAtom(): Promise<{ tag: string; publishedAt: string }[]> {
   try {
     const response = await timed(`https://github.com/${REPO}/releases.atom`, {
       headers: { "user-agent": "proofstack-releases", accept: "application/atom+xml" },
     });
     if (!response.ok) return [];
     const xml = await response.text();
-    const tags: string[] = [];
-    for (const match of xml.matchAll(/\/releases\/tag\/([^"'<\s]+)/g)) {
-      const tag = match[1] ? decodeURIComponent(match[1]) : "";
-      if (!tag) continue;
-      if (!tags.includes(tag)) tags.push(tag);
+    const found: { tag: string; publishedAt: string }[] = [];
+    for (const entry of xml.split("<entry>").slice(1)) {
+      const link = entry.match(/\/releases\/tag\/([^"'<\s]+)/);
+      if (!link?.[1]) continue;
+      const tag = decodeURIComponent(link[1]);
+      if (found.some((item) => item.tag === tag)) continue;
+      const updated = entry.match(/<updated>([^<]+)<\/updated>/);
+      found.push({ tag, publishedAt: updated?.[1] ?? "" });
+      if (found.length >= VERSION_LIMIT) break;
     }
-    return tags.slice(0, VERSION_LIMIT);
+    return found;
   } catch {
     return [];
   }
@@ -318,13 +322,29 @@ async function fetchReleases(token: string | undefined, limit: number): Promise<
   if (!response.ok) {
     // Same reasoning as the latest release: a rate limit is not a missing version. Ask
     // the releases themselves, newest first, from the public feed.
-    const tags = await tagsFromAtom();
-    if (tags.length > 0) {
+    const tagged = await tagsFromAtom();
+    if (tagged.length > 0) {
       const described = await Promise.all(
-        tags.map((tag) => releaseFromIndex(tag).catch(() => null))
+        tagged.map((item) => releaseFromIndex(item.tag).catch(() => null))
       );
       const usable = described.filter((item): item is NonNullable<typeof item> => item !== null);
-      if (usable.length > 0) return usable.map((release) => ({ release }));
+      if (usable.length > 0) {
+        // A tag from before releases described themselves is still a version a person may
+        // want. It is listed with the date the feed gives it and no files, rather than
+        // vanishing from a list that claims to show the versions.
+        const known = new Set(usable.map((item) => item.tag));
+        const bare: NonNullable<ReleaseBody["release"]>[] = tagged
+          .filter((item) => !known.has(item.tag))
+          .map((item) => ({
+            tag: item.tag,
+            name: item.tag,
+            url: `https://github.com/${REPO}/releases/tag/${encodeURIComponent(item.tag)}`,
+            publishedAt: item.publishedAt,
+            prerelease: false,
+            assets: [],
+          }));
+        return [...usable, ...bare].map((release) => ({ release }));
+      }
     }
     throw new HttpError(
       502,
@@ -503,6 +523,28 @@ export function releaseRoutes(options: ReleaseOptions = {}): Hono<AppEnv> {
   });
 
   app.get("/releases/latest", async (c) => {
+    // `?version=v0.5.0` names one release, for a version the selector lists but could not
+    // describe: the page asks for its files when somebody chooses it, instead of hiding a
+    // version that exists because its files could not be read up front.
+    const wantedTag = c.req.query("version");
+    if (wantedTag !== undefined && wantedTag.length > 0) {
+      const described = await releaseFromIndex(wantedTag).catch(() => null);
+      if (described !== null) {
+        c.header("Cache-Control", "public, max-age=300");
+        return c.json({ release: localise(described) });
+      }
+      const known = await fetchReleases(options.token, VERSION_LIMIT).catch(() => []);
+      const match = known.find((item) => item.release?.tag === wantedTag)?.release ?? null;
+      if (match !== null) {
+        c.header("Cache-Control", "public, max-age=300");
+        return c.json({ release: localise(match) });
+      }
+      throw new HttpError(
+        404,
+        "release_not_found",
+        `No release is tagged ${wantedTag}. Drop the version to get the latest.`
+      );
+    }
     const hit = cache.get(REPO);
     if (hit && Date.now() - hit.at < ttlMs) {
       c.header("Cache-Control", "public, max-age=60");
