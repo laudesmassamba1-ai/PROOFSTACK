@@ -11,7 +11,9 @@ import {
 } from "lucide-react";
 import { Link } from "react-router";
 import { HeroLockup } from "../components/brand/Logo.js";
+import { NightSky } from "../components/brand/NightSky.js";
 import { ParticleLogo } from "../components/brand/ParticleLogo.js";
+import { SeismoStrip } from "../components/brand/SeismoStrip.js";
 import { SplitWords } from "../components/brand/SplitWords.js";
 import { CliPreview } from "../components/marketing/CliPreview.js";
 import { EngineDiagram } from "../components/marketing/EngineDiagram.js";
@@ -46,6 +48,8 @@ export function Home() {
           the hero's main visual — but it sits *behind* a scrim and never over the copy.
           A static SVG mark renders when motion is reduced or Canvas is unavailable.
         */}
+        <div className="dark-nebula" aria-hidden="true" />
+        <NightSky className="z-0" />
         <ParticleLogo
           focus="right"
           density={1}
@@ -125,6 +129,11 @@ export function Home() {
               );
             })}
           </div>
+        </div>
+        {/* the engine records while you read: findings tick past a slow stylus */}
+        <div className="seismo-frame">
+          <p className="seismo-caption font-mono">{t("home.seismo")}</p>
+          <SeismoStrip />
         </div>
       </section>
 

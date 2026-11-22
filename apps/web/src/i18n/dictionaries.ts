@@ -27,6 +27,7 @@ export const en = {
   "hero.cta.docs": "Read the docs",
   "hero.cta.download": "Download the app",
   "hero.cli": "$ npm i -g proofcore && proofcore init",
+  "home.seismo": "The engine's seismograph — the night records pass, warn and fail while you read.",
   "hero.status": "CLI · local, CI, or staging",
   "home.ai.eyebrow": "The AI reading",
   "home.ai.title": "A report tells you what broke. The audit tells you what it costs.",
@@ -311,6 +312,8 @@ export const fr: Messages = {
   "hero.cta.docs": "Lire la documentation",
   "hero.cta.download": "Télécharger l’app",
   "hero.cli": "$ npm i -g proofcore && proofcore init",
+  "home.seismo":
+    "Le sismographe du moteur — la nuit enregistre pass, warn et fail pendant que vous lisez.",
   "hero.status": "CLI · s'exécute en local, en CI ou sur une préproduction",
   "home.ai.eyebrow": "La lecture IA",
   "home.ai.title": "Un rapport dit ce qui casse. L'audit dit ce que ça coûte.",
