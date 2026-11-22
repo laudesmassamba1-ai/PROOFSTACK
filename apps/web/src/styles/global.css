@@ -66,7 +66,7 @@
 [data-theme="light"] {
   --background: var(--paper);
   --surface: var(--paper-raised);
-  --surface-alt: #eae6dc;
+  --surface-alt: #ffffff;
   --text-primary: var(--ink);
   --text-secondary: var(--ink-soft);
   --border: var(--rule);
@@ -2713,11 +2713,10 @@ p {
 .app-page-title {
   max-width: 18ch;
   font-family: var(--font-display);
-  font-size: clamp(2.8rem, 6vw, 5.8rem);
-  font-weight: 760;
-  line-height: 0.88;
-  letter-spacing: -0.06em;
-  text-transform: uppercase;
+  font-size: clamp(2.2rem, 4.6vw, 3.6rem);
+  font-weight: 640;
+  line-height: 1.04;
+  letter-spacing: -0.025em;
   /* `break-word` only splits a word that cannot fit a line on its own; `anywhere`
    * let "EXAMINER" split into "EXAMINE / R." on a wide screen. */
   overflow-wrap: break-word;
@@ -2753,10 +2752,9 @@ p {
 .app-empty-title {
   margin-top: 2px;
   font-family: var(--font-display);
-  font-size: 1.2rem;
-  font-weight: 680;
-  letter-spacing: -0.025em;
-  text-transform: uppercase;
+  font-size: 1.15rem;
+  font-weight: 620;
+  letter-spacing: -0.01em;
 }
 
 .app-empty-body {
@@ -2911,10 +2909,9 @@ p {
 
 .app-section-title {
   font-family: var(--font-display);
-  font-size: 1.15rem;
-  font-weight: 680;
-  letter-spacing: -0.03em;
-  text-transform: uppercase;
+  font-size: 1.12rem;
+  font-weight: 620;
+  letter-spacing: -0.015em;
 }
 
 .app-object-grid {
@@ -3590,7 +3587,7 @@ p {
 .app-project-hero .app-display {
   max-width: 17ch;
   margin-top: 14px;
-  font-size: clamp(3.4rem, 8vw, 7.2rem);
+  font-size: clamp(2.1rem, 4.8vw, 3.8rem);
 }
 
 .app-project-facts {
