@@ -3,7 +3,7 @@
  *
  * "dark"  — the instrument on black: the original identity, particle wave on
  *           brand-black, mint accents.
- * "light" — the Stripe-grade calm: flat light surface, white cards, hairline
+ * "light" — the report edition: flat light surface, white cards, hairline
  *           ink borders, the dark zones kept as embedded instruments.
  *
  * The visitor chooses between them with the split comparer: a draggable bar

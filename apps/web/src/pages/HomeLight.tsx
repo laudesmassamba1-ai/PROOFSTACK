@@ -200,6 +200,14 @@ export function HomeLight() {
                   {format} <i>·</i>
                 </span>
               ))}
+              {["pass", "warn", "fail", "pending", "skipped"].map((status) => (
+                <span
+                  key={`${copy}-s-${status}`}
+                  className={`lh-marquee-item lh-marquee-status lh-marquee-${status}`}
+                >
+                  {status} <i>·</i>
+                </span>
+              ))}
             </div>
           ))}
         </div>
@@ -317,6 +325,25 @@ export function HomeLight() {
           <Link to="/pricing" className="lh-underline-link">
             {t("nav.pricing")}
           </Link>
+        </div>
+      </section>
+
+      {/* ---------- the closing argument: the run is yours ---------- */}
+      <section className="lh-section lh-deeper">
+        <div className="lh-final">
+          <p className="lh-eyebrow">{t("home.signal")}</p>
+          <h2 className="lh-title-md" style={{ maxWidth: "30ch", margin: "0 auto" }}>
+            {t("home.workflow.lede")}
+          </h2>
+          <div className="lh-cta-row lh-cta-center">
+            <Link to="/download" className="lh-btn lh-btn-solid">
+              {t("hero.cta.download")} <ArrowRight size={15} />
+            </Link>
+            <Link to="/signup" className="lh-underline-link">
+              {t("hero.cta.primary")}
+            </Link>
+          </div>
+          <p className="lh-final-foot">{t("hero.status")}</p>
         </div>
       </section>
     </div>

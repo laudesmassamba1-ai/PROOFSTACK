@@ -8186,13 +8186,13 @@ p {
   top: 0;
   bottom: 0;
   z-index: 5;
-  width: 18px;
-  transform: translateX(-9px);
+  width: 30px;
+  transform: translateX(-15px);
   cursor: ew-resize;
   touch-action: none;
   outline: none;
-  /* a soft gold bloom around the stream, so it never floats free */
-  filter: drop-shadow(0 0 12px rgba(245, 208, 111, 0.55));
+  /* the filaments alone carry the light; only a whisper of glow around them */
+  filter: drop-shadow(0 0 6px rgba(245, 208, 111, 0.28));
 }
 
 .da-bar-canvas {
@@ -8214,25 +8214,23 @@ p {
   top: 50%;
   left: 50%;
   display: grid;
-  width: 46px;
-  height: 46px;
+  width: 26px;
+  height: 26px;
   place-items: center;
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  background:
-    radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.85), transparent 46%),
-    linear-gradient(160deg, #fff3c4, #f5d06f 38%, #c9992e 78%, #8a6a1f);
-  color: #5c4512;
-  box-shadow:
-    0 10px 30px -6px rgba(245, 208, 111, 0.8),
-    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  background: rgba(10, 10, 11, 0.35);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 226, 140, 0.75);
+  color: rgba(255, 236, 180, 0.95);
+  box-shadow: 0 4px 18px -6px rgba(245, 208, 111, 0.5);
 }
 
 /* the grip: two thin chevrons drawn with borders, no icon dependency */
 .da-bar-handle::before {
-  content: "◄ ►";
-  font-size: 11px;
-  letter-spacing: 2px;
+  content: "‹ ›";
+  font-size: 12px;
+  letter-spacing: 1px;
 }
 
 .da-tag {
@@ -8309,7 +8307,7 @@ p {
 }
 
 /* --------------------------------------------------------------------------
-   LIGHT DA — the Stripe-grade calm, opt-in via [data-da="light"].
+   LIGHT DA — the report edition, opt-in via [data-da="light"].
    Flat light surface, white cards, hairline ink borders. The dark instrument
    zones ([data-dark]) keep their black surfaces and white text: they are
    embedded instruments on the light page, not flipped.
@@ -8655,6 +8653,41 @@ p {
 
 .brand-shell[data-da="light"] .pk-plan:hover {
   box-shadow: 0 18px 40px -18px rgba(79, 70, 229, 0.28);
+}
+
+
+.brand-shell[data-da="light"] .lh-marquee-status {
+  letter-spacing: 0.26em;
+}
+
+.brand-shell[data-da="light"] .lh-marquee-pass { color: #15803d; }
+.brand-shell[data-da="light"] .lh-marquee-warn { color: #b45309; }
+.brand-shell[data-da="light"] .lh-marquee-fail { color: #b91c1c; }
+.brand-shell[data-da="light"] .lh-marquee-pending,
+.brand-shell[data-da="light"] .lh-marquee-skipped { color: rgba(23, 22, 26, 0.45); }
+
+.brand-shell[data-da="light"] .lh-marquee-status i {
+  color: rgba(23, 22, 26, 0.25);
+}
+
+/* the closing argument */
+.brand-shell[data-da="light"] .lh-final {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  padding: clamp(3rem, 6vw, 5rem) 0;
+  text-align: center;
+}
+
+.brand-shell[data-da="light"] .lh-final .lh-cta-row {
+  margin-top: 8px;
+}
+
+.brand-shell[data-da="light"] .lh-final-foot {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  color: rgba(23, 22, 26, 0.42);
 }
 
 /* form fields on the light shell (auth pages inherit the light DA) */

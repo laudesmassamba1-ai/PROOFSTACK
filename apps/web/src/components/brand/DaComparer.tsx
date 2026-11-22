@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "../../i18n/index.js";
 import { type DAMode, inIframe, readDAChoice, rememberDAMode } from "../../lib/da.js";
-import { GoldStream } from "./GoldStream.js";
+import { FilamentStream } from "./FilamentStream.js";
 
 /**
  * The DA comparer: one window, two art directions.
@@ -30,7 +30,27 @@ export function DaComparer() {
     rememberDAMode(mode);
     // the storage event is cross-tab only; tell this document too
     window.dispatchEvent(new Event("da-changed"));
+    // the kept pane is the page the visitor was actually looking at: land on it,
+    // not on whatever the top window happened to show behind the overlay
+    const frame = (mode === "dark" ? leftRef : rightRef).current;
+    let target: string | null = null;
+    try {
+      const loc = frame?.contentWindow?.location;
+      if (loc && loc.origin === window.location.origin) {
+        const url = new URL(loc.href);
+        url.searchParams.delete("da");
+        target = url.pathname + url.search + url.hash;
+      }
+    } catch {
+      /* cross-origin pane: keep the top window where it is */
+    }
     setOpen(false);
+    if (
+      target &&
+      target !== window.location.pathname + window.location.search + window.location.hash
+    ) {
+      window.location.assign(target);
+    }
   }, []);
 
   // Bar dragging: pointer events on the whole overlay while dragging.
@@ -130,9 +150,7 @@ export function DaComparer() {
         className="da-reopen"
         onClick={() => setOpen(true)}
         aria-label={
-          fr
-            ? "Rouvrir le comparateur des deux directions artistiques"
-            : "Reopen the art direction comparer"
+          fr ? "Rouvrir le comparateur des deux directions" : "Reopen the direction comparer"
         }
       >
         ◐ {fr ? "Comparer les DA" : "Compare DAs"}
@@ -153,14 +171,14 @@ export function DaComparer() {
       <iframe
         ref={leftRef}
         src="/?da=dark"
-        title={fr ? "Direction sombre (actuelle)" : "Dark direction (current)"}
+        title={fr ? "Direction exécution (noir)" : "Run direction (black)"}
         className="da-pane"
         style={{ clipPath: leftClip }}
       />
       <iframe
         ref={rightRef}
         src="/?da=light"
-        title={fr ? "Direction claire (Stripe)" : "Light direction (Stripe)"}
+        title={fr ? "Direction rapport (papier)" : "Report direction (paper)"}
         className="da-pane"
         style={{ clipPath: rightClip }}
       />
@@ -192,22 +210,24 @@ export function DaComparer() {
         tabIndex={0}
         aria-label={
           fr
-            ? "Barre de comparaison — glisser vers un bord pour garder une seule direction"
-            : "Comparison bar — drag to an edge to keep one direction"
+            ? "Faisceau de fils — glisser vers un bord pour garder une seule direction"
+            : "Filament bundle — drag to an edge to keep one direction"
         }
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.round(fraction * 100)}
       >
-        <GoldStream />
+        <FilamentStream />
         <span className="da-bar-handle" aria-hidden="true" />
       </div>
 
       {/* floating labels name each side at its own edge */}
       <span className="da-tag da-tag-dark">
-        {fr ? "Actuelle — instrument noir" : "Current — black instrument"}
+        {fr ? "L'exécution — instrument noir" : "The run — black instrument"}
       </span>
-      <span className="da-tag da-tag-light">Stripe — {fr ? "calme clair" : "light calm"}</span>
+      <span className="da-tag da-tag-light">
+        {fr ? "Le rapport — édition papier" : "The report — paper edition"}
+      </span>
 
       <button type="button" className="da-close" onClick={() => setOpen(false)}>
         {fr ? "Continuer sans choisir" : "Continue without choosing"}
