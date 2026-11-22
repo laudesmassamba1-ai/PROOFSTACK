@@ -191,3 +191,114 @@ describe("release asset URLs", () => {
     expect(await response.text()).toContain("version: 9.9.9");
   });
 });
+
+describe("when the release API is rate-limited", () => {
+  /**
+   * Workers share their egress addresses, so the anonymous allowance is spent by strangers
+   * and the download page was showing a release four days old. A release asset has no such
+   * allowance: the release describes itself, and that description is enough to rebuild the
+   * page — name, size, digest, and the tag it belongs to.
+   */
+  const INDEX = {
+    version: "9.9.9",
+    tag: TAG,
+    publishedAt: "2026-11-22T10:00:00Z",
+    assets: [
+      { name: "proofcore-linux-x64", size: ASSET_BYTES.length, sha256: "abc" },
+      { name: "PROOFCORE-9.9.9-amd64.deb", size: 4096, sha256: "def" },
+    ],
+  };
+
+  function stubRateLimited() {
+    const seen: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        seen.push(url);
+        if (url.includes("api.github.com")) {
+          return new Response(JSON.stringify({ message: "API rate limit exceeded" }), {
+            status: 403,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        if (url.endsWith("/releases/latest")) {
+          return new Response(null, {
+            status: 302,
+            headers: {
+              location: `https://github.com/laudesmassamba1-ai/PROOFSTACK/releases/tag/${TAG}`,
+            },
+          });
+        }
+        if (url.endsWith("/proofcore-linux-x64")) {
+          return new Response(ASSET_BYTES, {
+            status: 200,
+            headers: { "content-length": String(ASSET_BYTES.length) },
+          });
+        }
+        if (url.endsWith("/release.json")) {
+          return new Response(JSON.stringify(INDEX), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        if (url.includes("/releases.atom")) {
+          const xml = `<feed><entry><link href="https://github.com/laudesmassamba1-ai/PROOFSTACK/releases/tag/${TAG}"/></entry></feed>`;
+          return new Response(xml, { status: 200 });
+        }
+        return new Response("missing", { status: 404 });
+      })
+    );
+    return seen;
+  }
+
+  it("serves the newest release from the release's own index", async () => {
+    stubRateLimited();
+    const response = await app().request("/releases/latest");
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      release: { tag: string; assets: { name: string; size: number; digest: string | null }[] };
+    };
+    expect(body.release.tag).toBe(TAG);
+    expect(body.release.assets.map((asset) => asset.name)).toEqual([
+      "proofcore-linux-x64",
+      "PROOFCORE-9.9.9-amd64.deb",
+    ]);
+    expect(body.release.assets[0].size).toBe(ASSET_BYTES.length);
+    expect(body.release.assets[0].digest).toBe("sha256:abc");
+  });
+
+  it("still localises the URLs it read from the index", async () => {
+    stubRateLimited();
+    const response = await app().request("/releases/latest");
+    const body = (await response.json()) as { release: { assets: { url: string }[] } };
+    for (const asset of body.release.assets) {
+      expect(asset.url.startsWith("https://api.example/api/v1/releases/assets/")).toBe(true);
+    }
+  });
+
+  it("builds the version list from the feed and the indexes", async () => {
+    stubRateLimited();
+    const response = await app().request("/releases/versions");
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { releases: { tag: string; assets: unknown[] }[] };
+    expect(body.releases).toHaveLength(1);
+    expect(body.releases[0].tag).toBe(TAG);
+    expect(body.releases[0].assets).toHaveLength(2);
+  });
+
+  it("downloads a file that only the index knows about", async () => {
+    stubRateLimited();
+    const response = await app().request(`/releases/assets/proofcore-linux-x64?version=${TAG}`);
+    expect(response.status).toBe(200);
+    expect(new TextDecoder().decode(await response.arrayBuffer())).toBe("binary-payload");
+  });
+
+  it("refuses a file the index does not describe", async () => {
+    stubRateLimited();
+    const response = await app().request("/releases/assets/not-in-any-release.bin");
+    expect(response.status).toBe(404);
+    const body = (await response.json()) as { error: { message: string } };
+    expect(body.error.message).toContain("not part of release");
+  });
+});

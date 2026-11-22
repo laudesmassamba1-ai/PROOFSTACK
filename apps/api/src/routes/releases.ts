@@ -117,7 +117,10 @@ async function fetchLatest(token: string | undefined): Promise<ReleaseBody> {
   // No release yet is a normal state for a young repository, not an error.
   if (response.status === 404) return { release: null };
   if (!response.ok) {
-    // 403 here is almost always the anonymous rate limit; name the fix for the operator.
+    // 403 here is almost always the anonymous rate limit. That is a limit on one address,
+    // not on the truth: ask the release itself before giving up on the caller.
+    const tag = await latestTag();
+    if (tag !== null) return { release: await releaseFromIndex(tag) };
     throw new HttpError(
       502,
       "release_unavailable",
@@ -147,6 +150,113 @@ async function fetchLatest(token: string | undefined): Promise<ReleaseBody> {
       assets,
     },
   };
+}
+
+/**
+ * The release's own index: `release.json`, written by the build that produced the files it
+ * describes and attached to the release itself.
+ *
+ * The REST API allows 60 anonymous calls an hour per address, and Cloudflare Workers share
+ * their egress addresses — in production that allowance is spent by strangers, and the
+ * download page then shows whatever it last saw. A release asset carries no such limit, so
+ * the page can be rebuilt from the release even when the API says 403.
+ */
+const INDEX_NAME = "release.json";
+
+async function timed(url: string, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** The tag of the newest release, read from the redirect rather than from the API. */
+async function latestTag(): Promise<string | null> {
+  try {
+    const response = await timed(`https://github.com/${REPO}/releases/latest`, {
+      redirect: "manual",
+      headers: { "user-agent": "proofstack-releases" },
+    });
+    const location = response.headers.get("location") ?? "";
+    const match = location.match(/\/releases\/tag\/([^/?#]+)/);
+    return match?.[1] ? decodeURIComponent(match[1]) : null;
+  } catch {
+    return null;
+  }
+}
+
+interface IndexBody {
+  version?: unknown;
+  tag?: unknown;
+  publishedAt?: unknown;
+  assets?: unknown;
+}
+
+/** One release, described by itself. */
+async function releaseFromIndex(tag: string): Promise<ReleaseBody["release"]> {
+  const response = await timed(
+    `https://github.com/${REPO}/releases/download/${encodeURIComponent(tag)}/${INDEX_NAME}`,
+    { headers: { "user-agent": "proofstack-releases" } }
+  );
+  if (!response.ok) {
+    throw new HttpError(
+      502,
+      "release_unavailable",
+      `${tag} does not carry ${INDEX_NAME} (HTTP ${response.status}), and the release API is rate-limited.`
+    );
+  }
+  const raw = (await response.json()) as IndexBody;
+  const list = Array.isArray(raw.assets) ? raw.assets : [];
+  const assets: ReleaseAsset[] = [];
+  for (const item of list) {
+    if (!item || typeof item !== "object") continue;
+    const file = item as Record<string, unknown>;
+    const name = typeof file.name === "string" ? file.name : "";
+    if (!name) continue;
+    assets.push({
+      name,
+      url: `https://github.com/${REPO}/releases/download/${encodeURIComponent(tag)}/${encodeURIComponent(name)}`,
+      size: typeof file.size === "number" ? file.size : 0,
+      digest:
+        typeof file.sha256 === "string" && file.sha256.length > 0 ? `sha256:${file.sha256}` : null,
+      contentType: null,
+    });
+  }
+  if (assets.length === 0) {
+    throw new HttpError(502, "release_unavailable", `${tag} describes no files.`);
+  }
+  return {
+    tag: typeof raw.tag === "string" && raw.tag.length > 0 ? raw.tag : tag,
+    name:
+      typeof raw.version === "string" && raw.version.length > 0 ? `PROOFCORE ${raw.version}` : tag,
+    url: `https://github.com/${REPO}/releases/tag/${encodeURIComponent(tag)}`,
+    publishedAt: typeof raw.publishedAt === "string" ? raw.publishedAt : "",
+    prerelease: false,
+    assets,
+  };
+}
+
+/** Recent tags, read from the public feed (no API quota, no HTML scraping). */
+async function tagsFromAtom(): Promise<string[]> {
+  try {
+    const response = await timed(`https://github.com/${REPO}/releases.atom`, {
+      headers: { "user-agent": "proofstack-releases", accept: "application/atom+xml" },
+    });
+    if (!response.ok) return [];
+    const xml = await response.text();
+    const tags: string[] = [];
+    for (const match of xml.matchAll(/\/releases\/tag\/([^"'<\s]+)/g)) {
+      const tag = match[1] ? decodeURIComponent(match[1]) : "";
+      if (!tag) continue;
+      if (!tags.includes(tag)) tags.push(tag);
+    }
+    return tags.slice(0, VERSION_LIMIT);
+  } catch {
+    return [];
+  }
 }
 
 /** At most a handful: the selector is a dropdown, not a changelog. */
@@ -206,6 +316,16 @@ async function fetchReleases(token: string | undefined, limit: number): Promise<
     clearTimeout(timer);
   }
   if (!response.ok) {
+    // Same reasoning as the latest release: a rate limit is not a missing version. Ask
+    // the releases themselves, newest first, from the public feed.
+    const tags = await tagsFromAtom();
+    if (tags.length > 0) {
+      const described = await Promise.all(
+        tags.map((tag) => releaseFromIndex(tag).catch(() => null))
+      );
+      const usable = described.filter((item): item is NonNullable<typeof item> => item !== null);
+      if (usable.length > 0) return usable.map((release) => ({ release }));
+    }
     throw new HttpError(
       502,
       "release_unavailable",

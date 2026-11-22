@@ -1,6 +1,6 @@
 {
   "name": "@proofcore/desktop",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "private": true,
   "description": "PROOFCORE desktop: the native window around the local engine",
   "main": "main.cjs",
