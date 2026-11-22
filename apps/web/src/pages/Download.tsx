@@ -224,9 +224,7 @@ export function DownloadPage() {
           <div className="mt-3 grid gap-1.5">
             <code className="block font-mono text-[0.76rem] text-white/72">npm i -g proofcore</code>
             <code className="block font-mono text-[0.72rem] text-white/48">
-              {fr
-                ? "# si macOS a été installé et que la commande existe déjà :"
-                : "# if it is already installed:"}
+              {fr ? "# déjà installée ? la mettre à jour :" : "# already installed? update it:"}
             </code>
             <code className="block font-mono text-[0.76rem] text-white/72">
               proofcore update --yes

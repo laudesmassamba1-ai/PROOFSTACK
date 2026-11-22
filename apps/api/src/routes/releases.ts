@@ -339,30 +339,30 @@ export function releaseRoutes(options: ReleaseOptions = {}): Hono<AppEnv> {
     }
 
     const range = c.req.header("range");
-    let upstream: Response;
+    let upstream: Response | null = null;
     try {
       upstream = await fetch(asset.url, {
         headers: {
           "user-agent": "proofstack-download",
+          // A token raises the release host's per-address limit. Workers share their
+          // egress addresses, so the anonymous limit is spent by everyone on the account
+          // before a visitor ever clicks.
+          ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
           ...(range ? { range } : {}),
         },
         redirect: "follow",
       });
-    } catch (error) {
-      throw new HttpError(
-        502,
-        "download_unavailable",
-        `Could not read ${name} from the release host: ${
-          error instanceof Error ? error.message : "unknown error"
-        }`
-      );
+    } catch {
+      upstream = null;
     }
-    if (!upstream.ok && upstream.status !== 206) {
-      throw new HttpError(
-        502,
-        "download_unavailable",
-        `The release host answered HTTP ${upstream.status} for ${name}.`
-      );
+    if (upstream === null || (!upstream.ok && upstream.status !== 206)) {
+      // The mirror is a convenience, not a single point of failure: when the release host
+      // refuses the Worker (429 is its per-address limit, and Workers share addresses),
+      // the browser is sent to fetch the file itself. It still never lands on a GitHub
+      // page — it downloads, with the right name, from the release host's asset URL.
+      const status = upstream?.status ?? 0;
+      c.header("x-download-fallback", status === 0 ? "unreachable" : String(status));
+      return c.redirect(asset.url, 302);
     }
 
     const isText = /\.(json|ya?ml|txt|sha256)$/.test(name);
