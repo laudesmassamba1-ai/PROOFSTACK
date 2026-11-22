@@ -23,7 +23,13 @@ delivery. It never selects password hashes or session tokens.
   session cookie remains same-origin.
 - API: `https://proofcore-api.laudesmassamba1.workers.dev`; `WEB_ORIGIN` and
   `API_ORIGIN` are set in `apps/api/wrangler.toml` for that pair of hosts.
-- D1: database `proofcore`; `wrangler d1 migrations apply proofcore --remote`.
+- D1: database `proofcore`; `wrangler d1 migrations apply proofcore --remote`. Holds identity,
+  billing, runs and audits.
+- Neon: project `proofcore` (`lively-queen-66947281`, `aws-us-east-2`), schema
+  `apps/api/neon/schema.sql`, installed as the `NEON_DATABASE_URL` Worker secret (pooled
+  endpoint). Holds imported project files and AI code audits only. `GET /health` reports
+  `knowledge: ok | not_configured | unreachable` from a real round trip, so a deployment
+  missing this URL is visible instead of looking healthy.
 
 No secret is ever committed. `.dev.vars.example` files list names with empty values;
 real values live in the host's secret store (Worker secrets) or a local, ignored file.
