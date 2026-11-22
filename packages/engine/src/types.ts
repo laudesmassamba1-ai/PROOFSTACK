@@ -85,6 +85,12 @@ export interface TestContext {
   report(input: ReportCall): void;
   /** Stop the case as SKIPPED with a reason surfaced in the report. */
   skip(reason: string): never;
+  /** Stop the case as BLOCKED: a prerequisite was missing, the product was not judged. */
+  block(reason: string): never;
+  /** Stop the case as NOT_APPLICABLE: the question does not apply to this product. */
+  notApplicable(reason: string): never;
+  /** Stop the case as NOT_CONFIGURED: nothing was declared for the check to read. */
+  notConfigured(reason: string): never;
   /** Attach text evidence (log excerpt, payload, diff) to the case. */
   attachText(input: {
     label: string;
@@ -116,6 +122,14 @@ export interface TestCaseDef {
   timeoutMs?: number;
   /** Set to a reason string to ship the case as SKIPPED with an explanation. */
   skip?: string;
+  /**
+   * Ship the case as BLOCKED, NOT_APPLICABLE or NOT_CONFIGURED, with the reason. Used by a
+   * module that knows before running that it has nothing it may judge.
+   */
+  status?: {
+    status: "BLOCKED" | "NOT_APPLICABLE" | "NOT_CONFIGURED";
+    reason: string;
+  };
   execute(ctx: TestContext): Promise<void> | void;
 }
 

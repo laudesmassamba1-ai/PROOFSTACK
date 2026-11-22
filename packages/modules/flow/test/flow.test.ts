@@ -284,11 +284,27 @@ describe("FLOW against a correct product", () => {
     expect(caseFor(run, "flow/webhook_invalid_signature").status).toBe("PASSED");
   });
 
-  it("skips every case with a reason when no target is configured", async () => {
+  it("reports NOT_CONFIGURED, with the reason, when no payment target is declared", async () => {
     const run = await runFlow(undefined, ["checkout_success"]);
     const testCase = caseFor(run, "flow/checkout_success");
-    expect(testCase.status).toBe("SKIPPED");
+    expect(testCase.status).toBe("NOT_CONFIGURED");
     expect(testCase.skippedReason).toContain("no payment target configured");
+    expect(run.status).not.toBe("COMPLETED");
+  });
+
+  it("reports NOT_APPLICABLE when the product has no checkout surface at all", async () => {
+    // The scenario cannot be asked of a product that never had a checkout: an answer,
+    // not a defect, and still not a pass.
+    const run = await runFlow(
+      {
+        capabilities: { checkout: false },
+        checkout: undefined,
+      } as unknown as Parameters<typeof runFlow>[0],
+      ["checkout_success"]
+    );
+    const testCase = caseFor(run, "flow/checkout_success");
+    expect(testCase.status).toBe("NOT_APPLICABLE");
+    expect(run.status).not.toBe("COMPLETED");
   });
 });
 

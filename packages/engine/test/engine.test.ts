@@ -65,6 +65,9 @@ describe("shared execution engine", () => {
       warnings: 0,
       skipped: 0,
       errors: 0,
+      blocked: 0,
+      notApplicable: 0,
+      notConfigured: 0,
     });
     expect(run.findings).toEqual([]);
   });

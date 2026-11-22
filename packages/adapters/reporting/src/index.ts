@@ -112,6 +112,24 @@ function junitBody(testCase: TestCaseResult, moduleRun: ModuleRun, run: TestRun)
     return `      <skipped message="${escapeXml(testCase.skippedReason ?? "skipped")}"/>`;
   }
 
+  // JUnit has no vocabulary for these three, and reporting them as passes is exactly the
+  // mistake the statuses exist to prevent. They ship as <skipped> carrying the reason, so a
+  // CI dashboard shows them as not run rather than green.
+  if (
+    testCase.status === "BLOCKED" ||
+    testCase.status === "NOT_APPLICABLE" ||
+    testCase.status === "NOT_CONFIGURED"
+  ) {
+    const why =
+      testCase.skippedReason ??
+      (testCase.status === "BLOCKED"
+        ? "blocked: a prerequisite was missing"
+        : testCase.status === "NOT_APPLICABLE"
+          ? "not applicable to this product"
+          : "not configured: nothing was declared to check");
+    return `      <skipped message="${escapeXml(`${testCase.status}: ${why}`)}"/>`;
+  }
+
   if (testCase.status === "ERROR") {
     const message = testCase.failure?.message ?? "case errored";
     return [
@@ -155,7 +173,7 @@ export function renderText(run: TestRun, options: RenderOptions = {}): string {
 
   for (const moduleRun of run.moduleRuns) {
     lines.push(
-      `${moduleRun.module.toUpperCase().padEnd(6)} ${statusBadge(moduleRun.status)}  ${moduleRun.totals.passed} passed  ${moduleRun.totals.failed} failed  ${moduleRun.totals.warnings} warning  ${moduleRun.totals.errors} error  ${moduleRun.totals.skipped} skipped`
+      `${moduleRun.module.toUpperCase().padEnd(6)} ${statusBadge(moduleRun.status)}  ${moduleRun.totals.passed} passed  ${moduleRun.totals.failed} failed  ${moduleRun.totals.warnings} warning  ${moduleRun.totals.errors} error  ${moduleRun.totals.skipped} skipped${extraCounts(moduleRun)}`
     );
 
     const interesting = options.verbose
@@ -164,8 +182,15 @@ export function renderText(run: TestRun, options: RenderOptions = {}): string {
 
     for (const testCase of interesting) {
       lines.push(`  ${statusBadge(testCase.status)} ${testCase.id}  ${testCase.name}`);
-      if (testCase.status === "SKIPPED" && testCase.skippedReason) {
-        lines.push(`         skipped: ${testCase.skippedReason}`);
+      if (
+        (testCase.status === "SKIPPED" ||
+          testCase.status === "BLOCKED" ||
+          testCase.status === "NOT_APPLICABLE" ||
+          testCase.status === "NOT_CONFIGURED") &&
+        testCase.skippedReason
+      ) {
+        const label = testCase.status.toLowerCase().replaceAll("_", " ");
+        lines.push(`         ${label}: ${testCase.skippedReason}`);
       }
       if (testCase.failure) {
         lines.push(`         ${testCase.failure.code}: ${testCase.failure.message}`);
@@ -179,7 +204,7 @@ export function renderText(run: TestRun, options: RenderOptions = {}): string {
   }
 
   lines.push(
-    `${statusBadge(run.status)} ${totals.total} cases: ${totals.passed} passed, ${totals.failed} failed, ${totals.warnings} warning, ${totals.errors} error, ${totals.skipped} skipped in ${(run.durationMs / 1000).toFixed(2)}s`
+    `${statusBadge(run.status)} ${totals.total} cases: ${totals.passed} passed, ${totals.failed} failed, ${totals.warnings} warning, ${totals.errors} error, ${totals.skipped} skipped in ${(run.durationMs / 1000).toFixed(2)}s${runExtraCounts(run)}`
   );
 
   if (totals.critical > 0) {
@@ -227,7 +252,7 @@ export function renderHtml(run: TestRun, options: RenderOptions = {}): string {
 
       return `<section>
       <h2>${escapeHtml(moduleRun.module.toUpperCase())} <span class="badge badge-${moduleRun.status.toLowerCase()}">${moduleRun.status}</span></h2>
-      <p class="muted">${moduleRun.totals.passed} passed · ${moduleRun.totals.failed} failed · ${moduleRun.totals.warnings} warning · ${moduleRun.totals.errors} error · ${moduleRun.totals.skipped} skipped</p>
+      <p class="muted">${moduleRun.totals.passed} passed · ${moduleRun.totals.failed} failed · ${moduleRun.totals.warnings} warning · ${moduleRun.totals.errors} error · ${moduleRun.totals.skipped} skipped${extraCountsHtml(moduleRun)}</p>
       <table>
         <thead><tr><th>Status</th><th>Case</th><th class="num">Time</th></tr></thead>
         <tbody>${rows}</tbody>
@@ -270,7 +295,9 @@ export function renderHtml(run: TestRun, options: RenderOptions = {}): string {
   .badge-failed { background:color-mix(in srgb, var(--fail) 16%, transparent); color:var(--fail); }
   .badge-warning, .badge-partial { background:color-mix(in srgb, var(--warn) 18%, transparent); color:var(--warn); }
   .badge-error { background:color-mix(in srgb, var(--err) 18%, transparent); color:var(--err); }
-  .badge-skipped, .badge-pending, .badge-running, .badge-cancelled { background:color-mix(in srgb, var(--skip) 16%, transparent); color:var(--skip); }
+  .badge-skipped, .badge-pending, .badge-running, .badge-cancelled, .badge-not_configured { background:color-mix(in srgb, var(--skip) 16%, transparent); color:var(--skip); }
+  .badge-blocked { background:color-mix(in srgb, var(--warn) 18%, transparent); color:var(--warn); }
+  .badge-not_applicable { background:color-mix(in srgb, var(--muted) 18%, transparent); color:var(--muted); }
   .badge-nothing_verified { background:color-mix(in srgb, var(--warn) 18%, transparent); color:var(--warn); }
   .findings { margin:.45rem 0 0; padding-left:1.1rem; }
   .findings li { margin-bottom:.35rem; }
@@ -288,6 +315,9 @@ export function renderHtml(run: TestRun, options: RenderOptions = {}): string {
     <div class="stat"><b style="color:var(--warn)">${totals.warnings}</b>warning</div>
     <div class="stat"><b style="color:var(--err)">${totals.errors}</b>error</div>
     <div class="stat"><b style="color:var(--skip)">${totals.skipped}</b>skipped</div>
+    ${totals.blocked > 0 ? `<div class="stat"><b style="color:var(--warn)">${totals.blocked}</b>blocked</div>` : ""}
+    ${totals.notApplicable > 0 ? `<div class="stat"><b style="color:var(--muted)">${totals.notApplicable}</b>not applicable</div>` : ""}
+    ${totals.notConfigured > 0 ? `<div class="stat"><b style="color:var(--skip)">${totals.notConfigured}</b>not configured</div>` : ""}
     <div class="stat"><b>${(run.durationMs / 1000).toFixed(1)}s</b>duration</div>
   </div>
   ${moduleSections}
@@ -307,6 +337,9 @@ export interface RunTotals {
   warnings: number;
   errors: number;
   skipped: number;
+  blocked: number;
+  notApplicable: number;
+  notConfigured: number;
   critical: number;
 }
 
@@ -318,6 +351,9 @@ export function runTotals(run: TestRun): RunTotals {
     warnings: 0,
     errors: 0,
     skipped: 0,
+    blocked: 0,
+    notApplicable: 0,
+    notConfigured: 0,
     critical: 0,
   };
   for (const moduleRun of run.moduleRuns) {
@@ -327,6 +363,9 @@ export function runTotals(run: TestRun): RunTotals {
     totals.warnings += moduleRun.totals.warnings;
     totals.errors += moduleRun.totals.errors;
     totals.skipped += moduleRun.totals.skipped;
+    totals.blocked += moduleRun.totals.blocked;
+    totals.notApplicable += moduleRun.totals.notApplicable;
+    totals.notConfigured += moduleRun.totals.notConfigured;
   }
   totals.critical = run.findings.filter(
     (f) => f.severity === "CRITICAL" && f.status === "FAILED"
@@ -337,7 +376,8 @@ export function runTotals(run: TestRun): RunTotals {
 /**
  * Exit code policy, in one place so the CLI and CI agree.
  *
- *   0  cases ran and none failed (some modules may legitimately be skipped)
+ *   0  cases ran and none failed; skipped and not-applicable cases do not fail a gate,
+ *      but a blocked or not-configured case does (see 2)
  *   1  at least one product defect
  *   2  at least one harness error, or nothing was verified at all
  *   3  the run was cancelled before it finished
@@ -351,7 +391,53 @@ export function exitCodeFor(run: TestRun): 0 | 1 | 2 | 3 {
   if (run.moduleRuns.some((m) => m.totals.errors > 0) || run.status === "ERROR") return 2;
   if (run.moduleRuns.some((m) => m.totals.failed > 0) || run.status === "FAILED") return 1;
   if (run.status === "NOTHING_VERIFIED") return 2;
+  // A blocked or unconfigured check is not a defect, but it is not a pass either. CI must
+  // not go green on a run that skipped the question it was asked to answer; the fix is a
+  // missing prerequisite or a missing configuration, so it is a harness exit (2), never 1.
+  if (run.moduleRuns.some((m) => m.totals.blocked > 0 || m.totals.notConfigured > 0)) return 2;
   return 0;
+}
+
+/** The HTML variant of `extraCounts`: same three labels, escaped markup. */
+function extraCountsHtml(moduleRun: ModuleRun): string {
+  const parts: string[] = [];
+  if (moduleRun.totals.blocked > 0) parts.push(`${moduleRun.totals.blocked} blocked`);
+  if (moduleRun.totals.notApplicable > 0) {
+    parts.push(`${moduleRun.totals.notApplicable} not applicable`);
+  }
+  if (moduleRun.totals.notConfigured > 0) {
+    parts.push(`${moduleRun.totals.notConfigured} not configured`);
+  }
+  return parts.length === 0 ? "" : ` · ${parts.join(" · ")}`;
+}
+
+/** Counts the three statuses a one-line summary would otherwise hide. */
+function extraCounts(moduleRun: ModuleRun): string {
+  const parts: string[] = [];
+  if (moduleRun.totals.blocked > 0) parts.push(`${moduleRun.totals.blocked} blocked`);
+  if (moduleRun.totals.notApplicable > 0) {
+    parts.push(`${moduleRun.totals.notApplicable} not applicable`);
+  }
+  if (moduleRun.totals.notConfigured > 0) {
+    parts.push(`${moduleRun.totals.notConfigured} not configured`);
+  }
+  return parts.length === 0 ? "" : `  ${parts.join("  ")}`;
+}
+
+function runExtraCounts(run: TestRun): string {
+  const totals = run.moduleRuns.reduce(
+    (acc, moduleRun) => ({
+      blocked: acc.blocked + moduleRun.totals.blocked,
+      notApplicable: acc.notApplicable + moduleRun.totals.notApplicable,
+      notConfigured: acc.notConfigured + moduleRun.totals.notConfigured,
+    }),
+    { blocked: 0, notApplicable: 0, notConfigured: 0 }
+  );
+  const parts: string[] = [];
+  if (totals.blocked > 0) parts.push(`${totals.blocked} blocked`);
+  if (totals.notApplicable > 0) parts.push(`${totals.notApplicable} not applicable`);
+  if (totals.notConfigured > 0) parts.push(`${totals.notConfigured} not configured`);
+  return parts.length === 0 ? "" : ` (${parts.join(", ")})`;
 }
 
 function statusBadge(status: RunStatus | TestCaseResult["status"]): string {
@@ -368,6 +454,12 @@ function statusBadge(status: RunStatus | TestCaseResult["status"]): string {
       return "ERR ";
     case "SKIPPED":
       return "SKIP";
+    case "BLOCKED":
+      return "BLCK";
+    case "NOT_APPLICABLE":
+      return "N/A ";
+    case "NOT_CONFIGURED":
+      return "CFG ";
     case "CANCELLED":
       return "CANC";
     case "NOTHING_VERIFIED":

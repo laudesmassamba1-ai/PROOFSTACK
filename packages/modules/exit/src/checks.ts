@@ -39,9 +39,14 @@ export function buildExitSuites(options: ExitCheckOptions): TestSuiteDef[] {
   const exitConfig = options.config.modules.exit;
   const source = options.source;
 
-  const skip =
+  // No source is a declaration gap, not an answer: `NOT_CONFIGURED` says so, and keeps the
+  // module out of the pass column until an export source exists.
+  const skip: TestCaseDef["status"] | undefined =
     source === undefined
-      ? "no export source configured (modules.exit.exportSource is unset)"
+      ? {
+          status: "NOT_CONFIGURED",
+          reason: "no export source configured (modules.exit.exportSource is unset)",
+        }
       : undefined;
 
   const cases: TestCaseDef[] = [];
@@ -54,7 +59,7 @@ export function buildExitSuites(options: ExitCheckOptions): TestSuiteDef[] {
       module: "exit",
       severity: "CRITICAL",
       suiteId: "exit:portability",
-      ...(skip ? { skip } : {}),
+      ...(skip ? { status: skip } : {}),
       execute: async (ctx) => {
         if (!source) return;
 
@@ -108,13 +113,13 @@ export function buildExitSuites(options: ExitCheckOptions): TestSuiteDef[] {
       module: "exit",
       severity: "HIGH",
       suiteId: "exit:portability",
-      ...(skip ? { skip } : {}),
+      ...(skip ? { status: skip } : {}),
       execute: async (ctx) => {
         if (!source) return;
         const artifact = await source.fetch(format);
         const records = artifact.records;
         if (!records) {
-          ctx.skip(
+          ctx.notApplicable(
             `the ${format} export could not be parsed into records, so schema checks do not apply`
           );
           return;
@@ -122,7 +127,7 @@ export function buildExitSuites(options: ExitCheckOptions): TestSuiteDef[] {
 
         const declared = Object.entries(exitConfig.schema);
         if (declared.length === 0) {
-          ctx.skip("no schema declared in modules.exit.schema, so there is nothing to conform to");
+          ctx.notConfigured("no schema declared in modules.exit.schema, so there is nothing to conform to");
           return;
         }
 
@@ -179,7 +184,7 @@ export function buildExitSuites(options: ExitCheckOptions): TestSuiteDef[] {
       module: "exit",
       severity: "CRITICAL",
       suiteId: "exit:portability",
-      ...(skip ? { skip } : {}),
+      ...(skip ? { status: skip } : {}),
       execute: async (ctx) => {
         if (!source) return;
         const artifact = await source.fetch(format);
@@ -189,7 +194,7 @@ export function buildExitSuites(options: ExitCheckOptions): TestSuiteDef[] {
           return;
         }
         if (exitConfig.relationships.length === 0) {
-          ctx.skip("no relationships declared in modules.exit.relationships");
+          ctx.notConfigured("no relationships declared in modules.exit.relationships");
           return;
         }
 
@@ -232,7 +237,7 @@ export function buildExitSuites(options: ExitCheckOptions): TestSuiteDef[] {
       module: "exit",
       severity: "HIGH",
       suiteId: "exit:portability",
-      ...(skip ? { skip } : {}),
+      ...(skip ? { status: skip } : {}),
       execute: async (ctx) => {
         if (!source) return;
         const artifact = await source.fetch(format);
@@ -242,7 +247,7 @@ export function buildExitSuites(options: ExitCheckOptions): TestSuiteDef[] {
           return;
         }
         if (exitConfig.unique.length === 0) {
-          ctx.skip("no unique constraints declared in modules.exit.unique");
+          ctx.notConfigured("no unique constraints declared in modules.exit.unique");
           return;
         }
 
@@ -398,13 +403,13 @@ export function buildExitSuites(options: ExitCheckOptions): TestSuiteDef[] {
 
       const manifest = artifact.manifest;
       if (!manifest) {
-        ctx.skip("the zip export has no manifest, so there is nothing to cross-check");
+        ctx.notApplicable("the zip export has no manifest, so there is nothing to cross-check");
         return;
       }
 
       const declared = Array.isArray(manifest.files) ? manifest.files : [];
       if (declared.length === 0) {
-        ctx.skip("the manifest declares no files");
+        ctx.notApplicable("the manifest declares no files");
         return;
       }
 

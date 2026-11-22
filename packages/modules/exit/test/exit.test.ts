@@ -232,11 +232,15 @@ describe("EXIT against a healthy export", () => {
     expect(caseFor(run, "exit/json/uniqueness").status).toBe("PASSED");
   });
 
-  it("skips every case with a reason when no export source is configured", async () => {
+  it("reports NOT_CONFIGURED, with the reason, when no export source is declared", async () => {
+    // Not a pass (`PASSED`), not a defect (`FAILED`) and not a generic skip: nothing was
+    // declared for the check to read, so the honest status is the configuration one.
     const run = await runExit({ exit: { formats: ["json"] }, formats: ["json"] });
     const testCase = caseFor(run, "exit/json/integrity");
-    expect(testCase.status).toBe("SKIPPED");
+    expect(testCase.status).toBe("NOT_CONFIGURED");
     expect(testCase.skippedReason).toContain("no export source configured");
+    // And the run must not read as verified.
+    expect(run.status).not.toBe("COMPLETED");
   });
 });
 

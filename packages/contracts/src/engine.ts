@@ -167,6 +167,10 @@ export const moduleRunSchema = z
         warnings: z.number().int().nonnegative(),
         skipped: z.number().int().nonnegative(),
         errors: z.number().int().nonnegative(),
+        // Added after the first stored runs existed: defaults keep an old payload readable.
+        blocked: z.number().int().nonnegative().default(0),
+        notApplicable: z.number().int().nonnegative().default(0),
+        notConfigured: z.number().int().nonnegative().default(0),
       })
       .strict(),
     cases: z.array(testCaseResultSchema),
@@ -212,6 +216,10 @@ export const moduleTotalsSchema = z
     warnings: z.number().int().nonnegative(),
     errors: z.number().int().nonnegative(),
     skipped: z.number().int().nonnegative(),
+    // Defaulted so a report stored before these statuses existed still parses.
+    blocked: z.number().int().nonnegative().default(0),
+    notApplicable: z.number().int().nonnegative().default(0),
+    notConfigured: z.number().int().nonnegative().default(0),
   })
   .strict();
 export type ModuleTotals = z.infer<typeof moduleTotalsSchema>;

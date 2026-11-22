@@ -18,6 +18,9 @@ const STATUS_LABELS = {
   PARTIAL: "ws.status.partial",
   WARNING: "ws.status.warning",
   SKIPPED: "ws.status.skipped",
+  BLOCKED: "ws.status.blocked",
+  NOT_APPLICABLE: "ws.status.notApplicable",
+  NOT_CONFIGURED: "ws.status.notConfigured",
   ERROR: "ws.status.error",
   NOTHING_VERIFIED: "ws.status.nothingVerified",
   PENDING: "ws.status.pending",
@@ -56,9 +59,14 @@ export function StatusBadge({ status }: { status: string }) {
           ? "app-badge-warning"
           : normalized === "SKIPPED" ||
               normalized === "NOTHING_VERIFIED" ||
+              normalized === "NOT_APPLICABLE" ||
               normalized === "CANCELLED"
             ? ""
-            : "app-badge-accent";
+            : // BLOCKED and NOT_CONFIGURED are not defects, but they are not answers
+              // either: warning tone so nobody reads them as green.
+              normalized === "BLOCKED" || normalized === "NOT_CONFIGURED"
+              ? "app-badge-warning"
+              : "app-badge-accent";
   return (
     <span className={`app-badge ${tone}`}>
       {labelKey ? t(labelKey) : normalized.replaceAll("_", " ").toLowerCase()}

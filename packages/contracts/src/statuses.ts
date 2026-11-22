@@ -15,6 +15,23 @@ export const TEST_STATUSES = [
   "WARNING",
   "SKIPPED",
   "ERROR",
+  /**
+   * The check could not be attempted because a prerequisite was missing: no network, no
+   * browser, no credentials. The product was not proven wrong, and it was not proven
+   * right either. A run containing a BLOCKED case can never be reported as a pass.
+   */
+  "BLOCKED",
+  /**
+   * The question does not apply to this product. It is an answer, not a failure: a
+   * print stylesheet on an API, a cookie check on a response that sets no cookie.
+   * It never counts as a defect and never counts as a verified pass either.
+   */
+  "NOT_APPLICABLE",
+  /**
+   * The check applies but the product declared nothing to check: no export format, no
+   * locale profile, no payment provider. The fix is configuration, not code.
+   */
+  "NOT_CONFIGURED",
 ] as const;
 export const testStatusSchema = z.enum(TEST_STATUSES);
 export type TestStatus = z.infer<typeof testStatusSchema>;
@@ -105,6 +122,9 @@ export const TERMINAL_TEST_STATUSES: readonly TestStatus[] = [
   "WARNING",
   "SKIPPED",
   "ERROR",
+  "BLOCKED",
+  "NOT_APPLICABLE",
+  "NOT_CONFIGURED",
 ];
 
 export function isTerminalStatus(status: TestStatus): boolean {
@@ -117,10 +137,23 @@ export function aggregateStatus(statuses: readonly TestStatus[]): RunStatus {
   if (active.some((s) => s === "RUNNING")) return "RUNNING";
   if (statuses.includes("ERROR")) return "ERROR";
   if (statuses.includes("FAILED")) return "FAILED";
-  // Every case skipped means nothing was actually verified. That is its own outcome:
-  // calling it ERROR blames the harness, calling it COMPLETED claims a pass nobody ran.
-  if (statuses.every((s) => s === "SKIPPED")) return "NOTHING_VERIFIED";
-  if (statuses.includes("WARNING")) return "PARTIAL";
+  // Only a case that was actually judged answered the question. Skipped, blocked,
+  // not-applicable and not-configured cases describe the *setup*, not the product, so a
+  // run made only of those verified nothing — the same rule that already applied to a run
+  // made only of skips, now stated once instead of case by case.
+  const answered = statuses.filter(
+    (s) => s === "PASSED" || s === "FAILED" || s === "WARNING"
+  );
+  if (answered.length === 0) return "NOTHING_VERIFIED";
+  // Something was judged, but part of the question was left unasked: PARTIAL, never
+  // COMPLETED, so nobody reads the run as fully verified.
+  if (
+    statuses.includes("WARNING") ||
+    statuses.includes("BLOCKED") ||
+    statuses.includes("NOT_CONFIGURED")
+  ) {
+    return "PARTIAL";
+  }
   return "COMPLETED";
 }
 

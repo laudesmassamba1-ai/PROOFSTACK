@@ -26,6 +26,7 @@ import {
   CaseContext,
   NullEvidenceStore,
   SkipRequested,
+  StatusRequested,
   TimeoutRequested,
 } from "./context.js";
 import { fingerprintFinding } from "./fingerprint.js";
@@ -243,6 +244,9 @@ export async function runEngine(options: EngineOptions): Promise<EngineRunResult
         failed: count(cases, "FAILED"),
         warnings: count(cases, "WARNING"),
         skipped: count(cases, "SKIPPED"),
+        blocked: count(cases, "BLOCKED"),
+        notApplicable: count(cases, "NOT_APPLICABLE"),
+        notConfigured: count(cases, "NOT_CONFIGURED"),
         errors: count(cases, "ERROR"),
       },
       cases,
@@ -343,11 +347,17 @@ async function executeCase(item: Planned, deps: ExecuteDeps): Promise<CaseOutcom
 
     try {
       if (caseDef.skip) throw new SkipRequested(caseDef.skip);
+      if (caseDef.status) throw new StatusRequested(caseDef.status.status, caseDef.status.reason);
       await raceWithTimeout(caseDef.execute(ctx), timeoutMs, local, caseDef.id);
       if (ctx.reports.length > 0) status = "WARNING";
     } catch (error) {
       if (error instanceof SkipRequested) {
         status = "SKIPPED";
+        skippedReason = error.reason;
+      } else if (error instanceof StatusRequested) {
+        // The reason travels with the case so the report can say why, and the status
+        // keeps a blocked or unconfigured check out of the pass column.
+        status = error.status;
         skippedReason = error.reason;
       } else if (error instanceof AssertionFailed) {
         status = "FAILED";

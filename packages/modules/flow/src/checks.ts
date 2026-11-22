@@ -68,7 +68,7 @@ function flowCase(scenario: FlowScenario, options: FlowCheckOptions): TestCaseDe
     module: "flow",
     severity: severityFor(scenario),
     suiteId: "flow:transactions",
-    ...(skipReason ? { skip: skipReason } : {}),
+    ...(skipReason ? { status: skipReason } : {}),
     execute: async (ctx) => {
       // unreachable: `skipFor` skips the case before execute when the target or
       // its checkout surface is absent. Assert once, for the type checker.
@@ -183,13 +183,15 @@ function flowCase(scenario: FlowScenario, options: FlowCheckOptions): TestCaseDe
           const paymentId = checkout.paymentId ?? checkout.orderId;
           const secret = options.webhookSecret;
           if (!paymentId) {
-            ctx.skip(
+            // The product was asked for a payment id and returned none: the forged-webhook
+            // check has nothing to address, so it cannot judge signature handling at all.
+            ctx.notApplicable(
               "the product did not return a payment id, so a webhook cannot be addressed to it"
             );
             return;
           }
           if (!secret) {
-            ctx.skip(
+            ctx.notConfigured(
               "no webhook secret configured (modules.flow.webhookSecretEnvVar is unset or empty)"
             );
             return;
@@ -532,22 +534,48 @@ async function readOrderOrSkip(
   return order;
 }
 
-function skipFor(scenario: FlowScenario, target: PaymentUnderTest | undefined): string | undefined {
-  if (!target) return 'no payment target configured (modules.flow.target.kind is "none")';
-  if (!target.capabilities.checkout || !target.checkout)
-    return "the product does not expose a checkout endpoint";
+/**
+ * Why a scenario cannot run, as a status rather than a sentence.
+ *
+ * The distinction is the point. A product that declared no target has not been configured
+ * (`NOT_CONFIGURED`, a setup task). A product that has no checkout or no refund surface
+ * makes the scenario inapplicable (`NOT_APPLICABLE`, an answer). Neither is a pass, and
+ * neither is a defect: FLOW reports what it could not ask, separately from what failed.
+ */
+function skipFor(
+  scenario: FlowScenario,
+  target: PaymentUnderTest | undefined
+): { status: "NOT_APPLICABLE" | "NOT_CONFIGURED"; reason: string } | undefined {
+  if (!target) {
+    return {
+      status: "NOT_CONFIGURED",
+      reason: 'no payment target configured (modules.flow.target.kind is "none")',
+    };
+  }
+  if (!target.capabilities.checkout || !target.checkout) {
+    return {
+      status: "NOT_APPLICABLE",
+      reason: "the product does not expose a checkout endpoint",
+    };
+  }
   const needsReadback = scenario !== "checkout_success" && scenario !== "checkout_declined";
   if (needsReadback && (!target.capabilities.orderReadback || !target.readOrder)) {
-    return "the product does not expose an order readback endpoint";
+    return {
+      status: "NOT_APPLICABLE",
+      reason: "the product does not expose an order readback endpoint",
+    };
   }
   if (
     scenario.startsWith("webhook_") &&
     (!target.capabilities.webhookReceiver || !target.deliverWebhook)
   ) {
-    return "the product does not expose a webhook receiver";
+    return {
+      status: "NOT_APPLICABLE",
+      reason: "the product does not expose a webhook receiver",
+    };
   }
   if (scenario === "refund_flow" && (!target.capabilities.refund || !target.refund)) {
-    return "the product does not expose a refund path";
+    return { status: "NOT_APPLICABLE", reason: "the product does not expose a refund path" };
   }
   return undefined;
 }

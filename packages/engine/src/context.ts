@@ -10,6 +10,24 @@ export class SkipRequested extends Error {
   }
 }
 
+/**
+ * A case that stops without answering, for a reason that is not the product's fault.
+ *
+ * SKIPPED already existed for "no target configured". These three make the *why* part of
+ * the contract instead of prose in a reason string: a missing prerequisite (BLOCKED), a
+ * question that does not apply to this product (NOT_APPLICABLE), a product that declared
+ * nothing to check (NOT_CONFIGURED). None of them may ever be displayed as a pass.
+ */
+export class StatusRequested extends Error {
+  constructor(
+    readonly status: "BLOCKED" | "NOT_APPLICABLE" | "NOT_CONFIGURED",
+    readonly reason: string
+  ) {
+    super(reason);
+    this.name = "StatusRequested";
+  }
+}
+
 export class AssertionFailed extends ProofCoreError {
   constructor(
     message: string,
@@ -160,6 +178,21 @@ export class CaseContext implements TestContext {
 
   skip(reason: string): never {
     throw new SkipRequested(reason);
+  }
+
+  /** A prerequisite is missing: no network, no browser, no credentials. */
+  block(reason: string): never {
+    throw new StatusRequested("BLOCKED", reason);
+  }
+
+  /** The question does not apply to this product, and that is an answer. */
+  notApplicable(reason: string): never {
+    throw new StatusRequested("NOT_APPLICABLE", reason);
+  }
+
+  /** The check applies, but the product declared nothing for it to read. */
+  notConfigured(reason: string): never {
+    throw new StatusRequested("NOT_CONFIGURED", reason);
   }
 
   async attachText(input: {
