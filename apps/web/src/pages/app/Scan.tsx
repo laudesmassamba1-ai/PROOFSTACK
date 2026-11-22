@@ -95,7 +95,37 @@ interface CorrectionItem extends ScanFinding {
   state: CorrectionState;
   note: string | null;
   updatedAt: string | null;
+  /** The last time this one finding was re-checked against the live site. */
+  verification: {
+    at: string;
+    status: string | null;
+    observed: string | null;
+    before: string | null;
+    verdict: CorrectionVerdict | null;
+  } | null;
 }
+
+type CorrectionVerdict = "fixed" | "still_present" | "worse" | "not_checked" | "inconclusive";
+
+const VERDICT_COPY: Record<CorrectionVerdict, { fr: string; en: string; tone: string }> = {
+  fixed: {
+    fr: "Corrigé : le contrôle passe maintenant",
+    en: "Fixed: the control passes now",
+    tone: "text-success",
+  },
+  still_present: { fr: "Toujours présent", en: "Still present", tone: "text-danger" },
+  worse: { fr: "Pire qu'avant", en: "Worse than before", tone: "text-danger" },
+  not_checked: {
+    fr: "Contrôle absent de cette lecture",
+    en: "The control was not part of this reading",
+    tone: "text-muted",
+  },
+  inconclusive: {
+    fr: "Site illisible : rien n'est conclu",
+    en: "Site unreachable: nothing concluded",
+    tone: "text-muted",
+  },
+};
 
 interface ScanComparison {
   before: string;
@@ -288,6 +318,7 @@ export function ScanPage(): React.ReactElement {
   // and re-control are project features: a pasted URL has no baseline to compare to.
   const [scanProjectId, setScanProjectId] = useState<string | null>(requestedProject);
   const [corrections, setCorrections] = useState<CorrectionsResponse | null>(null);
+  const [verifyingCorrection, setVerifyingCorrection] = useState<string | null>(null);
   const [correctionsError, setCorrectionsError] = useState<string | null>(null);
   const [savingCorrection, setSavingCorrection] = useState<string | null>(null);
   const [steps, setSteps] = useState<ScanStep[]>([]);
@@ -320,6 +351,58 @@ export function ScanPage(): React.ReactElement {
     },
     [session.workspaceId, scanProjectId, fr]
   );
+
+  /**
+   * Re-checks one finding against the live site, now.
+   *
+   * This is the loop the product was missing: a fix is only a fix once the site says so,
+   * and waiting for the next full scan to learn one answer is a poor trade. The verdict is
+   * shown as it came back, including "inconclusive" when the site could not be read.
+   */
+  const verifyCorrection = async (key: string) => {
+    if (!session.workspaceId || !scanProjectId) return;
+    setVerifyingCorrection(key);
+    setCorrectionsError(null);
+    try {
+      const result = await apiFetch<{
+        verdict: CorrectionVerdict;
+        after: { status: string; observed: string } | null;
+        checkedAt: string;
+      }>(
+        `/api/v1/projects/${scanProjectId}/corrections/${encodeURIComponent(key)}/verify?workspaceId=${session.workspaceId}`,
+        { method: "POST", timeoutMs: 30_000 }
+      );
+      setCorrections((current) =>
+        current
+          ? {
+              ...current,
+              items: current.items.map((item) =>
+                item.key === key
+                  ? {
+                      ...item,
+                      // A proven fix is the one verdict that also moves the workflow.
+                      state: result.verdict === "fixed" ? "fixed" : item.state,
+                      verification: {
+                        at: result.checkedAt,
+                        status: result.after?.status ?? null,
+                        observed: result.after?.observed ?? null,
+                        before: item.observed,
+                        verdict: result.verdict,
+                      },
+                    }
+                  : item
+              ),
+            }
+          : current
+      );
+    } catch (caught) {
+      setCorrectionsError(
+        (caught as ApiError).message || (fr ? "Vérification impossible." : "Verification failed.")
+      );
+    } finally {
+      setVerifyingCorrection(null);
+    }
+  };
 
   const setCorrection = async (key: string, state: CorrectionState) => {
     if (!session.workspaceId || !scanProjectId) return;
@@ -1101,7 +1184,14 @@ export function ScanPage(): React.ReactElement {
                         {item.status}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="app-mono text-xs">{item.id}</p>
+                        <p className="app-mono text-xs">
+                          {item.id}
+                          {controls[`${item.module}:${item.id}`] ? (
+                            <span className="scan-finding-title">
+                              {controls[`${item.module}:${item.id}`]?.title}
+                            </span>
+                          ) : null}
+                        </p>
                         <p className="truncate text-xs text-muted">{item.observed}</p>
                         {!item.present ? (
                           <p className="text-xs text-success">
@@ -1110,7 +1200,40 @@ export function ScanPage(): React.ReactElement {
                               : "Absent from the latest scan — confirm it is actually fixed."}
                           </p>
                         ) : null}
+                        {item.verification?.verdict ? (
+                          <p className={`text-xs ${VERDICT_COPY[item.verification.verdict].tone}`}>
+                            {VERDICT_COPY[item.verification.verdict][fr ? "fr" : "en"]}
+                            {item.verification.observed ? ` · ${item.verification.observed}` : ""}
+                            <span className="text-muted">
+                              {" "}
+                              {new Date(item.verification.at).toLocaleString(
+                                fr ? "fr-FR" : "en-GB",
+                                { dateStyle: "short", timeStyle: "short" }
+                              )}
+                            </span>
+                          </p>
+                        ) : null}
                       </div>
+                      {item.status === "FAIL" || item.status === "WARN" ? (
+                        <button
+                          type="button"
+                          className="app-button app-button-ghost text-xs"
+                          disabled={verifyingCorrection !== null}
+                          onClick={() => void verifyCorrection(item.key)}
+                          title={
+                            fr
+                              ? "Relit cette page maintenant et compare ce contrôle à ce qu'il était."
+                              : "Reads this page again now and compares this control to what it was."
+                          }
+                        >
+                          {verifyingCorrection === item.key ? (
+                            <Loader2 size={13} className="animate-spin" aria-hidden />
+                          ) : (
+                            <RefreshCw size={13} aria-hidden />
+                          )}
+                          {fr ? "Vérifier" : "Verify"}
+                        </button>
+                      ) : null}
                       <label className="text-xs text-muted">
                         <span className="sr-only">
                           {fr ? `État de ${item.id}` : `State of ${item.id}`}

@@ -1708,6 +1708,54 @@ export class AppStore {
       .run();
   }
 
+  /**
+   * Records the outcome of re-checking one finding against the live site.
+   *
+   * The state is untouched unless the caller says otherwise: a verification is evidence,
+   * and only a `fixed` verdict is allowed to move the workflow on its own.
+   */
+  async recordFindingVerification(input: {
+    workspaceId: string;
+    projectId: string;
+    findingKey: string;
+    status: string;
+    observed: string;
+    before: string;
+    verdict: "fixed" | "still_present" | "worse" | "not_checked" | "inconclusive";
+    state?: "todo" | "in_progress" | "fixed" | "verify";
+  }): Promise<void> {
+    const at = iso(this.clock());
+    await this.db
+      .prepare(
+        `INSERT INTO audit_finding_states
+           (workspace_id, project_id, finding_key, state, note, updated_at,
+            verified_at, verified_status, verified_observed, verified_before, verified_verdict)
+         VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(workspace_id, project_id, finding_key)
+         DO UPDATE SET updated_at = excluded.updated_at,
+                       state = COALESCE(?, audit_finding_states.state),
+                       verified_at = excluded.verified_at,
+                       verified_status = excluded.verified_status,
+                       verified_observed = excluded.verified_observed,
+                       verified_before = excluded.verified_before,
+                       verified_verdict = excluded.verified_verdict`
+      )
+      .bind(
+        input.workspaceId,
+        input.projectId,
+        input.findingKey,
+        input.state ?? "verify",
+        at,
+        at,
+        input.status,
+        input.observed,
+        input.before,
+        input.verdict,
+        input.state ?? null
+      )
+      .run();
+  }
+
   // --------------------------------------------------------------- projects
 
   async createProject(input: {

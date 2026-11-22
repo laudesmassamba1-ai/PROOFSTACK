@@ -2,7 +2,7 @@
 // Do not edit by hand: this is the last release verified from the public source, used
 // only when the live GitHub call is rate-limited. Regenerate with `pnpm releases:sync`.
 export const RELEASE_MANIFEST = {
-  fetchedAt: "2026-11-21T15:20:42.984Z",
+  fetchedAt: "2026-11-21T15:24:33.770Z",
   release: {
     tag: "v0.5.0",
     name: "PROOFCORE 0.5.0 — the audit that explains, and a site that sells",

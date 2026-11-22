@@ -112,6 +112,18 @@ function scanFindings(payload: unknown): PageFinding[] {
   );
 }
 
+/** The last verification of a tracked finding, as the board needs it. */
+function verificationOf(state: Record<string, unknown> | undefined) {
+  if (!state?.verified_at) return null;
+  return {
+    at: String(state.verified_at),
+    status: state.verified_status ? String(state.verified_status) : null,
+    observed: state.verified_observed ? String(state.verified_observed) : null,
+    before: state.verified_before ? String(state.verified_before) : null,
+    verdict: state.verified_verdict ? String(state.verified_verdict) : null,
+  };
+}
+
 function findingKey(item: Pick<PageFinding, "module" | "id">): string {
   return `${item.module}:${item.id}`;
 }
@@ -663,6 +675,7 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
         state: state ? String(state.state) : "todo",
         note: state?.note ? String(state.note) : null,
         updatedAt: state?.updated_at ? String(state.updated_at) : null,
+        verification: verificationOf(state),
       };
     });
 
@@ -682,6 +695,7 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
           state: String(state.state),
           note: state.note ? String(state.note) : null,
           updatedAt: state.updated_at ? String(state.updated_at) : null,
+          verification: verificationOf(state),
         });
       }
     }
@@ -698,6 +712,145 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
             latestPayload
           )
         : null,
+    });
+  });
+
+  /**
+   * Re-checks one finding against the live site, now.
+   *
+   * A correction is only corrected once the site says so, and waiting for the next full
+   * scan means re-measuring 45 controls to learn one answer. This endpoint reads the page
+   * again, picks the same `module:id` out of the fresh report, and records what it saw
+   * next to what it saw before. It does not create an audit row (it is not a new
+   * baseline) and does not consume the monthly audit quota.
+   *
+   * The verdict is a fact about one request: `fixed` means the control now passes, not
+   * that the product is secure.
+   */
+  app.post("/projects/:projectId/corrections/:key/verify", async (c) => {
+    const { workspace, role } = await requireWorkspace(c, services, c.req.query("workspaceId"));
+    if (role === "viewer") {
+      throw new HttpError(
+        403,
+        "insufficient_role",
+        "Viewers cannot verify a correction. Ask for member rights."
+      );
+    }
+    const project = await services.store.getProject(workspace.id, c.req.param("projectId"));
+    if (!project) throw new HttpError(404, "project_not_found", "Project not found.");
+
+    const limited = limiter.check(`verify:${workspace.id}`);
+    if (!limited.allowed) {
+      c.header("Retry-After", String(limited.retryAfterSeconds));
+      const minutes = Math.max(1, Math.ceil(limited.retryAfterSeconds / 60));
+      throw new HttpError(
+        429,
+        "scan_rate_limited",
+        `Trop de vérifications sur cette heure. Réessaie dans ${minutes} min.`,
+        { retryAfterSeconds: limited.retryAfterSeconds }
+      );
+    }
+
+    const key = c.req.param("key");
+    const audits = await services.store.latestPageAudits(workspace.id, project.id, 1);
+    const latest = audits[0];
+    if (!latest) {
+      throw new HttpError(
+        404,
+        "no_scan",
+        "This project has no scan yet. Scan it once before verifying a correction."
+      );
+    }
+    const payload = JSON.parse(String(latest.payload)) as { url?: string; finalUrl?: string };
+    const before = scanFindings(payload).find((item) => findingKey(item) === key);
+    if (!before) {
+      throw new HttpError(
+        404,
+        "finding_not_current",
+        `${key} is not a finding of the project's latest scan. Re-scan the project first.`
+      );
+    }
+
+    // Verifying a control that already passes answers nothing, and verifying a skipped one
+    // would produce a misleading "still present". Refuse with the action that makes sense.
+    if (before.status !== "FAIL" && before.status !== "WARN") {
+      throw new HttpError(
+        409,
+        "nothing_to_verify",
+        `${key} is ${before.status} on the latest scan: there is no defect to re-check. Fix the site and run a new scan.`
+      );
+    }
+
+    const recorded = payload.finalUrl ?? payload.url;
+    if (typeof recorded !== "string" || recorded.length === 0) {
+      // A stored scan without its URL cannot be re-read. Say so with the action that fixes
+      // it rather than failing with a bare parse error.
+      throw new HttpError(
+        409,
+        "scan_url_missing",
+        "This scan did not record the URL it read. Run a new scan on the project, then verify again."
+      );
+    }
+    let target: URL;
+    try {
+      target = new URL(recorded);
+    } catch {
+      throw new HttpError(
+        409,
+        "scan_url_invalid",
+        `This scan recorded an unusable URL (${recorded.slice(0, 120)}). Run a new scan on the project.`
+      );
+    }
+    let after: PageFinding | undefined;
+    let failure: string | null = null;
+    try {
+      const fresh = await services.scan(target.toString(), {
+        allowPrivate: false,
+        maxBytes: 1_500_000,
+        timeoutMs: 15_000,
+        ownershipHint: "remote",
+        light: true,
+      });
+      after = scanFindings(fresh).find((item) => findingKey(item) === key);
+    } catch (error) {
+      // The site could not be read: that is inconclusive, not "still present".
+      failure = error instanceof Error ? error.message : "unknown error";
+    }
+
+    // `before` is a defect by construction (checked above), so only three comparisons
+    // remain: it passes now, it is as bad as before, or it got worse.
+    const verdict: "fixed" | "still_present" | "worse" | "not_checked" | "inconclusive" =
+      failure !== null
+        ? "inconclusive"
+        : after === undefined
+          ? "not_checked"
+          : after.status === "PASS"
+            ? "fixed"
+            : after.status === "FAIL" && before.status === "WARN"
+              ? "worse"
+              : "still_present";
+
+    await services.store.recordFindingVerification({
+      workspaceId: workspace.id,
+      projectId: project.id,
+      findingKey: key,
+      status: after?.status ?? "NOT_CHECKED",
+      observed: after?.observed ?? failure ?? "the control was not part of this reading",
+      before: before.observed,
+      verdict,
+      // Only a proven fix moves the workflow; anything else leaves the user's state alone.
+      ...(verdict === "fixed" ? { state: "fixed" as const } : {}),
+    });
+
+    return c.json({
+      ok: verdict === "fixed",
+      key,
+      verdict,
+      before: { status: before.status, observed: before.observed },
+      after: after ? { status: after.status, observed: after.observed } : null,
+      url: target.toString(),
+      checkedAt: services.clock().toISOString(),
+      ...(failure === null ? {} : { error: failure }),
     });
   });
 

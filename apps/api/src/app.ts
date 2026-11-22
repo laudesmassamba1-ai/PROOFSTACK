@@ -1,6 +1,6 @@
 import type { PaymentProvider } from "@proofcore/adapter-payments";
 import { API_VERSION } from "@proofcore/contracts";
-import { iso, uuid } from "@proofcore/core";
+import { iso, type scanPage, uuid } from "@proofcore/core";
 import { Hono } from "hono";
 import type { Database } from "./db/types.js";
 import { type Env, originAllowed, readConfig } from "./env.js";
@@ -27,6 +27,8 @@ export interface CreateAppOptions {
   env?: Env;
   provider?: PaymentProvider;
   clock?: () => Date;
+  /** Injected scanner: production uses the real one, a test passes a stub. */
+  scan?: typeof scanPage;
 }
 
 /**
@@ -45,6 +47,7 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
     config,
     provider,
     ...(options.clock ? { clock: options.clock } : {}),
+    ...(options.scan ? { scan: options.scan } : {}),
   });
 
   const app = new Hono<AppEnv>();

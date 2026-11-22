@@ -1,5 +1,6 @@
 import type { PaymentProvider } from "@proofcore/adapter-payments";
 import { CheckoutService, UsageMeter, WebhookProcessor } from "@proofcore/billing";
+import { scanPage } from "@proofcore/core";
 import type { PaymentAutomationEvent } from "../automation.js";
 import type { Database } from "../db/types.js";
 import type { EmailSender } from "../email.js";
@@ -35,6 +36,11 @@ export interface Services {
   /** Absent when NEON_DATABASE_URL is not configured: file audits then answer 503. */
   projectKnowledge: ProjectKnowledge | null;
   clock: () => Date;
+  /**
+   * The page scanner, injected so a route can be tested without reaching the network.
+   * Production passes `scanPage` itself; a test passes a stub, exactly like `fetchImpl`.
+   */
+  scan: typeof scanPage;
 }
 
 export function createServices(input: {
@@ -42,6 +48,7 @@ export function createServices(input: {
   config: AppConfig;
   provider: PaymentProvider;
   clock?: () => Date;
+  scan?: typeof scanPage;
 }): Services {
   const clock = input.clock ?? (() => new Date());
   const store = new AppStore(input.db, clock);
@@ -77,6 +84,7 @@ export function createServices(input: {
     email,
     projectKnowledge,
     clock,
+    scan: input.scan ?? scanPage,
   };
 }
 
