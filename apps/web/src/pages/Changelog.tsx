@@ -3,6 +3,26 @@ import { Section, SectionHeading } from "../layouts/BrandLayout.js";
 
 const RELEASES = [
   {
+    tag: "v0.6.2",
+    date: "2026-11-22",
+    title: "The audit a whole site, and one release for three systems",
+    added: [
+      "A site audit, not a page audit: sign-in through the real form (CSRF token, cookie, redirect, JSON and bearer fallbacks), then a bounded crawl of the pages behind it — same origin, robots.txt per user-agent group, logout and delete never followed",
+      "13 checks that only exist across pages: broken links, redirect chains, duplicate and missing titles, heavy or slow pages, missing TLS/HSTS, published source maps, mixed content, robots and sitemap, coverage — each one naming the pages it found",
+      "A score you can recompute: risk weights read from the control registry, Wilson lower bound on the weighted pass rate, times a coverage factor, marked provisional under 10 pages read",
+      "A correction can be verified from the scan screen: the control is measured again and the evidence kept; a verification is evidence, and only a `fixed` outcome moves the workflow state",
+      "59 controls, each with its objective, consequence, fix, code snippet, how to verify, and a reference — reachable with `proofcore explain <control>`",
+      "Desktop applications for Windows, macOS and Linux, each carrying the same local engine, the same web interface and the same updater",
+      "Downloads served from this site for every platform, with a version selector and platform detection, and the CLI, the window and the engine all updating from the same release",
+    ],
+    known: [
+      "The macOS application is unsigned: the first launch needs right-click → Open. Signing it needs a paid Apple Developer account",
+      "pages read per audit are bounded (9 by default, 20 from the assistant), because every page is measured, not just fetched",
+      "The npm package trails the release by one version until the npm token is supplied; `proofcore update` closes that gap in one command",
+      "On Windows the terminal runs in line mode: a PTY is a POSIX facility, and shipping one would mean a native module per Electron ABI",
+    ],
+  },
+  {
     tag: "v0.4.0",
     date: "2026-11-19",
     title: "One assistant, a real browser and a terminal",
