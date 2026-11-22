@@ -17,6 +17,17 @@ code is sent anywhere to be "processed for you" unless you ask for a cloud featu
 | `proofcore-<version>-installer-linux-x64.run` | Linux x64 (Mint, Ubuntu, Debian) | `chmod +x` then run. Installs to `~/.local/share/proofcore`, adds one `PATH` line to your shell profile.           |
 | `proofcore_<version>_amd64.deb`               | Debian, Ubuntu, Linux Mint       | `sudo dpkg -i proofcore_<version>_amd64.deb`                                                                       |
 | `proofcore-<version>-installer-darwin-*.run`  | macOS Intel and Apple Silicon    | Same as Linux.                                                                                                     |
+| `PROOFCORE-<version>-x64.exe`                 | Windows 10/11, x64               | The desktop app. Same installer flow, opens a window instead of a terminal.                                         |
+| `PROOFCORE-<version>-amd64.deb` / `.AppImage` | Debian, Ubuntu, Linux Mint       | `dpkg -i` or `chmod +x` then run.                                                                                   |
+| `PROOFCORE-<version>-arm64.dmg` / `.zip`      | macOS Apple Silicon              | `dmg` to install, `zip` for the updater to replace.                                                                 |
+| `release.json`                                | the download page                | What the build produced, with sizes and sha256. Not for people; the page reads it.                                   |
+
+Everything above comes from one tag, in one run of `.github/workflows/release.yml`, and the
+download page offers it from our own domain — `https://proofcore-api.laudesmassamba1.workers.dev/api/v1/releases/assets/<name>`
+— so a visitor never leaves the site and a network that blocks the release host still gets
+the file. The same run writes `manifest.json` (what `proofcore update` reads) and
+`release.json` (what the page reads when GitHub's API is rate-limited), so a release
+describes itself instead of depending on a call that answered earlier.
 
 Every artifact is self-contained: the Node runtime the CLI needs is inside the file, so the
 installation is one executable. That is also why the Windows setup is ~116 MB — it carries

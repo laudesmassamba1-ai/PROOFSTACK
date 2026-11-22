@@ -117,24 +117,36 @@ Sans fournisseur : le jeton est créé, le message reste dans `email_outbox` ave
 | ------------- | ------------- |
 | `NPM_TOKEN`   | npmjs.com → **Account** → **Access Tokens** → *Generate New Token* → **Granular**: package `proofcore`, permission **Read and write** (ou *Automation* si le compte impose la 2FA) |
 
+Le plus simple : l'ajouter **une fois** comme secret du dépôt, et chaque étiquette
+publiée sort la même version sur npm sans intervention.
+
+```bash
+gh secret set NPM_TOKEN --repo laudesmassamba1-ai/PROOFSTACK
+# colle le jeton quand il le demande, puis relance la publication de la dernière étiquette :
+gh run rerun --repo laudesmassamba1-ai/PROOFSTACK $(gh run list --workflow release --limit 1 --json databaseId -q '.[0].databaseId')
+```
+
+L'étape « Publish the CLI to npm » du workflow de release est sautée quand le secret
+n'existe pas : elle ne casse jamais une release déjà complète.
+
+À la main, si tu préfères :
+
 ```bash
 cd /home/laudes/Documents/PROOFSTACK
 NPM_TOKEN=npm_… pnpm cli:publish          # lit le jeton dans l'environnement
-# ou
-pnpm cli:publish                           # puis colle-le quand le terminal le demande (saisie masquée)
+pnpm cli:publish                          # ou colle-le à la saisie masquée
 ```
 
-Vérification : `npm view proofcore version` répond la version publiée, puis
+Vérification : `npm view proofcore version` doit répondre la version de l'étiquette, puis
 `npm install -g proofcore && proofcore --version` sur une machine vierge.
 
-État au 22 novembre 2026 : `proofcore@0.6.0` est construite, installée et vérifiée
-localement (tarball `artifacts/proofcore-0.6.0.tgz`, `proofcore login` ouvre le navigateur
-et approuve par code), mais **le registre public est encore à `0.1.0`** — la publication
-attend ce jeton. Sans lui, `npm i -g proofcore` installe une version d'il y a plusieurs mois.
+État au 22 novembre 2026 : la release `v0.6.2` est publiée avec les quatre plateformes,
+mais **le registre public est encore à `0.6.0`** — `npm i -g proofcore` installe donc la
+version d'avant. C'est le seul écart de version qui reste, et il se ferme avec ce jeton.
 
 ## Priorité 1 — l'app est utilisable, il manque la finition
 
-### 4. Jeton GitHub pour le flux des versions
+### 4. Jeton GitHub pour le flux des versions (facultatif depuis 0.6.2)
 
 | Ce qu'il faut | Où le trouver                                                                                     |
 | ------------- | ------------------------------------------------------------------------------------------------- |
@@ -146,10 +158,16 @@ npx wrangler secret put GITHUB_TOKEN
 ```
 
 Vérification : `curl -s -o /dev/null -w '%{http_code}\n' https://proofcore-api.laudesmassamba1.workers.dev/api/v1/releases/latest`
-doit rester `200` même après plusieurs appels d'affilée. Sans jeton, GitHub plafonne à
-60 appels par heure **par IP de sortie** — et les Workers partagent les leurs, donc la page
-`/download` finit par servir un instantané au lieu du direct. Le jeton ne va jamais au
-navigateur.
+doit rester `200` même après plusieurs appels d'affilée.
+
+Sans jeton, GitHub plafonne à 60 appels par heure **par IP de sortie**, et les Workers
+partagent les leurs : la page `/download` a servi une release vieille de quatre jours alors
+que la dernière venait de sortir. Depuis 0.6.2 elle n'en dépend plus pour la dernière
+version — chaque release attache `release.json`, le build décrivant ses propres fichiers,
+et la page se reconstruit avec ça quand l'API refuse. Le jeton reste utile pour deux
+choses : lever la limite, et décrire les **anciennes** versions (celles d'avant
+`release.json`), qui sinon s'affichent sans fichiers, avec le motif écrit à l'écran. Le
+jeton ne va jamais au navigateur.
 
 ### 5. Informations légales (5 valeurs, dans le code)
 

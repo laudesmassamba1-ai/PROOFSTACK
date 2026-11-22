@@ -257,6 +257,15 @@ jobs:
           console.log("release.json describes", described.length, "files");
           '
 
+      # The command line is part of the same release, so it is published from the same tag
+      # and cannot drift from the files beside it. The secret is optional: without it the
+      # step is skipped rather than failing a release that is otherwise complete.
+      - name: Publish the CLI to npm
+        if: ${{ secrets.NPM_TOKEN != '' }}
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: pnpm cli:publish
+
       - name: Attach every artifact to the release
         uses: softprops/action-gh-release@v2
         with:
