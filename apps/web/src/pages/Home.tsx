@@ -61,7 +61,10 @@ export function Home() {
         <div className="relative z-[2] mx-auto max-w-[1240px] px-5 pb-10 pt-6 lg:px-8">
           {/* Copy left, proof right: the promise above, the evidence beside it. */}
           <div className="grid items-center gap-10">
-            <div className="min-w-0 max-w-[640px]">
+            {/* 44rem, not 40: the headline is sized against the window (5.6vw) but capped
+                here, and at 1280 the longest word needed 648px inside a 640px column — it
+                was clipped by 8px. The cap has to fit the type it holds. */}
+            <div className="min-w-0 max-w-[44rem]">
               <HeroLockup size={46} />
               <p className="eyebrow mt-7 text-white/78">{t("hero.eyebrow")}</p>
               {/* The promise, one masked word at a time; the last phrase carries the

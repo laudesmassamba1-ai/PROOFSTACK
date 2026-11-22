@@ -6,8 +6,8 @@
 # scripts are not granted inline privileges. If a component ever needs an inline
 # script, add a nonce instead of widening this policy.
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://proofcore-api.laudesmassamba1.workers.dev; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
-  X-Frame-Options: DENY
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://proofcore-api.laudesmassamba1.workers.dev; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'
+  X-Frame-Options: SAMEORIGIN
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=()

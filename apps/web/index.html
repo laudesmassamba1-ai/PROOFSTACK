@@ -9,12 +9,12 @@
       content="PROOFCORE is an integrated software quality suite: verify global compatibility (WORLD), transaction reliability (FLOW) and data portability (EXIT) from one engine, one CLI and one dashboard."
     />
     <meta name="color-scheme" content="dark light" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap"
-      rel="stylesheet"
-    />
+    <!-- The brand typefaces are served from this origin: the Content-Security-Policy allows
+         fonts from 'self' only, and a Google Fonts link is refused by it, which left every
+         page rendering in fallback system fonts. Regenerate with
+         `node tooling/scripts/fetch-fonts.mjs`. -->
+    <link rel="preload" as="style" href="/fonts.css" />
+    <link rel="stylesheet" href="/fonts.css" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
     <meta property="og:title" content="PROOFCORE — Make Software Work Everywhere" />
