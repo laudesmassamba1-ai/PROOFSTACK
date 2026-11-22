@@ -8339,7 +8339,7 @@ p {
     [class*="text-white/36"],
     [class*="text-white/38"]
   ):not([data-dark] *) {
-  color: rgba(10, 10, 11, 0.42);
+  color: rgba(10, 10, 11, 0.52);
 }
 
 .brand-shell[data-da="light"]
@@ -8667,10 +8667,10 @@ p {
 .brand-shell[data-da="light"] .lh-marquee-warn { color: #b45309; }
 .brand-shell[data-da="light"] .lh-marquee-fail { color: #b91c1c; }
 .brand-shell[data-da="light"] .lh-marquee-pending,
-.brand-shell[data-da="light"] .lh-marquee-skipped { color: rgba(23, 22, 26, 0.45); }
+.brand-shell[data-da="light"] .lh-marquee-skipped { color: rgba(23, 22, 26, 0.6); }
 
 .brand-shell[data-da="light"] .lh-marquee-status i {
-  color: rgba(23, 22, 26, 0.25);
+  color: rgba(23, 22, 26, 0.4);
 }
 
 /* the closing argument */
@@ -8690,25 +8690,50 @@ p {
   font-family: var(--font-mono);
   font-size: 0.7rem;
   letter-spacing: 0.08em;
-  color: rgba(23, 22, 26, 0.42);
+  color: rgba(23, 22, 26, 0.55);
 }
 
 
-/* the divider carries its story: the evidence passing from the run to the report */
-.da-bar-caption {
+/* the divider carries its story: the evidence passing from the run to the
+   report. The headline names the exercise: this is what CLEAN grades. */
+.da-headline {
   position: absolute;
-  top: 50%;
+  top: 16px;
   left: 50%;
   z-index: 6;
-  transform: translate(-50%, -50%) rotate(90deg) translateY(64px);
-  font-family: var(--font-mono);
-  font-size: 0.56rem;
-  letter-spacing: 0.42em;
-  text-transform: uppercase;
-  color: rgba(255, 226, 140, 0.9);
-  text-shadow: 0 0 8px rgba(245, 208, 111, 0.6);
+  transform: translateX(-50%);
+  display: grid;
+  justify-items: center;
+  gap: 8px;
   pointer-events: none;
-  white-space: nowrap;
+}
+
+.da-headline-title {
+  padding: 10px 22px;
+  border: 1px solid rgba(10, 10, 11, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #17161a;
+  font-family: var(--font-display, serif);
+  font-size: 1.15rem;
+  line-height: 1.2;
+  box-shadow: 0 8px 24px -12px rgba(10, 10, 11, 0.4);
+}
+
+.da-headline-title em {
+  font-style: italic;
+  color: #4f46e5;
+}
+
+.da-headline-note {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(5, 7, 8, 0.72);
+  color: rgba(255, 255, 255, 0.85);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 /* one scrollbar on screen: the panes hide theirs, the evidence line is the
@@ -9089,7 +9114,7 @@ p {
 .brand-shell[data-da="light"] .lh-proof-foot {
   padding: 0 18px 14px;
   font-size: 0.7rem;
-  color: rgba(23, 22, 26, 0.42);
+  color: rgba(23, 22, 26, 0.55);
 }
 
 /* ---- marquee ---- */
@@ -9138,7 +9163,7 @@ p {
 }
 
 .brand-shell[data-da="light"] .lh-marquee-mono {
-  color: rgba(23, 22, 26, 0.4);
+  color: rgba(23, 22, 26, 0.56);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -9205,7 +9230,7 @@ p {
 .brand-shell[data-da="light"] .lh-row-num {
   font-family: var(--font-mono);
   font-size: 0.78rem;
-  color: rgba(23, 22, 26, 0.4);
+  color: rgba(23, 22, 26, 0.56);
 }
 
 .brand-shell[data-da="light"] .lh-row-name {
@@ -9241,7 +9266,7 @@ p {
   font-family: var(--font-mono);
   font-size: 0.66rem;
   letter-spacing: 0.06em;
-  color: rgba(23, 22, 26, 0.38);
+  color: rgba(23, 22, 26, 0.55);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -9249,7 +9274,7 @@ p {
 
 .brand-shell[data-da="light"] .lh-row-arrow {
   grid-area: arrow;
-  color: rgba(23, 22, 26, 0.35);
+  color: rgba(23, 22, 26, 0.55);
   transition:
     transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
     color 0.25s ease;
@@ -9466,7 +9491,7 @@ p {
   font-family: var(--font-mono);
   font-size: 0.64rem;
   letter-spacing: 0.06em;
-  color: rgba(23, 22, 26, 0.4);
+  color: rgba(23, 22, 26, 0.56);
 }
 
 /* ---- workflow path ---- */

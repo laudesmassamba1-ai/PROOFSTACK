@@ -185,6 +185,26 @@ export function DaComparer() {
         style={{ clipPath: rightClip }}
       />
 
+      {/* the exercise has a name: this is the before/after CLEAN grades */}
+      <div className="da-headline" aria-hidden="true">
+        <span className="da-headline-title">
+          {fr ? (
+            <>
+              Avant et après <em>CLEAN</em>
+            </>
+          ) : (
+            <>
+              Before and after <em>CLEAN</em>
+            </>
+          )}
+        </span>
+        <span className="da-headline-note">
+          {fr
+            ? "CLEAN mesure la qualité de l'interface — comparez les deux directions"
+            : "CLEAN grades interface quality — compare the two directions"}
+        </span>
+      </div>
+
       {/* the bar: drag to compare, push to an edge to keep one identity */}
       <div
         className="da-bar"
@@ -220,9 +240,6 @@ export function DaComparer() {
         aria-valuenow={Math.round(fraction * 100)}
       >
         <FilamentStream />
-        <span className="da-bar-caption" aria-hidden="true">
-          {fr ? "la preuve" : "the evidence"}
-        </span>
         <span className="da-bar-handle" aria-hidden="true" />
       </div>
 
