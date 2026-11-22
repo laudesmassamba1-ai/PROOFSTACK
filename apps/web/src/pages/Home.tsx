@@ -19,6 +19,7 @@ import { ModuleShowcase } from "../components/marketing/ModuleShowcase.js";
 import { StatStrip } from "../components/marketing/StatStrip.js";
 import { useI18n } from "../i18n/index.js";
 import { Section, SectionHeading } from "../layouts/BrandLayout.js";
+import { useDAMode } from "../lib/da.js";
 
 const MODULE_CARDS = [
   { id: "world", icon: Globe2, className: "module-world" },
@@ -30,11 +31,15 @@ const MODULE_CARDS = [
 
 export function Home() {
   const { t } = useI18n();
+  const da = useDAMode();
 
   return (
     <>
       {/* ---------- brand hero ---------- */}
-      <section className="hero-section relative overflow-hidden" data-dark>
+      <section
+        className="hero-section relative overflow-hidden"
+        data-dark={da === "dark" ? true : undefined}
+      >
         {/*
           The signature motion: a field of particles drifts as a wave, converges into the
           three-layer P, holds, then dissolves back. It is the brand's identity, so it is
@@ -47,6 +52,7 @@ export function Home() {
           waveIntensity={1.05}
           particleSize={1.9}
           className="z-0"
+          colorPalette={da === "light" ? ["#0d9488", "#14b8a6", "#0f766e"] : undefined}
         />
         {/* The scrim is what keeps the copy legible: particles are a texture, never a
             backdrop for a paragraph. It is a class, not an inline gradient, so the

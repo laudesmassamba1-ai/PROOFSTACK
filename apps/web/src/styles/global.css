@@ -8335,6 +8335,49 @@ p {
   color: var(--ink);
 }
 
+
+/* In the light DA the hero is light too: the wave stays, redrawn in deep teal
+   (palette prop), the scrim fades white, the copy reads in ink. */
+.brand-shell[data-da="light"] .hero-section {
+  background:
+    radial-gradient(90% 70% at 88% 30%, rgba(15, 128, 110, 0.08), transparent 62%),
+    #f7f7f5;
+}
+
+.brand-shell[data-da="light"] .hero-scrim {
+  background: linear-gradient(
+    100deg,
+    rgba(247, 247, 245, 0.97) 0%,
+    rgba(247, 247, 245, 0.9) 30%,
+    rgba(247, 247, 245, 0.42) 58%,
+    rgba(247, 247, 245, 0.02) 82%
+  );
+}
+
+@media (max-width: 1023px) {
+  .brand-shell[data-da="light"] .hero-scrim {
+    background: linear-gradient(
+      180deg,
+      rgba(247, 247, 245, 0.96) 0%,
+      rgba(247, 247, 245, 0.86) 42%,
+      rgba(247, 247, 245, 0.4) 68%,
+      rgba(247, 247, 245, 0.8) 100%
+    );
+  }
+
+  .brand-shell[data-da="light"] .particle-canvas {
+    opacity: 0.85;
+  }
+}
+
+.brand-shell[data-da="light"] .hero-title {
+  color: var(--ink);
+}
+
+.brand-shell[data-da="light"] .hero-title-accent {
+  color: #0c7a6b;
+}
+
 /* form fields on the light shell (auth pages inherit the light DA) */
 .brand-shell[data-da="light"] .field {
   background: #fff;

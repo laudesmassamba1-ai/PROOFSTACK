@@ -45,6 +45,23 @@ export function rememberDAMode(mode: DAMode): void {
   }
 }
 
+import { useEffect, useState } from "react";
+
+/** React hook: the active art direction, live across comparer commits. */
+export function useDAMode(): DAMode {
+  const [mode, setMode] = useState<DAMode>(() => resolveDAMode());
+  useEffect(() => {
+    const onChange = () => setMode(resolveDAMode());
+    window.addEventListener("da-changed", onChange);
+    window.addEventListener("storage", onChange);
+    return () => {
+      window.removeEventListener("da-changed", onChange);
+      window.removeEventListener("storage", onChange);
+    };
+  }, []);
+  return mode;
+}
+
 /** True when this page runs inside the comparer's own pane. */
 export function inIframe(): boolean {
   try {
