@@ -9,7 +9,7 @@ import { useI18n } from "../../i18n/index.js";
 export function EngineDiagram() {
   const { t } = useI18n();
   return (
-    <div className="engine-frame p-5 sm:p-7">
+    <div className="engine-frame p-5 sm:p-7" data-dark>
       <div className="relative z-10 grid gap-3">
         <div className="flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.035] px-4 py-3">
           <div className="flex items-center gap-3">

@@ -60,7 +60,7 @@ export function ModuleShowcase() {
   const { t } = useI18n();
 
   return (
-    <div className="module-wall">
+    <div className="module-wall" data-dark>
       <div className="module-wall-grid">
         {MODULES.map((module, index) => {
           const Icon = module.icon;

@@ -43,7 +43,7 @@ export function CliPreview({ className = "" }: { className?: string }) {
   };
 
   return (
-    <div className={`terminal-preview ${className}`}>
+    <div className={`terminal-preview ${className}`} data-dark>
       <div className="terminal-preview-bar flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-2">
           <span className="size-2 rounded-full bg-[#e967a6]" />

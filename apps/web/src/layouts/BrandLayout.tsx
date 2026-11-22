@@ -1,10 +1,12 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router";
 import { WindowControls } from "../components/app/WindowControls.js";
+import { DaComparer } from "../components/brand/DaComparer.js";
 import { Mark } from "../components/brand/Logo.js";
 import { SplitWords } from "../components/brand/SplitWords.js";
 import { Footer } from "../components/marketing/Footer.js";
 import { Nav } from "../components/marketing/Nav.js";
+import { type DAMode, inIframe, resolveDAMode } from "../lib/da.js";
 import { initMotion, teardownMotion } from "../lib/motion.js";
 import { initReveals, teardownReveals } from "../lib/reveal.js";
 
@@ -71,13 +73,62 @@ export function BrandLayout() {
     );
   }
 
+  // The visitor's art direction: remembered choice, or the comparer's URL override.
+  const [da, setDa] = useState<DAMode>(() => resolveDAMode());
+
+  // Inside a comparer pane, keep both panes at the same scroll offset so the two
+  // identities are compared on the same content, never on different pages.
+  useEffect(() => {
+    if (!inIframe()) return;
+    let syncing = false;
+    const onScroll = () => {
+      if (syncing) return;
+      syncing = true;
+      window.parent.postMessage(
+        { type: "da-scroll", y: window.scrollY, from: resolveDAMode() },
+        "*"
+      );
+      window.setTimeout(() => {
+        syncing = false;
+      }, 16);
+    };
+    const onMessage = (event: MessageEvent) => {
+      const data = event.data as { type?: string; y?: number };
+      if (data?.type === "da-scroll-to" && typeof data.y === "number") {
+        syncing = true;
+        window.scrollTo(0, data.y);
+        window.setTimeout(() => {
+          syncing = false;
+        }, 16);
+      }
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("message", onMessage);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("message", onMessage);
+    };
+  }, []);
+
+  // The comparer re-resolves after a choice is remembered.
+  useEffect(() => {
+    const onChange = () => setDa(resolveDAMode());
+    window.addEventListener("storage", onChange);
+    window.addEventListener("da-changed", onChange);
+    return () => {
+      window.removeEventListener("storage", onChange);
+      window.removeEventListener("da-changed", onChange);
+    };
+  }, []);
+
   return (
-    <div className="brand-shell min-h-screen">
+    <div className={`brand-shell min-h-screen`} data-da={da}>
       <Nav />
       <main id="main" className="pt-24">
         <Outlet />
       </main>
       <Footer />
+      {pathname === "/" ? <DaComparer /> : null}
     </div>
   );
 }

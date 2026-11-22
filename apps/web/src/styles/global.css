@@ -7951,3 +7951,419 @@ p {
   line-height: 1.55;
   color: var(--text-secondary);
 }
+
+/* --------------------------------------------------------------------------
+   DA COMPARER — one window, two art directions.
+   Two panes of the landing clip at a draggable bar; an edge commits a choice.
+   -------------------------------------------------------------------------- */
+
+.da-comparer {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: #050708;
+}
+
+.da-pane {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.da-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 5;
+  width: 2px;
+  transform: translateX(-1px);
+  cursor: ew-resize;
+  touch-action: none;
+  background: var(--brand-mint);
+  box-shadow: 0 0 0 1px rgba(5, 7, 8, 0.6);
+  outline: none;
+}
+
+.da-bar:focus-visible {
+  box-shadow:
+    0 0 0 2px #fff,
+    0 0 0 4px var(--brand-mint);
+}
+
+.da-bar-handle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--brand-mint);
+  color: #06231a;
+  box-shadow: 0 10px 30px -8px rgba(120, 227, 203, 0.7);
+}
+
+/* the grip: two thin chevrons drawn with borders, no icon dependency */
+.da-bar-handle::before {
+  content: "◄ ►";
+  font-size: 11px;
+  letter-spacing: 2px;
+}
+
+.da-tag {
+  position: absolute;
+  top: 18px;
+  z-index: 6;
+  padding: 7px 13px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.da-tag-dark {
+  left: 18px;
+  color: #e9fbf3;
+  background: rgba(5, 7, 8, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.da-tag-light {
+  right: 18px;
+  color: #0a3f36;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(10, 10, 11, 0.12);
+}
+
+.da-close {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  z-index: 6;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  border: 1px solid rgba(10, 10, 11, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #0a0a0b;
+  font-size: 0.78rem;
+  font-weight: 560;
+  cursor: pointer;
+}
+
+.da-close:hover {
+  border-color: rgba(10, 10, 11, 0.4);
+}
+
+.da-hint {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  z-index: 6;
+  max-width: min(92vw, 60ch);
+  transform: translateX(-50%);
+  padding: 9px 16px;
+  border-radius: 12px;
+  background: rgba(5, 7, 8, 0.78);
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 0.76rem;
+  line-height: 1.5;
+  text-align: center;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .da-comparer,
+  .da-bar,
+  .da-pane {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   LIGHT DA — the Stripe-grade calm, opt-in via [data-da="light"].
+   Flat light surface, white cards, hairline ink borders. The dark instrument
+   zones ([data-dark]) keep their black surfaces and white text: they are
+   embedded instruments on the light page, not flipped.
+   -------------------------------------------------------------------------- */
+
+.brand-shell[data-da="light"] {
+  background:
+    radial-gradient(90% 60% at 85% 0%, rgba(15, 128, 110, 0.05), transparent 60%), #f7f7f5;
+  color: var(--ink);
+}
+
+/* text utilities flip to graded ink outside the dark zones */
+.brand-shell[data-da="light"] .text-white:not([data-dark] *),
+.brand-shell[data-da="light"] [class*="text-white/"]:not([data-dark] *) {
+  color: var(--ink);
+}
+
+.brand-shell[data-da="light"]
+  :is(
+    [class*="text-white/25"],
+    [class*="text-white/26"],
+    [class*="text-white/30"],
+    [class*="text-white/32"],
+    [class*="text-white/34"],
+    [class*="text-white/35"],
+    [class*="text-white/36"],
+    [class*="text-white/38"]
+  ):not([data-dark] *) {
+  color: rgba(10, 10, 11, 0.42);
+}
+
+.brand-shell[data-da="light"]
+  :is(
+    [class*="text-white/40"],
+    [class*="text-white/42"],
+    [class*="text-white/44"],
+    [class*="text-white/45"],
+    [class*="text-white/46"],
+    [class*="text-white/48"]
+  ):not([data-dark] *) {
+  color: rgba(10, 10, 11, 0.52);
+}
+
+.brand-shell[data-da="light"]
+  :is(
+    [class*="text-white/52"],
+    [class*="text-white/54"],
+    [class*="text-white/56"],
+    [class*="text-white/58"],
+    [class*="text-white/60"]
+  ):not([data-dark] *) {
+  color: rgba(10, 10, 11, 0.62);
+}
+
+.brand-shell[data-da="light"]
+  :is(
+    [class*="text-white/62"],
+    [class*="text-white/68"],
+    [class*="text-white/70"],
+    [class*="text-white/72"],
+    [class*="text-white/74"]
+  ):not([data-dark] *) {
+  color: rgba(10, 10, 11, 0.74);
+}
+
+.brand-shell[data-da="light"]
+  :is([class*="text-white/76"], [class*="text-white/78"], [class*="text-white/82"]):not(
+    [data-dark] *
+  ) {
+  color: rgba(10, 10, 11, 0.84);
+}
+
+.brand-shell[data-da="light"]
+  :is([class*="text-white/86"], [class*="text-white/88"]):not([data-dark] *) {
+  color: rgba(10, 10, 11, 0.94);
+}
+
+/* surfaces */
+.brand-shell[data-da="light"] .brand-panel:not([data-dark] *) {
+  background: #fff;
+  border: 1px solid rgba(10, 10, 11, 0.08);
+  box-shadow: 0 1px 2px rgba(10, 10, 11, 0.04);
+}
+
+.brand-shell[data-da="light"] .hairline:not([data-dark] *) {
+  border-top: 1px solid rgba(10, 10, 11, 0.08);
+}
+
+.brand-shell[data-da="light"] .section-deeper {
+  border-top: 1px solid rgba(10, 10, 11, 0.06);
+  border-bottom: 1px solid rgba(10, 10, 11, 0.06);
+  background: linear-gradient(180deg, #f1f1ee, #f4f4f1);
+}
+
+.brand-shell[data-da="light"] .eyebrow {
+  color: #0c7a6b;
+}
+
+.brand-shell[data-da="light"] .btn-ghost {
+  border-color: rgba(10, 10, 11, 0.16);
+  color: var(--ink);
+  background: #fff;
+}
+
+.brand-shell[data-da="light"] .btn-ghost:hover {
+  border-color: rgba(10, 10, 11, 0.38);
+}
+
+.brand-shell[data-da="light"] .btn-primary {
+  box-shadow: 0 8px 22px -12px rgba(15, 128, 110, 0.5);
+}
+
+/* the fixed nav reads light over the light shell */
+.brand-shell[data-da="light"] header.fixed {
+  background: rgba(255, 255, 255, 0.86) !important;
+  border-color: rgba(10, 10, 11, 0.08) !important;
+  backdrop-filter: blur(14px);
+}
+
+.brand-shell[data-da="light"] .nav-flyout {
+  border: 1px solid rgba(10, 10, 11, 0.1);
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 30px 60px -30px rgba(10, 10, 11, 0.35);
+}
+
+.brand-shell[data-da="light"] .nav-flyout-label {
+  color: rgba(10, 10, 11, 0.5);
+}
+
+.brand-shell[data-da="light"] .nav-flyout-item {
+  color: var(--ink);
+}
+
+.brand-shell[data-da="light"] .nav-flyout-item:hover {
+  background: rgba(10, 10, 11, 0.04);
+}
+
+.brand-shell[data-da="light"] .module-card:not([data-dark] *) {
+  background: #fff;
+  border: 1px solid rgba(10, 10, 11, 0.08);
+}
+
+/* white-tinted borders and fills flip to ink tints outside the dark zones */
+.brand-shell[data-da="light"]
+  :is(
+    [class*="border-white/6"],
+    [class*="border-white/8"],
+    [class*="border-white/10"],
+    [class*="border-white/12"]
+  ):not([data-dark] *) {
+  border-color: rgba(10, 10, 11, 0.1);
+}
+
+.brand-shell[data-da="light"] :is([class*="border-white/15"]):not([data-dark] *) {
+  border-color: rgba(10, 10, 11, 0.16);
+}
+
+.brand-shell[data-da="light"]
+  :is([class*="bg-white/4"], [class*="bg-white/8"], [class*="bg-white/10"]):not([data-dark] *) {
+  background-color: rgba(10, 10, 11, 0.05);
+}
+
+/* mint accents darken to keep AA contrast on the light surface */
+.brand-shell[data-da="light"]
+  :is([class*="border-brand-mint/"], [class*="bg-brand-mint/"], [class*="text-brand-mint"]):not(
+    [data-dark] *
+  ) {
+  border-color: rgba(12, 122, 107, 0.32);
+}
+
+.brand-shell[data-da="light"] .text-brand-mint:not([data-dark] *),
+.brand-shell[data-da="light"] [class*="text-brand-mint/"]:not([data-dark] *) {
+  color: #0c7a6b;
+}
+
+.brand-shell[data-da="light"] [class*="bg-brand-mint/"]:not([data-dark] *) {
+  background-color: rgba(12, 122, 107, 0.09);
+}
+
+/* Dark instrument zones keep their black identity inside the light page: they
+   re-establish light ink by inheritance (their text has no explicit colour of
+   its own) and carry their own dark surface, since the light shell no longer
+   supplies the black behind them. */
+.brand-shell[data-da="light"] [data-dark] {
+  color: #f3f6f5;
+}
+
+.brand-shell[data-da="light"] .hero-section {
+  background: var(--brand-black);
+}
+
+.brand-shell[data-da="light"] .module-wall {
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: var(--brand-black);
+}
+
+.brand-shell[data-da="light"] .ai-sample {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: #070a0c;
+  box-shadow: 0 24px 50px -30px rgba(10, 10, 11, 0.5);
+}
+
+.brand-shell[data-da="light"] .terminal-preview {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 24px 50px -30px rgba(10, 10, 11, 0.5);
+}
+
+.brand-shell[data-da="light"] .engine-frame {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(60% 80% at 20% 0%, rgba(49, 95, 200, 0.16), transparent 70%),
+    linear-gradient(180deg, #0b0f12, #070a0c);
+  box-shadow: 0 24px 50px -30px rgba(10, 10, 11, 0.5);
+}
+
+/* the stat strip sits on the light shell: its whites become ink */
+.brand-shell[data-da="light"] .stat-strip {
+  border-top: 1px solid rgba(10, 10, 11, 0.08);
+  border-bottom: 1px solid rgba(10, 10, 11, 0.08);
+}
+
+.brand-shell[data-da="light"] .stat-strip-item:nth-child(even) {
+  border-left: 1px solid rgba(10, 10, 11, 0.08);
+}
+
+.brand-shell[data-da="light"] .stat-strip-value {
+  color: var(--ink);
+}
+
+.brand-shell[data-da="light"] .stat-strip-label {
+  color: rgba(10, 10, 11, 0.52);
+}
+
+.brand-shell[data-da="light"] .stat-strip-note {
+  color: rgba(10, 10, 11, 0.36);
+}
+
+.brand-shell[data-da="light"] header.fixed .wordmark,
+.brand-shell[data-da="light"] header.fixed a:not([data-dark] *),
+.brand-shell[data-da="light"] header.fixed button:not([data-dark] *) {
+  color: var(--ink);
+}
+
+/* form fields on the light shell (auth pages inherit the light DA) */
+.brand-shell[data-da="light"] .field {
+  background: #fff;
+  border-color: rgba(10, 10, 11, 0.14);
+  color: var(--ink);
+}
+
+.da-reopen {
+  position: fixed;
+  bottom: 18px;
+  left: 18px;
+  z-index: 80;
+  padding: 8px 14px;
+  border: 1px solid rgba(10, 10, 11, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #0a0a0b;
+  font-size: 0.74rem;
+  font-weight: 560;
+  cursor: pointer;
+  box-shadow: 0 4px 14px -6px rgba(10, 10, 11, 0.25);
+}
+
+.da-reopen:hover {
+  border-color: rgba(10, 10, 11, 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .da-reopen {
+    transition: none;
+  }
+}

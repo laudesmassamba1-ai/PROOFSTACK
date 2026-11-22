@@ -34,7 +34,7 @@ export function Home() {
   return (
     <>
       {/* ---------- brand hero ---------- */}
-      <section className="hero-section relative overflow-hidden">
+      <section className="hero-section relative overflow-hidden" data-dark>
         {/*
           The signature motion: a field of particles drifts as a wave, converges into the
           three-layer P, holds, then dissolves back. It is the brand's identity, so it is
@@ -304,7 +304,7 @@ function AiAuditSample() {
   ] as const;
 
   return (
-    <figure className="ai-sample">
+    <figure className="ai-sample" data-dark>
       <figcaption className="ai-sample-bar">
         <Bot size={14} className="text-brand-mint" />
         <span className="font-mono text-[0.64rem] tracking-[0.14em] text-white/58">
