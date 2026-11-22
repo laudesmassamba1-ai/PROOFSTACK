@@ -200,10 +200,10 @@ export function ParticleLogo({
     if (import.meta.env.DEV) {
       (window as unknown as { __proofcoreWaveStart?: number }).__proofcoreWaveStart = started;
     }
-    const formationStart = 1400;
-    const holdDuration = 2600;
-    const dissolutionDuration = 2400;
-    const wavePause = 1600;
+    const formationStart = 900;
+    const holdDuration = 9200;
+    const dissolutionDuration = 1500;
+    const wavePause = 1100;
     const cycle =
       formationStart + logoFormationDuration + holdDuration + dissolutionDuration + wavePause;
     const formEnd = formationStart + logoFormationDuration;

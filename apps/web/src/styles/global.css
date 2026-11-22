@@ -28,9 +28,9 @@
   --brand-pink: #e967a6;
   --brand-orange: #f28a49;
 
-  --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: "Bricolage Grotesque Variable", "Geist Variable", ui-sans-serif, sans-serif;
-  --font-mono: "JetBrains Mono Variable", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-sans: "Archivo", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Archivo", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 
   /* Ink & Object workspace palette */
   --paper: #f6f6f4;
@@ -250,10 +250,11 @@ p {
 
 .eyebrow {
   font-family: var(--font-mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.22em;
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--brand-mint);
+  color: rgba(120, 227, 203, 0.8);
 }
 
 /*
@@ -270,10 +271,11 @@ p {
  * laptop and still dominates the viewport.
  */
 .hero-title {
-  font-size: clamp(2rem, 5.4vw, 4.6rem);
-  line-height: 0.94;
-  letter-spacing: -0.045em;
-  font-weight: 600;
+  font-size: clamp(2.1rem, 5.6vw, 4.8rem);
+  line-height: 0.96;
+  letter-spacing: -0.012em;
+  font-weight: 780;
+  font-stretch: 118%;
   text-transform: uppercase;
   text-wrap: balance;
 }
@@ -489,7 +491,7 @@ p {
 .module-panel-tokens {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.3rem;
+  gap: 0.35rem 0;
   margin-top: auto;
   padding-top: 0.5rem;
   list-style: none;
@@ -497,12 +499,14 @@ p {
 
 .module-panel-tokens li {
   font-family: var(--font-mono);
-  font-size: 0.62rem;
-  padding: 0.16rem 0.42rem;
-  border-radius: 5px;
-  color: rgba(255, 255, 255, 0.5);
-  background: rgba(255, 255, 255, 0.045);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.64rem;
+  color: rgba(255, 255, 255, 0.52);
+}
+
+.module-panel-tokens li + li::before {
+  content: "·";
+  margin: 0 0.5rem;
+  color: rgba(255, 255, 255, 0.24);
 }
 
 .module-panel-out {
@@ -557,10 +561,10 @@ p {
 }
 
 .wall-state {
-  padding: 0.18rem 0.4rem;
-  border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.42);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.45);
 }
 
 .wall-state-pass {
@@ -682,13 +686,12 @@ p {
 }
 
 .btn-primary {
-  background: linear-gradient(180deg, #eafaf2, #b9efce);
+  background: var(--brand-mint);
   color: #06231a;
-  box-shadow: 0 10px 26px -12px rgba(115, 214, 139, 0.6);
 }
 
 .btn-primary:hover {
-  background: linear-gradient(180deg, #f4fff8, #c9f3d8);
+  background: #a5ecd9;
 }
 
 .btn-ghost {
@@ -1138,7 +1141,6 @@ p {
   height: 6px;
   border-radius: 999px;
   background: var(--brand-mint);
-  box-shadow: 0 0 14px 2px rgba(120, 227, 203, 0.55);
 }
 
 .engine-frame {
@@ -8400,7 +8402,13 @@ p {
 }
 
 .brand-shell[data-da="light"] .eyebrow {
-  color: #0c7a6b;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 1.06rem;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: var(--lh-accent);
 }
 
 .brand-shell[data-da="light"] .btn-ghost {
@@ -8732,194 +8740,6 @@ p {
   width: 0;
 }
 
-/* ============ the two universes, staged ============
-   Dark = the night the software ran: grain like a photographic plate, a
-   vignette that closes the room, a nebula behind the machine. Light = the
-   morning the report was read: paper grain, a registered margin, ink that
-   dries in front of you, a notary's stamp. */
-
-.dark-grain,
-.paper-grain {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
-  background-size: 160px 160px;
-  mix-blend-mode: overlay;
-}
-
-.dark-grain {
-  opacity: 0.1;
-}
-.paper-grain {
-  opacity: 0.055;
-  mix-blend-mode: multiply;
-}
-
-.dark-vignette {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background:
-    radial-gradient(120% 90% at 50% 40%, rgba(5, 7, 8, 0) 55%, rgba(2, 3, 4, 0.55) 100%),
-    radial-gradient(70% 60% at 18% 8%, rgba(18, 47, 58, 0.16), rgba(5, 7, 8, 0) 70%),
-    radial-gradient(80% 70% at 86% 90%, rgba(23, 20, 46, 0.2), rgba(5, 7, 8, 0) 72%);
-}
-
-.dark-nebula {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(46% 34% at 72% 30%, rgba(23, 84, 76, 0.13), rgba(5, 7, 8, 0) 70%),
-    radial-gradient(38% 30% at 26% 66%, rgba(46, 40, 92, 0.12), rgba(5, 7, 8, 0) 72%);
-  filter: blur(2px);
-}
-
-/* the paper's margin: a registered red line, like a ledger page */
-.lh {
-  background-image: linear-gradient(
-    90deg,
-    transparent calc(3rem + 8px),
-    rgba(196, 74, 74, 0.16) calc(3rem + 8px),
-    rgba(196, 74, 74, 0.16) calc(3rem + 9.5px),
-    transparent calc(3rem + 9.5px)
-  );
-}
-
-@media (min-width: 1024px) {
-  .lh {
-    background-image: linear-gradient(
-      90deg,
-      transparent calc(6rem + 8px),
-      rgba(196, 74, 74, 0.14) calc(6rem + 8px),
-      rgba(196, 74, 74, 0.14) calc(6rem + 9.5px),
-      transparent calc(6rem + 9.5px)
-    );
-  }
-}
-
-/* morning light: a warm wash the report is read in */
-.lh-sun {
-  position: absolute;
-  top: -18%;
-  right: -6%;
-  width: min(52vw, 620px);
-  aspect-ratio: 1;
-  z-index: 0;
-  pointer-events: none;
-  background: radial-gradient(
-    closest-side,
-    rgba(244, 200, 120, 0.3),
-    rgba(244, 200, 120, 0.1) 55%,
-    rgba(244, 200, 120, 0) 100%
-  );
-  filter: blur(6px);
-}
-
-/* ink underline under the serif headline */
-.lh-underline-wrap {
-  display: block;
-  width: min(340px, 62%);
-  height: 14px;
-  margin: 6px 0 10px;
-  position: relative;
-  top: -14px;
-}
-
-.lh-underline-wrap svg {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-/* the notary's stamp: double ring, uneven ink, lands with a settle */
-.lh-stamp {
-  position: absolute;
-  top: -26px;
-  right: 22px;
-  z-index: 2;
-  display: grid;
-  justify-items: center;
-  gap: 3px;
-  padding: 10px 16px;
-  border: 1.6px solid rgba(64, 92, 68, 0.75);
-  border-radius: 10px;
-  box-shadow:
-    inset 0 0 0 3.5px rgba(255, 255, 255, 0.9),
-    inset 0 0 0 5px rgba(64, 92, 68, 0.5);
-  background: rgba(255, 255, 255, 0.6);
-  color: rgba(47, 84, 52, 0.9);
-  transform: scale(1.55) rotate(7deg);
-  opacity: 0;
-  transition:
-    transform 0.34s cubic-bezier(0.16, 1.1, 0.4, 1),
-    opacity 0.28s ease;
-  pointer-events: none;
-}
-
-.lh-stamp.is-landed {
-  transform: scale(1) rotate(-7deg);
-  opacity: 1;
-}
-
-.lh-stamp-word {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.34em;
-  text-indent: 0.34em;
-}
-
-.lh-stamp-meta {
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
-  letter-spacing: 0.18em;
-}
-
-.lh-stamp-rule {
-  width: 100%;
-  height: 1px;
-  background: rgba(64, 92, 68, 0.55);
-}
-
-/* fleuron closes each numbered entry */
-.lh-row-fleuron {
-  width: 15px;
-  height: 15px;
-  margin-left: 7px;
-  vertical-align: -2px;
-  opacity: 0;
-  transform: scale(0.6) rotate(-40deg);
-  transition:
-    opacity 0.5s ease 0.25s,
-    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.25s;
-}
-
-.lh-row.is-in .lh-row-fleuron {
-  opacity: 0.9;
-  transform: none;
-}
-
-/* the seismograph sits in a hairline frame, like an instrument on a bench */
-.seismo-frame {
-  position: relative;
-  z-index: 2;
-  border-top: 1px solid rgba(214, 226, 224, 0.1);
-  background: linear-gradient(180deg, rgba(9, 12, 13, 0.6), rgba(5, 7, 8, 0));
-}
-
-.seismo-caption {
-  padding: 10px clamp(1.25rem, 4vw, 2.5rem) 0;
-  font-size: 0.62rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: rgba(214, 226, 224, 0.42);
-}
-
 /* form fields on the light shell (auth pages inherit the light DA) */
 .brand-shell[data-da="light"] .field {
   background: #fff;
@@ -9025,11 +8845,12 @@ p {
 /* ---- shared atoms ---- */
 
 .brand-shell[data-da="light"] .lh-eyebrow {
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  font-weight: 500;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 1.12rem;
+  letter-spacing: 0.01em;
+  text-transform: none;
   color: var(--lh-accent);
 }
 

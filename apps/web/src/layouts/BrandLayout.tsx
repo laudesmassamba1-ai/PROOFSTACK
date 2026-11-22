@@ -99,20 +99,8 @@ export function BrandLayout() {
   }, []);
 
   return (
-    <div className={`brand-shell min-h-screen`} data-da={da} style={{ position: "relative" }}>
+    <div className={`brand-shell min-h-screen`} data-da={da}>
       {/* the universe's atmosphere, fixed behind the pages */}
-      <div
-        aria-hidden="true"
-        className={da === "light" ? "paper-grain" : "dark-grain"}
-        style={{ position: "fixed", inset: 0, zIndex: 0 }}
-      />
-      {da !== "light" ? (
-        <div
-          aria-hidden="true"
-          className="dark-vignette"
-          style={{ position: "fixed", inset: 0, zIndex: 0, opacity: 0.5 }}
-        />
-      ) : null}
       <Nav />
       <main id="main" className="pt-24">
         <Outlet />

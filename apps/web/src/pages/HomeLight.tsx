@@ -1,7 +1,6 @@
 import { ArrowRight, ArrowUpRight, Check } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
-import { Fleuron, InkUnderline, Stamp } from "../components/brand/Ornaments.js";
 import { SplitChars } from "../components/brand/SplitChars.js";
 import { useI18n } from "../i18n/index.js";
 import { useReveal } from "../lib/useReveal.js";
@@ -125,7 +124,6 @@ export function HomeLight() {
 
       {/* ---------- hero ---------- */}
       <section className="lh-hero">
-        <span className="lh-sun" aria-hidden="true" />
         <div ref={heroRef} className={`lh-hero-grid ${heroIn ? "is-in" : ""}`}>
           <div className="lh-hero-copy">
             <p className="lh-eyebrow">{t("hero.eyebrow")}</p>
@@ -138,9 +136,6 @@ export function HomeLight() {
                 />
               </em>
             </h1>
-            <span className="lh-underline-wrap" aria-hidden="true">
-              <InkUnderline />
-            </span>
             <p className="lh-lede">{t("hero.lede")}</p>
             <div className="lh-cta-row">
               <Link to="/signup" className="lh-btn lh-btn-solid" data-magnet>
@@ -156,7 +151,6 @@ export function HomeLight() {
           </div>
 
           <div className="lh-hero-proof" data-tilt>
-            <Stamp ok={29} skip={3} time={fr ? "00:18.42" : "00:18.42"} fr={fr} />
             <div className="lh-proof-head">
               <span className="lh-proof-dot" />
               proofcore test — {fr ? "extrait du rapport" : "report extract"}
@@ -228,10 +222,7 @@ export function HomeLight() {
         <div className="lh-index">
           {MODULES.map((module, index) => (
             <Link key={module.id} to={`/${module.id}`} className="lh-row" data-reveal>
-              <span className="lh-row-num">
-                {String(index + 1).padStart(2, "0")}
-                <Fleuron className="lh-row-fleuron" />
-              </span>
+              <span className="lh-row-num">{String(index + 1).padStart(2, "0")}</span>
               <span className="lh-row-main">
                 <span className="lh-row-name">{t(`modules.${module.id}.name` as never)}</span>
                 <span className="lh-row-tag"> — {t(`modules.${module.id}.tag` as never)}</span>

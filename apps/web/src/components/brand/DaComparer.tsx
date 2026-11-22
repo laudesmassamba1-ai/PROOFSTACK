@@ -251,8 +251,8 @@ export function DaComparer() {
 
       <p className="da-hint">
         {fr
-          ? "Glissez la barre pour comparer. Poussez-la vers un bord : la direction de ce bord est gardée, l'autre disparaît."
-          : "Drag the bar to compare. Push it to an edge: that edge's direction is kept, the other disappears."}
+          ? "Glissez pour comparer. Poussez vers un bord : cette direction disparaît, l'autre reste."
+          : "Drag to compare. Push to an edge: that direction disappears, the other stays."}
       </p>
     </div>
   );
