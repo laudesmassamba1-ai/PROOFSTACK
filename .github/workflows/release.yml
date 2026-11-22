@@ -209,12 +209,21 @@ jobs:
           node -e '
           const fs = require("fs"), path = require("path"), crypto = require("crypto");
           const version = require("./packages/cli/package.json").version;
+          // download-artifact keeps the paths the upload used, so the files sit under
+          // dist/installers, dist/bin and dist/desktop. The release itself attaches by
+          // file name, so walk instead of assuming a flat directory.
+          const walk = (dir) =>
+            fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+              entry.isDirectory() ? walk(path.join(dir, entry.name)) : [path.join(dir, entry.name)]
+            );
           const files = {};
-          for (const name of fs.readdirSync("dist")) {
+          for (const file of walk("dist")) {
+            const name = path.basename(file);
             // Only the runnable binaries: the manifest tells the CLI which file to fetch.
             if (!/^proofcore-(linux|darwin|win)/.test(name) || name.endsWith(".sha256")) continue;
             const target = name.replace(/^proofcore-/, "").replace(/\.exe$/, "");
-            const bytes = fs.readFileSync(path.join("dist", name));
+            if (files[target]) continue;
+            const bytes = fs.readFileSync(file);
             files[target] = {
               binary: name,
               sha256: crypto.createHash("sha256").update(bytes).digest("hex"),
@@ -232,7 +241,9 @@ jobs:
       - name: Attach every artifact to the release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*
+          # Every file the builds produced, wherever the download put it.
+          files: |
+            dist/**/*
           generate_release_notes: true
           body: |
             ## Install
