@@ -185,6 +185,14 @@ export function DownloadPage() {
         ) : null}
       </div>
 
+      {release !== null && state === "ready" && release.assets.length === 0 ? (
+        <p className="mt-4 text-[0.82rem] leading-relaxed text-white/46">
+          {fr
+            ? `Les fichiers de ${release.tag} n'ont pas pu être lus à l'instant — l'hôte de publication limite les appels anonymes. Réessaie dans une minute, ou choisis la dernière version.`
+            : `The files for ${release.tag} could not be read just now — the release host throttles anonymous calls. Try again in a minute, or choose the latest version.`}
+        </p>
+      ) : null}
+
       {/* minmax(0,1fr): the sha256 names are unbreakable mono strings, and a plain
           1fr track lets the widest child push the column past the viewport. */}
       <div className="mt-6 grid gap-5 lg:grid-cols-[repeat(3,minmax(0,1fr))]">
