@@ -1776,6 +1776,15 @@ async function commandStatus(flags: GlobalFlags, args: string[]): Promise<number
       return 0;
     }
     out(flags, bold(flags, "PROOFCORE status"));
+    // The version belongs here: "which build is on this machine, and is it the current
+    // one" is the first question after an install, and it used to require knowing about
+    // `--version` or running an update that could do work. Read from the cache, so status
+    // never waits on the network for it.
+    const pending = updateAvailable(readState());
+    out(
+      flags,
+      `version    ${CLI_VERSION}${pending ? ` → ${pending} available · proofcore update` : ""}`
+    );
     out(flags, `account    ${auth.user.email}`);
     out(flags, `api        ${apiUrl}`);
     out(
