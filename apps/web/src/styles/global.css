@@ -8279,23 +8279,6 @@ p {
   border-color: rgba(10, 10, 11, 0.4);
 }
 
-.da-hint {
-  position: absolute;
-  bottom: 18px;
-  left: 50%;
-  z-index: 6;
-  max-width: min(92vw, 60ch);
-  transform: translateX(-50%);
-  padding: 9px 16px;
-  border-radius: 12px;
-  background: rgba(5, 7, 8, 0.78);
-  color: rgba(255, 255, 255, 0.86);
-  font-size: 0.76rem;
-  line-height: 1.5;
-  text-align: center;
-  pointer-events: none;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .da-comparer,
   .da-bar,
@@ -8745,6 +8728,44 @@ p {
   background: #fff;
   border-color: rgba(10, 10, 11, 0.14);
   color: var(--ink);
+}
+
+/* the auth page speaks ink on paper: its atoms are hard-coded white for the
+   black instrument, so the light shell re-voices them explicitly */
+.brand-shell[data-da="light"] .auth-page {
+  color: var(--lh-ink);
+}
+
+.brand-shell[data-da="light"] .label {
+  color: rgba(23, 22, 26, 0.6);
+}
+
+.brand-shell[data-da="light"] .auth-page a,
+.brand-shell[data-da="light"] .auth-page .text-white\/56,
+.brand-shell[data-da="light"] .auth-page .text-white\/46 {
+  color: rgba(23, 22, 26, 0.66);
+}
+
+.brand-shell[data-da="light"] .auth-page .text-white {
+  color: var(--lh-ink);
+}
+
+/* underlined links that inherit the dark context read ink on paper */
+.brand-shell[data-da="light"] a.underline:not([data-dark] *) {
+  color: rgba(23, 22, 26, 0.72);
+}
+
+/* the amber "known limits" note was tuned for black: darken it on paper */
+.brand-shell[data-da="light"] .text-\[\#e9b45a\] {
+  color: #8a5a12;
+}
+
+/* every zone that declares itself a dark instrument gets its black surface in
+   the light DA — without this, zones on shell-dressed pages (docs, changelog,
+   security, download) kept white text over the paper background: invisible */
+.brand-shell[data-da="light"] [data-dark] {
+  background-color: #050708;
+  color: #f3f6f5;
 }
 
 .da-reopen {

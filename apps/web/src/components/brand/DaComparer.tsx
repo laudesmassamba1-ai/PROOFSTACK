@@ -248,12 +248,6 @@ export function DaComparer() {
       <span className="da-tag da-tag-light">
         {fr ? "Le rapport — édition papier" : "The report — paper edition"}
       </span>
-
-      <p className="da-hint">
-        {fr
-          ? "Glissez pour comparer. Poussez vers un bord : cette direction disparaît, l'autre reste."
-          : "Drag to compare. Push to an edge: that direction disappears, the other stays."}
-      </p>
     </div>
   );
 }

@@ -217,7 +217,16 @@ export function Auth({ mode }: { mode: Mode }) {
               : probe.status === "checking"
                 ? "rgba(255,255,255,0.03)"
                 : "rgba(233,180,90,0.07)",
-          color: probe.status === "reachable" ? "#bfeed4" : "rgba(242,246,250,0.7)",
+          // the paper edition needs ink-safe tints — pale mint/white on cream
+          // paper was unreadable
+          color:
+            document.querySelector(".brand-shell")?.getAttribute("data-da") === "light"
+              ? probe.status === "reachable"
+                ? "#1e5c40"
+                : "rgba(23,22,26,0.66)"
+              : probe.status === "reachable"
+                ? "#bfeed4"
+                : "rgba(242,246,250,0.7)",
         }}
       >
         {probe.status === "checking" ? (
