@@ -1,4 +1,5 @@
 export * from "./controls.js";
+export * from "./crawl.js";
 export * from "./crypto.js";
 export * from "./currency.js";
 export * from "./errors.js";
@@ -9,5 +10,8 @@ export * from "./logger.js";
 export * from "./money.js";
 export * from "./page-scan.js";
 export * from "./result.js";
+export * from "./session.js";
+export * from "./site-audit.js";
+export * from "./site-scan.js";
 export * from "./text.js";
 export * from "./time.js";

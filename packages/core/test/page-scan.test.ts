@@ -259,7 +259,11 @@ describe("scanPage", () => {
     });
 
     expect(result.login).toEqual({ attempted: true, ok: true, status: 200 });
-    const login = requests.find((item) => item.url.endsWith("/api/login"));
+    // The engine reads the login page before posting to it, so the first request to that
+    // URL is the discovery GET: the credentials are in the POST that follows.
+    const login = requests.find(
+      (item) => item.url.endsWith("/api/login") && item.body !== undefined
+    );
     expect(JSON.parse(login?.body ?? "{}")).toEqual({
       email: "audit@shop.example",
       password,

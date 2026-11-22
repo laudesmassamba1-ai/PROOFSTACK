@@ -1,5 +1,6 @@
 import {
   assertScannableUrl,
+  auditSite,
   hmacSha256Hex,
   scanPage,
   VERIFICATION_META_NAME,
@@ -58,11 +59,27 @@ const absoluteHttpUrl = z
 
 const loginSchema = z
   .object({
+    /** The page holding the form, or the JSON endpoint when the site is an API. */
     url: absoluteHttpUrl,
     email: z.string().email().max(320),
     password: z.string().min(1).max(200),
+    /** The form's action, when it cannot be read from the page (a SPA, a separate host). */
+    endpoint: absoluteHttpUrl.optional(),
+    /** A page that requires the session: the proof the login worked. */
+    verifyUrl: absoluteHttpUrl.optional(),
     emailField: z.string().min(1).max(60).optional(),
     passwordField: z.string().min(1).max(60).optional(),
+    /** Extra fields a multi-tenant login wants (tenant, domain). Never logged. */
+    extraFields: z.record(z.string().max(60), z.string().max(200)).optional(),
+  })
+  .strict();
+
+const crawlSchema = z
+  .object({
+    maxPages: z.number().int().min(1).max(200).optional(),
+    maxDepth: z.number().int().min(0).max(6).optional(),
+    pathPrefix: z.string().max(200).optional(),
+    allowExternal: z.boolean().optional(),
   })
   .strict();
 
@@ -78,8 +95,101 @@ const scanSchema = z
     ownershipToken: z.string().min(1).max(200).optional(),
     /** Set when the scan is started from a project page, so its result stays with it. */
     projectId: z.string().min(1).max(64).optional(),
+    /**
+     * Read the site and not just the address. Absent means one page: a crawl is opt-in
+     * because it costs the target several dozen requests.
+     */
+    crawl: crawlSchema.optional(),
   })
   .strict();
+
+/**
+ * One engine for both routes.
+ *
+ * A crawl or a login goes through `auditSite`: real session, real pages, site-level controls,
+ * computed scores. A plain scan stays one request, because that is all it costs. Extracted so
+ * the streaming route cannot drift from the plain one — the two used to duplicate this block.
+ */
+async function runScan(
+  body: {
+    url: string;
+    headers?: Record<string, string>;
+    login?: LoginInput;
+    crawl?: CrawlInput;
+    ownershipToken?: string;
+  },
+  target: URL,
+  onProgress?: (event: { step: string; message: string; done?: number; total?: number }) => void
+): Promise<{
+  result: Awaited<ReturnType<typeof scanPage>>;
+  site: Awaited<ReturnType<typeof auditSite>> | null;
+}> {
+  if (body.crawl === undefined && body.login === undefined) {
+    const result = await scanPage(target.toString(), {
+      headers: body.headers,
+      allowPrivate: false,
+      maxBytes: 1_500_000,
+      timeoutMs: 15_000,
+      // A remote site is only ever "verified" by publishing the token: the API has no way to
+      // know who is asking, and an unproven report must not name locations.
+      ownershipHint: "remote",
+      ...(body.ownershipToken ? { ownershipToken: body.ownershipToken } : {}),
+    });
+    return { result, site: null };
+  }
+  const site = await auditSite({
+    url: target.toString(),
+    allowPrivate: false,
+    timeoutMs: 15_000,
+    ...(body.login
+      ? {
+          login: {
+            loginPageUrl: body.login.url,
+            ...(body.login.endpoint === undefined ? {} : { loginUrl: body.login.endpoint }),
+            ...(body.login.verifyUrl === undefined ? {} : { verifyUrl: body.login.verifyUrl }),
+            email: body.login.email,
+            password: body.login.password,
+            ...(body.login.emailField === undefined ? {} : { emailField: body.login.emailField }),
+            ...(body.login.passwordField === undefined
+              ? {}
+              : { passwordField: body.login.passwordField }),
+            ...(body.login.extraFields === undefined
+              ? {}
+              : { extraFields: body.login.extraFields }),
+          },
+        }
+      : {}),
+    crawl: {
+      // Without an explicit crawl request the engine still reads the site's own declarations
+      // (robots, sitemap) but does not roam: one page, no depth.
+      maxPages: body.crawl?.maxPages ?? (body.crawl ? 25 : 1),
+      maxDepth: body.crawl?.maxDepth ?? (body.crawl ? 2 : 0),
+      ...(body.crawl?.pathPrefix === undefined ? {} : { pathPrefix: body.crawl.pathPrefix }),
+      ...(body.crawl?.allowExternal === undefined
+        ? {}
+        : { allowExternal: body.crawl.allowExternal }),
+    },
+    ...(onProgress === undefined ? {} : { onProgress }),
+  });
+  return { result: site.scan, site };
+}
+
+type LoginInput = {
+  url: string;
+  email: string;
+  password: string;
+  endpoint?: string;
+  verifyUrl?: string;
+  emailField?: string;
+  passwordField?: string;
+  extraFields?: Record<string, string>;
+};
+type CrawlInput = {
+  maxPages?: number;
+  maxDepth?: number;
+  pathPrefix?: string;
+  allowExternal?: boolean;
+};
 
 const MAX_SCANS_PER_HOUR = 20;
 
@@ -267,18 +377,11 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
     }
 
     let result: Awaited<ReturnType<typeof scanPage>>;
+    let site: Awaited<ReturnType<typeof auditSite>> | null = null;
     try {
-      result = await scanPage(target.toString(), {
-        headers: body.headers,
-        allowPrivate: false,
-        maxBytes: 1_500_000,
-        timeoutMs: 15_000,
-        // A remote site is only ever "verified" by publishing the token: the API has no way
-        // to know who is asking, and an unproven report must not name locations.
-        ownershipHint: "remote",
-        ...(body.login ? { login: body.login } : {}),
-        ...(body.ownershipToken ? { ownershipToken: body.ownershipToken } : {}),
-      });
+      const run = await runScan(body, target);
+      result = run.result;
+      site = run.site;
     } catch (error) {
       // A scan that could not happen is a harness problem, not a finding about the site:
       // it must not appear as a red result the customer would act on.
@@ -322,7 +425,14 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
       worstVerdict,
       failed,
       warnings,
-      payload: JSON.stringify(result),
+      // The payload is the report: one page's findings, the site section when a crawl ran,
+      // the computed scores, and the login outcome (never a credential).
+      payload: JSON.stringify({
+        ...result,
+        ...(site === null
+          ? {}
+          : { site: site.site, scores: site.scores, score: site.score, login: site.login }),
+      }),
       ownership: result.ownership,
       redacted: result.redacted,
       projectId: body.projectId ?? null,
@@ -365,7 +475,20 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
       }
     }
 
-    return c.json({ audit: { id, projectId: body.projectId ?? null, ...result }, comparison }, 201);
+    return c.json(
+      {
+        audit: {
+          id,
+          projectId: body.projectId ?? null,
+          ...result,
+          ...(site === null
+            ? {}
+            : { site: site.site, scores: site.scores, score: site.score, login: site.login }),
+        },
+        comparison,
+      },
+      201
+    );
   });
 
   /**
@@ -447,15 +570,12 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
         await step("request", "Demande validée et quota réservé", "done");
         const fetchLabel = `Lecture de ${target.hostname} et analyse des cinq familles`;
         await step("fetch", fetchLabel, "running");
-        const result = await scanPage(target.toString(), {
-          headers: body.headers,
-          allowPrivate: false,
-          maxBytes: 1_500_000,
-          timeoutMs: 15_000,
-          ownershipHint: "remote",
-          ...(body.login ? { login: body.login } : {}),
-          ...(body.ownershipToken ? { ownershipToken: body.ownershipToken } : {}),
+        // Each phase below is emitted when the engine actually reaches it: a crawl that takes
+        // four seconds shows four seconds of real work, not a timer filling the gap.
+        const run = await runScan(body, target, (event) => {
+          void step("fetch", `  ${event.message}`, "running").catch(() => undefined);
         });
+        const result = run.result;
         await step(
           "fetch",
           fetchLabel,
@@ -466,7 +586,10 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
             Math.round(result.bytes / 1024) +
             " kB · " +
             result.durationMs +
-            " ms"
+            " ms" +
+            (run.site === null
+              ? ""
+              : ` · ${run.site.site.pages.filter((page) => page.measured).length} page(s) mesurée(s)`)
         );
 
         await step("verdict", "Calcul du verdict et des scores", "running");
@@ -503,7 +626,17 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
           worstVerdict,
           failed,
           warnings,
-          payload: JSON.stringify(result),
+          payload: JSON.stringify({
+            ...result,
+            ...(run.site === null
+              ? {}
+              : {
+                  site: run.site.site,
+                  scores: run.site.scores,
+                  score: run.site.score,
+                  login: run.site.login,
+                }),
+          }),
           ownership: result.ownership,
           redacted: result.redacted,
           projectId: body.projectId ?? null,

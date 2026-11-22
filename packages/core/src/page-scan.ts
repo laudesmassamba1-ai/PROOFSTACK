@@ -25,6 +25,7 @@
  */
 
 import { isAlias } from "./controls.js";
+import { signIn } from "./session.js";
 
 export type ScanModule = "fail" | "clean" | "flow" | "world" | "exit";
 export type ScanStatus = "PASS" | "WARN" | "FAIL" | "SKIPPED";
@@ -1046,10 +1047,9 @@ async function verifyOwnership(
 /**
  * Sign in before scanning, so the report covers the product and not its front door.
  *
- * Two body shapes are tried because a JSON API and a classic form post are both common, and
- * the difference is not something the caller should have to know. Success requires a cookie:
- * a login that answers 200 and sets nothing has not authenticated anyone, and pretending
- * otherwise would produce a scan of the public pages labelled "signed in".
+ * The work is done by `signIn` in `session.ts`: it discovers the form and its anti-CSRF
+ * token, keeps a real cookie jar, and — the part this function used to get wrong — proves
+ * the session on a page that requires it. A 200 with a fresh cookie is not a login.
  */
 async function performLogin(
   login: ScanLogin,
@@ -1058,64 +1058,31 @@ async function performLogin(
   result: ScanLoginResult;
   cookie: string | null;
 }> {
-  const doFetch = options.fetchImpl ?? fetch;
-  const target = assertScannableUrl(login.url, { allowPrivate: options.allowPrivate });
-  const fields = {
-    [login.emailField ?? "email"]: login.email,
-    [login.passwordField ?? "password"]: login.password,
+  const attempt = await signIn({
+    // `url` is the endpoint this option has always meant; giving it as both the endpoint and
+    // the page lets discovery run when the address happens to be a form page.
+    loginUrl: login.url,
+    loginPageUrl: login.url,
+    email: login.email,
+    password: login.password,
+    ...(login.emailField === undefined ? {} : { emailField: login.emailField }),
+    ...(login.passwordField === undefined ? {} : { passwordField: login.passwordField }),
+    ...(options.fetchImpl === undefined ? {} : { fetchImpl: options.fetchImpl }),
+    timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+  });
+  const report = attempt.report;
+  const all = new URL(login.url);
+  const cookie = attempt.jar.header(all);
+  const names = attempt.jar.names();
+  return {
+    result: {
+      attempted: true,
+      ok: report.ok,
+      status: report.status,
+      ...(report.ok ? {} : { reason: report.reason ?? "the session could not be established" }),
+    },
+    cookie: names.length > 0 ? cookie : null,
   };
-  const attempt = async (body: string, contentType: string): Promise<Response> =>
-    doFetch(target.toString(), {
-      method: "POST",
-      redirect: "manual",
-      headers: { "user-agent": USER_AGENT, "content-type": contentType },
-      body,
-      signal: AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS),
-    });
-
-  let status: number | null = null;
-  let cookies: string[] = [];
-  try {
-    let response = await attempt(JSON.stringify(fields), "application/json");
-    if (response.status >= 400) {
-      const form = new URLSearchParams(fields as Record<string, string>).toString();
-      response = await attempt(form, "application/x-www-form-urlencoded");
-    }
-    status = response.status;
-    cookies = collectCookies(response);
-    // A redirect after login is the normal case for a form post: the cookie is the evidence,
-    // and it is already on this response.
-    if (status >= 400) {
-      return {
-        result: { attempted: true, ok: false, status, reason: `the site answered HTTP ${status}` },
-        cookie: cookies.length > 0 ? cookies.join("; ") : null,
-      };
-    }
-    if (cookies.length === 0) {
-      return {
-        result: {
-          attempted: true,
-          ok: false,
-          status,
-          reason: "the login answered but set no cookie, so nothing was authenticated",
-        },
-        cookie: null,
-      };
-    }
-    return { result: { attempted: true, ok: true, status }, cookie: cookies.join("; ") };
-  } catch (error) {
-    return {
-      result: {
-        attempted: true,
-        ok: false,
-        status,
-        reason: `could not reach the login endpoint: ${
-          error instanceof Error ? error.message : "unknown error"
-        }`,
-      },
-      cookie: null,
-    };
-  }
 }
 
 function collectCookies(response: Response): string[] {

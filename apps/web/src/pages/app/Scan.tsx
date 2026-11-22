@@ -4,6 +4,7 @@ import {
   Check,
   Eye,
   Loader2,
+  Minus,
   RefreshCw,
   ScanLine,
   X,
@@ -84,6 +85,39 @@ interface ScanResult {
   findings: ScanFinding[];
   modules: ScanModuleSummary[];
   clientRendered: boolean;
+  /** Present only when the run read the site, not just the address. */
+  site?: ScanSite;
+  scores?: { module: string; score: number; verdict: string; coverage: number }[];
+  score?: { score: number; coverage: number; provisional: boolean };
+}
+
+interface ScanSite {
+  pages: {
+    url: string;
+    finalUrl: string;
+    status: number;
+    title: string | null;
+    bytes: number;
+    durationMs: number;
+    depth: number;
+    measured: boolean;
+    error: string | null;
+  }[];
+  skipped: { url: string; reason: string }[];
+  robots: { found: boolean } | null;
+  sitemap: { found: boolean } | null;
+  truncated: boolean;
+  truncatedBy: "pages" | "depth" | "time" | "bytes" | null;
+  requests: number;
+  durationMs: number;
+  findings: {
+    module: string;
+    id: string;
+    status: string;
+    observed: string;
+    why: string;
+    pages: string[];
+  }[];
 }
 
 type CorrectionState = "todo" | "in_progress" | "fixed" | "verify";
@@ -301,6 +335,12 @@ export function ScanPage(): React.ReactElement {
   const [showAuth, setShowAuth] = useState(false);
   /** A site usually offers an account, not a cookie jar: that is the default path. */
   const [authMode, setAuthMode] = useState<"account" | "cookie">("account");
+  /** Read the site, not just the address. Off by default: it costs the target requests. */
+  const [readSite, setReadSite] = useState(false);
+  const [maxPages, setMaxPages] = useState(25);
+  /** Overrides for sites whose form cannot be read from the page. */
+  const [loginEndpoint, setLoginEndpoint] = useState("");
+  const [loginVerify, setLoginVerify] = useState("");
   const [loginUrl, setLoginUrl] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -549,8 +589,17 @@ export function ScanPage(): React.ReactElement {
           url: target,
           ...(scanProjectId ? { projectId: scanProjectId } : {}),
           ...(authMode === "cookie" && cookie.trim() ? { headers: { cookie: cookie.trim() } } : {}),
+          ...(readSite ? { crawl: { maxPages, maxDepth: 2 } } : {}),
           ...(authMode === "account" && email.trim() && password
-            ? { login: { url: loginUrl.trim(), email: email.trim(), password } }
+            ? {
+                login: {
+                  url: loginUrl.trim(),
+                  email: email.trim(),
+                  password,
+                  ...(loginEndpoint.trim() ? { endpoint: loginEndpoint.trim() } : {}),
+                  ...(loginVerify.trim() ? { verifyUrl: loginVerify.trim() } : {}),
+                },
+              }
             : {}),
         },
         (step) =>
@@ -744,6 +793,28 @@ export function ScanPage(): React.ReactElement {
           spellCheck={false}
           autoComplete="off"
         />
+        <label className="scan-crawl">
+          <input
+            type="checkbox"
+            checked={readSite}
+            onChange={(event) => setReadSite(event.target.checked)}
+          />
+          <span>{fr ? "Lire tout le site" : "Read the whole site"}</span>
+          {readSite ? (
+            <select
+              value={maxPages}
+              onChange={(event) => setMaxPages(Number(event.target.value))}
+              aria-label={fr ? "Nombre de pages" : "Number of pages"}
+              className="scan-crawl-pages"
+            >
+              {[10, 25, 50, 100].map((value) => (
+                <option key={value} value={value}>
+                  {value} {fr ? "pages" : "pages"}
+                </option>
+              ))}
+            </select>
+          ) : null}
+        </label>
         <button
           type="button"
           className="app-btn app-btn-primary"
@@ -802,12 +873,12 @@ export function ScanPage(): React.ReactElement {
                   : "Preferably create an account dedicated to the audit on the site, with a read-only role. The app uses it to see the pages behind the login, then forgets it: nothing is stored."}
               </p>
               <label className="scan-field">
-                <span>{fr ? "Adresse de connexion" : "Login endpoint"}</span>
+                <span>{fr ? "Page de connexion" : "Login page"}</span>
                 <input
                   type="url"
                   value={loginUrl}
                   onChange={(event) => setLoginUrl(event.target.value)}
-                  placeholder="https://ton-site.com/api/auth/sign-in"
+                  placeholder="https://ton-site.com/login"
                   className="app-input"
                   spellCheck={false}
                   autoComplete="off"
@@ -835,6 +906,48 @@ export function ScanPage(): React.ReactElement {
                   autoComplete="off"
                 />
               </label>
+              <details className="scan-auth-advanced">
+                <summary>
+                  {fr
+                    ? "Le site ne suit pas le standard ? (formulaire en JavaScript, autre domaine)"
+                    : "The site does not follow the standard? (JavaScript form, other domain)"}
+                </summary>
+                <p className="scan-auth-hint">
+                  {fr
+                    ? "Le scan lit la page, trouve le formulaire, son action et son jeton anti-CSRF, puis vérifie la session sur une page qui l'exige. Renseigne ces deux champs seulement si l'une de ces étapes échoue : la raison exacte est alors affichée."
+                    : "The scan reads the page, finds the form, its action and its anti-CSRF token, then proves the session on a page that requires it. Fill these two fields only if one of those steps fails: the exact reason is then shown."}
+                </p>
+                <label className="scan-field">
+                  <span>
+                    {fr ? "URL de soumission (si différente)" : "Submission URL (if different)"}
+                  </span>
+                  <input
+                    type="url"
+                    value={loginEndpoint}
+                    onChange={(event) => setLoginEndpoint(event.target.value)}
+                    placeholder="https://ton-site.com/api/auth/sign-in"
+                    className="app-input"
+                    spellCheck={false}
+                    autoComplete="off"
+                  />
+                </label>
+                <label className="scan-field">
+                  <span>
+                    {fr
+                      ? "Page qui exige la session (preuve du login)"
+                      : "Page that requires the session (proof of login)"}
+                  </span>
+                  <input
+                    type="url"
+                    value={loginVerify}
+                    onChange={(event) => setLoginVerify(event.target.value)}
+                    placeholder="https://ton-site.com/dashboard"
+                    className="app-input"
+                    spellCheck={false}
+                    autoComplete="off"
+                  />
+                </label>
+              </details>
             </div>
           ) : (
             <div className="scan-auth-grid">
@@ -1081,6 +1194,171 @@ export function ScanPage(): React.ReactElement {
               <ScanLine size={13} aria-hidden />
               {plainSummary}
             </p>
+          ) : null}
+
+          {scan.site ? (
+            <Card className="scan-site">
+              <div className="scan-site-head">
+                <div>
+                  <p className="scan-findings-head">
+                    {fr ? "LE SITE, PAS SEULEMENT L'ADRESSE" : "THE SITE, NOT JUST THE ADDRESS"}{" "}
+                    <span>
+                      {fr
+                        ? `${scan.site.pages.filter((page) => page.measured).length} page(s) mesurée(s) sur ${scan.site.pages.length} lue(s) · ${scan.site.requests} requête(s)`
+                        : `${scan.site.pages.filter((page) => page.measured).length} page(s) measured of ${scan.site.pages.length} read · ${scan.site.requests} request(s)`}
+                    </span>
+                  </p>
+                  {scan.score ? (
+                    <p className="scan-site-score">
+                      <strong>{scan.score.score}</strong>
+                      <span>/100</span>
+                      <span className="scan-site-coverage">
+                        {fr ? "couverture" : "coverage"} {Math.round(scan.score.coverage * 100)} %
+                        {scan.score.provisional ? (fr ? " · provisoire" : " · provisional") : ""}
+                      </span>
+                    </p>
+                  ) : null}
+                  {scan.score ? (
+                    <p className="scan-auth-hint">
+                      {fr
+                        ? "Note = borne basse de Wilson sur le taux de réussite pondéré par le risque de chaque contrôle, × la couverture (0,5 + 0,5 × pages lues / pages découvertes). Recalculable à la main."
+                        : "Score = Wilson lower bound on the risk-weighted pass rate, × coverage (0.5 + 0.5 × pages read / pages discovered). Recomputable by hand."}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+
+              {scan.site.truncated ? (
+                <p className="scan-notice">
+                  <AlertTriangle size={13} aria-hidden />
+                  {fr
+                    ? `Lecture interrompue par la limite de ${
+                        scan.site.truncatedBy === "depth"
+                          ? "profondeur"
+                          : scan.site.truncatedBy === "time"
+                            ? "temps"
+                            : scan.site.truncatedBy === "bytes"
+                              ? "octets"
+                              : "pages"
+                      } : ce rapport ne couvre qu'une partie du site, et la note le dit.`
+                    : `Reading stopped at the ${
+                        scan.site.truncatedBy ?? "page"
+                      } limit: this report covers part of the site, and the score says so.`}
+                </p>
+              ) : null}
+
+              <ul className="scan-site-pages">
+                {scan.site.pages.slice(0, 12).map((page) => (
+                  <li key={page.url} className="scan-site-page">
+                    <span
+                      className={`scan-site-status is-${page.measured ? "ok" : "skip"}`}
+                      aria-hidden
+                    >
+                      {page.measured ? <Check size={11} /> : <Minus size={11} />}
+                    </span>
+                    <span className="scan-site-path">{new URL(page.url).pathname}</span>
+                    <span className="scan-site-page-meta">
+                      {page.status} · {Math.round(page.bytes / 1024)} kB · {page.durationMs} ms
+                      {page.title ? ` · ${page.title.slice(0, 48)}` : ""}
+                    </span>
+                  </li>
+                ))}
+                {scan.site.pages.length > 12 ? (
+                  <li className="scan-site-page">
+                    <span className="scan-site-path">
+                      {fr
+                        ? `+ ${scan.site.pages.length - 12} autre(s)`
+                        : `+ ${scan.site.pages.length - 12} more`}
+                    </span>
+                  </li>
+                ) : null}
+              </ul>
+
+              {scan.site.skipped.length > 0 ? (
+                <details className="scan-site-skipped">
+                  <summary>
+                    {fr
+                      ? `${scan.site.skipped.length} adresse(s) volontairement non suivie(s)`
+                      : `${scan.site.skipped.length} address(es) deliberately not followed`}
+                  </summary>
+                  <ul>
+                    {scan.site.skipped.slice(0, 20).map((item) => (
+                      <li key={item.url}>
+                        <code>{item.url}</code> — {item.reason}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              ) : null}
+
+              {(() => {
+                const defects = scan.site.findings.filter(
+                  (item) => item.status === "FAIL" || item.status === "WARN"
+                );
+                if (defects.length === 0) {
+                  return (
+                    <p className="scan-auth-hint">
+                      {fr
+                        ? "Aucun défaut de site : liens, redirections, titres, poids, TLS et déclarations tiennent."
+                        : "No site-level defect: links, redirects, titles, weight, TLS and declarations hold."}
+                    </p>
+                  );
+                }
+                return (
+                  <ul className="scan-site-defects">
+                    {defects.map((item) => {
+                      const copy = controls[`${item.module}:${item.id}`];
+                      return (
+                        <li key={`${item.module}:${item.id}`} className={`is-${item.status}`}>
+                          <p className="scan-site-defect-head">
+                            <span aria-hidden>{item.status === "FAIL" ? "✗" : "!"}</span>{" "}
+                            {copy?.title ?? item.id}
+                          </p>
+                          <p className="scan-site-defect-observed">{item.observed}</p>
+                          {item.pages.length > 0 ? (
+                            <ul className="scan-site-defect-pages">
+                              {item.pages.slice(0, 5).map((page) => (
+                                <li key={page}>
+                                  <a href={page} target="_blank" rel="noreferrer noopener">
+                                    {page}
+                                  </a>
+                                </li>
+                              ))}
+                              {item.pages.length > 5 ? (
+                                <li>
+                                  {fr
+                                    ? `et ${item.pages.length - 5} autre(s)`
+                                    : `and ${item.pages.length - 5} more`}
+                                </li>
+                              ) : null}
+                            </ul>
+                          ) : null}
+                          {copy ? (
+                            <details>
+                              <summary>
+                                {fr ? "Pourquoi, et quoi faire" : "Why, and what to do"}
+                              </summary>
+                              <p>
+                                <strong>{fr ? "Ce que cela expose" : "What it exposes"} : </strong>
+                                {copy.consequence}
+                              </p>
+                              <p>
+                                <strong>{fr ? "Le correctif" : "The fix"} : </strong>
+                                {copy.fix}
+                              </p>
+                              <p>
+                                <strong>{fr ? "Comment vérifier" : "How to verify"} : </strong>
+                                {copy.verify}
+                              </p>
+                            </details>
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                );
+              })()}
+            </Card>
           ) : null}
 
           {explanation || explainError ? (

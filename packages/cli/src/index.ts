@@ -24,6 +24,7 @@ import {
 import type { ModuleId, ReportFormat, TestRun } from "@proofcore/contracts";
 import {
   allControls,
+  auditSite,
   controlFor,
   iso,
   Logger,
@@ -2628,19 +2629,38 @@ async function commandScan(flags: GlobalFlags, args: string[], only: string[]): 
     "--header",
     "--cookie",
     "--login-url",
+    "--login-endpoint",
     "--login-email",
     "--login-password",
+    "--login-verify",
+    "--login-email-field",
+    "--login-password-field",
     "--verify-token",
+    "--max-pages",
+    "--max-depth",
+    "--path-prefix",
   ]);
   if (!target) {
-    err(flags, red(flags, "Usage: proofcore scan <url> [--only fail,clean] [--explain]"));
+    err(flags, red(flags, "Usage: proofcore scan <url> [--crawl] [--only fail,clean] [--explain]"));
+    err(flags, dim(flags, "Read the whole site: proofcore scan https://site.example --crawl"));
     err(flags, dim(flags, "Example: proofcore scan http://localhost:3000"));
     return 64;
   }
   const headers: Record<string, string> = {};
   let explain = false;
-  let login: { url: string; email: string; password: string } | undefined;
+  let login:
+    | {
+        url: string;
+        email: string;
+        password: string;
+        endpoint?: string;
+        verifyUrl?: string;
+        emailField?: string;
+        passwordField?: string;
+      }
+    | undefined;
   let ownershipToken: string | undefined;
+  let crawl: { maxPages?: number; maxDepth?: number; pathPrefix?: string } | undefined;
   const extraOnly: string[] = [];
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
@@ -2693,6 +2713,67 @@ async function commandScan(flags: GlobalFlags, args: string[], only: string[]): 
         )
       );
       return 64;
+    } else if (arg === "--crawl") {
+      crawl = crawl ?? {};
+    } else if (arg === "--max-pages") {
+      const value = Number(args[++i] ?? "");
+      if (!Number.isInteger(value) || value < 1 || value > 200) {
+        err(flags, red(flags, "--max-pages expects an integer between 1 and 200"));
+        return 64;
+      }
+      crawl = { ...(crawl ?? {}), maxPages: value };
+    } else if (arg === "--max-depth") {
+      const value = Number(args[++i] ?? "");
+      if (!Number.isInteger(value) || value < 0 || value > 6) {
+        err(flags, red(flags, "--max-depth expects an integer between 0 and 6"));
+        return 64;
+      }
+      crawl = { ...(crawl ?? {}), maxDepth: value };
+    } else if (arg === "--path-prefix") {
+      const value = args[++i] ?? "";
+      if (!value.startsWith("/")) {
+        err(flags, red(flags, "--path-prefix expects a path starting with /"));
+        return 64;
+      }
+      crawl = { ...(crawl ?? {}), pathPrefix: value };
+    } else if (arg === "--login-endpoint") {
+      const raw = args[++i] ?? "";
+      if (!/^https?:\/\//i.test(raw)) {
+        err(flags, red(flags, "--login-endpoint expects an absolute URL"));
+        return 64;
+      }
+      login = {
+        url: login?.url ?? raw,
+        endpoint: raw,
+        email: login?.email ?? "",
+        password: login?.password ?? "",
+        ...(login?.verifyUrl === undefined ? {} : { verifyUrl: login.verifyUrl }),
+      };
+    } else if (arg === "--login-verify") {
+      const raw = args[++i] ?? "";
+      if (!/^https?:\/\//i.test(raw)) {
+        err(flags, red(flags, "--login-verify expects an absolute URL"));
+        return 64;
+      }
+      if (!login) {
+        err(flags, red(flags, "--login-verify needs --login-url and --login-email too"));
+        return 64;
+      }
+      login = { ...login, verifyUrl: raw };
+    } else if (arg === "--login-email-field") {
+      const value = args[++i] ?? "";
+      if (!login) {
+        err(flags, red(flags, "--login-email-field needs --login-url and --login-email too"));
+        return 64;
+      }
+      login = { ...login, emailField: value };
+    } else if (arg === "--login-password-field") {
+      const value = args[++i] ?? "";
+      if (!login) {
+        err(flags, red(flags, "--login-password-field needs --login-url and --login-email too"));
+        return 64;
+      }
+      login = { ...login, passwordField: value };
     } else if (arg === "--verify-token") {
       ownershipToken = args[++i] ?? "";
       if (!ownershipToken) {
@@ -2733,18 +2814,66 @@ async function commandScan(flags: GlobalFlags, args: string[], only: string[]): 
   }
 
   let result: Awaited<ReturnType<typeof scanPage>>;
+  let siteReport: Awaited<ReturnType<typeof auditSite>> | null = null;
   try {
-    result = await scanPage(target, {
-      headers,
-      // The CLI runs on the operator's machine: scanning their own localhost is the point.
-      allowPrivate: true,
-      // Loopback and private targets belong to the person running the command, so the report
-      // may name locations. A remote URL gets the same gate as the app: proof, or redaction.
-      ownershipHint: isLocalTarget(target) ? "local" : "remote",
-      timeoutMs: 15_000,
-      ...(login ? { login } : {}),
-      ...(ownershipToken ? { ownershipToken } : {}),
-    });
+    if (crawl !== undefined || login !== undefined) {
+      // One engine for the site: session, crawl, site-level controls, computed scores. The
+      // CLI shows the phases as they happen, because a crawl takes seconds, not milliseconds.
+      siteReport = await auditSite({
+        url: target,
+        // The CLI runs on the operator's machine: scanning their own localhost is the point.
+        allowPrivate: true,
+        timeoutMs: 15_000,
+        ...(login === undefined
+          ? {}
+          : {
+              login: {
+                loginPageUrl: login.url,
+                ...(login.endpoint === undefined ? {} : { loginUrl: login.endpoint }),
+                ...(login.verifyUrl === undefined ? {} : { verifyUrl: login.verifyUrl }),
+                email: login.email,
+                password: login.password,
+                ...(login.emailField === undefined ? {} : { emailField: login.emailField }),
+                ...(login.passwordField === undefined
+                  ? {}
+                  : { passwordField: login.passwordField }),
+              },
+            }),
+        crawl: {
+          maxPages: crawl?.maxPages ?? 25,
+          maxDepth: crawl?.maxDepth ?? 2,
+          ...(crawl?.pathPrefix === undefined ? {} : { pathPrefix: crawl.pathPrefix }),
+        },
+        onProgress: (event) => {
+          if (!flags.quiet) err(flags, dim(flags, `  ${event.step}: ${event.message}`));
+        },
+      });
+      result = siteReport.scan;
+      if (siteReport.login && !siteReport.login.ok) {
+        err(
+          flags,
+          yellow(flags, `  Connexion refusée : ${siteReport.login.reason ?? "raison inconnue"}`)
+        );
+        err(
+          flags,
+          dim(
+            flags,
+            "  Le scan a couvert la surface publique. Corrige l'accès puis relance, ou donne --login-endpoint / --login-email-field."
+          )
+        );
+      }
+    } else {
+      result = await scanPage(target, {
+        headers,
+        // The CLI runs on the operator's machine: scanning their own localhost is the point.
+        allowPrivate: true,
+        // Loopback and private targets belong to the person running the command, so the report
+        // may name locations. A remote URL gets the same gate as the app: proof, or redaction.
+        ownershipHint: isLocalTarget(target) ? "local" : "remote",
+        timeoutMs: 15_000,
+        ...(ownershipToken ? { ownershipToken } : {}),
+      });
+    }
   } catch (error) {
     err(flags, red(flags, error instanceof Error ? error.message : String(error)));
     return 2;
@@ -2763,6 +2892,15 @@ async function commandScan(flags: GlobalFlags, args: string[], only: string[]): 
           modules: result.modules.filter((item) => wanted.size === 0 || wanted.has(item.module)),
           findings,
           probes: result.probes,
+          ...(siteReport === null
+            ? {}
+            : {
+                login: siteReport.login,
+                site: siteReport.site,
+                scores: siteReport.scores,
+                score: siteReport.score,
+                measuredControls: siteReport.measuredControls,
+              }),
         },
         2
       )}\n`
@@ -2828,6 +2966,74 @@ async function commandScan(flags: GlobalFlags, args: string[], only: string[]): 
         )
       );
     }
+    if (siteReport !== null) {
+      const site = siteReport.site;
+      out(flags, "");
+      out(
+        flags,
+        `${bold(flags, "SITE")} ${dim(
+          flags,
+          `${site.pages.filter((page) => page.measured).length} page(s) measured · ${
+            site.pages.length
+          } read · ${site.requests} request(s) · ${site.durationMs} ms`
+        )}`
+      );
+      out(
+        flags,
+        `  ${dim(flags, "score")} ${bold(flags, String(siteReport.score.score))}${dim(
+          flags,
+          `/100 · couverture ${Math.round(siteReport.score.coverage * 100)} %${
+            siteReport.score.provisional ? " · provisoire" : ""
+          }`
+        )}`
+      );
+      if (site.truncated) {
+        out(
+          flags,
+          yellow(
+            flags,
+            `  crawl interrompu par la limite de ${
+              site.truncatedBy === "depth" ? "profondeur" : "pages"
+            } : le rapport ne couvre qu'une partie du site`
+          )
+        );
+      }
+      const siteFindings = site.findings.filter(
+        (item) =>
+          (item.status === "FAIL" || item.status === "WARN") &&
+          (wanted.size === 0 || wanted.has(item.module))
+      );
+      const notMeasured = site.findings.filter(
+        (item) => item.status === "SKIPPED" && (wanted.size === 0 || wanted.has(item.module))
+      ).length;
+      if (notMeasured > 0) {
+        out(
+          flags,
+          dim(
+            flags,
+            `  ${notMeasured} contrôle(s) de site non mesuré(s) : voir --json pour le détail`
+          )
+        );
+      }
+      if (siteFindings.length > 0) {
+        out(flags, "");
+        out(flags, `  ${bold(flags, "DÉFAUTS DE SITE")}`);
+        for (const item of siteFindings) {
+          const glyph = item.status === "FAIL" ? red(flags, "✗") : yellow(flags, "!");
+          out(flags, `    ${glyph} ${item.id.padEnd(20)} ${item.observed}`);
+          for (const page of item.pages.slice(0, 3)) out(flags, `      ${dim(flags, page)}`);
+          if (item.pages.length > 3) {
+            out(flags, `      ${dim(flags, `… et ${item.pages.length - 3} autre(s)`)}`);
+          }
+          const control = controlFor(item.module, item.id);
+          if (control) {
+            const copy = flags.json ? control.en : control.fr;
+            out(flags, `      ${dim(flags, copy.fix)}`);
+          }
+        }
+      }
+    }
+
     const failed = findings.filter((item) => item.status === "FAIL").length;
     out(flags, "");
     out(

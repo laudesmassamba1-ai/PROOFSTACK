@@ -1587,6 +1587,421 @@ const controls: Control[] = [
       },
     ],
   },
+  // ------------------------------------------------------- SITE-LEVEL CONTROLS
+  //
+  // These cannot be answered by one request: they compare pages with each other, or they
+  // follow what the site declares. They are reported by a crawl, grouped in the module whose
+  // question they answer, and explained like every other control.
+  {
+    id: "broken_links",
+    module: "flow",
+    fr: {
+      title: "Liens cassés",
+      objective: "Établit combien de pages atteintes depuis l'accueil répondent une erreur.",
+      consequence:
+        "Un lien en 404 ou 500 est un client qui repart, et un moteur de recherche qui cesse de suivre le reste du site.",
+      fix: "Corriger ou retirer chaque lien listé : la page existe-t-elle encore, ou faut-il une redirection 301 vers son nouvel emplacement ?",
+      verify:
+        "Le crawl suivant ne trouve plus aucune page en erreur, et les liens listés répondent 200.",
+    },
+    en: {
+      title: "Broken links",
+      objective: "Establishes how many pages reached from the entry point answer an error.",
+      consequence:
+        "A 404 or 500 is a customer who leaves, and a crawler that stops following the rest of the site.",
+      fix: "Fix or remove each listed link: does the page still exist, or does it need a 301 to its new location?",
+      verify: "The next crawl finds no erroring page, and every listed link answers 200.",
+    },
+    complexity: "low",
+    risk: "high",
+    method: "Crawl des liens internes, statut de chaque page visitée.",
+    result: "Nombre de pages en erreur, avec leurs URL",
+    fixes: [
+      { stack: "Nginx", code: "location /ancien-chemin { return 301 /nouveau-chemin; }" },
+      {
+        stack: "Next.js",
+        code: '// next.config.js\nasync redirects() { return [{ source: "/ancien", destination: "/nouveau", permanent: true }]; }',
+      },
+      { stack: "HTML", code: '<a href="/nouveau-chemin">Intitulé exact de la destination</a>' },
+    ],
+  },
+  {
+    id: "redirects",
+    module: "clean",
+    fr: {
+      title: "Redirections à l'arrivée",
+      objective: "Établit combien de pages changent d'adresse avant de répondre.",
+      consequence:
+        "Chaque redirection coûte un aller-retour ; une chaîne en coûte plusieurs et masque l'adresse canonique d'une page.",
+      fix: "Faire pointer les liens internes directement vers l'URL finale, et garder une seule redirection par ancienne adresse.",
+      verify:
+        "Le crawl ne rapporte plus qu'une minorité de pages redirigées, et les liens internes visent l'URL finale.",
+    },
+    en: {
+      title: "Redirecting pages",
+      objective: "Establishes how many pages change address before answering.",
+      consequence:
+        "Every redirect costs a round trip; a chain costs several and hides a page's canonical address.",
+      fix: "Point internal links straight at the final URL, and keep one redirect per old address.",
+      verify:
+        "The crawl reports only a minority of redirected pages, and internal links target the final URL.",
+    },
+    complexity: "low",
+    risk: "low",
+    method: "Comparaison entre l'URL demandée et l'URL finale de chaque page.",
+    result: "Nombre de pages redirigées, avec la cible",
+    fixes: [
+      { stack: "HTML", code: '<a href="https://site.example/nouvelle-url">…</a>' },
+      { stack: "Nginx", code: "return 301 https://$host/nouvelle-url;" },
+    ],
+  },
+  {
+    id: "duplicate_titles",
+    module: "clean",
+    fr: {
+      title: "Titres dupliqués",
+      objective: "Établit combien de pages partagent le même titre.",
+      consequence:
+        "Deux pages au même titre sont deux pages que le client ne distingue pas dans ses onglets, et que le moteur de recherche confond.",
+      fix: "Rendre chaque titre unique en y ajoutant ce que la page a de propre : la section, le produit, la ville.",
+      verify: "Le crawl ne signale plus deux pages au même titre.",
+    },
+    en: {
+      title: "Duplicate titles",
+      objective: "Establishes how many pages share one title.",
+      consequence:
+        "Two pages with one title are two pages a customer cannot tell apart in tabs, and a search engine conflates.",
+      fix: "Make each title unique by adding what the page is about: the section, the product, the city.",
+      verify: "The crawl no longer reports two pages with one title.",
+    },
+    complexity: "low",
+    risk: "medium",
+    method: "Comparaison des balises `title` des pages lues.",
+    result: "Titres en double, avec les pages concernées",
+    fixes: [
+      {
+        stack: "Next.js",
+        code: 'export const metadata = { title: "Facturation — " + customerName };',
+      },
+      { stack: "PHP", code: "$title = 'Commandes — ' . $customer['name'];" },
+    ],
+  },
+  {
+    id: "missing_titles",
+    module: "clean",
+    fr: {
+      title: "Pages sans titre",
+      objective: "Établit combien de pages n'ont aucune balise `title`.",
+      consequence:
+        "Une page sans titre n'a pas de nom : l'onglet affiche l'URL, le favori aussi, et le résultat de recherche est inventé.",
+      fix: "Ajouter un `title` propre à chaque page, qui commence par ce que la page contient et finit par le nom du produit.",
+      verify: "Chaque page lue porte une balise `title` non vide.",
+    },
+    en: {
+      title: "Pages without a title",
+      objective: "Establishes how many pages carry no `title` tag.",
+      consequence:
+        "A page with no title has no name: the tab shows the URL, so does the bookmark, and the search result is invented.",
+      fix: "Add a title specific to each page, starting with what the page holds and ending with the product name.",
+      verify: "Every page read carries a non-empty `title`.",
+    },
+    complexity: "low",
+    risk: "medium",
+    method: "Présence de `<title>` sur chaque page lue.",
+    result: "Nombre de pages sans titre",
+    fixes: [
+      { stack: "HTML", code: "<title>Commandes — Acme</title>" },
+      { stack: "Laravel", code: "@section('title', 'Commandes — Acme')" },
+    ],
+  },
+  {
+    id: "heavy_pages",
+    module: "clean",
+    fr: {
+      title: "Pages lourdes",
+      objective: "Établit combien de pages dépassent 400 ko de HTML seul.",
+      consequence:
+        "Le HTML doit arriver avant que quoi que ce soit s'affiche ; sur un réseau mobile, la page lourde est une page qu'on quitte.",
+      fix: "Paginer les listes longues, sortir le contenu répété du document, et compresser la réponse en brotli ou gzip.",
+      verify: "Le crawl ne trouve plus de page au-dessus du seuil.",
+    },
+    en: {
+      title: "Heavy pages",
+      objective: "Establishes how many pages exceed 400 kB of HTML alone.",
+      consequence:
+        "The HTML has to arrive before anything is drawn; on a mobile network a heavy page is a page people leave.",
+      fix: "Paginate long lists, move repeated content out of the document, and compress the response with brotli or gzip.",
+      verify: "The crawl finds no page above the threshold.",
+    },
+    complexity: "medium",
+    risk: "medium",
+    method: "Taille du corps HTML de chaque page lue.",
+    result: "Nombre de pages au-dessus du seuil, avec la plus lourde",
+    fixes: [
+      {
+        stack: "Nginx",
+        code: "gzip on;\ngzip_types text/html application/json application/javascript;",
+      },
+      { stack: "Next.js", code: "// Pagination serveur : searchParams.page → LIMIT/OFFSET" },
+    ],
+  },
+  {
+    id: "slow_pages",
+    module: "clean",
+    fr: {
+      title: "Pages lentes",
+      objective: "Établit combien de pages mettent plus de 1,5 s à répondre.",
+      consequence:
+        "Le temps serveur est le plancher de la vitesse perçue : au-dessus, aucun raffinement côté navigateur ne compense.",
+      fix: "Mesurer la requête lente dans les journaux, ajouter l'index qui manque, puis mettre en cache ce qui ne change pas par requête.",
+      verify: "Le crawl suivant montre toutes les pages sous le seuil.",
+    },
+    en: {
+      title: "Slow pages",
+      objective: "Establishes how many pages take more than 1.5 s to answer.",
+      consequence:
+        "Server time is the floor of perceived speed: above it, no browser-side refinement compensates.",
+      fix: "Find the slow query in the logs, add the missing index, then cache what does not change per request.",
+      verify: "The next crawl shows every page under the threshold.",
+    },
+    complexity: "medium",
+    risk: "medium",
+    method: "Durée de chaque requête de page, mesurée par le crawl.",
+    result: "Nombre de pages lentes, avec la plus lente",
+    fixes: [
+      {
+        stack: "SQL",
+        code: "EXPLAIN ANALYZE SELECT * FROM orders WHERE customer_id = $1 ORDER BY created_at DESC LIMIT 20;\nCREATE INDEX ON orders (customer_id, created_at DESC);",
+      },
+      {
+        stack: "Nginx",
+        code: "proxy_cache_path /var/cache/nginx levels=1:2 keys_zone=app:10m;\nproxy_cache app;",
+      },
+    ],
+  },
+  {
+    id: "pages_without_tls",
+    module: "fail",
+    fr: {
+      title: "Pages servies en http",
+      objective: "Établit combien de pages lues ne sont pas en https.",
+      consequence:
+        "Une seule page en http suffit à exposer un cookie de session ou un mot de passe saisi dessus.",
+      fix: "Rediriger tout http vers https en 301, pages internes comprises, sous-domaines inclus.",
+      verify: "Aucune page du crawl ne répond en http.",
+    },
+    en: {
+      title: "Pages served over http",
+      objective: "Establishes how many pages read are not over https.",
+      consequence:
+        "One page over http is enough to expose a session cookie or a password typed on it.",
+      fix: "Redirect every http request to https with a 301, internal pages and subdomains included.",
+      verify: "No page of the crawl answers over http.",
+    },
+    complexity: "low",
+    risk: "high",
+    method: "Schéma de chaque URL de page lue et de son URL finale.",
+    result: "Nombre de pages en http, avec leurs URL",
+    fixes: [
+      { stack: "Nginx", code: "server { listen 80; return 301 https://$host$request_uri; }" },
+      { stack: "Apache", code: "Redirect permanent / https://site.example/" },
+    ],
+  },
+  {
+    id: "pages_without_hsts",
+    module: "fail",
+    fr: {
+      title: "Pages sans HSTS",
+      objective: "Établit combien de pages lues n'envoient pas `Strict-Transport-Security`.",
+      consequence:
+        "HSTS vaut par réponse : une page qui ne l'envoie pas rouvre la dégradation que les autres ont fermée.",
+      fix: "Envoyer l'en-tête sur toutes les réponses https, au niveau du serveur et non d'une seule route.",
+      verify: "Chaque page du crawl envoie HSTS avec un max-age non nul.",
+    },
+    en: {
+      title: "Pages without HSTS",
+      objective: "Establishes how many pages read do not send `Strict-Transport-Security`.",
+      consequence:
+        "HSTS is per response: one page that omits it reopens the downgrade the others closed.",
+      fix: "Send the header on every https response, at the server level rather than in one route.",
+      verify: "Every crawled page sends HSTS with a non-zero max-age.",
+    },
+    complexity: "low",
+    risk: "medium",
+    method: "En-tête `strict-transport-security` de chaque page lue.",
+    result: "Nombre de pages sans HSTS",
+    fixes: [
+      {
+        stack: "Nginx",
+        code: 'add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;',
+      },
+      {
+        stack: "Apache",
+        code: 'Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"',
+      },
+    ],
+  },
+  {
+    id: "source_maps_exposed",
+    module: "fail",
+    fr: {
+      title: "Source maps publiés",
+      objective: "Établit si les pages référencent des fichiers `.map`.",
+      consequence:
+        "Une source map publiée rend votre code d'origine à quiconque ouvre les outils du navigateur, commentaires compris.",
+      fix: "Ne pas publier les `.map` en production, ou les servir derrière l'authentification et les retirer du build déployé.",
+      verify:
+        "Aucune page ne référence de `.map`, et une requête directe sur un `.map` répond 404.",
+    },
+    en: {
+      title: "Published source maps",
+      objective: "Establishes whether pages reference `.map` files.",
+      consequence:
+        "A published source map hands your original code, comments included, to anyone who opens devtools.",
+      fix: "Do not ship `.map` files in production, or serve them behind authentication and strip them from the deployed build.",
+      verify: "No page references a `.map`, and a direct request for one answers 404.",
+    },
+    complexity: "low",
+    risk: "low",
+    method: "Recherche de références `.map` dans les actifs des pages lues.",
+    result: "Nombre de source maps référencées",
+    fixes: [
+      {
+        stack: "Vite",
+        code: "// vite.config.ts — jamais 'inline' ni 'hidden' en production\nexport default { build: { sourcemap: false } };",
+      },
+      { stack: "webpack", code: "module.exports = { devtool: false };" },
+    ],
+  },
+  {
+    id: "mixed_content_site",
+    module: "fail",
+    fr: {
+      title: "Ressources en http sur le site",
+      objective: "Établit combien d'actifs (scripts, styles, images) sont chargés en http.",
+      consequence:
+        "Un script servi en http est bloqué par le navigateur, ou exécuté sans la protection de la page : c'est une porte d'entrée.",
+      fix: "Référencer chaque actif en https, y compris les polices et les bibliothèques tierces.",
+      verify: "Aucune page du crawl ne référence d'actif en http.",
+    },
+    en: {
+      title: "Assets loaded over http",
+      objective: "Establishes how many assets (scripts, styles, images) load over http.",
+      consequence:
+        "A script served over http is blocked by the browser, or executed without the page's protection: an entry point.",
+      fix: "Reference every asset over https, fonts and third-party libraries included.",
+      verify: "No crawled page references an http asset.",
+    },
+    complexity: "low",
+    risk: "high",
+    method: "Schéma des actifs référencés par chaque page lue.",
+    result: "Nombre d'actifs en http, avec leurs URL",
+    fixes: [
+      { stack: "HTML", code: '<script src="https://cdn.example.com/lib.js"></script>' },
+      {
+        stack: "Nginx",
+        code: 'add_header Content-Security-Policy "upgrade-insecure-requests" always;',
+      },
+    ],
+  },
+  {
+    id: "sitemap",
+    module: "exit",
+    fr: {
+      title: "Sitemap",
+      objective: "Établit si `sitemap.xml` existe à la racine et combien d'URL il déclare.",
+      consequence:
+        "Sans sitemap, les pages qu'aucun lien n'atteint restent invisibles pour un moteur de recherche comme pour un export.",
+      fix: "Générer un `sitemap.xml` à jour et le déclarer dans `robots.txt` avec une ligne `Sitemap:`.",
+      verify: "`/sitemap.xml` répond 200 et liste les pages publiées.",
+    },
+    en: {
+      title: "Sitemap",
+      objective:
+        "Establishes whether `sitemap.xml` exists at the root, and how many URLs it declares.",
+      consequence:
+        "Without a sitemap, pages no link reaches stay invisible to a search engine and to an export.",
+      fix: "Generate an up-to-date `sitemap.xml` and declare it in `robots.txt` with a `Sitemap:` line.",
+      verify: "`/sitemap.xml` answers 200 and lists the published pages.",
+    },
+    complexity: "low",
+    risk: "low",
+    method: "Requête sur `/sitemap.xml` et comptage des `<loc>`.",
+    result: "Présence et nombre d'URL déclarées",
+    fixes: [
+      { stack: "robots.txt", code: "Sitemap: https://site.example/sitemap.xml" },
+      {
+        stack: "Next.js",
+        code: '// app/sitemap.ts\nexport default function sitemap() { return [{ url: "https://site.example/", lastModified: new Date() }]; }',
+      },
+    ],
+  },
+  {
+    id: "robots",
+    module: "exit",
+    fr: {
+      title: "robots.txt",
+      objective: "Établit si `robots.txt` existe et quels chemins il interdit.",
+      consequence:
+        "Sans `robots.txt`, la politique de lecture est laissée à l'interprétation de chaque robot, y compris des indésirables.",
+      fix: "Publier un `robots.txt` explicite : ce qui est ouvert, ce qui est fermé, et l'adresse du sitemap.",
+      verify: "`/robots.txt` répond 200 et contient les règles attendues.",
+    },
+    en: {
+      title: "robots.txt",
+      objective: "Establishes whether `robots.txt` exists and which paths it disallows.",
+      consequence:
+        "Without `robots.txt`, the reading policy is left to each bot's interpretation, unwelcome ones included.",
+      fix: "Publish an explicit `robots.txt`: what is open, what is closed, and where the sitemap lives.",
+      verify: "`/robots.txt` answers 200 and carries the expected rules.",
+    },
+    complexity: "low",
+    risk: "low",
+    method: "Requête sur `/robots.txt` et lecture des directives.",
+    result: "Présence et chemins interdits",
+    fixes: [
+      {
+        stack: "robots.txt",
+        code: "User-agent: *\nDisallow: /admin\nDisallow: /api/\nSitemap: https://site.example/sitemap.xml",
+      },
+    ],
+  },
+  {
+    id: "crawl_coverage",
+    module: "clean",
+    fr: {
+      title: "Couverture du crawl",
+      objective: "Établit combien de pages ont été lues, et si une limite a arrêté le parcours.",
+      consequence:
+        "Un verdict sur un site ne vaut que les pages qu'il couvre ; le reste doit être annoncé comme non lu, jamais comme conforme.",
+      fix: "Si la limite de pages est atteinte, relancer avec une limite plus haute ; si la profondeur bloque, l'augmenter aussi.",
+      verify:
+        "Le crawl se termine sans limite atteinte, et le rapport indique le nombre de pages lues.",
+    },
+    en: {
+      title: "Crawl coverage",
+      objective: "Establishes how many pages were read, and whether a limit stopped the walk.",
+      consequence:
+        "A verdict about a site is worth the pages it covers; the rest must be reported as not read, never as compliant.",
+      fix: "If the page limit was hit, run again with a higher one; if depth stopped the walk, raise that too.",
+      verify:
+        "The crawl finishes with no limit reached, and the report states how many pages were read.",
+    },
+    complexity: "low",
+    risk: "medium",
+    method: "Comptage des pages lues et du motif d'arrêt du crawl.",
+    result: "Nombre de pages lues et limite atteinte, le cas échéant",
+    fixes: [
+      {
+        stack: "CLI",
+        code: "proofcore scan https://site.example --crawl --max-pages 80 --max-depth 4",
+      },
+      {
+        stack: "API",
+        code: '{ "url": "https://site.example", "crawl": { "maxPages": 80, "maxDepth": 4 } }',
+      },
+    ],
+  },
 ];
 
 /** Grouped lookup, built once. */
