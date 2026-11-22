@@ -108,7 +108,7 @@ export function buildSiteFindings(input: SiteCheckInput): SiteFinding[] {
         ? `all ${titled.length} titled pages are distinct`
         : `${duplicates.reduce((sum, [, pages]) => sum + pages.length, 0)} pages share ${
             duplicates.length === 1 ? "one title" : `${duplicates.length} titles`
-          }: “${duplicates[0]?.[0] ?? ""}” on ${duplicates[0]?.[1].length ?? 0}`,
+          }: “${duplicates[0]?.[1][0]?.title ?? ""}” on ${duplicates[0]?.[1].length ?? 0} of them`,
     "Two pages with one title are two pages a search engine picks one of, and a customer cannot tell apart in a tab.",
     duplicates.flatMap(([, pages]) => pages.map((page) => page.url))
   );
@@ -185,20 +185,32 @@ export function buildSiteFindings(input: SiteCheckInput): SiteFinding[] {
     insecurePages.map((page) => page.url)
   );
 
+  const httpsPages = withFindings.filter((page) => page.url.startsWith("https://"));
   const noHsts = withFindings.filter((page) =>
     page.findings.some((finding) => finding.id === "hsts" && finding.status === "FAIL")
   );
   push(
     "fail",
     "pages_without_hsts",
-    withFindings.length === 0 ? "SKIPPED" : noHsts.length === 0 ? "PASS" : "WARN",
-    withFindings.length === 0
-      ? "no page was measured"
-      : noHsts.length === 0
-        ? "every measured page sends HSTS"
-        : `${noHsts.length} of ${withFindings.length} pages ${
-            noHsts.length === 1 ? "sends" : "send"
-          } no Strict-Transport-Security`,
+    // HSTS only exists on https: on a site read entirely over http, the missing header is the
+    // symptom, and `pages_without_tls` already names the cause. Claiming it here would report
+    // the same problem twice and teach the reader to distrust the list.
+    httpsPages.length === 0
+      ? "SKIPPED"
+      : withFindings.length === 0
+        ? "SKIPPED"
+        : noHsts.length === 0
+          ? "PASS"
+          : "WARN",
+    httpsPages.length === 0
+      ? "no https page was measured: HSTS cannot be judged, and pages_without_tls names the cause"
+      : withFindings.length === 0
+        ? "no page was measured"
+        : noHsts.length === 0
+          ? "every measured page sends HSTS"
+          : `${noHsts.length} of ${withFindings.length} pages ${
+              noHsts.length === 1 ? "sends" : "send"
+            } no Strict-Transport-Security`,
     "HSTS is per-response: one page without it reopens the downgrade the others closed.",
     noHsts.map((page) => page.url)
   );

@@ -191,6 +191,57 @@ type CrawlInput = {
   allowExternal?: boolean;
 };
 
+/**
+ * The engine's progress, in French.
+ *
+ * The engine emits `{step, page, done, total, status}` in English; the app writes its own
+ * sentence from those fields. Printing the engine's string here would leak English into a
+ * French interface — the same defect the billing page had with its usage labels.
+ */
+function progressLine(
+  event: {
+    step: string;
+    page?: string;
+    done?: number;
+    total?: number;
+    status?: number;
+    ok?: boolean;
+  },
+  withLogin: boolean
+): string {
+  const path = event.page === undefined ? null : safePath(event.page);
+  switch (event.step) {
+    case "login":
+      if (event.ok === true) {
+        return "connexion établie, la session est vérifiée sur une page qui l'exige";
+      }
+      return event.ok === false
+        ? "connexion refusée : le scan couvre la surface publique"
+        : "connexion en cours";
+    case "scan":
+      return "mesure de la page demandée, tous les contrôles";
+    case "crawl":
+      return `lecture de ${path ?? "la racine"}${event.status === undefined ? "" : ` (HTTP ${event.status})`}${
+        event.done === undefined ? "" : ` · ${event.done} adresse(s) vues`
+      }`;
+    case "measure":
+      if (event.done === 0) return `${event.total ?? 0} autre(s) page(s) à mesurer`;
+      return `mesure de ${path ?? "la page"}${event.done === undefined ? "" : ` (${event.done}/${event.total ?? "?"})`}`;
+    case "score":
+      return "calcul de la note et de la couverture";
+    default:
+      return withLogin ? "lecture du site" : "lecture de la page";
+  }
+}
+
+function safePath(url: string): string {
+  try {
+    return new URL(url).pathname;
+  } catch {
+    return url;
+  }
+}
+
 const MAX_SCANS_PER_HOUR = 20;
 
 const correctionSchema = z
@@ -573,7 +624,9 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
         // Each phase below is emitted when the engine actually reaches it: a crawl that takes
         // four seconds shows four seconds of real work, not a timer filling the gap.
         const run = await runScan(body, target, (event) => {
-          void step("fetch", `  ${event.message}`, "running").catch(() => undefined);
+          void step("fetch", `  ${progressLine(event, body.login !== undefined)}`, "running").catch(
+            () => undefined
+          );
         });
         const result = run.result;
         await step(

@@ -1085,16 +1085,6 @@ async function performLogin(
   };
 }
 
-function collectCookies(response: Response): string[] {
-  // `getSetCookie` is the only API that keeps several cookies apart; headers.get would
-  // join them into one unusable string.
-  const withGetter = response.headers as Headers & { getSetCookie?: () => string[] };
-  const raw = withGetter.getSetCookie?.() ?? [];
-  const single = response.headers.get("set-cookie");
-  const all = raw.length > 0 ? raw : single ? [single] : [];
-  return all.map((value) => value.split(";")[0] ?? "").filter((value) => value.length > 0);
-}
-
 /**
  * Scan one URL and return findings grouped by module.
  *

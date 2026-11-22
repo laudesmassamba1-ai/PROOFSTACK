@@ -2845,7 +2845,29 @@ async function commandScan(flags: GlobalFlags, args: string[], only: string[]): 
           ...(crawl?.pathPrefix === undefined ? {} : { pathPrefix: crawl.pathPrefix }),
         },
         onProgress: (event) => {
-          if (!flags.quiet) err(flags, dim(flags, `  ${event.step}: ${event.message}`));
+          // The engine reports in English; the person reading the terminal is not.
+          if (flags.quiet) return;
+          const line =
+            event.step === "login"
+              ? event.ok === true
+                ? "connexion établie et vérifiée"
+                : event.ok === false
+                  ? "connexion refusée : surface publique seulement"
+                  : "connexion en cours"
+              : event.step === "scan"
+                ? "mesure de la page demandée"
+                : event.step === "crawl"
+                  ? `lecture de ${event.page ? new URL(event.page).pathname : "la racine"}${
+                      event.status === undefined ? "" : ` (HTTP ${event.status})`
+                    }`
+                  : event.step === "measure"
+                    ? event.done === 0
+                      ? `${event.total ?? 0} autre(s) page(s) à mesurer`
+                      : `mesure de ${event.page ? new URL(event.page).pathname : "la page"}${
+                          event.done === undefined ? "" : ` (${event.done}/${event.total ?? "?"})`
+                        }`
+                    : "calcul de la note";
+          err(flags, dim(flags, `  ${line}`));
         },
       });
       result = siteReport.scan;
@@ -4455,9 +4477,15 @@ function printHelp(flags: GlobalFlags): void {
   w("check options (works on localhost and on a live site behind a login)");
   w('  --header "Name: value"   Extra request header, repeatable');
   w('  --cookie "name=value"    Cookie sent with the request, repeatable');
+  w("  --crawl                  Read the whole site, not just the address");
+  w("  --max-pages <n>          Page limit for --crawl (default 25)");
+  w("  --max-depth <n>          Hops from the start URL (default 2, max 6)");
+  w("  --path-prefix </path>    Stay under one path, e.g. /app");
   w("  --login-url <url>        Sign in before scanning (use a read-only audit account)");
   w("  --login-email <email>    Account created for the audit");
   w("                           Password: PROOFCORE_LOGIN_PASSWORD or a hidden prompt");
+  w("  --login-endpoint <url>   Form posts somewhere else: the URL it posts to");
+  w("  --login-verify <url>     A page that requires the session: proof the login worked");
   w("  --verify-token <token>   The token from /app/scan, to unlock exact locations");
   w("");
   w(bold(flags, "exit codes"));

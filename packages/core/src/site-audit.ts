@@ -52,13 +52,21 @@ export interface SiteAuditOptions {
   fetchImpl?: typeof fetch;
   allowPrivate?: boolean;
   timeoutMs?: number;
-  /** Progress, in order, for a streamed UI. Never contains a secret. */
+  /**
+   * Progress, in order, for a streamed UI. Never contains a secret.
+   *
+   * `step` and the counts are the contract; `message` is an English fallback for library
+   * callers. A surface that shows progress to people writes its own sentence from the
+   * structured fields, which is why the French app never prints these English strings.
+   */
   onProgress?: (event: {
     step: "login" | "scan" | "crawl" | "measure" | "score";
     message: string;
     page?: string;
     done?: number;
     total?: number;
+    status?: number;
+    ok?: boolean;
   }) => void;
 }
 
@@ -128,6 +136,8 @@ export async function auditSite(options: SiteAuditOptions): Promise<SiteAuditRes
       options.onProgress?.({
         step: "login",
         message: `signed in with the ${attempt.report.method} flow`,
+        ok: true,
+        ...(attempt.report.status === null ? {} : { status: attempt.report.status }),
       });
     } else {
       // The crawl still runs, on the public surface, and the report carries the reason. A
@@ -135,6 +145,8 @@ export async function auditSite(options: SiteAuditOptions): Promise<SiteAuditRes
       options.onProgress?.({
         step: "login",
         message: `login refused: ${attempt.report.reason ?? "unknown reason"}`,
+        ok: false,
+        ...(attempt.report.status === null ? {} : { status: attempt.report.status }),
       });
     }
   }
@@ -178,6 +190,7 @@ export async function auditSite(options: SiteAuditOptions): Promise<SiteAuditRes
         message: `read ${new URL(page.url).pathname} (${page.status})`,
         page: page.url,
         done: discovered,
+        status: page.status,
       });
     },
   };
@@ -258,6 +271,7 @@ export async function auditSite(options: SiteAuditOptions): Promise<SiteAuditRes
       page: page.url,
       done: index + 1,
       total: toMeasure.length,
+      status: page.status,
     });
   }
 
