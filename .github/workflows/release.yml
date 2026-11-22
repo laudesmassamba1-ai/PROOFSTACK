@@ -242,9 +242,9 @@ jobs:
 
           // release.json: the release described by itself, attached to the release.
           // The download page reads it when the release API is rate-limited, which for a
-          // Worker is most of the time — it shares its addresses with everyone else on the
+          // Worker is most of the time: it shares its addresses with everyone else on the
           // account. A release asset has no such allowance, so the page survives without
-          // one, and what it shows is still this build's own account of its files.
+          // one, and what it shows is still this build describing what it produced.
           const described = walk("dist").map((file) => ({
             name: path.basename(file),
             size: fs.statSync(file).size,
