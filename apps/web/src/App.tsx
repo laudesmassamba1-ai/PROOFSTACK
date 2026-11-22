@@ -2,6 +2,8 @@ import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router";
 import { useI18n } from "./i18n/index.js";
 import { BrandLayout } from "./layouts/BrandLayout.js";
+import { useDAMode } from "./lib/da.js";
+import { HomeLight } from "./pages/HomeLight.js";
 
 /** Route-level splitting keeps marketing, docs, the workspace and admin apart. */
 const Home = lazy(() => import("./pages/Home.js").then((m) => ({ default: m.Home })));
@@ -98,6 +100,12 @@ function RouteFallback() {
   );
 }
 
+/** The landing speaks one of two identities; the comparer's choice decides. */
+function HomeGate() {
+  const da = useDAMode();
+  return da === "light" ? <HomeLight /> : <Home />;
+}
+
 export function App() {
   const { t } = useI18n();
   return (
@@ -110,7 +118,7 @@ export function App() {
       </a>
       <Routes>
         <Route element={<BrandLayout />}>
-          <Route index element={<Home />} />
+          <Route index element={<HomeGate />} />
           <Route path="product" element={<Product />} />
           <Route path="world" element={<MarketingModulePage name="world" />} />
           <Route path="flow" element={<MarketingModulePage name="flow" />} />
