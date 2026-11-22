@@ -758,7 +758,9 @@ export function ScanPage(): React.ReactElement {
         failing.length > 0
           ? ` ${fr ? "À corriger d'abord :" : "Fix first:"} ${failing
               .slice(0, 3)
-              .map((item) => `${item.id} (${item.why})`)
+              // The registry title is in the interface's language; the raw `why` is the
+              // engine's English sentence and belongs inside the detail block, not here.
+              .map((item) => `${controls[`${item.module}:${item.id}`]?.title ?? item.why}`)
               .join(" · ")}`
           : ""
       }`;

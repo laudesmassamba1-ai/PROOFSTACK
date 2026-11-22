@@ -6832,6 +6832,9 @@ p {
 
 .scan-site {
   margin-bottom: 14px;
+  /* The card holds a table-like list: one inset for every child, so the reading edge is
+     the same on the title, the rows and the explanations. */
+  padding: 15px 18px 16px;
 }
 
 .scan-site-head {
