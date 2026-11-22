@@ -8765,6 +8765,34 @@ p {
   color: rgba(23, 22, 26, 0.55);
 }
 
+/* the phone's DA switch: one button, no split screen */
+.da-toggle {
+  position: fixed;
+  bottom: 18px;
+  left: 18px;
+  z-index: 80;
+  padding: 9px 15px;
+  border: 1px solid rgba(10, 10, 11, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #17161a;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 560;
+  cursor: pointer;
+  box-shadow: 0 4px 14px -6px rgba(10, 10, 11, 0.3);
+}
+
+.da-toggle:hover {
+  border-color: rgba(10, 10, 11, 0.45);
+}
+
+@media (min-width: 768px) {
+  .da-toggle {
+    display: none;
+  }
+}
+
 /* underlined links that inherit the dark context read ink on paper */
 .brand-shell[data-da="light"] a.underline:not([data-dark] *) {
   color: rgba(23, 22, 26, 0.72);

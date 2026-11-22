@@ -13,6 +13,7 @@ import { FilamentStream } from "./FilamentStream.js";
  * overlay dissolves, and the site continues in the kept art direction.
  */
 const EDGE = 64; // px from an edge where the bar commits the choice
+const MOBILE_QUERY = "(max-width: 767px)"; // phones get a plain toggle button
 
 export function DaComparer() {
   const { t, locale } = useI18n();
@@ -20,6 +21,20 @@ export function DaComparer() {
   // Auto-open only until the visitor has made a choice; afterwards the site
   // continues in the kept direction and a discreet chip reopens the comparison.
   const [open, setOpen] = useState(() => !inIframe() && !readDAChoice());
+  // phones don't get the split: a plain toggle button switches the direction
+  const [mobile, setMobile] = useState(
+    () => typeof window !== "undefined" && window.matchMedia?.(MOBILE_QUERY).matches === true
+  );
+  useEffect(() => {
+    const query = window.matchMedia?.(MOBILE_QUERY);
+    if (!query) return;
+    const onChange = (event: MediaQueryListEvent): void => {
+      setMobile(event.matches);
+      if (event.matches) setOpen(false);
+    };
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
   const [fraction, setFraction] = useState(0.5);
   const [dragging, setDragging] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -143,7 +158,7 @@ export function DaComparer() {
     };
   }, [open]);
 
-  if (inIframe()) return null;
+  if (inIframe() || mobile) return null;
 
   if (!open) {
     return (

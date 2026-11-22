@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router";
 import { WindowControls } from "../components/app/WindowControls.js";
 import { DaComparer } from "../components/brand/DaComparer.js";
+import { DaToggleChip } from "../components/brand/DaToggleChip.js";
 import { Mark } from "../components/brand/Logo.js";
 import { SplitWords } from "../components/brand/SplitWords.js";
 import { Footer } from "../components/marketing/Footer.js";
@@ -107,6 +108,7 @@ export function BrandLayout() {
       </main>
       <Footer />
       {pathname === "/" ? <DaComparer /> : null}
+      <DaToggleChip />
     </div>
   );
 }
