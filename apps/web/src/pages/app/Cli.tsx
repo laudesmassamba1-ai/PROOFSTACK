@@ -22,8 +22,7 @@ const STEPS = [
   {
     titleKey: "ws.cli.install",
     bodyKey: "ws.cli.step.install.body",
-    command:
-      "git clone https://github.com/laudesmassamba1-ai/PROOFSTACK.git\ncd PROOFCORE && pnpm install\npnpm cli:install",
+    command: "npm i -g proofcore\nproofcore --version",
   },
   {
     titleKey: "ws.cli.configure",
@@ -203,7 +202,7 @@ export function Cli() {
           <p>
             <span className="font-medium text-ink">{t("ws.cli.trouble.command.title")}</span>{" "}
             {t("ws.cli.trouble.command.body")}{" "}
-            <code className="app-mono">pnpm cli -- &lt;command&gt;</code>
+            <code className="app-mono">proofcore &lt;command&gt;</code>
           </p>
           <p>
             <span className="font-medium text-ink">{t("ws.cli.trouble.sync.title")}</span>{" "}

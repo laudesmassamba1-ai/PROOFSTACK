@@ -229,13 +229,13 @@ export const en = {
   "download.eyebrow": "Application",
   "download.title": "Download PROOFCORE",
   "download.lede":
-    "The desktop app for Windows and Linux, with the embedded browser, terminal and assistant tools.",
+    "The desktop app for Windows, macOS and Linux, with the embedded browser, terminal and assistant tools. Files download from this site.",
   "download.cta": "Download",
   "download.all": "All releases",
-  "download.fallback": "Open the releases page to download.",
+  "download.fallback": "No release is published yet.",
   "download.cli.title": "Command line",
   "download.cli.body":
-    "The CLI is included in the desktop app and also available as a separate installer on the releases page.",
+    "The CLI ships in the desktop app, installs with one npm command, and has its own standalone installer in each column.",
   "docs.title": "Documentation",
   "docs.lede":
     "Guides live in the repository under docs/guides. This page lists what is implemented today.",
@@ -520,13 +520,13 @@ export const fr: Messages = {
   "download.eyebrow": "Application",
   "download.title": "Télécharger PROOFCORE",
   "download.lede":
-    "L’application de bureau pour Windows et Linux, avec le navigateur intégré, le terminal et les outils de l’assistant.",
+    "L’application de bureau pour Windows, macOS et Linux, avec le navigateur intégré, le terminal et les outils de l’assistant. Les fichiers se téléchargent depuis ce site.",
   "download.cta": "Télécharger",
   "download.all": "Toutes les versions",
-  "download.fallback": "Ouvrez la page des versions pour télécharger.",
+  "download.fallback": "Aucune version n'est encore publiée.",
   "download.cli.title": "Ligne de commande",
   "download.cli.body":
-    "Le CLI est inclus dans l’application de bureau et disponible séparément sur la page des versions.",
+    "Le CLI est fourni avec l’application de bureau, s’installe en une commande npm, et a son propre installateur autonome dans chaque colonne.",
   "docs.title": "Documentation",
   "docs.lede":
     "Les guides vivent dans le dépôt sous docs/guides. Cette page liste ce qui est réellement implémenté aujourd'hui.",

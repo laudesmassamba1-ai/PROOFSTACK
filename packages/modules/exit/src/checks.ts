@@ -127,7 +127,9 @@ export function buildExitSuites(options: ExitCheckOptions): TestSuiteDef[] {
 
         const declared = Object.entries(exitConfig.schema);
         if (declared.length === 0) {
-          ctx.notConfigured("no schema declared in modules.exit.schema, so there is nothing to conform to");
+          ctx.notConfigured(
+            "no schema declared in modules.exit.schema, so there is nothing to conform to"
+          );
           return;
         }
 

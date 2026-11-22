@@ -141,9 +141,7 @@ export function aggregateStatus(statuses: readonly TestStatus[]): RunStatus {
   // not-applicable and not-configured cases describe the *setup*, not the product, so a
   // run made only of those verified nothing — the same rule that already applied to a run
   // made only of skips, now stated once instead of case by case.
-  const answered = statuses.filter(
-    (s) => s === "PASSED" || s === "FAILED" || s === "WARNING"
-  );
+  const answered = statuses.filter((s) => s === "PASSED" || s === "FAILED" || s === "WARNING");
   if (answered.length === 0) return "NOTHING_VERIFIED";
   // Something was judged, but part of the question was left unasked: PARTIAL, never
   // COMPLETED, so nobody reads the run as fully verified.

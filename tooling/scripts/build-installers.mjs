@@ -32,6 +32,7 @@ import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gunzipSync, gzipSync } from "node:zlib";
+import { build as esbuildBuild } from "esbuild";
 import { desktopEntry, iconPng } from "../../packaging/assets.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -123,22 +124,24 @@ function writeChecksum(path) {
 }
 
 /** Windows: a SEA binary that installs the payload appended to itself. */
-function buildWindowsSetup(target) {
+async function buildWindowsSetup(target) {
   const { binary, runtime } = ensureBinary(target);
   mkdirSync(work, { recursive: true });
   mkdirSync(outDir, { recursive: true });
 
   say("bundling the installer script");
   const installerJs = join(work, "installer.cjs");
-  run(packageBin("esbuild", "esbuild"), [
-    join(root, "packaging/installer-main.mjs"),
-    "--bundle",
-    "--platform=node",
-    "--target=node20",
-    "--format=cjs",
-    `--outfile=${installerJs}`,
-    "--log-level=warning",
-  ]);
+  // The API, not the CLI shim: on Windows that shim is `esbuild.exe` and the path the
+  // package advertises does not exist, which is how a Windows job dies with ENOENT.
+  await esbuildBuild({
+    entryPoints: [join(root, "packaging/installer-main.mjs")],
+    bundle: true,
+    platform: "node",
+    target: "node20",
+    format: "cjs",
+    outfile: installerJs,
+    logLevel: "warning",
+  });
 
   say("creating the installer SEA blob");
   const config = join(work, "installer-sea.json");
@@ -341,7 +344,7 @@ if (!selected.length)
 
 for (const target of selected) {
   if (!TARGETS[target]) throw new Error(`unknown target ${target}`);
-  if (target.startsWith("win")) buildWindowsSetup(target);
+  if (target.startsWith("win")) await buildWindowsSetup(target);
   else buildShellInstaller(target);
   if (target.startsWith("linux") && process.platform === "linux") buildDeb(target);
 }

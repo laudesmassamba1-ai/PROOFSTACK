@@ -122,7 +122,10 @@ describe("planFor", () => {
   it("resolves the asset against the manifest, so mirrors work without config", () => {
     const plan = planFor(manifest, "linux-x64", "binary");
     expect(plan.ok).toBe(true);
-    if (plan.ok) expect(plan.url.endsWith("/download/proofcore-linux-x64")).toBe(true);
+    // The default manifest is now our API's mirror, not the release host: the binary sits
+    // beside the manifest, so the resolution rule is the same and the origin changed.
+    if (plan.ok)
+      expect(plan.url.endsWith("/api/v1/releases/assets/proofcore-linux-x64")).toBe(true);
   });
 
   it("refuses a target the release does not build", () => {

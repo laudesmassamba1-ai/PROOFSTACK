@@ -31,7 +31,20 @@ import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 
 export const REPOSITORY = "laudesmassamba1-ai/PROOFSTACK";
-export const DEFAULT_MANIFEST_URL = `https://github.com/${REPOSITORY}/releases/latest/download/manifest.json`;
+
+/**
+ * Where `proofcore update` looks for the newest build.
+ *
+ * Our own API mirrors the release: the manifest and the binaries it names are served from
+ * the same origin the CLI already talks to. GitHub stays the place releases are published,
+ * not the place a customer's machine has to reach — on a corporate network that host is
+ * frequently blocked, and the update then looked like "none available".
+ */
+const DEFAULT_API = (
+  process.env.PROOFCORE_API_URL ?? "https://proofcore-api.laudesmassamba1.workers.dev"
+).replace(/\/+$/, "");
+
+export const DEFAULT_MANIFEST_URL = `${DEFAULT_API}/api/v1/releases/assets/manifest.json`;
 
 /** How long a successful check is trusted before asking again. */
 const CHECK_TTL_MS = 6 * 60 * 60 * 1000;

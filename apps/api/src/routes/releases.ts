@@ -56,6 +56,14 @@ export interface ReleaseOptions {
   ttlMs?: number;
   /** Generator output, injected by tests; the module default is the checked-in manifest. */
   manifest?: ReleaseBody;
+  /**
+   * Public base the download endpoints are reachable at, e.g. `https://api.example`.
+   *
+   * Every asset URL handed to the browser points here, not at GitHub: the download starts
+   * on our domain, keeps our name for the file, and works when the visitor's network
+   * blocks the release host.
+   */
+  baseUrl?: string;
 }
 
 let cache = new Map<string, { at: number; body: ReleaseBody }>();
@@ -141,9 +149,238 @@ async function fetchLatest(token: string | undefined): Promise<ReleaseBody> {
   };
 }
 
+/** At most a handful: the selector is a dropdown, not a changelog. */
+const VERSION_LIMIT = 8;
+
+interface GitHubRelease {
+  tag_name?: unknown;
+  name?: unknown;
+  html_url?: unknown;
+  published_at?: unknown;
+  prerelease?: unknown;
+  draft?: unknown;
+  assets?: unknown;
+}
+
+function toRelease(raw: GitHubRelease): ReleaseBody["release"] {
+  if (typeof raw.tag_name !== "string") return null;
+  const assets = Array.isArray(raw.assets)
+    ? raw.assets.map(assetFrom).filter((item): item is ReleaseAsset => item !== null)
+    : [];
+  return {
+    tag: raw.tag_name,
+    name: typeof raw.name === "string" && raw.name.length > 0 ? raw.name : raw.tag_name,
+    url:
+      typeof raw.html_url === "string"
+        ? raw.html_url
+        : `https://github.com/${REPO}/releases/latest`,
+    publishedAt: typeof raw.published_at === "string" ? raw.published_at : "",
+    prerelease: raw.prerelease === true,
+    assets,
+  };
+}
+
+async function fetchReleases(token: string | undefined, limit: number): Promise<ReleaseBody[]> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=${limit}`, {
+      signal: controller.signal,
+      headers: {
+        accept: "application/vnd.github+json",
+        "x-github-api-version": "2022-11-28",
+        "user-agent": "proofstack-releases",
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+      },
+    });
+  } catch (error) {
+    throw new HttpError(
+      502,
+      "release_unavailable",
+      `Could not read the published releases: ${
+        error instanceof Error ? error.message : "unknown error"
+      }`
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!response.ok) {
+    throw new HttpError(
+      502,
+      "release_unavailable",
+      response.status === 403
+        ? "The release source refused the call (rate limit). Set GITHUB_TOKEN on the API to raise it."
+        : `The release source answered HTTP ${response.status}.`
+    );
+  }
+  const raw = (await response.json()) as GitHubRelease[];
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((item) => item?.draft !== true)
+    .map((item) => ({ release: toRelease(item) }))
+    .filter((item): item is ReleaseBody => item.release !== null);
+}
+
 export function releaseRoutes(options: ReleaseOptions = {}): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
   const ttlMs = options.ttlMs ?? TTL_MS;
+
+  /**
+   * The release the client should use, as a value both the JSON routes and the download
+   * route can share. Cached for the same window as the page: a download that resolves a
+   * different version than the page displayed is a bug people can see.
+   */
+  const currentRelease = async (): Promise<ReleaseBody["release"]> => {
+    const hit = cache.get(REPO);
+    if (hit && Date.now() - hit.at < ttlMs) return hit.body.release;
+    try {
+      const body = await fetchLatest(options.token);
+      cache.set(REPO, { at: Date.now(), body });
+      return body.release;
+    } catch (error) {
+      if (hit) return hit.body.release;
+      const manifest = options.manifest ?? DEFAULT_MANIFEST;
+      if (manifest.release) return manifest.release;
+      throw error;
+    }
+  };
+
+  /** Every asset URL we hand out points at this API, never at the release host. */
+  const localise = (release: NonNullable<ReleaseBody["release"]>) => {
+    const base = (options.baseUrl ?? "").replace(/\/+$/, "");
+    if (base.length === 0) return release;
+    return {
+      ...release,
+      assets: release.assets.map((asset) => ({
+        ...asset,
+        url: `${base}/api/v1/releases/assets/${encodeURIComponent(asset.name)}?version=${encodeURIComponent(release.tag)}`,
+      })),
+    };
+  };
+
+  /**
+   * The version selector's data: recent releases, newest first, with our own asset URLs.
+   *
+   * GitHub is read once per window for the list; a failure is a 502, not an empty list
+   * that would make the page claim nothing was ever published.
+   */
+  app.get("/releases/versions", async (c) => {
+    const key = `${REPO}:list`;
+    const hit = cache.get(key);
+    if (hit && Date.now() - hit.at < ttlMs) {
+      c.header("Cache-Control", "public, max-age=300");
+      return c.json(hit.body);
+    }
+    try {
+      const releases = await fetchReleases(options.token, VERSION_LIMIT);
+      const body = {
+        releases: releases
+          .filter((item) => item.release !== null)
+          .map((item) => localise(item.release as NonNullable<ReleaseBody["release"]>)),
+      } as unknown as ReleaseBody;
+      cache.set(key, { at: Date.now(), body });
+      c.header("Cache-Control", "public, max-age=300");
+      return c.json(body);
+    } catch (error) {
+      if (hit) {
+        c.header("Cache-Control", "public, max-age=60");
+        c.header("x-release-cache", "stale");
+        return c.json(hit.body);
+      }
+      throw error;
+    }
+  });
+
+  /**
+   * One file of a release, streamed from our own origin.
+   *
+   * The download page used to send people to GitHub. Two things were wrong with that: the
+   * visitor left the product, and on a corporate network the release host is often
+   * blocked, so the button did nothing. Here the browser downloads from us, the file keeps
+   * its name, and range requests are forwarded so the updater's differential download
+   * still works.
+   *
+   * Only names that appear in a published release are served: this route is a mirror of
+   * the release, never an open proxy.
+   */
+  app.get("/releases/assets/:name", async (c) => {
+    const name = c.req.param("name");
+    if (!/^[A-Za-z0-9._+-]{1,160}$/.test(name)) {
+      throw new HttpError(400, "invalid_asset_name", "That is not a release asset name.");
+    }
+    const wanted = c.req.query("version");
+    const release = await currentRelease();
+    if (release === null) {
+      throw new HttpError(404, "no_release", "No release has been published yet.");
+    }
+    if (wanted !== undefined && wanted !== release.tag) {
+      // Pinning a version matters for reproducible downloads; an unknown one is refused
+      // rather than silently swapped for the latest, which is how scripts break quietly.
+      const known = await fetchReleases(options.token, VERSION_LIMIT).catch(() => []);
+      const match = known.find((item) => item.release?.tag === wanted)?.release ?? null;
+      if (match === null) {
+        throw new HttpError(
+          404,
+          "release_not_found",
+          `No release is tagged ${wanted}. Drop the version to get the latest.`
+        );
+      }
+    }
+    const asset = release.assets.find((item) => item.name === name);
+    if (!asset) {
+      throw new HttpError(
+        404,
+        "asset_not_found",
+        `${name} is not part of release ${release.tag}. Available: ${
+          release.assets.map((item) => item.name).join(", ") || "none"
+        }`
+      );
+    }
+
+    const range = c.req.header("range");
+    let upstream: Response;
+    try {
+      upstream = await fetch(asset.url, {
+        headers: {
+          "user-agent": "proofstack-download",
+          ...(range ? { range } : {}),
+        },
+        redirect: "follow",
+      });
+    } catch (error) {
+      throw new HttpError(
+        502,
+        "download_unavailable",
+        `Could not read ${name} from the release host: ${
+          error instanceof Error ? error.message : "unknown error"
+        }`
+      );
+    }
+    if (!upstream.ok && upstream.status !== 206) {
+      throw new HttpError(
+        502,
+        "download_unavailable",
+        `The release host answered HTTP ${upstream.status} for ${name}.`
+      );
+    }
+
+    const isText = /\.(json|ya?ml|txt|sha256)$/.test(name);
+    const headers = new Headers({
+      "content-type": isText ? "text/plain; charset=utf-8" : "application/octet-stream",
+      // The name the browser saves, and the length it can show while downloading.
+      "content-disposition": `attachment; filename="${name}"`,
+      "cache-control": isText ? "public, max-age=300" : "public, max-age=3600, immutable",
+      "accept-ranges": "bytes",
+    });
+    for (const header of ["content-length", "content-range", "etag"]) {
+      const value = upstream.headers.get(header);
+      if (value !== null) headers.set(header, value);
+    }
+    // `body` is piped, never buffered: an installer is 100 MB and a Worker has 128 MB of
+    // memory for everything it is doing at that moment.
+    return new Response(upstream.body, { status: upstream.status, headers });
+  });
 
   app.get("/releases/latest", async (c) => {
     const hit = cache.get(REPO);
@@ -155,14 +392,16 @@ export function releaseRoutes(options: ReleaseOptions = {}): Hono<AppEnv> {
       const body = await fetchLatest(options.token);
       cache.set(REPO, { at: Date.now(), body });
       c.header("Cache-Control", "public, max-age=60");
-      return c.json(body);
+      return c.json({ release: body.release === null ? null : localise(body.release) });
     } catch (error) {
       // A rate-limited source is not proof that the release disappeared. Serving the last
       // real answer is more truthful than an empty page, and the header says which it is.
       if (hit) {
         c.header("Cache-Control", "public, max-age=30");
         c.header("x-release-cache", "stale");
-        return c.json(hit.body);
+        return c.json({
+          release: hit.body.release === null ? null : localise(hit.body.release),
+        });
       }
       // Cold isolate plus a rate-limited source: the deploy-time manifest is the last
       // release actually read from GitHub, not a guess. It is dated, and the header says
@@ -171,7 +410,7 @@ export function releaseRoutes(options: ReleaseOptions = {}): Hono<AppEnv> {
       if (manifest.release) {
         c.header("Cache-Control", "public, max-age=30");
         c.header("x-release-cache", "manifest");
-        return c.json(manifest);
+        return c.json({ release: localise(manifest.release) });
       }
       throw error;
     }

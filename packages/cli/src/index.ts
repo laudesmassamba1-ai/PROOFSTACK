@@ -4447,6 +4447,7 @@ function printHelp(flags: GlobalFlags): void {
   w("  sync                     Upload the last run to the API");
   w("  ai <status|tools|ask|agent>  MCP servers, AI providers and external agents");
   w(bold(flags, "\nAd-hoc scans"));
+  w("  scan <url> [--crawl]         every module on one page, or on the whole site");
   w("  audit fail|clean <url>       FAIL: security scan · CLEAN: UI quality score");
   w("  check <url>                  both of the above, in one run");
   w("  map [dir]                   architecture as a Mermaid dependency diagram");

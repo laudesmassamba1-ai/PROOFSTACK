@@ -33,6 +33,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { build } from "esbuild";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const require = createRequire(import.meta.url);
@@ -102,25 +103,29 @@ function step(message) {
   process.stdout.write(`\u001b[2m▸\u001b[0m ${message}\n`);
 }
 
-/** One file, CommonJS, no dependency on the repository's node_modules. */
-function bundle() {
+/**
+ * Bundles with esbuild's JavaScript API, not its command-line binary.
+ *
+ * The CLI shim is a platform binary installed by a postinstall step: on Windows the path
+ * `esbuild/bin/esbuild` does not exist, so `spawn` fails with ENOENT and the whole Windows
+ * installer job dies before it builds anything. The API calls the same compiler through the
+ * package's own resolver, which is the supported way to run esbuild from a script.
+ */
+async function bundle() {
   step("bundling the CLI");
   const output = join(work, "proofcore.cjs");
-  run(packageBin("esbuild", "esbuild"), [
-    join(root, "packages/cli/src/index.ts"),
-    "--bundle",
-    "--platform=node",
-    "--target=node20",
-    "--format=cjs",
-    `--outfile=${output}`,
+  await build({
+    entryPoints: [join(root, "packages/cli/src/index.ts")],
+    bundle: true,
+    platform: "node",
+    target: "node20",
+    format: "cjs",
+    outfile: output,
     // Native and optional modules stay external: they are resolved at run time, and a
     // bundled native addon would be the one thing that cannot be injected into a binary.
-    "--external:playwright",
-    "--external:playwright-core",
-    "--external:@playwright/test",
-    "--external:ws",
-    "--log-level=warning",
-  ]);
+    external: ["playwright", "playwright-core", "@playwright/test", "ws"],
+    logLevel: "warning",
+  });
   return output;
 }
 
@@ -229,6 +234,6 @@ mkdirSync(work, { recursive: true });
 // clone and a CI runner build the same thing a warm working copy does.
 step("building the workspace packages");
 run(process.execPath, [join(root, "tooling/scripts/build.mjs")]);
-const blob = seaBlob(bundle());
+const blob = seaBlob(await bundle());
 for (const target of targets) await buildTarget(target, blob);
 process.stdout.write(`\n${existsSync(outDir) ? `Binaries in ${outDir}\n` : ""}`);

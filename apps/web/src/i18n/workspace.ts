@@ -228,7 +228,7 @@ export const workspaceEn = {
   "ws.cli.prove": "Prove",
   "ws.cli.checking": "Checking the workspace connection…",
   "ws.cli.step.install.body":
-    "Run this from a parent directory, not inside an existing checkout. The npm registry package is not published yet; the last command builds and installs the dependency-free `proofcore` binary globally.",
+    "One command, nothing to clone and no toolchain to set up. Prefer a file that needs no Node? The download page carries a self-contained installer for Windows, macOS and Linux.",
   "ws.cli.step.configure.body":
     "Open a terminal in your application directory, then run these commands. `init` writes `proofcore.config.ts`; it never creates the directory for you. Then point the modules at localhost or staging and validate the targets.",
   "ws.cli.step.prove.body":
@@ -629,7 +629,7 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
   "ws.cli.prove": "Prouver",
   "ws.cli.checking": "Vérification de la connexion à l'espace…",
   "ws.cli.step.install.body":
-    "Lancez ceci depuis un dossier parent, pas à l'intérieur d'un checkout existant. Le paquet npm n'est pas encore publié ; la dernière commande construit et installe globalement le binaire autonome `proofcore`.",
+    "Une commande, aucun dépôt à cloner, aucune chaîne d'outils à monter. Tu préfères un fichier qui ne demande pas Node ? La page de téléchargement porte un installateur autonome pour Windows, macOS et Linux.",
   "ws.cli.step.configure.body":
     "Ouvrez un terminal dans le dossier de votre application, puis lancez ces commandes. `init` écrit `proofcore.config.ts` ; il ne crée jamais le dossier à votre place. Pointez ensuite les modules vers localhost ou la préproduction et validez les cibles.",
   "ws.cli.step.prove.body":

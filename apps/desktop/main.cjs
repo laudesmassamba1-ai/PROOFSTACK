@@ -497,6 +497,16 @@ async function signIn(credentials = {}) {
  * because they are two different files with two different lifetimes; a half-updated pair
  * would be a window that speaks a protocol the engine no longer has.
  */
+/**
+ * Where updates come from.
+ *
+ * Same host as the API the app already talks to. `PROOFCORE_API_URL` exists for a
+ * self-hosted deployment; the default is the public one.
+ */
+const UPDATE_FEED_BASE = (
+  process.env.PROOFCORE_API_URL ?? "https://proofcore-api.laudesmassamba1.workers.dev"
+).replace(/\/+$/, "");
+
 function setupAppUpdates() {
   if (!app.isPackaged || SMOKE || process.env.PROOFCORE_NO_UPDATE === "1") return;
   // electron-updater can replace an AppImage in place; a .deb is owned by the system package
@@ -519,6 +529,18 @@ function setupAppUpdates() {
   appUpdater = autoUpdater;
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
+  // The feed is our own API, not the release host: the update comes from the same place
+  // the download page sends people, it works on networks that block the release host, and
+  // one origin serves the window, the engine and the CLI. The Worker mirrors
+  // `latest-linux.yml` / `latest.yml` / `latest-mac.yml` and the files they name.
+  try {
+    autoUpdater.setFeedURL({
+      provider: "generic",
+      url: `${UPDATE_FEED_BASE}/api/v1/releases/assets/`,
+    });
+  } catch (error) {
+    log(`app update feed: ${error?.message ?? error}`);
+  }
   autoUpdater.on("checking-for-update", () => setUpdateState({ status: "checking" }));
   autoUpdater.on("update-available", (info) => {
     log(`app update ${info.version} disponible, téléchargement`);

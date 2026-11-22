@@ -169,7 +169,10 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
   // Registered before the workspace router: that router mounts a session guard on
   // `/api/v1/*`, so anything mounted after it would answer 401 to an anonymous visitor.
   // The download page is public by design and must describe releases before sign-in.
-  app.route("/api/v1", releaseRoutes({ token: services.config.githubToken }));
+  app.route(
+    "/api/v1",
+    releaseRoutes({ token: services.config.githubToken, baseUrl: services.config.apiOrigin })
+  );
   // Same reason as the release feed: the catalogue is public by design, so it has to be
   // mounted before the workspace router that guards `/api/v1/*`.
   app.route("/api/v1", controlRoutes());

@@ -4,11 +4,9 @@ import { useI18n } from "../i18n/index.js";
 import { Section, SectionHeading } from "../layouts/BrandLayout.js";
 import { apiFetch } from "../lib/api.js";
 
-const REPO = "laudesmassamba1-ai/PROOFSTACK";
-const RELEASES_PAGE = `https://github.com/${REPO}/releases/latest`;
-
 interface Asset {
   name: string;
+  /** Points at this API, never at the release host: the bytes come from our domain. */
   url: string;
   size: number;
   digest: string | null;
@@ -16,7 +14,7 @@ interface Asset {
 
 interface Release {
   tag: string;
-  url: string;
+  name?: string;
   publishedAt: string;
   prerelease: boolean;
   assets: Asset[];
@@ -28,57 +26,88 @@ function formatSize(bytes: number): string {
   return `${mb >= 100 ? Math.round(mb) : mb.toFixed(1)} MB`;
 }
 
-/**
- * What a release actually carries.
- *
- * Two surfaces ship from one tag, and they are different products for different people:
- * a self-contained installer for someone who has no toolchain (`.run`, `setup.exe`,
- * `.deb`), and the bare binary for someone who already has one. The page lists what the
- * release contains instead of what the page wishes it contained — an empty card with a
- * "download" button that lands on a 404 is worse than no card at all.
- */
-function pickAssets(assets: Asset[]) {
-  const byName = (suffix: string, prefix = "") =>
-    assets.find((asset) => asset.name.startsWith(prefix) && asset.name.endsWith(suffix)) ?? null;
-  return {
-    winSetup: byName("setup-win-x64.exe", "proofcore-"),
-    linuxRun: byName("installer-linux-x64.run", "proofcore-"),
-    deb: byName(".deb"),
-    appImage: byName(".AppImage"),
-    winBinary: byName("win-x64.exe", "proofcore-") ?? byName("proofcore-win-x64.exe"),
-    linuxBinary: byName("proofcore-linux-x64"),
-  };
+/** The desktop app and the command line ship from one tag: this is what tells them apart. */
+function pick(assets: Asset[], desktop: RegExp, cli?: RegExp, bare?: RegExp) {
+  const first = (pattern: RegExp) => assets.find((asset) => pattern.test(asset.name)) ?? null;
+  return { desktop: first(desktop), cli: cli ? first(cli) : null, bare: bare ? first(bare) : null };
+}
+
+function detectPlatform(): "windows" | "macos" | "linux" {
+  const ua = typeof navigator === "undefined" ? "" : navigator.userAgent.toLowerCase();
+  if (ua.includes("win")) return "windows";
+  if (ua.includes("mac")) return "macos";
+  return "linux";
 }
 
 export function DownloadPage() {
   const { t, locale } = useI18n();
   const fr = locale === "fr";
-  const [release, setRelease] = useState<Release | null>(null);
+  const [releases, setReleases] = useState<Release[]>([]);
+  const [selected, setSelected] = useState<string | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "empty" | "error">("loading");
+  const [mine] = useState(detectPlatform);
 
-  // Read through our own API: the CSV/CSP audit found this page calling api.github.com
-  // from the browser, which production blocks and which exposes every visitor to GitHub's
-  // unauthenticated rate limit. The Worker caches one answer for everyone.
+  // Every list and every file comes from our own API: the visitor stays on this site, the
+  // file keeps our name, and a network that blocks the release host still works.
   useEffect(() => {
     let alive = true;
-    apiFetch<{ release: Release | null }>("/api/v1/releases/latest", { timeoutMs: 12_000 })
+    apiFetch<{ releases: Release[] }>("/api/v1/releases/versions", { timeoutMs: 12_000 })
       .then((data) => {
         if (!alive) return;
-        setRelease(data.release);
-        setState(data.release ? "ready" : "empty");
+        const list = Array.isArray(data.releases) ? data.releases : [];
+        setReleases(list);
+        setSelected(list[0]?.tag ?? null);
+        setState(list.length > 0 ? "ready" : "empty");
       })
       .catch(() => {
-        if (alive) setState("error");
+        // A list failure must not hide a download that works: fall back to the latest
+        // release, which is the same file the first entry would have offered.
+        apiFetch<{ release: Release | null }>("/api/v1/releases/latest", { timeoutMs: 12_000 })
+          .then((data) => {
+            if (!alive) return;
+            if (data.release) {
+              setReleases([data.release]);
+              setSelected(data.release.tag);
+              setState("ready");
+            } else {
+              setState("error");
+            }
+          })
+          .catch(() => {
+            if (alive) setState("error");
+          });
       });
     return () => {
       alive = false;
     };
   }, []);
 
-  const picks = useMemo(() => (release ? pickAssets(release.assets) : null), [release]);
-  // No hard-coded fallback version: a number that lives in the page drifts from the
-  // release it claims to describe. Without a release we say so and link to the page.
+  const release = releases.find((item) => item.tag === selected) ?? releases[0] ?? null;
   const version = release?.tag?.replace(/^v/, "") ?? null;
+
+  const platforms = useMemo(() => {
+    const assets = release?.assets ?? [];
+    return {
+      windows: pick(
+        assets,
+        /^PROOFCORE-.*\.exe$/i,
+        /setup-win-x64\.exe$/i,
+        /^proofcore-win-x64\.exe$/i
+      ),
+      macos: pick(
+        assets,
+        /^PROOFCORE-.*\.(dmg|zip)$/i,
+        /installer-darwin-arm64\.run$/i,
+        /^proofcore-darwin-arm64$/i
+      ),
+      linux: pick(
+        assets,
+        /^PROOFCORE-.*\.(AppImage|deb)$/i,
+        /installer-linux-x64\.run$/i,
+        /^proofcore-linux-x64$/i
+      ),
+    };
+  }, [release]);
 
   return (
     <Section>
@@ -86,119 +115,101 @@ export function DownloadPage() {
         as="h1"
         eyebrow={t("download.eyebrow")}
         title={t("download.title")}
-        lede={t("download.lede")}
+        lede={
+          fr
+            ? "L'application de bureau pour Windows, macOS et Linux, avec le navigateur intégré, le terminal et les outils de l'assistant. Le fichier se télécharge depuis ce site."
+            : "The desktop app for Windows, macOS and Linux, with the embedded browser, terminal and assistant tools. The file downloads from this site."
+        }
       />
+
+      <div className="mt-8 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="font-mono text-[0.62rem] tracking-[0.18em] text-white/40">
+            {fr ? "VERSION" : "VERSION"}
+          </p>
+          {releases.length > 1 ? (
+            <label className="relative mt-1 block">
+              <span className="sr-only">{fr ? "Choisir une version" : "Choose a version"}</span>
+              <select
+                value={selected ?? ""}
+                onChange={(event) => setSelected(event.target.value)}
+                className="brand-select"
+              >
+                {releases.map((item, index) => (
+                  <option key={item.tag} value={item.tag}>
+                    {item.tag}
+                    {index === 0 ? (fr ? " — dernière" : " — latest") : ""}
+                    {item.publishedAt ? ` · ${item.publishedAt.slice(0, 10)}` : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <p className="mt-1 font-mono text-[0.92rem] text-white/72">
+              {version ? `v${version}` : state === "loading" ? "…" : "—"}
+            </p>
+          )}
+        </div>
+        {release?.publishedAt ? (
+          <p className="font-mono text-[0.7rem] text-white/40">
+            {fr ? "publiée le " : "published "}
+            {release.publishedAt.slice(0, 10)}
+            {release.prerelease ? (fr ? " · préversion" : " · pre-release") : ""}
+          </p>
+        ) : null}
+      </div>
 
       {/* minmax(0,1fr): the sha256 names are unbreakable mono strings, and a plain
           1fr track lets the widest child push the column past the viewport. */}
-      <div className="mt-10 grid gap-5 lg:grid-cols-[repeat(3,minmax(0,1fr))]">
+      <div className="mt-6 grid gap-5 lg:grid-cols-[repeat(3,minmax(0,1fr))]">
         <DownloadCard
           icon={Monitor}
           title="Windows"
-          subtitle={
-            fr
-              ? "Installateur autonome — aucun prérequis"
-              : "Self-contained installer — no prerequisites"
-          }
-          asset={picks?.winSetup ?? null}
+          subtitle={fr ? "Installateur — aucun prérequis" : "Installer — no prerequisites"}
+          asset={platforms.windows.desktop}
+          cli={platforms.windows.cli}
+          bare={platforms.windows.bare}
+          highlighted={mine === "windows"}
           loading={state === "loading"}
-          primary
-          fallback={RELEASES_PAGE}
           cta={t("download.cta")}
           note={
             fr
-              ? "Installe pour l'utilisateur courant, sans élévation."
-              : "Installs for the current user, no elevation."
+              ? "Installe pour l'utilisateur courant, sans élévation. Se met à jour toute seule."
+              : "Installs for the current user, no elevation. Updates itself."
+          }
+        />
+        <DownloadCard
+          icon={Package}
+          title="macOS"
+          subtitle={fr ? "Image disque (.dmg)" : "Disk image (.dmg)"}
+          asset={platforms.macos.desktop}
+          cli={platforms.macos.cli}
+          bare={platforms.macos.bare}
+          highlighted={mine === "macos"}
+          loading={state === "loading"}
+          cta={t("download.cta")}
+          note={
+            fr
+              ? "Apple Silicon et Intel. Une image non signée demande un clic droit → Ouvrir au premier lancement."
+              : "Apple Silicon and Intel. An unsigned image needs right-click → Open the first time."
           }
         />
         <DownloadCard
           icon={Package}
           title="Linux"
-          subtitle={
-            fr ? "Installateur .run — aucune dépendance" : ".run installer — no dependencies"
-          }
-          asset={picks?.linuxRun ?? null}
+          subtitle={fr ? "AppImage ou paquet Debian" : "AppImage or Debian package"}
+          asset={platforms.linux.desktop}
+          cli={platforms.linux.cli}
+          bare={platforms.linux.bare}
+          highlighted={mine === "linux"}
           loading={state === "loading"}
-          fallback={RELEASES_PAGE}
           cta={t("download.cta")}
           note={
             fr
-              ? "chmod +x, puis exécuter : ajoute le CLI au PATH."
-              : "chmod +x, then run: adds the CLI to PATH."
+              ? "chmod +x pour l'AppImage, dpkg -i pour le .deb. Se met à jour toute seule."
+              : "chmod +x for the AppImage, dpkg -i for the .deb. Updates itself."
           }
         />
-        <DownloadCard
-          icon={Package}
-          title="Linux"
-          subtitle={fr ? "Paquet Debian (.deb), ou AppImage" : "Debian package (.deb), or AppImage"}
-          asset={picks?.deb ?? picks?.appImage ?? null}
-          loading={state === "loading"}
-          fallback={RELEASES_PAGE}
-          cta={t("download.cta")}
-          note={
-            picks?.appImage
-              ? fr
-                ? "AppImage également disponible ci-dessous."
-                : "AppImage also available below."
-              : undefined
-          }
-        />
-      </div>
-
-      {/* The bare binaries: same engine, for machines that already have a toolchain and
-          want a file they can hash. */}
-      <div className="brand-panel mt-5 grid gap-4 p-5 sm:grid-cols-2">
-        <div>
-          <p className="font-mono text-[0.62rem] tracking-[0.18em] text-white/40">
-            {fr ? "BINAIRES SANS INSTALLEUR" : "BARE BINARIES"}
-          </p>
-          <p className="mt-1.5 text-[0.84rem] leading-relaxed text-white/52">
-            {fr
-              ? "Le même moteur, un seul fichier, une empreinte sha256 publiée à côté. Vérifiez avant d'exécuter."
-              : "The same engine as one file, with a published sha256 beside it. Verify before you run it."}
-          </p>
-        </div>
-        <div className="flex flex-col gap-2 self-center">
-          {[
-            { label: "Linux x64", asset: picks?.linuxBinary ?? null },
-            { label: "Windows x64", asset: picks?.winBinary ?? null },
-          ].map(({ label, asset }) => (
-            <a
-              key={label}
-              href={asset?.url ?? RELEASES_PAGE}
-              className="flex items-center justify-between gap-3 rounded-lg border border-white/10 px-3 py-2 font-mono text-[0.72rem] text-white/70 transition-colors hover:border-brand-mint/40 hover:text-white"
-              target="_blank"
-              rel="noreferrer"
-            >
-              <span>{label}</span>
-              <span className="text-white/36">{asset ? formatSize(asset.size) : "—"}</span>
-            </a>
-          ))}
-        </div>
-      </div>
-
-      <div className="mt-8 flex flex-wrap items-center gap-4">
-        <a
-          href={release?.url ?? RELEASES_PAGE}
-          className="btn btn-ghost"
-          target="_blank"
-          rel="noreferrer"
-        >
-          {t("download.all")} <span aria-hidden>→</span>
-        </a>
-        <span className="text-[0.82rem] text-white/40">
-          {version
-            ? `v${version}`
-            : state === "loading"
-              ? "…"
-              : state === "error"
-                ? fr
-                  ? "Versions momentanément indisponibles — la page GitHub reste accessible ci-dessus."
-                  : "Versions temporarily unavailable — the GitHub page above still works."
-                : fr
-                  ? "Aucune version publiée pour l'instant"
-                  : t("download.fallback")}
-        </span>
       </div>
 
       <div className="brand-panel mt-10 flex items-start gap-4 p-5">
@@ -206,23 +217,38 @@ export function DownloadPage() {
         <div>
           <h3 className="text-[0.96rem] font-semibold">{t("download.cli.title")}</h3>
           <p className="mt-1 text-[0.86rem] leading-relaxed text-white/54">
-            {t("download.cli.body")}
+            {fr
+              ? "La même version en ligne de commande, pour les machines sans interface. Elle s'installe en une commande et se met à jour depuis ce site."
+              : "The same version on the command line, for machines without a display. One command to install, and it updates from this site."}
           </p>
-          {/* Two ways in, because there are two kinds of machine: one with Node and one
-              without. Both are real commands, and both are in the release above. */}
           <div className="mt-3 grid gap-1.5">
             <code className="block font-mono text-[0.76rem] text-white/72">npm i -g proofcore</code>
             <code className="block font-mono text-[0.72rem] text-white/48">
               {fr
-                ? "# ou : l'installateur autonome ci-dessus, sans Node installé"
-                : "# or: the self-contained installer above, with no Node installed"}
+                ? "# si macOS a été installé et que la commande existe déjà :"
+                : "# if it is already installed:"}
             </code>
             <code className="block font-mono text-[0.76rem] text-white/72">
               proofcore update --yes
             </code>
+            <code className="block font-mono text-[0.72rem] text-white/48">
+              {fr
+                ? "# ou l'installateur autonome de la colonne de ton système, sans Node installé"
+                : "# or the standalone installer in your system's column, with no Node installed"}
+            </code>
           </div>
         </div>
       </div>
+
+      {state === "empty" || state === "error" ? (
+        <p className="mt-6 text-[0.82rem] text-white/46">
+          {state === "error"
+            ? fr
+              ? "Les versions sont momentanément indisponibles. Rien n'est inventé : réessaie dans une minute, ou installe par npm (commande ci-dessus)."
+              : "Releases are temporarily unavailable. Nothing is invented: try again in a minute, or install through npm (command above)."
+            : t("download.fallback")}
+        </p>
+      ) : null}
     </Section>
   );
 }
@@ -232,9 +258,10 @@ function DownloadCard({
   title,
   subtitle,
   asset,
+  cli,
+  bare,
+  highlighted,
   loading,
-  primary,
-  fallback,
   cta,
   note,
 }: {
@@ -242,44 +269,82 @@ function DownloadCard({
   title: string;
   subtitle: string;
   asset: Asset | null;
+  cli: Asset | null;
+  bare: Asset | null;
+  highlighted: boolean;
   loading: boolean;
-  primary?: boolean;
-  fallback: string;
   cta: string;
   note?: string;
 }) {
-  const href = asset?.url ?? fallback;
   const size = asset ? formatSize(asset.size) : null;
   return (
-    <article className="brand-panel flex min-w-0 flex-col p-6">
+    <article
+      className={`brand-panel flex min-w-0 flex-col p-6 ${highlighted ? "is-detected" : ""}`}
+    >
       <Icon size={22} className="text-brand-mint" />
-      <h3 className="mt-4 text-[1.05rem] font-semibold text-white">{title}</h3>
+      <h3 className="mt-4 text-[1.05rem] font-semibold text-white">
+        {title}
+        {highlighted ? (
+          <span className="ml-2 align-middle font-mono text-[0.58rem] tracking-[0.14em] text-brand-mint">
+            TON SYSTÈME
+          </span>
+        ) : null}
+      </h3>
       <p className="mt-1 text-[0.86rem] text-white/54">{subtitle}</p>
       {size ? <p className="mt-1 font-mono text-[0.72rem] text-white/38">{size}</p> : null}
       <div className="mt-6">
-        <a
-          href={href}
-          className={`btn w-full justify-center ${primary ? "btn-primary" : "btn-ghost"}`}
-          target="_blank"
-          rel="noreferrer"
-          aria-busy={loading || undefined}
-        >
-          <DownloadIcon size={15} />
-          {loading ? "…" : cta}
-        </a>
+        {asset ? (
+          // A plain link with `download`: the browser saves the file from our own origin.
+          // No new tab, no release host, no page to land on.
+          <a
+            href={asset.url}
+            download={asset.name}
+            className="btn btn-primary w-full justify-center"
+          >
+            <DownloadIcon size={15} />
+            {cta}
+          </a>
+        ) : (
+          <span className="btn w-full justify-center opacity-50" aria-busy={loading || undefined}>
+            <DownloadIcon size={15} />
+            {loading ? "…" : "—"}
+          </span>
+        )}
       </div>
       {note ? <p className="mt-3 text-[0.74rem] leading-relaxed text-white/38">{note}</p> : null}
+
+      <dl className="mt-4 grid gap-1.5 border-t border-white/8 pt-3 font-mono text-[0.68rem] text-white/40">
+        {cli ? (
+          <div className="flex items-baseline justify-between gap-3">
+            <dt className="text-white/34">CLI</dt>
+            <dd className="min-w-0 truncate text-right">
+              <a href={cli.url} download={cli.name} className="underline-offset-2 hover:underline">
+                {formatSize(cli.size) || cli.name}
+              </a>
+            </dd>
+          </div>
+        ) : null}
+        {bare ? (
+          <div className="flex items-baseline justify-between gap-3">
+            <dt className="text-white/34">
+              {bare.name.includes("darwin") ? "binaire" : "binaire"}
+            </dt>
+            <dd className="min-w-0 truncate text-right">
+              <a
+                href={bare.url}
+                download={bare.name}
+                className="underline-offset-2 hover:underline"
+              >
+                {formatSize(bare.size) || bare.name}
+              </a>
+            </dd>
+          </div>
+        ) : null}
+      </dl>
       {asset ? (
-        <div className="mt-2 min-w-0">
-          <p className="truncate font-mono text-[0.68rem] text-white/30" title={asset.name}>
-            {asset.name}
-          </p>
-          {asset.digest ? (
-            <p className="truncate font-mono text-[0.64rem] text-white/26" title={asset.digest}>
-              {asset.digest}
-            </p>
-          ) : null}
-        </div>
+        <p className="mt-2 truncate font-mono text-[0.64rem] text-white/26" title={asset.name}>
+          {asset.name}
+        </p>
       ) : null}
     </article>
   );
