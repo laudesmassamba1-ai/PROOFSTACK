@@ -7,7 +7,7 @@ une décision de ta part. Il ne décrit aucun travail futur comme acquis.
 
 | Contrôle | Commande | Résultat |
 | --- | --- | --- |
-| Tests | `npx vitest run` | **653 passés**, 52 fichiers (647 avant ce tour, +6 nouveaux) |
+| Tests | `npx vitest run` | **674 passés**, 55 fichiers (653 avant ce tour, +21) |
 | Lint / format | `npx biome check .` | 0 erreur |
 | Types web | `npx tsc --noEmit -p apps/web` | 0 erreur |
 | Types API | `npx tsc --noEmit -p apps/api` | 0 erreur |
@@ -94,20 +94,20 @@ garantissait pas. Un fichier analysé pouvait écrire `--- END FILE` puis un fau
 
 | # | Test | Statut | Ce qui bloque |
 | - | ---- | ------ | ------------- |
-| 1 | Débutant complet, sans clé IA ni CLI | **Échoue** | L'IA exige une clé fournisseur ; le parcours guidé s'arrête avant le premier résultat expliqué |
+| 1 | Débutant complet, sans clé IA ni CLI | **Passe pour l'essentiel** | Un scan s'explique sans clé (registre) ; il reste à guider un débutant jusqu'au premier résultat sans qu'il cherche le champ |
 | 2 | Intelligence contextuelle | **Passe partiellement** | Le contexte projet est injecté ; la lecture d'un rapport précédent n'est pas prouvée de bout en bout |
 | 3 | Configuration assistée WORLD | **Échoue** | Pas de génération de config par l'IA avec validation avant écriture |
 | 4 | Constructeur FLOW | **Échoue** | Les parcours s'écrivent à la main dans la config |
 | 5 | EXIT | **Passe** | Fidélité d'aller-retour prouvée par tests, à condition d'avoir une source |
 | 6 | FAIL et CLEAN | **Passe** | Contrôles, scores, limites HTML-serveur assumées |
-| 7 | Historique et comparaison | **Passe partiellement** | Deux scans de page comparés ; les runs moteur ne sont pas comparés |
+| 7 | Historique et comparaison | **Passe** | Deux scans comparés, et un contrôle peut être re-vérifié à la demande sans attendre le scan suivant |
 | 8 | Cohérence Web et CLI | **Passe partiellement** | Même API, mêmes statuts ; le partage de config Web→CLI n'est pas outillé |
-| 9 | Assistant sans fournisseur | **Échoue** | Sans clé, il n'y a pas d'explications déterministes de rechange |
+| 9 | Assistant sans fournisseur | **Passe** | Sans clé : constats, scores, rapports, explication, correctif, vérification et boucle de re-vérification fonctionnent. Ce qui manque sans clé est nommé, pas simulé |
 | 10 | Sécurité | **Passe sur le cloisonnement, la faille d'injection fermée** | Restent à prouver : appels IA, approbations d'actions, commandes sensibles de bout en bout |
 
-Quatre tests sur dix échouent pour une raison unique et nommable : **le produit dépend d'une
-clé IA fournie par l'utilisateur pour la partie « explication »**. C'est le prochain chantier,
-et il demande ta décision (§5).
+Un test sur dix échoue encore, et un seul dépend d'une clé : **le parcours guidé d'un
+débutant** (test 3 et 4 restent bloqués par la génération de configuration, qui elle exige un
+modèle). L'explication, elle, ne dépend plus d'aucune clé.
 
 ---
 
@@ -144,15 +144,24 @@ et il demande ta décision (§5).
 
 ---
 
-## 6. Prochaine tranche, dans cet ordre
+## 6. Tranche livrée depuis ce rapport
 
-1. **Explications déterministes** : pour chaque contrôle, résumé, conséquence et correction
-   écrite en dur, dans les deux langues, rendue sans IA. Rend les tests 1 et 9 vrais et ne
-   dépend d'aucun fournisseur.
-2. **Registre de contrôles déclaratif** : un seul fichier par module décrivant objectif,
-   prérequis, complexité, risque, méthode de vérification. Les profils combinés en découlent.
-3. **`BLOCKED` / `NOT_APPLICABLE` / `NOT_CONFIGURED`** dans le contrat de statuts, avec
-   agrégation et affichage. Aujourd'hui un contrôle non applicable ne peut pas le dire.
-4. **Boucle de vérification après correction** : relancer les seuls contrôles du constat
-   corrigé et comparer.
-5. **Fournisseur IA mutualisé**, une fois le plafond décidé.
+1. **Explications déterministes — fait.** `packages/core/src/controls.ts` : 46 contrôles,
+   chacun avec objectif, conséquence, correctif, vérification et exemples par pile
+   (Nginx, Apache, helmet, Laravel, Django, PHP, React, Next.js, WordPress, Stripe,
+   Paystack), en français et en anglais. Rendus dans la page de scan (un `<details>` par
+   défaut), dans `GET /api/v1/controls` et dans `proofcore explain [contrôle]`. Aucun appel
+   de modèle, aucune clé, fonctionne hors ligne.
+2. **Registre déclaratif — fait.** Le même fichier porte complexité, risque, méthode de
+   mesure et forme du résultat. Un test compare un scan réel hostile au registre, id par id :
+   le registre ne peut pas dériver du scan.
+3. **Statuts — fait.** `BLOCKED`, `NOT_APPLICABLE`, `NOT_CONFIGURED` dans le contrat, avec
+   agrégation (seul un cas jugé compte comme réponse), totaux, rapport texte/HTML/JUnit et
+   code de sortie. FLOW et EXIT les émettent réellement.
+4. **Vérification après correction — fait.** `POST /projects/:id/corrections/:key/verify`
+   relit la page, isole le même contrôle, enregistre avant/après et un verdict
+   (`fixed`, `still_present`, `worse`, `not_checked`, `inconclusive`), sans consommer de
+   quota d'audit. Un bouton « Vérifier » sur chaque défaut, verdict affiché en ligne.
+
+Prochaine tranche proposée : configuration assistée WORLD/FLOW (tests 3 et 4), profils
+combinés, puis fournisseur IA mutualisé une fois le plafond décidé.

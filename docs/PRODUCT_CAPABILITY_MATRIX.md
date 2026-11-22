@@ -135,7 +135,7 @@ Vocabulaire de maturité :
 | Audit IA de projet | `POST /projects/:projectId/ai-audit`, `GET /projects/:projectId/ai-audits`, quota `monthly_ai_audits` | Dépend d'une clé fournisseur | **Disponible** |
 | Blog de corrections | `GET /projects/:projectId/corrections`, `PATCH .../corrections/:key` : état par constat + comparaison avec le scan précédent | — | **Disponible** |
 | Fournisseur imposé à l'utilisateur | **Bring Your Own Key** est le chemin par défaut : chaque utilisateur colle sa clé | **C'est exactement ce que la partie 4.4 interdit.** Il n'existe pas de fournisseur serveur mutualisé | **Écart assumé, à corriger** |
-| Mode déterministe sans IA | Les constats, preuves, scores et rapports sont calculés sans IA ; l'IA ne fait qu'interpréter | Pas encore de « plan de résolution » généré hors IA | **Partiel** |
+| Explications déterministes | Registre de 46 contrôles (`packages/core/src/controls.ts`) : objectif, conséquence, correctif, vérification, exemples par pile, en français et en anglais. Rendu dans la page de scan, dans `GET /api/v1/controls` et dans `proofcore explain` | Le « plan de résolution » ordonné (quelle correction d'abord) reste un calcul à écrire | **Disponible** |
 
 ---
 
@@ -145,10 +145,11 @@ Vocabulaire de maturité :
 | ------- | ------- | ------ | -------- |
 | Modèle de constat | `findingSchema` : id, testCaseId, module, titre, détail, sévérité (5 niveaux), statut, `fingerprint` stable, failure (expected/actual), reproduction (commande exacte), evidenceIds, durées | Pas de champs `impact`, `cause probable`, `correction` structurés : ils vivent dans `detail` / le texte du scan | **Partiel** |
 | Empreinte stable | `fingerprint` : le même défaut sur 10 runs = 1 problème avec une tendance | — | **Disponible** |
-| Statuts | `PENDING, RUNNING, PASSED, FAILED, WARNING, SKIPPED, ERROR` (+ `NOTHING_VERIFIED` au niveau run) | **Manquent `BLOCKED`, `NOT_APPLICABLE`, `NOT_CONFIGURED`** exigés en 6.6 | **Partiel** |
+| Statuts | `PENDING, RUNNING, PASSED, FAILED, WARNING, SKIPPED, ERROR, **BLOCKED, NOT_APPLICABLE, NOT_CONFIGURED**` (+ `NOTHING_VERIFIED` au niveau run) | Aucune : les trois statuts exigés en 6.6 existent, sont agrégés, rapportés (JUnit inclus) et comptés séparément | **Disponible** |
 | Cinq niveaux d'explication | Le scan produit `observed` (preuve) + `why` (conséquence) + statut ; la correction est proposée par l'IA ou la page de correction | Résumé / explication / conséquence / correction ne sont pas des champs normalisés du constat | **Partiel** |
 | Regroupement des doublons | `findingKey` + état par constat dans le board de corrections | Le regroupement par cause commune (6.7) n'est pas implémenté | **Partiel** |
 | Comparaison historique | `latestPageAudits(…, 2)` + `comparison` renvoyée par `/corrections` | Comparaison limitée à deux scans de page, pas aux runs moteur | **Partiel** |
+| Vérification après correction | `POST /projects/:id/corrections/:key/verify` : relit la page, isole le même `module:id`, enregistre avant/après et un verdict (`fixed`, `still_present`, `worse`, `not_checked`, `inconclusive`). Sans quota d'audit | Un contrôle à la fois, pas encore de « vérifier tout ce qui est marqué corrigé » | **Disponible** |
 | Couverture réelle | `verdict: not_measured` quand rien n'a été jugé ; `NOTHING_VERIFIED` au niveau run | Pas de ratio « contrôles applicables / exécutés » affiché comme tel | **Partiel** |
 
 ---
