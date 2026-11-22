@@ -8537,8 +8537,8 @@ p {
 }
 
 .brand-shell[data-da="light"] header.fixed .wordmark,
-.brand-shell[data-da="light"] header.fixed a:not([data-dark] *),
-.brand-shell[data-da="light"] header.fixed button:not([data-dark] *) {
+.brand-shell[data-da="light"] header.fixed a:not([data-dark] *):not(.btn-primary),
+.brand-shell[data-da="light"] header.fixed button:not([data-dark] *):not(.btn-primary) {
   color: var(--ink);
 }
 
@@ -8750,6 +8750,21 @@ p {
   color: var(--lh-ink);
 }
 
+/* the mobile menu joins the paper edition: it keeps its dark panel markup
+   (bg-[#050708]) whose white links the flip turns to ink — ink on black */
+.brand-shell[data-da="light"] #mobile-nav {
+  background: #fff;
+  border-color: rgba(10, 10, 11, 0.08);
+}
+
+.brand-shell[data-da="light"] #mobile-nav .nav-flyout-name {
+  color: var(--lh-ink);
+}
+
+.brand-shell[data-da="light"] #mobile-nav .nav-flyout-tag {
+  color: rgba(23, 22, 26, 0.55);
+}
+
 /* underlined links that inherit the dark context read ink on paper */
 .brand-shell[data-da="light"] a.underline:not([data-dark] *) {
   color: rgba(23, 22, 26, 0.72);
@@ -8802,6 +8817,14 @@ p {
    landing composition is HomeLight: editorial index, document audit, numbered
    path — against the dark identity's instrument wall and terminals.
    ========================================================================== */
+
+/* the theme's --ink is the dark identity's paper-white; the light shell re-inks
+   it so every rule that reaches for var(--ink) writes dark on paper */
+.brand-shell[data-da="light"] {
+  --ink: #17161a;
+  --rule: rgba(23, 22, 26, 0.12);
+  --border: rgba(23, 22, 26, 0.12);
+}
 
 .brand-shell[data-da="light"] {
   --font-display: "Instrument Serif", "Geist Variable", ui-serif, Georgia, serif;
@@ -9574,4 +9597,40 @@ p {
   background: var(--lh-accent);
   transform-origin: 0 50%;
   transform: scaleX(0);
+}
+
+/* ------------------------------------------------------------ download page
+   The version selector and the "this is your system" mark. Kept to two rules: the page
+   is a list of files, and every extra ornament on a download page is a place where the
+   real button gets missed. */
+
+.brand-select {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  padding: 5px 26px 5px 9px;
+  background-color: transparent;
+  background-image:
+    linear-gradient(45deg, transparent 50%, rgba(255, 255, 255, 0.5) 50%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.5) 50%, transparent 50%);
+  background-position:
+    calc(100% - 13px) 50%,
+    calc(100% - 9px) 50%;
+  background-size:
+    4px 4px,
+    4px 4px;
+  background-repeat: no-repeat;
+  color: rgba(255, 255, 255, 0.82);
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+  cursor: pointer;
+}
+
+.brand-select option {
+  color: #0a0a0b;
+  background: #f3f0e8;
+}
+
+.brand-panel.is-detected {
+  border-color: color-mix(in srgb, var(--mint, #5cf2c4) 42%, transparent);
 }
