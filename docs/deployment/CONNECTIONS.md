@@ -111,9 +111,30 @@ Sans fournisseur : le jeton est créé, le message reste dans `email_outbox` ave
 
 ---
 
+### 3. Jeton npm — publier la commande `proofcore`
+
+| Ce qu'il faut | Où le trouver |
+| ------------- | ------------- |
+| `NPM_TOKEN`   | npmjs.com → **Account** → **Access Tokens** → *Generate New Token* → **Granular**: package `proofcore`, permission **Read and write** (ou *Automation* si le compte impose la 2FA) |
+
+```bash
+cd /home/laudes/Documents/PROOFSTACK
+NPM_TOKEN=npm_… pnpm cli:publish          # lit le jeton dans l'environnement
+# ou
+pnpm cli:publish                           # puis colle-le quand le terminal le demande (saisie masquée)
+```
+
+Vérification : `npm view proofcore version` répond la version publiée, puis
+`npm install -g proofcore && proofcore --version` sur une machine vierge.
+
+État au 22 novembre 2026 : `proofcore@0.6.0` est construite, installée et vérifiée
+localement (tarball `artifacts/proofcore-0.6.0.tgz`, `proofcore login` ouvre le navigateur
+et approuve par code), mais **le registre public est encore à `0.1.0`** — la publication
+attend ce jeton. Sans lui, `npm i -g proofcore` installe une version d'il y a plusieurs mois.
+
 ## Priorité 1 — l'app est utilisable, il manque la finition
 
-### 3. Jeton GitHub pour le flux des versions
+### 4. Jeton GitHub pour le flux des versions
 
 | Ce qu'il faut | Où le trouver                                                                                     |
 | ------------- | ------------------------------------------------------------------------------------------------- |
@@ -130,7 +151,7 @@ doit rester `200` même après plusieurs appels d'affilée. Sans jeton, GitHub p
 `/download` finit par servir un instantané au lieu du direct. Le jeton ne va jamais au
 navigateur.
 
-### 4. Informations légales (5 valeurs, dans le code)
+### 5. Informations légales (5 valeurs, dans le code)
 
 Les pages `/legal/terms`, `/legal/privacy`, `/legal/cookies` existent et décrivent le
 comportement réel du logiciel. Cinq valeurs y sont affichées comme des emplacements
@@ -149,7 +170,7 @@ place dans `apps/web/src/pages/Legal.tsx` (constante `PLACEHOLDERS`).
 
 Vérification : `/legal/privacy` ne contient plus aucun `[…]`.
 
-### 5. Nom de domaine (décision + DNS)
+### 6. Nom de domaine (décision + DNS)
 
 Aujourd'hui : `https://proofstack-01z.pages.dev` (Cloudflare) et
 `https://proofstack-iota.vercel.app`. Fonctionnels, mais un client sérieux clique sur un
@@ -170,7 +191,7 @@ Vérification : `curl -sI https://tondomaine.com` → `200` + `strict-transport-
 
 ## Priorité 2 — confort et confiance, à faire quand le reste tourne
 
-### 6. Signature des installeurs Windows et macOS
+### 7. Signature des installeurs Windows et macOS
 
 Sans certificat, Windows affiche « Éditeur inconnu » et macOS refuse le premier lancement
 sans clic droit → Ouvrir. Les installeurs fonctionnent : ils font peur.
@@ -187,7 +208,7 @@ dépôt, et `.github/workflows/release.yml` signe puis notarise.
 Vérification : `signtool verify /pa installer.exe` (Windows), `codesign -dv --verbose=4`
 (macOS).
 
-### 7. Rendu réel pour les audits CLEAN sur application cliente
+### 8. Rendu réel pour les audits CLEAN sur application cliente
 
 `PROOFCORE_RENDER_URL` attend un service qui répond `{ "html": "…" }` après avoir exécuté le
 JavaScript. Il ne sert qu'au CLI, sur ta machine, pour noter une SPA à sa vraie interface.
@@ -200,7 +221,7 @@ Ce service demande un hébergement avec navigateur (Playwright + un POST). Le Wo
 pas le faire ; Cloudflare Browser Rendering pourrait, avec un petit Worker dédié. Dis-moi si
 tu veux que je l'écrive : c'est une demi-journée, et ça supprime la dernière note partielle.
 
-### 8. Automatisation n8n (facultatif)
+### 9. Automatisation n8n (facultatif)
 
 `N8N_WEBHOOK_URL` + `N8N_WEBHOOK_SECRET` reçoivent les événements de paiement vérifiés.
 Sans eux, rien ne casse : c'est un confort d'exploitation, jamais une autorité de paiement.
@@ -232,6 +253,7 @@ d'opérateur quand elle existe.
 | Réinitialisation de mot de passe        | jeton créé, message en file, interface honnête  | e-mail livré               | **P0**   |
 | Fichiers de projet + audits IA de code  | `503 neon_not_configured` (déjà branché, vérifié) | fonctionne                 | ✔        |
 | Assistant IA                            | fonctionne avec la clé du compte (BYOK)         | —                          | ✔        |
+| Commande `proofcore` sur npm            | registre à 0.1.0, `npm i -g` installe du vieux  | 0.6.0, connexion navigateur | **P0**   |
 | Flux des versions sur `/download`       | instantané, parfois périmé                      | direct, 5 000 appels/h     | P1       |
 | Pages légales                           | publiées, 5 emplacements visibles               | prêtes à publier           | P1       |
 | Domaine                                 | `.pages.dev` + `.vercel.app`                    | domaine à toi              | P1       |

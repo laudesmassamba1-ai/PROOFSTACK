@@ -97,6 +97,7 @@ import {
   type Screen,
   type SessionPayload,
   sessionFilePath,
+  staleSessionHost,
 } from "./ui.js";
 import {
   applyUpdate,
@@ -1738,7 +1739,18 @@ async function commandStatus(flags: GlobalFlags, args: string[]): Promise<number
   const apiUrl = resolveApiUrl(flagValue(args, "--api"));
   const session = await loadStoredSession(apiUrl);
   if (!session) {
-    err(flags, red(flags, "Not signed in. Run `proofcore login` in a terminal first."));
+    // A session saved against another host is not a session: say which host, or the user
+    // re-types a password that was never the problem.
+    const stale = await staleSessionHost(apiUrl);
+    err(
+      flags,
+      red(
+        flags,
+        stale === null
+          ? "Not signed in. Run `proofcore login` in a terminal first."
+          : `This machine is signed in to ${stale}, not to ${apiUrl}. Run \`proofcore login\` to sign in to the current API.`
+      )
+    );
     return 2;
   }
   try {

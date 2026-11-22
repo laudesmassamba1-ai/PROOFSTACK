@@ -286,6 +286,27 @@ export async function loadStoredSession(apiUrl = resolveApiUrl()): Promise<Store
   }
 }
 
+/**
+ * The host a stored session was issued for, when it is not the one being asked for.
+ *
+ * A cookie is scoped to its API, so a session saved against another host is treated as no
+ * session at all — which is correct and, without this, looks like "you were never signed
+ * in". The old default pointed at the web app instead of the API, so a machine that signed
+ * in before the fix keeps a file that can never work. Naming the two hosts is the
+ * difference between a mystery and a fix.
+ */
+export async function staleSessionHost(apiUrl = resolveApiUrl()): Promise<string | null> {
+  try {
+    const raw = await readFile(sessionFilePath(), "utf8");
+    const parsed = JSON.parse(raw) as Partial<StoredSession>;
+    if (typeof parsed.apiUrl !== "string") return null;
+    const stored = parsed.apiUrl.replace(/\/+$/, "");
+    return stored === apiUrl.replace(/\/+$/, "") ? null : stored;
+  } catch {
+    return null;
+  }
+}
+
 export async function saveStoredSession(session: StoredSession): Promise<void> {
   const path = sessionFilePath();
   await mkdir(dirname(path), { recursive: true, mode: 0o700 });
