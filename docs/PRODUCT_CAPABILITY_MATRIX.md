@@ -8,8 +8,8 @@ manque, et **Maturité** le dit en un mot.
 Méthode de vérification : lecture des routes (`apps/api/src/routes/*.ts`), des modules
 (`packages/modules/*/src`), du moteur de scan (`packages/core/src/page-scan.ts`), du CLI
 (`packages/cli/src/index.ts`), du routeur web (`apps/web/src/App.tsx`), et exécution réelle
-de la suite de tests. État au moment de la rédaction : **647 tests, 51 fichiers, lint 0,
-typecheck web 0 erreur**.
+de la suite de tests. État au moment de la rédaction : **712 tests, 59 fichiers, lint 0
+sur les fichiers livrés, typecheck web/API/CLI 0 erreur**.
 
 Vocabulaire de maturité :
 
@@ -108,6 +108,51 @@ Vocabulaire de maturité :
 | Maturité      | **Disponible**, avec la limite HTML-serveur assumée |
 
 ---
+
+### Le moteur de site — session, crawl, note
+
+Les cinq modules ci-dessus répondent chacun à une famille de questions. Ce qui leur manquait
+n'était pas une question de plus, mais une **portée** : ils ne voyaient qu'une page publique.
+Trois pièces du moteur corrigent cela, et elles sont les mêmes pour le CLI, l'API, l'interface
+et l'assistant.
+
+| Élément | Contenu |
+| ------- | ------- |
+| Objectif | Auditer un site entier, y compris derrière son login, et rendre une note que l'on peut recalculer à la main. |
+| Fichiers | `packages/core/src/session.ts` (connexion), `crawl.ts` (exploration), `site-scan.ts` (contrôles de site + note), `site-audit.ts` (orchestration). |
+| Maturité | **Disponible.** 4 fichiers, 38 tests, dont 4 qui attaquent le moteur (mot de passe refusé, MFA, formulaire en JavaScript, jeton qui ne doit pas fuir). |
+| Surfaces | `proofcore scan <url> --crawl`, `POST /api/v1/audits` avec `crawl` et `login`, panneau « Le site, pas seulement l'adresse » dans `/app/scan`, outil `site_audit` de l'assistant. |
+| Limites | Pas de rendu JavaScript dans le crawl (une page dessinée côté client n'est lue que par son HTML) ; 200 pages maximum par appel d'API, 20 par l'assistant ; l'exploration reste sur l'origine par défaut. |
+
+**Connexion.** Le formulaire est découvert dans la page (`action`, `method`, noms des champs,
+champs cachés dont le jeton anti-CSRF). Les cookies sont gardés dans un jar qui applique les
+règles de chemin, de domaine, `Secure` et d'expiration qu'un navigateur applique. Les
+redirections sont suivies une par une pour que chaque saut conserve ses cookies. La session
+n'est déclarée ouverte que si une page **qui l'exige** répond autrement qu'avec le formulaire :
+un HTTP 200 accompagné d'un cookie ne prouve rien, et c'était exactement le défaut de la
+version précédente, qui aurait présenté un mot de passe refusé comme une connexion réussie.
+Un refus est rapporté avec la phrase du site, un mur MFA est dit MFA, et un jeton bearer
+trouvé dans une réponse JSON sert à la vérification sans jamais entrer dans le rapport.
+
+**Crawl.** Même origine par défaut ; limites de pages (25), de profondeur (3), de concurrence
+(4), d'octets par page (1,5 Mo) et de durée (12 s). `robots.txt` est respecté par groupe
+d'agent, `Crawl-delay` compris. Les adresses de déconnexion, de suppression et de
+désabonnement ne sont **jamais** suivies : un outil d'audit qui se déconnecte du compte qu'on
+lui a prêté détruit la preuve qu'il produisait.
+
+**Contrôles de site.** Treize questions qu'une page seule ne peut pas poser : liens cassés,
+redirections, titres dupliqués, titres absents, pages lourdes (> 400 kB de HTML), pages lentes
+(> 1,5 s), pages sans TLS, pages sans HSTS, source maps publiées, contenu mixte, `robots.txt`,
+`sitemap.xml`, couverture du crawl. Chacune **nomme les pages** concernées : « 3 liens cassés »
+n'est pas actionnable, la liste des trois l'est.
+
+**La note.** Les poids de risque sont lus dans le registre des contrôles, donc le texte et le
+nombre ne peuvent pas se contredire. La note est une **borne basse de Wilson** sur le taux de
+réussite pondéré, multipliée par un facteur de couverture `0,5 + 0,5 × pages lues / pages
+découvertes`. Conséquences vérifiées par des tests arithmétiques : trois contrôles mesurés ne
+peuvent pas valoir 100, un module fait uniquement d'avertissements tombe entre 0 et 100 au lieu
+de 0, et un intervalle de 3 pages ne peut pas dépasser un crawl de 40. Sous 75 % de couverture,
+la note est marquée `provisional` et l'interface l'affiche.
 
 ## 2. Surfaces produit
 
