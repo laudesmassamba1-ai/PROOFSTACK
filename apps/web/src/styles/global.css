@@ -33,11 +33,11 @@
   --font-mono: "JetBrains Mono Variable", ui-monospace, "SFMono-Regular", Menlo, monospace;
 
   /* Ink & Object workspace palette */
-  --paper: #f3f0e8;
-  --paper-raised: #faf8f3;
+  --paper: #f6f6f4;
+  --paper-raised: #ffffff;
   --ink: #0a0a0b;
-  --ink-soft: #5b5a55;
-  --rule: rgba(10, 10, 11, 0.12);
+  --ink-soft: #565550;
+  --rule: rgba(10, 10, 11, 0.1);
   --mint: #5cf2c4;
   --turquoise: #0fd9d0;
   --world: #2f5bff;
@@ -799,9 +799,9 @@ p {
 
 .app-card {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 1px 2px rgba(20, 32, 51, 0.04);
+  border: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(10, 10, 11, 0.04);
   /*
    * A grid or flex child defaults to `min-width: auto`, which means its minimum size is
    * the widest unbreakable thing inside it. A long API token, a URL or a hash then
@@ -1570,10 +1570,8 @@ p {
 
 .app-shell {
   min-height: 100vh;
-  padding: 18px;
-  background:
-    radial-gradient(80% 60% at 100% 0%, rgba(47, 91, 255, 0.055), transparent 58%),
-    radial-gradient(55% 45% at 0% 100%, rgba(255, 176, 32, 0.05), transparent 62%), var(--paper);
+  padding: 0;
+  background: var(--paper);
   color: var(--ink);
 }
 
@@ -1586,15 +1584,11 @@ p {
 .app-frame {
   display: flex;
   width: 100%;
-  max-width: 1440px;
-  min-height: calc(100vh - 36px);
+  min-height: 100vh;
   margin: 0 auto;
   flex-direction: column;
   overflow: clip;
-  border: 1px solid var(--rule);
-  border-radius: 28px;
-  background: var(--surface);
-  box-shadow: 0 1px 0 rgba(10, 10, 11, 0.04);
+  background: transparent;
 }
 
 .app-loading-frame,
@@ -2397,16 +2391,15 @@ p {
 
 .app-display {
   font-family: var(--font-display);
-  font-weight: 760;
-  line-height: 0.88;
-  letter-spacing: -0.06em;
-  text-transform: uppercase;
+  font-weight: 640;
+  line-height: 1.04;
+  letter-spacing: -0.025em;
   text-wrap: balance;
 }
 
 .app-eyebrow {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.13em;
   line-height: 1.4;
@@ -2428,7 +2421,7 @@ p {
   border-bottom: 1px solid var(--rule);
   padding-bottom: 2px;
   color: var(--ink);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 560;
   white-space: nowrap;
 }
@@ -2438,10 +2431,10 @@ p {
 }
 
 .app-card {
-  border: 1px solid var(--rule);
-  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+  border-radius: 12px;
   background: var(--surface);
-  box-shadow: none;
+  box-shadow: 0 1px 2px rgba(10, 10, 11, 0.04);
 }
 
 .app-card > header {
@@ -2451,9 +2444,8 @@ p {
 .app-card h2 {
   font-family: var(--font-display);
   font-size: 1rem;
-  font-weight: 680;
-  letter-spacing: -0.02em;
-  text-transform: uppercase;
+  font-weight: 620;
+  letter-spacing: -0.01em;
 }
 
 .app-btn {
@@ -2849,10 +2841,9 @@ p {
 
 .app-situation-headline {
   margin-top: 22px;
-  /* Sized so the longest editorial word ("EXAMINER.") always fits one line of
-   * the headline column at every clamp point — balance then chooses elegant
-   * breaks, never a mid-word split. */
-  font-size: clamp(3.4rem, 7.6vw, 7rem);
+  /* Sentence case at a reading-first scale: the situation is a headline, not a
+   * shout. Long words still must never split mid-word. */
+  font-size: clamp(2.1rem, 4.8vw, 3.8rem);
   overflow-wrap: break-word;
 }
 
@@ -6975,6 +6966,104 @@ p {
   font-size: 0.74rem;
   line-height: 1.5;
   color: var(--muted-foreground);
+}
+
+.scan-finding-title {
+  margin-left: 8px;
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--foreground);
+}
+
+/* The explanation is a detail element, so it opens without JavaScript and answers the
+   keyboard for free. Its text is the registry's, not a model's. */
+.scan-finding-explain {
+  margin-top: 6px;
+}
+
+.scan-finding-explain > summary {
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--foreground);
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 1px;
+}
+
+.scan-finding-explain > summary::-webkit-details-marker {
+  display: none;
+}
+
+.scan-finding-explain > summary::after {
+  content: "+";
+  font-family: var(--font-mono);
+  color: var(--muted-foreground);
+}
+
+.scan-finding-explain[open] > summary::after {
+  content: "–";
+}
+
+.scan-finding-explain > summary:focus-visible {
+  outline: 2px solid var(--brand-mint);
+  outline-offset: 3px;
+}
+
+.scan-finding-explain dl {
+  margin-top: 8px;
+  display: grid;
+  gap: 2px 12px;
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+}
+
+.scan-finding-explain dt {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  margin-top: 8px;
+}
+
+.scan-finding-explain dt:first-child {
+  margin-top: 0;
+}
+
+.scan-finding-explain dd {
+  font-size: 0.76rem;
+  line-height: 1.55;
+  color: var(--foreground);
+}
+
+.scan-fix-example {
+  margin-top: 6px;
+}
+
+.scan-fix-stack {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--muted-foreground);
+  margin-bottom: 3px;
+}
+
+.scan-fix-example pre {
+  overflow-x: auto;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  line-height: 1.5;
+  white-space: pre;
 }
 
 .scan-saved {

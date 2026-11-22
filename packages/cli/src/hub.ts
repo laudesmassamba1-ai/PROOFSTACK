@@ -65,6 +65,12 @@ export const HUB_COMMANDS: {
   },
   {
     group: "Modules",
+    command: "/explain",
+    args: "[control]",
+    description: "what a control establishes, what it exposes, how to fix it",
+  },
+  {
+    group: "Modules",
     command: "/world",
     args: "[--only WORLD]",
     description: "run WORLD locally in this repository",
@@ -154,6 +160,7 @@ const ALIASES: Record<string, string[]> = {
   "/logout": ["logout"],
   "/projects": ["projects"],
   "/modules": ["modules"],
+  "/explain": ["explain"],
   "/module": ["module"],
   "/world": ["test", "--module", "world"],
   "/flow": ["test", "--module", "flow"],

@@ -31,6 +31,25 @@ import { useSession } from "../../lib/session.js";
 
 type ScanStatus = "PASS" | "WARN" | "FAIL" | "SKIPPED";
 
+/**
+ * A control's explanation, as the registry writes it.
+ *
+ * Fetched once per language from the public catalogue and indexed by `module:id`. Nothing
+ * here is generated: when the catalogue cannot be reached, the finding keeps its observed
+ * value and its one-line reason, and no text is invented to fill the gap.
+ */
+interface ControlCopy {
+  title: string;
+  objective: string;
+  consequence: string;
+  fix: string;
+  verify: string;
+  fixes: { stack: string; code: string }[];
+  complexity: "low" | "medium" | "high";
+  risk: "low" | "medium" | "high";
+  aliasOf?: string;
+}
+
 interface ScanFinding {
   module: "fail" | "clean" | "flow" | "world" | "exit";
   id: string;
@@ -275,6 +294,7 @@ export function ScanPage(): React.ReactElement {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | Error | null>(null);
   const [history, setHistory] = useState<AuditSummary[]>([]);
+  const [controls, setControls] = useState<Record<string, ControlCopy>>({});
   const [explanation, setExplanation] = useState<string | null>(null);
   const [explaining, setExplaining] = useState(false);
   const [explainError, setExplainError] = useState<string | null>(null);
@@ -341,6 +361,28 @@ export function ScanPage(): React.ReactElement {
       // History is a convenience; a failure here must not block scanning.
     }
   }, [session.workspaceId]);
+
+  useEffect(() => {
+    // The catalogue is the explanation. One request per language, cached by the browser for
+    // a day; a failure leaves the findings readable with their raw observation only.
+    let cancelled = false;
+    void apiFetch<{ items: (ControlCopy & { module: string; id: string })[] }>(
+      `/api/v1/controls?locale=${locale}`
+    )
+      .then((body) => {
+        if (cancelled) return;
+        const index: Record<string, ControlCopy> = {};
+        for (const item of body.items) {
+          const { module, ...copy } = item;
+          index[`${module}:${item.id}`] = copy as ControlCopy;
+        }
+        setControls(index);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [locale]);
 
   useEffect(() => {
     // Opening the page shows the last scan rather than an empty form: the result someone
@@ -1117,19 +1159,56 @@ export function ScanPage(): React.ReactElement {
                   {module.toUpperCase()} <span>{MODULE_LABELS[module]?.[fr ? "fr" : "en"]}</span>
                 </p>
                 <ul>
-                  {items.map((item) => (
-                    <li key={item.id} className={STATUS_STYLE[item.status]}>
-                      <span className="scan-finding-status">
-                        {statusIcon(item.status)}
-                        {item.status}
-                      </span>
-                      <div className="scan-finding-body">
-                        <p className="scan-finding-id">{item.id}</p>
-                        <p className="scan-finding-observed">{item.observed}</p>
-                        <p className="scan-finding-why">{item.why}</p>
-                      </div>
-                    </li>
-                  ))}
+                  {items.map((item) => {
+                    const copy = controls[`${item.module}:${item.id}`];
+                    const fixable = item.status === "FAIL" || item.status === "WARN";
+                    return (
+                      <li key={item.id} className={STATUS_STYLE[item.status]}>
+                        <span className="scan-finding-status">
+                          {statusIcon(item.status)}
+                          {item.status}
+                        </span>
+                        <div className="scan-finding-body">
+                          <p className="scan-finding-id">
+                            {item.id}
+                            {copy ? <span className="scan-finding-title">{copy.title}</span> : null}
+                          </p>
+                          <p className="scan-finding-observed">{item.observed}</p>
+                          <p className="scan-finding-why">{item.why}</p>
+                          {copy && fixable ? (
+                            <details className="scan-finding-explain">
+                              <summary>
+                                {fr ? "Comprendre et corriger" : "Understand and fix"}
+                              </summary>
+                              <dl>
+                                <dt>{fr ? "Ce qui est établi" : "What is established"}</dt>
+                                <dd>{copy.objective}</dd>
+                                <dt>{fr ? "Ce que cela expose" : "What it exposes"}</dt>
+                                <dd>{copy.consequence}</dd>
+                                <dt>{fr ? "Le correctif" : "The fix"}</dt>
+                                <dd>{copy.fix}</dd>
+                                {copy.fixes.length > 0 ? (
+                                  <>
+                                    <dt>{fr ? "Exemple" : "Example"}</dt>
+                                    <dd>
+                                      {copy.fixes.map((example) => (
+                                        <div key={example.stack} className="scan-fix-example">
+                                          <span className="scan-fix-stack">{example.stack}</span>
+                                          <pre>{example.code}</pre>
+                                        </div>
+                                      ))}
+                                    </dd>
+                                  </>
+                                ) : null}
+                                <dt>{fr ? "Comment vérifier" : "How to verify"}</dt>
+                                <dd>{copy.verify}</dd>
+                              </dl>
+                            </details>
+                          ) : null}
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               </Card>
             );

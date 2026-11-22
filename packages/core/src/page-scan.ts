@@ -24,6 +24,8 @@
  *     response, so a scan costs one request plus whatever it deliberately probes.
  */
 
+import { isAlias } from "./controls.js";
+
 export type ScanModule = "fail" | "clean" | "flow" | "world" | "exit";
 export type ScanStatus = "PASS" | "WARN" | "FAIL" | "SKIPPED";
 
@@ -944,7 +946,10 @@ function analyse(body: {
 
 /** Weighted score: a skipped check is neutral, a failure costs more than a warning. */
 function summarise(findings: ScanFinding[], module: ScanModule): ScanModuleSummary {
-  const own = findings.filter((item) => item.module === module);
+  // Aliases restate a control that is already counted (`clickjacking_frame_headers` asks the
+  // `frame_ancestors` question). They stay in the report so history keeps its ids, but the
+  // score counts the question once.
+  const own = findings.filter((item) => item.module === module && !isAlias(item.module, item.id));
   const passed = own.filter((item) => item.status === "PASS").length;
   const warnings = own.filter((item) => item.status === "WARN").length;
   const failed = own.filter((item) => item.status === "FAIL").length;

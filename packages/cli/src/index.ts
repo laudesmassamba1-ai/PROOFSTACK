@@ -22,7 +22,15 @@ import {
   starterConfig,
 } from "@proofcore/config";
 import type { ModuleId, ReportFormat, TestRun } from "@proofcore/contracts";
-import { iso, Logger, ProofCoreError, scanPage, stableStringify } from "@proofcore/core";
+import {
+  allControls,
+  controlFor,
+  iso,
+  Logger,
+  ProofCoreError,
+  scanPage,
+  stableStringify,
+} from "@proofcore/core";
 import { ENGINE_VERSION, type EngineEvent, runEngine } from "@proofcore/engine";
 import {
   buildSemanticIndex,
@@ -336,6 +344,8 @@ async function main(argv: string[]): Promise<number> {
       return commandModule(flags, args);
     case "modules":
       return commandModules(flags, args);
+    case "explain":
+      return commandExplain(flags, args);
     case "world":
     case "flow":
     case "exit":
@@ -996,6 +1006,117 @@ async function commandModules(flags: GlobalFlags, _args: string[] = []): Promise
     dim(flags, "Run one module with `proofcore world`, `proofcore flow` or `proofcore exit`.")
   );
   out(flags, dim(flags, "In the hub: /world, /flow, /module exit. /exit leaves the hub."));
+  return 0;
+}
+
+/**
+ * `proofcore explain` — the control registry, on the machine, with no account and no model.
+ *
+ * This is the same text the web app renders inside a finding, and it is the reason a scan
+ * can be understood without an AI key. With no argument it lists what can be explained.
+ */
+async function commandExplain(flags: GlobalFlags, args: string[]): Promise<number> {
+  const wanted = (args[0] ?? "").toLowerCase();
+  // The CLI speaks French by rule; `PROOFCORE_LANG=en` is enough to read the same registry
+  // in English, which is what a partner or a non-French developer needs.
+  const lang = (process.env.PROOFCORE_LANG ?? "fr").toLowerCase().startsWith("en") ? "en" : "fr";
+
+  if (!wanted || wanted === "--help" || wanted === "-h") {
+    const rows = allControls().map((control) => ({
+      module: control.module,
+      id: control.id,
+      title: lang === "en" ? control.en.title : control.fr.title,
+    }));
+    if (flags.json) {
+      stdout.write(`${stableStringify({ controls: rows }, 2)}\n`);
+      return 0;
+    }
+    out(flags, `${bold(flags, "PROOFCORE")} ${dim(flags, "explain")}`);
+    out(flags, dim(flags, `${rows.length} contrôles, expliqués sans modèle ni compte.`));
+    out(flags, "");
+    for (const module of ["fail", "clean", "flow", "world", "exit"] as const) {
+      const own = rows.filter((row) => row.module === module);
+      out(flags, `  ${bold(flags, module.toUpperCase())} ${dim(flags, `(${own.length})`)}`);
+      for (const row of own)
+        out(flags, `    ${cyan(flags, row.id.padEnd(28))} ${dim(flags, row.title)}`);
+    }
+    out(flags, "");
+    out(
+      flags,
+      dim(
+        flags,
+        "`proofcore explain hsts` affiche l'objectif, la conséquence, le correctif et la vérification."
+      )
+    );
+    return 0;
+  }
+
+  // Accept both `hsts` and `fail:hsts`, since a report prints `module:id` in places.
+  const [maybeModule, maybeId] = wanted.includes(":") ? wanted.split(":") : [undefined, wanted];
+  const control =
+    (maybeModule
+      ? controlFor(maybeModule as "fail" | "clean" | "flow" | "world" | "exit", maybeId ?? "")
+      : undefined) ?? allControls().find((item) => item.id === wanted || item.id === maybeId);
+
+  if (!control) {
+    const near = allControls()
+      .filter((item) => item.id.includes(wanted) || wanted.includes(item.id))
+      .slice(0, 5)
+      .map((item) => `${item.module}:${item.id}`);
+    out(flags, red(flags, `Aucun contrôle ne s'appelle « ${wanted} ».`));
+    if (near.length > 0) out(flags, dim(flags, `Peut-être : ${near.join(", ")}`));
+    out(flags, dim(flags, "`proofcore explain` liste les 46 contrôles."));
+    return 2;
+  }
+
+  const copy = lang === "en" ? control.en : control.fr;
+  if (flags.json) {
+    stdout.write(
+      `${stableStringify(
+        {
+          module: control.module,
+          id: control.id,
+          risk: control.risk,
+          complexity: control.complexity,
+          method: control.method,
+          result: control.result,
+          ...copy,
+          fixes: control.fixes,
+          ...(control.aliasOf === undefined ? {} : { aliasOf: control.aliasOf }),
+        },
+        2
+      )}\n`
+    );
+    return 0;
+  }
+
+  out(flags, `${bold(flags, copy.title)} ${dim(flags, `${control.module}:${control.id}`)}`);
+  out(
+    flags,
+    dim(flags, `risque ${control.risk} · correctif ${control.complexity} · ${control.method}`)
+  );
+  out(flags, "");
+  out(flags, `  ${dim(flags, "Établit".padEnd(12))} ${copy.objective}`);
+  out(flags, `  ${dim(flags, "Expose".padEnd(12))} ${copy.consequence}`);
+  out(flags, `  ${dim(flags, "Correctif".padEnd(12))} ${copy.fix}`);
+  out(flags, `  ${dim(flags, "Vérifier".padEnd(12))} ${copy.verify}`);
+  if (control.fixes.length > 0) {
+    out(flags, "");
+    for (const example of control.fixes) {
+      out(flags, `  ${cyan(flags, example.stack)}`);
+      for (const line of example.code.split("\n")) out(flags, `    ${line}`);
+    }
+  }
+  if (control.aliasOf) {
+    out(flags, "");
+    out(
+      flags,
+      dim(
+        flags,
+        `Ce contrôle reprend ${control.aliasOf} : le score compte la question une seule fois.`
+      )
+    );
+  }
   return 0;
 }
 

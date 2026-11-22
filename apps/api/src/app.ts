@@ -14,6 +14,7 @@ import { auditRoutes } from "./routes/audits.js";
 import { authRoutes } from "./routes/auth.js";
 import { billingRoutes, planRoutes } from "./routes/billing.js";
 import { browserRoutes } from "./routes/browser.js";
+import { controlRoutes } from "./routes/controls.js";
 import { deviceRoutes } from "./routes/device.js";
 import { machineRoutes } from "./routes/machine.js";
 import { projectIntelligenceRoutes } from "./routes/project-intelligence.js";
@@ -158,6 +159,9 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
   // `/api/v1/*`, so anything mounted after it would answer 401 to an anonymous visitor.
   // The download page is public by design and must describe releases before sign-in.
   app.route("/api/v1", releaseRoutes({ token: services.config.githubToken }));
+  // Same reason as the release feed: the catalogue is public by design, so it has to be
+  // mounted before the workspace router that guards `/api/v1/*`.
+  app.route("/api/v1", controlRoutes());
   app.route("/api/v1", workspaceRoutes(services));
   app.route("/api/v1", projectIntelligenceRoutes(services));
   app.route("/api/v1/ai", aiRoutes(services));
