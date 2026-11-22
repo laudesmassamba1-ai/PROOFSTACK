@@ -186,7 +186,7 @@ export function DaComparer() {
       />
 
       {/* the exercise has a name: this is the before/after CLEAN grades */}
-      <div className="da-headline" aria-hidden="true">
+      <div className="da-headline">
         <span className="da-headline-title">
           {fr ? (
             <>
@@ -198,11 +198,9 @@ export function DaComparer() {
             </>
           )}
         </span>
-        <span className="da-headline-note">
-          {fr
-            ? "CLEAN mesure la qualité de l'interface — comparez les deux directions"
-            : "CLEAN grades interface quality — compare the two directions"}
-        </span>
+        <button type="button" className="da-close" onClick={() => setOpen(false)}>
+          {fr ? "Continuer sans choisir" : "Continue without choosing"}
+        </button>
       </div>
 
       {/* the bar: drag to compare, push to an edge to keep one identity */}
@@ -250,10 +248,6 @@ export function DaComparer() {
       <span className="da-tag da-tag-light">
         {fr ? "Le rapport — édition papier" : "The report — paper edition"}
       </span>
-
-      <button type="button" className="da-close" onClick={() => setOpen(false)}>
-        {fr ? "Continuer sans choisir" : "Continue without choosing"}
-      </button>
 
       <p className="da-hint">
         {fr

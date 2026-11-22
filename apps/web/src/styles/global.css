@@ -8207,9 +8207,7 @@ p {
 }
 
 .da-bar:focus-visible {
-  filter:
-    drop-shadow(0 0 0 2px #fff)
-    drop-shadow(0 0 0 4px #f5d06f);
+  filter: drop-shadow(0 0 0 2px #fff) drop-shadow(0 0 0 4px #f5d06f);
 }
 
 .da-bar-handle {
@@ -8238,7 +8236,7 @@ p {
 
 .da-tag {
   position: absolute;
-  top: 18px;
+  bottom: 14px;
   z-index: 6;
   padding: 7px 13px;
   border-radius: 999px;
@@ -8264,12 +8262,8 @@ p {
 }
 
 .da-close {
-  position: absolute;
-  top: 16px;
-  left: 50%;
-  z-index: 6;
-  transform: translateX(-50%);
-  padding: 8px 16px;
+  flex: none;
+  padding: 9px 16px;
   border: 1px solid rgba(10, 10, 11, 0.14);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.94);
@@ -8557,13 +8551,11 @@ p {
   color: var(--ink);
 }
 
-
 /* In the light DA the hero is light too: the wave stays, redrawn in deep teal
    (palette prop), the scrim fades white, the copy reads in ink. */
 .brand-shell[data-da="light"] .hero-section {
   background:
-    radial-gradient(90% 70% at 88% 30%, rgba(15, 128, 110, 0.08), transparent 62%),
-    #f7f7f5;
+    radial-gradient(90% 70% at 88% 30%, rgba(15, 128, 110, 0.08), transparent 62%), #f7f7f5;
 }
 
 .brand-shell[data-da="light"] .hero-scrim {
@@ -8600,7 +8592,6 @@ p {
   color: #0c7a6b;
 }
 
-
 /* the paper edition's footer: cream, hairline, ink */
 .brand-shell[data-da="light"] footer {
   background: var(--lh-paper-deep) !important;
@@ -8611,7 +8602,6 @@ p {
 .brand-shell[data-da="light"] footer [class*="bg-white/"] {
   background-color: transparent;
 }
-
 
 .brand-shell[data-da="light"] .lh-doc-pre {
   margin: 0;
@@ -8646,7 +8636,6 @@ p {
   margin-top: 3px;
 }
 
-
 /* the featured plan speaks indigo in the paper edition */
 .brand-shell[data-da="light"] .pk-plan-featured {
   animation: none;
@@ -8658,16 +8647,23 @@ p {
   box-shadow: 0 18px 40px -18px rgba(79, 70, 229, 0.28);
 }
 
-
 .brand-shell[data-da="light"] .lh-marquee-status {
   letter-spacing: 0.26em;
 }
 
-.brand-shell[data-da="light"] .lh-marquee-pass { color: #15803d; }
-.brand-shell[data-da="light"] .lh-marquee-warn { color: #b45309; }
-.brand-shell[data-da="light"] .lh-marquee-fail { color: #b91c1c; }
+.brand-shell[data-da="light"] .lh-marquee-pass {
+  color: #15803d;
+}
+.brand-shell[data-da="light"] .lh-marquee-warn {
+  color: #b45309;
+}
+.brand-shell[data-da="light"] .lh-marquee-fail {
+  color: #b91c1c;
+}
 .brand-shell[data-da="light"] .lh-marquee-pending,
-.brand-shell[data-da="light"] .lh-marquee-skipped { color: rgba(23, 22, 26, 0.6); }
+.brand-shell[data-da="light"] .lh-marquee-skipped {
+  color: rgba(23, 22, 26, 0.6);
+}
 
 .brand-shell[data-da="light"] .lh-marquee-status i {
   color: rgba(23, 22, 26, 0.4);
@@ -8693,19 +8689,18 @@ p {
   color: rgba(23, 22, 26, 0.55);
 }
 
-
 /* the divider carries its story: the evidence passing from the run to the
    report. The headline names the exercise: this is what CLEAN grades. */
 .da-headline {
   position: absolute;
-  top: 16px;
+  bottom: 46px;
   left: 50%;
   z-index: 6;
   transform: translateX(-50%);
-  display: grid;
-  justify-items: center;
-  gap: 8px;
-  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
 }
 
 .da-headline-title {
@@ -8723,17 +8718,6 @@ p {
 .da-headline-title em {
   font-style: italic;
   color: #4f46e5;
-}
-
-.da-headline-note {
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: rgba(5, 7, 8, 0.72);
-  color: rgba(255, 255, 255, 0.85);
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
 }
 
 /* one scrollbar on screen: the panes hide theirs, the evidence line is the
@@ -8780,7 +8764,6 @@ p {
     transition: none;
   }
 }
-
 
 /* ==========================================================================
    LIGHT DA — THE PAPER EDITION
@@ -8996,10 +8979,18 @@ p {
 }
 
 /* the copy children stagger, the headline chars run on their own delays */
-.brand-shell[data-da="light"] .lh-hero-grid.is-in .lh-hero-copy > :nth-child(1) { transition-delay: 0.05s; }
-.brand-shell[data-da="light"] .lh-hero-grid.is-in .lh-hero-copy > :nth-child(3) { transition-delay: 0.35s; }
-.brand-shell[data-da="light"] .lh-hero-grid.is-in .lh-hero-copy > :nth-child(4) { transition-delay: 0.5s; }
-.brand-shell[data-da="light"] .lh-hero-grid.is-in .lh-hero-copy > :nth-child(5) { transition-delay: 0.62s; }
+.brand-shell[data-da="light"] .lh-hero-grid.is-in .lh-hero-copy > :nth-child(1) {
+  transition-delay: 0.05s;
+}
+.brand-shell[data-da="light"] .lh-hero-grid.is-in .lh-hero-copy > :nth-child(3) {
+  transition-delay: 0.35s;
+}
+.brand-shell[data-da="light"] .lh-hero-grid.is-in .lh-hero-copy > :nth-child(4) {
+  transition-delay: 0.5s;
+}
+.brand-shell[data-da="light"] .lh-hero-grid.is-in .lh-hero-copy > :nth-child(5) {
+  transition-delay: 0.62s;
+}
 
 .brand-shell[data-da="light"] .lh-hero-title {
   margin: 14px 0 22px;
@@ -9138,8 +9129,12 @@ p {
 }
 
 @keyframes lh-marquee {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
 }
 
 .brand-shell[data-da="light"] .lh-marquee-run {
