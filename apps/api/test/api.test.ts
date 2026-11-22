@@ -232,10 +232,13 @@ describe("health and public catalogue", () => {
     const body = await json<{
       status: string;
       database: string;
+      knowledge: string;
       payments: { provider: string; configured: boolean };
     }>(response);
     expect(body.status).toBe("ok");
     expect(body.database).toBe("ok");
+    // No Neon URL in the test environment: the second store says so instead of pretending.
+    expect(body.knowledge).toBe("not_configured");
     expect(body.payments).toEqual({ provider: "sandbox", configured: false });
   });
 

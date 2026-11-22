@@ -138,13 +138,21 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
     } catch {
       database = "unreachable";
     }
+    // Neon holds the project-intelligence store (imported files, AI code audits). It is a
+    // second database with its own failure mode, so it is reported separately: a green
+    // "database: ok" that hides a missing Neon URL is how a feature looks shipped and is not.
+    let knowledge: "ok" | "not_configured" | "unreachable" = "not_configured";
+    if (services.projectKnowledge) {
+      knowledge = (await services.projectKnowledge.ping()) ? "ok" : "unreachable";
+    }
     return c.json(
       {
-        status: database === "ok" ? "ok" : "degraded",
+        status: database === "ok" && knowledge !== "unreachable" ? "ok" : "degraded",
         service: "proofcore-api",
         apiVersion: API_VERSION,
         time: iso(services.clock()),
         database,
+        knowledge,
         payments: {
           provider: services.provider.getCapabilities().provider,
           configured: services.provider.getCapabilities().provider !== "sandbox",

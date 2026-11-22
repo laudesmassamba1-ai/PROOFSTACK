@@ -78,6 +78,8 @@ export interface ProjectIntelligenceMetrics {
 
 export interface ProjectKnowledge {
   readonly configured: true;
+  /** One round trip, so /health can say whether this store answers. */
+  ping(): Promise<boolean>;
   createSource(input: {
     workspaceId: string;
     projectId: string;
@@ -181,6 +183,15 @@ export function createProjectKnowledge(databaseUrl: string | undefined): Project
 
   return {
     configured: true,
+
+    async ping() {
+      try {
+        await sql`select 1`;
+        return true;
+      } catch {
+        return false;
+      }
+    },
 
     async createSource(input) {
       const id = `src_${uuid().replaceAll("-", "").slice(0, 20)}`;
