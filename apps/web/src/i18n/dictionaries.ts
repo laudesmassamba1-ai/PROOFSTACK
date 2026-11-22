@@ -100,6 +100,36 @@ export const en = {
   "question.fail": "Where does the deployed application leak, expose or mislead?",
   "question.clean": "Is the interface measured, scored and clean, provably?",
   "modules.eyebrow": "Five questions, one engine",
+  "product.title": "An integrated suite, not five tools in a tab bar",
+  "product.lede":
+    "PROOFCORE validates five independent properties of a product — reach, reliability, reversibility, safety and cleanliness — with shared machinery underneath and a module you can adopt alone.",
+  "product.assistant.eyebrow": "The assistant",
+  "product.assistant.title": "It works on the machine, not on a screenshot of it",
+  "product.assistant.lede":
+    "The assistant opens a real browser, reads the page it rendered, acts on it and keeps the session. A terminal runs the shell itself. The tools that change files show the change before they make it.",
+  "product.assistant.browser.t": "A browser, embedded",
+  "product.assistant.browser.d":
+    "Chromium already on the machine, with tabs, cookies, keyboard, zoom and find. The assistant clicks and types through the same page you see.",
+  "product.assistant.terminal.t": "A terminal, integrated",
+  "product.assistant.terminal.d":
+    "Your own shell, in the application, with colours, prompts and full-screen programs. The session survives navigation.",
+  "product.assistant.tools.t": "Tools that can finish the job",
+  "product.assistant.tools.d":
+    "Read, search, edit, move, delete, run, fetch, audit and commit — with an exact diff before every write.",
+  "product.shared.eyebrow": "Shared by design",
+  "product.shared.title": "What the modules refuse to duplicate",
+  "product.shared.project.t": "One project system",
+  "product.shared.project.d":
+    "A project owns environments, module activation and tokens. Modules never invent their own notion of a project.",
+  "product.shared.engine.t": "One execution engine",
+  "product.shared.engine.d":
+    "Scheduling, timeouts, retries, cancellation, evidence and status aggregation are implemented once, in @proofcore/engine, and validated against the shared contract.",
+  "product.shared.report.t": "One report architecture",
+  "product.shared.report.d":
+    "JSON, JUnit XML, HTML and CLI text all render from the same TestRun object, so a CI gate and a dashboard cannot disagree.",
+  "product.shared.workspace.t": "One workspace and one bill",
+  "product.shared.workspace.d":
+    "Entitlements, usage metering and payment state live server-side. A plan change is enforced, not styled.",
   "modules.title": "WORLD. FLOW. EXIT. FAIL. CLEAN.",
   "modules.lede":
     "Five modules on one engine, with one CLI and one report. Three run fixture and transaction cases; two audit a live URL. Each works on its own when you only need that one.",
@@ -359,6 +389,36 @@ export const fr: Messages = {
   "question.fail": "Où l'application déployée fuit-elle, s'expose-t-elle, induit-elle en erreur ?",
   "question.clean": "L'interface est-elle mesurée, notée et propre, de façon prouvable ?",
   "modules.eyebrow": "Cinq questions, un moteur",
+  "product.title": "Une suite intégrée, pas cinq outils dans des onglets",
+  "product.lede":
+    "PROOFCORE valide cinq propriétés indépendantes d'un produit — portée, fiabilité, réversibilité, sécurité et propreté — sur une machinerie partagée, avec un module adoptable seul.",
+  "product.assistant.eyebrow": "L'assistant",
+  "product.assistant.title": "Il travaille sur la machine, pas sur une capture d'écran",
+  "product.assistant.lede":
+    "L'assistant ouvre un vrai navigateur, lit la page qu'il affiche, agit dessus et garde la session. Un terminal exécute le shell lui-même. Les outils qui modifient des fichiers montrent le changement avant de le faire.",
+  "product.assistant.browser.t": "Un navigateur, intégré",
+  "product.assistant.browser.d":
+    "Chromium déjà présent sur la machine, avec onglets, cookies, clavier, zoom et recherche. L'assistant clique et tape dans la même page que vous.",
+  "product.assistant.terminal.t": "Un terminal, intégré",
+  "product.assistant.terminal.d":
+    "Votre shell, dans l'application, avec couleurs, prompts et programmes plein écran. La session survit à la navigation.",
+  "product.assistant.tools.t": "Des outils qui finissent le travail",
+  "product.assistant.tools.d":
+    "Lire, chercher, éditer, déplacer, supprimer, exécuter, récupérer, auditer et committer — avec un diff exact avant chaque écriture.",
+  "product.shared.eyebrow": "Partagé par construction",
+  "product.shared.title": "Ce que les modules refusent de dupliquer",
+  "product.shared.project.t": "Un seul système de projet",
+  "product.shared.project.d":
+    "Un projet possède environnements, activation de modules et tokens. Les modules n'inventent jamais leur propre notion de projet.",
+  "product.shared.engine.t": "Un seul moteur d'exécution",
+  "product.shared.engine.d":
+    "Ordonnancement, timeouts, réessais, annulation, preuves et agrégation de statuts sont implémentés une fois, dans @proofcore/engine, et validés par le contrat partagé.",
+  "product.shared.report.t": "Une seule architecture de rapport",
+  "product.shared.report.d":
+    "JSON, JUnit XML, HTML et texte CLI rendent tous à partir du même objet TestRun : un gate CI et un dashboard ne peuvent pas se contredire.",
+  "product.shared.workspace.t": "Un espace et une facture",
+  "product.shared.workspace.d":
+    "Entitlements, comptage d'usage et état de paiement vivent côté serveur. Un changement d'offre est appliqué, pas stylisé.",
   "modules.title": "WORLD. FLOW. EXIT. FAIL. CLEAN.",
   "modules.lede":
     "Cinq modules sur un seul moteur, un seul CLI, un seul rapport. Trois exécutent des cas et des parcours ; deux auditent une URL en ligne. Chacun reste utilisable seul, quand vous n'avez besoin que de lui.",

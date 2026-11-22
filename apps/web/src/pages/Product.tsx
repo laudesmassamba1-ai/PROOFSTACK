@@ -4,27 +4,25 @@ import { ModuleShowcase } from "../components/marketing/ModuleShowcase.js";
 import { useI18n } from "../i18n/index.js";
 import { Section, SectionHeading } from "../layouts/BrandLayout.js";
 
-const SHARED = [
-  {
-    icon: Boxes,
-    title: "One project system",
-    body: "A project owns environments, module activation and tokens. Modules never invent their own notion of a project.",
-  },
-  {
-    icon: Layers,
-    title: "One execution engine",
-    body: "Scheduling, timeouts, retries, cancellation, evidence and status aggregation are implemented once, in @proofcore/engine, and validated against the shared contract.",
-  },
-  {
-    icon: GitBranch,
-    title: "One report architecture",
-    body: "JSON, JUnit XML, HTML and CLI text all render from the same TestRun object, so a CI gate and a dashboard cannot disagree.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "One workspace and one bill",
-    body: "Entitlements, usage metering and payment state live server-side. A plan change is enforced, not styled.",
-  },
+/**
+ * The product page carries the art direction's second movement: after the brand
+ * hero proves the instrument exists, this page shows the machinery. The layout
+ * is deliberately asymmetric (the shared machinery gets the wide cell, the
+ * assistant gets a bento with one dominant panel), every card is a spot-lit
+ * spring-tilted surface, and the deeper band carries the corner-anchored aurora
+ * from the reference board. No invented numbers, no decoration without duty.
+ */
+const SHARED: { key: "project" | "engine" | "report" | "workspace"; icon: typeof Boxes }[] = [
+  { key: "project", icon: Boxes },
+  { key: "engine", icon: Layers },
+  { key: "report", icon: GitBranch },
+  { key: "workspace", icon: ShieldCheck },
+];
+
+const ASSISTANT: { key: "browser" | "terminal" | "tools"; icon: typeof Monitor }[] = [
+  { key: "browser", icon: Monitor },
+  { key: "terminal", icon: Terminal },
+  { key: "tools", icon: Wrench },
 ];
 
 export function Product() {
@@ -35,76 +33,73 @@ export function Product() {
         <SectionHeading
           as="h1"
           eyebrow={t("modules.eyebrow")}
-          title="An integrated suite, not five tools in a tab bar"
-          lede="PROOFCORE validates five independent properties of a product — reach, reliability, reversibility, safety and cleanliness — with shared machinery underneath and a module you can adopt alone."
+          title={t("product.title")}
+          lede={t("product.lede")}
         />
-        <div className="mt-10">
+        <div className="mt-10" data-reveal>
           <ModuleShowcase />
         </div>
       </Section>
 
-      <Section>
+      <Section tone="deeper" className="aurora-band">
         <SectionHeading
-          eyebrow="The assistant"
-          title="It works on the machine, not on a screenshot of it"
-          lede="The assistant opens a real browser, reads the page it rendered, acts on it and keeps the session. A terminal runs the shell itself. The tools that change files show the change before they make it."
+          eyebrow={t("product.assistant.eyebrow")}
+          title={t("product.assistant.title")}
+          lede={t("product.assistant.lede")}
         />
-        <div className="mt-9 grid gap-5 md:grid-cols-3">
-          <article className="brand-panel p-6">
+        {/* Bento: the browser panel is the claim's proof, so it takes the wide cell;
+            terminal and tools stack beside it. Equal thirds would read as filler. */}
+        <div className="mt-9 grid gap-5 lg:grid-cols-[1.35fr_1fr]">
+          <article className="brand-panel spot-card p-7" data-tilt data-reveal>
             <Monitor size={20} className="text-brand-mint" />
-            <h3 className="mt-4 text-[1rem] font-semibold">A browser, embedded</h3>
-            <p className="mt-2 text-[0.88rem] leading-relaxed text-white/54">
-              Chromium already on the machine, with tabs, cookies, keyboard, zoom and find. The
-              assistant clicks and types through the same page you see.
+            <h3 className="mt-4 text-[1.05rem] font-semibold">
+              {t("product.assistant.browser.t")}
+            </h3>
+            <p className="mt-2 max-w-[52ch] text-[0.88rem] leading-relaxed text-white/54">
+              {t("product.assistant.browser.d")}
+            </p>
+            <p className="mt-5 font-mono text-[0.66rem] tracking-[0.14em] text-white/32">
+              CHROMIUM · TABS · COOKIES · ZOOM · FIND
             </p>
           </article>
-          <article className="brand-panel p-6">
-            <Terminal size={20} className="text-brand-mint" />
-            <h3 className="mt-4 text-[1rem] font-semibold">A terminal, integrated</h3>
-            <p className="mt-2 text-[0.88rem] leading-relaxed text-white/54">
-              Your own shell, in the application, with colours, prompts and full-screen programs.
-              The session survives navigation.
-            </p>
-          </article>
-          <article className="brand-panel p-6">
-            <Wrench size={20} className="text-brand-mint" />
-            <h3 className="mt-4 text-[1rem] font-semibold">Tools that can finish the job</h3>
-            <p className="mt-2 text-[0.88rem] leading-relaxed text-white/54">
-              Read, search, edit, move, delete, run, fetch, audit and commit — with an exact diff
-              before every write.
-            </p>
-          </article>
+          <div className="grid gap-5">
+            {ASSISTANT.slice(1).map(({ key, icon: Icon }) => (
+              <article key={key} className="brand-panel spot-card p-6" data-tilt data-reveal>
+                <Icon size={20} className="text-brand-mint" />
+                <h3 className="mt-4 text-[1rem] font-semibold">
+                  {t(`product.assistant.${key}.t`)}
+                </h3>
+                <p className="mt-2 text-[0.88rem] leading-relaxed text-white/54">
+                  {t(`product.assistant.${key}.d`)}
+                </p>
+              </article>
+            ))}
+          </div>
         </div>
       </Section>
 
-      <Section tone="deeper">
-        <SectionHeading eyebrow="Shared by design" title="What the modules refuse to duplicate" />
+      <Section>
+        <SectionHeading eyebrow={t("product.shared.eyebrow")} title={t("product.shared.title")} />
+        {/* 2×2 but not a filler grid: each card is a real architectural fact, and the
+            spotlight border + layered shadow give them the reference's depth. */}
         <div className="mt-9 grid gap-5 md:grid-cols-2">
-          {SHARED.map(({ icon: Icon, title, body }) => (
-            <article key={title} className="brand-panel p-6">
+          {SHARED.map(({ key, icon: Icon }) => (
+            <article key={key} className="brand-panel spot-card p-6" data-tilt data-reveal>
               <Icon size={20} className="text-brand-mint" />
-              <h3 className="mt-4 text-[1rem] font-semibold">{title}</h3>
-              <p className="mt-2 text-[0.88rem] leading-relaxed text-white/54">{body}</p>
+              <h3 className="mt-4 text-[1rem] font-semibold">{t(`product.shared.${key}.t`)}</h3>
+              <p className="mt-2 text-[0.88rem] leading-relaxed text-white/54">
+                {t(`product.shared.${key}.d`)}
+              </p>
             </article>
           ))}
         </div>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Link to="/world" className="btn btn-ghost">
-            WORLD
-          </Link>
-          <Link to="/flow" className="btn btn-ghost">
-            FLOW
-          </Link>
-          <Link to="/exit" className="btn btn-ghost">
-            EXIT
-          </Link>
-          <Link to="/fail" className="btn btn-ghost">
-            FAIL
-          </Link>
-          <Link to="/clean" className="btn btn-ghost">
-            CLEAN
-          </Link>
-          <Link to="/platform" className="btn btn-primary">
+        <div data-reveal className="mt-8 flex flex-wrap gap-3">
+          {(["world", "flow", "exit", "fail", "clean"] as const).map((module) => (
+            <Link key={module} to={`/${module}`} className="btn btn-ghost" data-magnet>
+              {module.toUpperCase()}
+            </Link>
+          ))}
+          <Link to="/platform" className="btn btn-primary" data-magnet>
             {t("nav.platform")}
           </Link>
         </div>
