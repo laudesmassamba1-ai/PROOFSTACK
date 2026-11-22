@@ -507,7 +507,7 @@ export function ModulePage({ name }: { name: ModuleName }) {
         />
         <div className="mt-8 grid gap-4 md:grid-cols-2">
           {content.checks.map((check) => (
-            <article key={check.label} className="brand-panel p-5">
+            <article key={check.label} className="brand-panel spot-card p-5" data-tilt data-reveal>
               <h3 className="text-[0.95rem] font-semibold">{check.label}</h3>
               <p className="mt-2 text-[0.86rem] leading-relaxed text-white/52">{check.detail}</p>
             </article>
@@ -517,7 +517,7 @@ export function ModulePage({ name }: { name: ModuleName }) {
 
       <Section>
         <div className="grid gap-8 lg:grid-cols-[1.1fr_1fr]">
-          <figure className="brand-panel overflow-hidden">
+          <figure className="brand-panel spot-card overflow-hidden" data-reveal>
             <figcaption className="border-b border-white/8 px-4 py-3 font-mono text-[0.74rem] text-white/48">
               {fr ? "Sortie CLI" : "CLI output"}
             </figcaption>
@@ -548,11 +548,11 @@ export function ModulePage({ name }: { name: ModuleName }) {
               {(["world", "flow", "exit", "fail", "clean"] as ModuleName[])
                 .filter((other) => other !== name)
                 .map((other) => (
-                  <Link key={other} to={`/${other}`} className="btn btn-ghost">
+                  <Link key={other} to={`/${other}`} className="btn btn-ghost" data-magnet>
                     {other.toUpperCase()}
                   </Link>
                 ))}
-              <Link to="/pricing" className="btn btn-primary">
+              <Link to="/pricing" className="btn btn-primary" data-magnet>
                 {t("nav.pricing")}
               </Link>
             </div>
