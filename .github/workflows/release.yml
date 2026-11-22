@@ -163,7 +163,10 @@ jobs:
           test -x "$APP/Contents/Resources/sidecar/proofcore-darwin-arm64"
           test -s artifacts/desktop/latest-mac.yml
           grep -q "version:" artifacts/desktop/latest-mac.yml
-          ls -l artifacts/desktop/*.dmg artifacts/desktop/*.zip
+          # Both, and not as a formality: the dmg is the install, the zip is what the
+          # updater can actually replace.
+          ls -l artifacts/desktop/*.dmg
+          ls -l artifacts/desktop/*.zip
 
       - name: Prove the packaged app has its Windows files
         if: runner.os == 'Windows'

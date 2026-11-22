@@ -64,7 +64,12 @@ nsis:
   shortcutName: PROOFCORE
 
 mac:
-  target: dmg
+  # The dmg is what a person installs; the zip is what the updater replaces. Squirrel.Mac
+  # cannot update from a dmg, so a release without the zip would ship a window that can
+  # never update itself — and `latest-mac.yml` would name a file that is not there.
+  target:
+    - dmg
+    - zip
   category: public.app-category.developer-tools
 
 publish:
