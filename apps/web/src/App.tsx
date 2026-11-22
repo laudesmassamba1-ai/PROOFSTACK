@@ -4,6 +4,8 @@ import { useI18n } from "./i18n/index.js";
 import { BrandLayout } from "./layouts/BrandLayout.js";
 import { useDAMode } from "./lib/da.js";
 import { HomeLight } from "./pages/HomeLight.js";
+import { ModuleLightPage } from "./pages/ModuleLightPage.js";
+import { ProductLight } from "./pages/ProductLight.js";
 
 /** Route-level splitting keeps marketing, docs, the workspace and admin apart. */
 const Home = lazy(() => import("./pages/Home.js").then((m) => ({ default: m.Home })));
@@ -106,6 +108,16 @@ function HomeGate() {
   return da === "light" ? <HomeLight /> : <Home />;
 }
 
+function ProductGate() {
+  const da = useDAMode();
+  return da === "light" ? <ProductLight /> : <Product />;
+}
+
+function ModuleGate({ name }: { name: "world" | "flow" | "exit" | "fail" | "clean" }) {
+  const da = useDAMode();
+  return da === "light" ? <ModuleLightPage name={name} /> : <MarketingModulePage name={name} />;
+}
+
 export function App() {
   const { t } = useI18n();
   return (
@@ -119,12 +131,12 @@ export function App() {
       <Routes>
         <Route element={<BrandLayout />}>
           <Route index element={<HomeGate />} />
-          <Route path="product" element={<Product />} />
-          <Route path="world" element={<MarketingModulePage name="world" />} />
-          <Route path="flow" element={<MarketingModulePage name="flow" />} />
-          <Route path="exit" element={<MarketingModulePage name="exit" />} />
-          <Route path="fail" element={<MarketingModulePage name="fail" />} />
-          <Route path="clean" element={<MarketingModulePage name="clean" />} />
+          <Route path="product" element={<ProductGate />} />
+          <Route path="world" element={<ModuleGate name="world" />} />
+          <Route path="flow" element={<ModuleGate name="flow" />} />
+          <Route path="exit" element={<ModuleGate name="exit" />} />
+          <Route path="fail" element={<ModuleGate name="fail" />} />
+          <Route path="clean" element={<ModuleGate name="clean" />} />
           <Route path="platform" element={<Platform />} />
           <Route path="pricing" element={<Pricing />} />
           <Route path="download" element={<DownloadPage />} />

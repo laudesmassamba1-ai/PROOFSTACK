@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router";
 import { useI18n } from "../../i18n/index.js";
 import { Wordmark } from "../brand/Logo.js";
+import { useDAMode } from "../../lib/da.js";
 
 /**
  * The header is deliberately short.
@@ -39,6 +40,7 @@ const MODULES = [
 ];
 
 export function Nav() {
+  const da = useDAMode();
   const { t, locale, setLocale } = useI18n();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
@@ -87,7 +89,7 @@ export function Nav() {
     >
       <nav className="mx-auto flex max-w-[1240px] items-center gap-3 px-5 py-3.5 lg:px-8">
         <Link to="/" aria-label={t("mkt.homeLabel")} className="shrink-0">
-          <Wordmark size={15} />
+          <Wordmark size={15} variant={da === "light" ? "onLight" : "default"} />
         </Link>
 
         <ul className="ml-3 hidden items-center gap-0.5 lg:flex">

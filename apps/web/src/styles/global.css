@@ -6797,6 +6797,215 @@ p {
   font-size: 0.72rem;
 }
 
+/* ---------------------------------------------------------------- site section
+   The proof that the product read the site and not a page: what was read, what was
+   deliberately skipped, how the score was built. Dense on purpose — this is the part
+   a technical reader checks first. */
+
+.scan-crawl {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 7px 11px;
+  background: var(--surface);
+  font-size: 0.74rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.scan-crawl input {
+  accent-color: var(--accent);
+  width: 13px;
+  height: 13px;
+}
+
+.scan-crawl-pages {
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+
+.scan-site {
+  margin-bottom: 14px;
+}
+
+.scan-site-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.scan-site-score {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin: 6px 0 2px;
+  font-family: var(--font-mono);
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.scan-site-score strong {
+  font-weight: 600;
+}
+
+.scan-site-coverage {
+  margin-left: 10px;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.scan-site-pages {
+  display: grid;
+  gap: 1px;
+  margin: 10px 0;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  overflow: hidden;
+  list-style: none;
+  padding: 0;
+}
+
+.scan-site-page {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 10px;
+  background: var(--surface);
+  font-size: 0.73rem;
+}
+
+.scan-site-page:nth-child(even) {
+  background: color-mix(in srgb, var(--ink) 3%, var(--surface));
+}
+
+.scan-site-status {
+  display: inline-flex;
+  width: 15px;
+  height: 15px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  flex: none;
+}
+
+.scan-site-status.is-ok {
+  background: color-mix(in srgb, var(--success) 18%, transparent);
+  color: var(--success);
+}
+
+.scan-site-status.is-skip {
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  color: var(--muted);
+}
+
+.scan-site-path {
+  font-family: var(--font-mono);
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scan-site-page-meta {
+  margin-left: auto;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+
+.scan-site-skipped summary,
+.scan-site-defects summary,
+.scan-auth-advanced summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.scan-site-skipped ul {
+  margin: 8px 0 0;
+  padding-left: 16px;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.scan-site-skipped code {
+  font-size: 0.68rem;
+}
+
+.scan-site-defects {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scan-site-defects > li {
+  border-left: 3px solid var(--border);
+  padding: 2px 0 2px 11px;
+}
+
+.scan-site-defects > li.is-FAIL {
+  border-left-color: var(--destructive);
+}
+
+.scan-site-defects > li.is-WARN {
+  border-left-color: var(--warning);
+}
+
+.scan-site-defect-head {
+  margin: 0;
+  font-size: 0.79rem;
+  font-weight: 600;
+}
+
+.scan-site-defect-observed {
+  margin: 2px 0 4px;
+  font-size: 0.73rem;
+  color: var(--muted);
+}
+
+.scan-site-defect-pages {
+  margin: 0 0 4px;
+  padding-left: 15px;
+  font-size: 0.7rem;
+}
+
+.scan-site-defect-pages a {
+  color: var(--accent-ink, var(--ink));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+}
+
+.scan-site-defects details p {
+  margin: 6px 0 0;
+  font-size: 0.72rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.scan-site-defects details strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.scan-auth-advanced {
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--border);
+  padding-top: 9px;
+}
+
 .scan-modules {
   display: grid;
   gap: 8px;
@@ -7977,19 +8186,27 @@ p {
   top: 0;
   bottom: 0;
   z-index: 5;
-  width: 2px;
-  transform: translateX(-1px);
+  width: 18px;
+  transform: translateX(-9px);
   cursor: ew-resize;
   touch-action: none;
-  background: var(--brand-mint);
-  box-shadow: 0 0 0 1px rgba(5, 7, 8, 0.6);
   outline: none;
+  /* a soft gold bloom around the stream, so it never floats free */
+  filter: drop-shadow(0 0 12px rgba(245, 208, 111, 0.55));
+}
+
+.da-bar-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .da-bar:focus-visible {
-  box-shadow:
-    0 0 0 2px #fff,
-    0 0 0 4px var(--brand-mint);
+  filter:
+    drop-shadow(0 0 0 2px #fff)
+    drop-shadow(0 0 0 4px #f5d06f);
 }
 
 .da-bar-handle {
@@ -7997,14 +8214,18 @@ p {
   top: 50%;
   left: 50%;
   display: grid;
-  width: 44px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
   place-items: center;
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  background: var(--brand-mint);
-  color: #06231a;
-  box-shadow: 0 10px 30px -8px rgba(120, 227, 203, 0.7);
+  background:
+    radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.85), transparent 46%),
+    linear-gradient(160deg, #fff3c4, #f5d06f 38%, #c9992e 78%, #8a6a1f);
+  color: #5c4512;
+  box-shadow:
+    0 10px 30px -6px rgba(245, 208, 111, 0.8),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 /* the grip: two thin chevrons drawn with borders, no icon dependency */
@@ -8390,6 +8611,52 @@ p {
   background-color: transparent;
 }
 
+
+.brand-shell[data-da="light"] .lh-doc-pre {
+  margin: 0;
+  padding: 18px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  line-height: 1.7;
+  color: rgba(23, 22, 26, 0.8);
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+.brand-shell[data-da="light"] .lh-ledger {
+  margin-top: 18px;
+  display: grid;
+  gap: 0;
+}
+
+.brand-shell[data-da="light"] .lh-ledger-line {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--lh-rule);
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: rgba(23, 22, 26, 0.78);
+}
+
+.brand-shell[data-da="light"] .lh-ledger-line svg {
+  flex: 0 0 auto;
+  margin-top: 3px;
+}
+
+
+/* the featured plan speaks indigo in the paper edition */
+.brand-shell[data-da="light"] .pk-plan-featured {
+  animation: none;
+  border-color: rgba(79, 70, 229, 0.4);
+  box-shadow: 0 24px 54px -30px rgba(79, 70, 229, 0.45);
+}
+
+.brand-shell[data-da="light"] .pk-plan:hover {
+  box-shadow: 0 18px 40px -18px rgba(79, 70, 229, 0.28);
+}
+
 /* form fields on the light shell (auth pages inherit the light DA) */
 .brand-shell[data-da="light"] .field {
   background: #fff;
@@ -8446,11 +8713,51 @@ p {
   color: var(--lh-ink);
 }
 
-/* the serif must breathe: the dark identity's tracking values are wrong for it */
-.brand-shell[data-da="light"] .lh {
+/* the serif must breathe: the dark identity's tracking values are wrong for it.
+   The whole light shell speaks the paper edition — every page, not just the
+   landing — with Instrument Serif display and Instrument Sans text. */
+.brand-shell[data-da="light"] {
   font-family: var(--font-sans);
   font-size: 16px;
   line-height: 1.55;
+}
+
+/* system display type joins the identity: serif, sentence case */
+.brand-shell[data-da="light"] .app-display,
+.brand-shell[data-da="light"] .app-page-title,
+.brand-shell[data-da="light"] .hero-title,
+.brand-shell[data-da="light"] .app-section-title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: -0.01em;
+}
+
+.brand-shell[data-da="light"] .hero-title,
+.brand-shell[data-da="light"] .app-page-title {
+  color: var(--lh-ink);
+}
+
+.brand-shell[data-da="light"] .app-card h2 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.35rem;
+}
+
+/* the CTA speaks indigo in the paper edition */
+.brand-shell[data-da="light"] .btn-primary {
+  background: linear-gradient(180deg, #5b52ee, #4f46e5);
+  color: #fff;
+  box-shadow: 0 10px 24px -14px rgba(79, 70, 229, 0.65);
+}
+
+.brand-shell[data-da="light"] .btn-primary:hover {
+  background: linear-gradient(180deg, #655df0, #4338ca);
+}
+
+.brand-shell[data-da="light"] .hero-title-accent {
+  color: var(--lh-accent);
+  font-style: italic;
 }
 
 /* ---- shared atoms ---- */

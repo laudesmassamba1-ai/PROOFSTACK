@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "../../i18n/index.js";
 import { type DAMode, inIframe, readDAChoice, rememberDAMode } from "../../lib/da.js";
+import { GoldStream } from "./GoldStream.js";
 
 /**
  * The DA comparer: one window, two art directions.
@@ -57,19 +58,67 @@ export function DaComparer() {
     };
   }, [open, dragging, commit]);
 
-  // Scroll sync: each pane reports its offset; the other follows.
+  // Scroll sync without messaging: the panes are same-origin, so the parent
+  // attaches scroll listeners to their documents directly. An echo flag is
+  // consumed by the first scroll event of the applied scroll, and the
+  // last-forwarded ratio stops any residual oscillation. Listeners attach when
+  // each pane finishes loading and survive SPA navigations inside the pane.
   useEffect(() => {
     if (!open) return;
-    const onMessage = (event: MessageEvent) => {
-      const data = event.data as { type?: string; y?: number; from?: string };
-      if (data?.type !== "da-scroll" || typeof data.y !== "number") return;
-      const target = data.from === "dark" ? rightRef.current : leftRef.current;
-      if (target?.contentWindow) {
-        target.contentWindow.postMessage({ type: "da-scroll-to", y: data.y }, "*");
+    const panes = [
+      { frame: leftRef.current, mode: "dark" as const },
+      { frame: rightRef.current, mode: "light" as const },
+    ];
+    const cleanups: (() => void)[] = [];
+    const state: Record<"dark" | "light", { echo: boolean; lastSent: number }> = {
+      dark: { echo: false, lastSent: -1 },
+      light: { echo: false, lastSent: -1 },
+    };
+    const attach = (): void => {
+      for (const cleanup of cleanups) cleanup();
+      cleanups.length = 0;
+      for (const pane of panes) {
+        const doc = pane.frame?.contentDocument;
+        const win = pane.frame?.contentWindow;
+        if (!doc || !win) continue;
+        const otherMode: "dark" | "light" = pane.mode === "dark" ? "light" : "dark";
+        const other = (pane.mode === "dark" ? panes[1] : panes[0]) ?? panes[0];
+        const ratioOf = (): number => {
+          const w = pane.frame?.contentWindow;
+          const d = pane.frame?.contentDocument;
+          if (!w || !d) return 0;
+          const max = d.documentElement.scrollHeight - w.innerHeight;
+          return max > 0 ? Math.min(1, Math.max(0, w.scrollY / max)) : 0;
+        };
+        const onScroll = (): void => {
+          const mine = state[pane.mode];
+          if (mine.echo) {
+            mine.echo = false;
+            return;
+          }
+          const ratio = ratioOf();
+          if (Math.abs(ratio - mine.lastSent) < 0.001) return;
+          mine.lastSent = ratio;
+          const otherFrame = other?.frame;
+          const owin = otherFrame?.contentWindow;
+          const odoc = otherFrame?.contentDocument;
+          if (!otherFrame || !owin || !odoc) return;
+          state[otherMode].echo = true;
+          // instant: the panes' smooth scrolling would rain intermediate events
+          // that echo back and fight the leader
+          const max = odoc.documentElement.scrollHeight - owin.innerHeight;
+          owin.scrollTo({ top: max * ratio, behavior: "instant" });
+        };
+        doc.addEventListener("scroll", onScroll, { passive: true });
+        cleanups.push(() => doc.removeEventListener("scroll", onScroll));
       }
     };
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
+    attach();
+    const interval = window.setInterval(attach, 700);
+    return () => {
+      window.clearInterval(interval);
+      for (const cleanup of cleanups) cleanup();
+    };
   }, [open]);
 
   if (inIframe()) return null;
@@ -150,6 +199,7 @@ export function DaComparer() {
         aria-valuemax={100}
         aria-valuenow={Math.round(fraction * 100)}
       >
+        <GoldStream />
         <span className="da-bar-handle" aria-hidden="true" />
       </div>
 

@@ -5,7 +5,7 @@ import { Section, SectionHeading } from "../layouts/BrandLayout.js";
 
 export type ModuleName = "world" | "flow" | "exit" | "fail" | "clean";
 
-interface ModuleContent {
+export interface ModuleContent {
   name: ModuleName;
   tag: string;
   headline: string;
@@ -17,7 +17,7 @@ interface ModuleContent {
   command: string;
 }
 
-const CONTENT: Record<ModuleName, ModuleContent> = {
+export const CONTENT: Record<ModuleName, ModuleContent> = {
   world: {
     name: "world",
     tag: "Global compatibility",
@@ -245,7 +245,7 @@ score 61/100  ·  4 fail · 2 warn · 5 pass
   },
 };
 
-const CONTENT_FR: Record<ModuleName, ModuleContent> = {
+export const CONTENT_FR: Record<ModuleName, ModuleContent> = {
   world: {
     name: "world",
     tag: "Compatibilité mondiale",
