@@ -66,9 +66,11 @@ export function DaComparer() {
       setDragging(false);
       const rect = rootRef.current?.getBoundingClientRect();
       if (!rect) return;
+      // the bundle sweeps the direction it is pushed toward: push it onto the
+      // black side and the run is swept away — the report is kept, and vice versa
       const x = event.clientX - rect.left;
-      if (x <= EDGE) commit("dark");
-      else if (rect.width - x <= EDGE) commit("light");
+      if (x <= EDGE) commit("light");
+      else if (rect.width - x <= EDGE) commit("dark");
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
@@ -203,21 +205,24 @@ export function DaComparer() {
             setFraction((value) => Math.min(1, value + 0.04));
           }
           if (event.key === "Enter") {
-            commit(fraction < 0.5 ? "dark" : "light");
+            commit(fraction < 0.5 ? "light" : "dark");
           }
         }}
         role="slider"
         tabIndex={0}
         aria-label={
           fr
-            ? "Faisceau de fils — glisser vers un bord pour garder une seule direction"
-            : "Filament bundle — drag to an edge to keep one direction"
+            ? "Ligne de preuve — glisser le faisceau vers un bord pour balayer cette direction et garder l'autre"
+            : "Evidence line — drag the bundle to an edge to sweep that direction away and keep the other"
         }
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.round(fraction * 100)}
       >
         <FilamentStream />
+        <span className="da-bar-caption" aria-hidden="true">
+          {fr ? "la preuve" : "the evidence"}
+        </span>
         <span className="da-bar-handle" aria-hidden="true" />
       </div>
 

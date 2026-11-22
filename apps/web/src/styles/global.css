@@ -8690,6 +8690,36 @@ p {
   color: rgba(23, 22, 26, 0.42);
 }
 
+
+/* the divider carries its story: the evidence passing from the run to the report */
+.da-bar-caption {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 6;
+  transform: translate(-50%, -50%) rotate(90deg) translateY(64px);
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: rgba(255, 226, 140, 0.9);
+  text-shadow: 0 0 8px rgba(245, 208, 111, 0.6);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* one scrollbar on screen: the panes hide theirs, the evidence line is the
+   shared control */
+[data-da-pane] {
+  scrollbar-width: none;
+}
+
+[data-da-pane]::-webkit-scrollbar,
+[data-da-pane] body::-webkit-scrollbar {
+  display: none;
+  width: 0;
+}
+
 /* form fields on the light shell (auth pages inherit the light DA) */
 .brand-shell[data-da="light"] .field {
   background: #fff;

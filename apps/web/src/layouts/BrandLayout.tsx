@@ -76,6 +76,17 @@ export function BrandLayout() {
   // The visitor's art direction: remembered choice, or the comparer's URL override.
   const [da, setDa] = useState<DAMode>(() => resolveDAMode());
 
+  // Inside a comparer pane the document hides its own scrollbar: the two panes
+  // scroll together, so there is exactly one scrollbar on screen — the evidence
+  // line the visitor drags.
+  useEffect(() => {
+    if (!inIframe()) return;
+    document.documentElement.dataset.daPane = "1";
+    return () => {
+      delete document.documentElement.dataset.daPane;
+    };
+  }, []);
+
   // The comparer re-resolves after a choice is remembered.
   useEffect(() => {
     const onChange = () => setDa(resolveDAMode());
