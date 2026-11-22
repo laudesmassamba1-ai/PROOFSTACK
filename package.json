@@ -37,6 +37,7 @@
     "app:dist": "pnpm build:packages && pnpm --filter @proofcore/web build && node tooling/scripts/package-desktop.mjs",
     "app:dist:linux": "pnpm build:packages && pnpm --filter @proofcore/web build && pnpm --filter @proofcore/desktop dist:linux",
     "app:dist:win": "pnpm build:packages && pnpm --filter @proofcore/web build && pnpm --filter @proofcore/desktop dist:win",
+    "app:dist:mac": "pnpm build:packages && pnpm --filter @proofcore/web build && pnpm --filter @proofcore/desktop dist:mac",
     "cloud:deploy": "node tooling/scripts/deploy-cloudflare.mjs",
     "cloud:deploy:api": "node tooling/scripts/deploy-cloudflare.mjs --only api",
     "cloud:deploy:web": "node tooling/scripts/deploy-cloudflare.mjs --only web",
