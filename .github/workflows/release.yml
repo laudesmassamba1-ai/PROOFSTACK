@@ -194,6 +194,11 @@ jobs:
     needs: [installers, desktop]
     runs-on: ubuntu-latest
     steps:
+      # The manifest is written from the repository's own version, and a job without a
+      # checkout has no packages/cli/package.json to read: `require` then fails with a
+      # message about a missing module rather than a missing checkout.
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           path: dist
