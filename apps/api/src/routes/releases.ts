@@ -218,9 +218,10 @@ async function releaseFromIndex(tag: string): Promise<ReleaseBody["release"]> {
     if (!name) continue;
     assets.push({
       name,
-      // Our own route, so a download never leaves the site for the release host. The Worker
-      // streams the file (see GET /releases/assets/:name); Vercel forwards /api/* to it.
-      url: `/api/v1/releases/assets/${encodeURIComponent(name)}`,
+      // The release host's own URL: the Worker fetches it in GET /releases/assets/:name.
+      // Every response that reaches a client goes through localise(), which swaps this for
+      // our own route, so a visitor never leaves the site for the release host.
+      url: `https://github.com/${REPO}/releases/download/${encodeURIComponent(tag)}/${encodeURIComponent(name)}`,
       size: typeof file.size === "number" ? file.size : 0,
       digest:
         typeof file.sha256 === "string" && file.sha256.length > 0 ? `sha256:${file.sha256}` : null,
