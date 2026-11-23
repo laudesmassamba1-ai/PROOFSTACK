@@ -1,6 +1,5 @@
 import type { PaymentState } from "@proofcore/contracts";
-import type { Money } from "@proofcore/core";
-import { hmacSha256Hex, sha256Hex, timingSafeEqualHex } from "@proofcore/core";
+import { hmacSha256Hex, Money, sha256Hex, timingSafeEqualHex } from "@proofcore/core";
 import type {
   CheckoutInput,
   CheckoutResult,
@@ -109,11 +108,12 @@ export class SandboxProvider implements PaymentProvider {
       createdAt: new Date().toISOString(),
       terminal: scripted !== "pending",
     };
-    this.transactions.set(id, transaction);
-    this.seenIdempotency.set(input.idempotencyKey, id);
+    const providerReference = encodeTransaction(transaction);
+    this.transactions.set(providerReference, transaction);
+    this.seenIdempotency.set(input.idempotencyKey, providerReference);
 
     return {
-      providerReference: id,
+      providerReference,
       flow: input.flow,
       state,
       checkoutUrl: `http://localhost:5173/sandbox/checkout/${id}`,
@@ -123,12 +123,35 @@ export class SandboxProvider implements PaymentProvider {
     };
   }
 
-  /** Sandbox control surface: lets a test or the demo page settle a payment. */
+  /**
+   * Sandbox control surface: lets a test or the demo page settle a payment.
+   *
+   * Returns a self-contained reference carrying the settled state and amount. The
+   * caller must persist it before finalising. Cloudflare may serve the checkout and
+   * the settle request from different isolates, so an in-memory map alone would make
+   * the settlement unreachable in production (`unknown transaction`).
+   */
   settle(
     providerReference: string,
-    outcome: "success" | "declined" | "cancelled" | "expired"
-  ): void {
-    const transaction = this.transactions.get(providerReference);
+    outcome: "success" | "declined" | "cancelled" | "expired",
+    fallback?: { amount: Money; metadata?: Record<string, string> }
+  ): string {
+    const transaction =
+      this.transactions.get(providerReference) ??
+      decodeTransaction(providerReference) ??
+      (fallback
+        ? {
+            id: providerReference,
+            flow: "hosted" as const,
+            state: "PENDING" as PaymentState,
+            providerStatus: "PENDING",
+            amount: fallback.amount,
+            description: "Sandbox checkout",
+            metadata: fallback.metadata ?? {},
+            createdAt: new Date().toISOString(),
+            terminal: false,
+          }
+        : null);
     if (!transaction) throw new Error(`sandbox: unknown transaction ${providerReference}`);
     transaction.state =
       outcome === "success"
@@ -140,12 +163,18 @@ export class SandboxProvider implements PaymentProvider {
             : "EXPIRED";
     transaction.providerStatus = outcome.toUpperCase();
     transaction.terminal = true;
+    const settledReference = encodeTransaction(transaction);
+    // Keep the in-process map useful for tests, but never require it to be shared.
+    this.transactions.set(providerReference, transaction);
+    this.transactions.set(settledReference, transaction);
+    return settledReference;
   }
 
   async verifyTransaction(providerReference: string): Promise<VerifiedTransaction> {
     if (this.options.latencyMs)
       await new Promise((resolve) => setTimeout(resolve, this.options.latencyMs));
-    const transaction = this.transactions.get(providerReference);
+    const transaction =
+      this.transactions.get(providerReference) ?? decodeTransaction(providerReference);
     if (!transaction) throw new Error(`sandbox: unknown transaction ${providerReference}`);
     return {
       providerReference,
@@ -167,7 +196,8 @@ export class SandboxProvider implements PaymentProvider {
   }
 
   async refund(input: RefundInput): Promise<RefundResult> {
-    const transaction = this.transactions.get(input.providerReference);
+    const transaction =
+      this.transactions.get(input.providerReference) ?? decodeTransaction(input.providerReference);
     if (!transaction) throw new Error(`sandbox: unknown transaction ${input.providerReference}`);
     const partial = input.amount !== undefined && input.amount.minor < transaction.amount.minor;
     transaction.state = partial ? "PARTIALLY_REFUNDED" : "REFUNDED";
@@ -208,6 +238,120 @@ interface SandboxTransaction {
   metadata: Record<string, string>;
   createdAt: string;
   terminal: boolean;
+}
+
+/**
+ * A 1-byte version + the fields verification needs. The reference is data, not a
+ * credential: it is only trusted after the intent id, workspace and amount checks
+ * in the billing engine have passed. It carries no customer or secret material.
+ */
+interface SandboxReference {
+  v: 1;
+  id: string;
+  flow: "hosted" | "push";
+  state: PaymentState;
+  status: string;
+  currency: string;
+  minor: string;
+  createdAt: string;
+  metadata: Record<string, string>;
+}
+
+const BASE64URL = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
+function base64UrlEncode(input: string): string {
+  const bytes = new TextEncoder().encode(input);
+  let out = "";
+  for (let i = 0; i < bytes.length; i += 3) {
+    const a = bytes[i] ?? 0;
+    const b = bytes[i + 1];
+    const c = bytes[i + 2];
+    const triple = (a << 16) | ((b ?? 0) << 8) | (c ?? 0);
+    out += BASE64URL[(triple >> 18) & 63];
+    out += BASE64URL[(triple >> 12) & 63];
+    if (b !== undefined) out += BASE64URL[(triple >> 6) & 63];
+    if (c !== undefined) out += BASE64URL[triple & 63];
+  }
+  return out;
+}
+
+function base64UrlDecode(input: string): string | null {
+  if (input.length % 4 === 1) return null;
+  const values: number[] = [];
+  for (const char of input) {
+    const value = BASE64URL.indexOf(char);
+    if (value < 0) return null;
+    values.push(value);
+  }
+  const bytes: number[] = [];
+  for (let i = 0; i < values.length; i += 4) {
+    const a = values[i] ?? 0;
+    const b = values[i + 1];
+    const c = values[i + 2];
+    const d = values[i + 3];
+    const triple = (a << 18) | ((b ?? 0) << 12) | ((c ?? 0) << 6) | (d ?? 0);
+    bytes.push((triple >> 16) & 255);
+    if (c !== undefined) bytes.push((triple >> 8) & 255);
+    if (d !== undefined) bytes.push(triple & 255);
+  }
+  try {
+    return new TextDecoder().decode(new Uint8Array(bytes));
+  } catch {
+    return null;
+  }
+}
+
+function encodeTransaction(transaction: SandboxTransaction): string {
+  const payload: SandboxReference = {
+    v: 1,
+    id: transaction.id,
+    flow: transaction.flow,
+    state: transaction.state,
+    status: transaction.providerStatus,
+    currency: transaction.amount.currency,
+    minor: transaction.amount.minor.toString(),
+    createdAt: transaction.createdAt,
+    metadata: transaction.metadata,
+  };
+  return `sbx_${base64UrlEncode(JSON.stringify(payload))}`;
+}
+
+function decodeTransaction(reference: string): SandboxTransaction | null {
+  if (!reference.startsWith("sbx_")) return null;
+  const decoded = base64UrlDecode(reference.slice(4));
+  if (!decoded) return null;
+  let payload: SandboxReference;
+  try {
+    payload = JSON.parse(decoded) as SandboxReference;
+  } catch {
+    return null;
+  }
+  if (
+    payload.v !== 1 ||
+    typeof payload.id !== "string" ||
+    (payload.flow !== "hosted" && payload.flow !== "push") ||
+    typeof payload.state !== "string" ||
+    typeof payload.status !== "string" ||
+    typeof payload.currency !== "string" ||
+    typeof payload.minor !== "string" ||
+    !/^\d+$/.test(payload.minor) ||
+    typeof payload.createdAt !== "string" ||
+    typeof payload.metadata !== "object" ||
+    payload.metadata === null
+  ) {
+    return null;
+  }
+  return {
+    id: payload.id,
+    flow: payload.flow,
+    state: payload.state,
+    providerStatus: payload.status,
+    amount: Money.of(payload.currency, BigInt(payload.minor)),
+    description: "Sandbox checkout",
+    metadata: payload.metadata,
+    createdAt: payload.createdAt,
+    terminal: payload.state !== "PENDING" && payload.state !== "PROCESSING",
+  };
 }
 
 /**

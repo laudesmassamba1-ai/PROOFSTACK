@@ -7,7 +7,7 @@ import {
   resolveEntitlements,
 } from "@proofcore/billing";
 import type { BillingPeriod } from "@proofcore/contracts";
-import { iso } from "@proofcore/core";
+import { iso, Money } from "@proofcore/core";
 import { Hono } from "hono";
 import { z } from "zod";
 import { createApiKeyToken } from "../auth.js";
@@ -215,7 +215,12 @@ export function billingRoutes(services: Services): Hono<AppEnv> {
     if (!intent.providerReference)
       throw new HttpError(409, "no_provider_reference", "This attempt has no provider session.");
     const body = await readBody(c, settleSchema);
-    services.provider.settle(intent.providerReference, body.outcome);
+    // The settled reference carries the outcome. Persist it before verifying: a Worker
+    // isolate may not share the sandbox provider's in-memory transaction map.
+    intent.providerReference = services.provider.settle(intent.providerReference, body.outcome, {
+      amount: Money.of(intent.currency, BigInt(intent.amountMinor)),
+    });
+    await services.billing.saveIntent(intent);
     const result = await services.checkout.finalize(intent.id, { source: "return" });
     // The billing engine writes the real audit row (finalize.credited or
     // finalize.payment_failed). Project it into the inbox of the workspace members.
