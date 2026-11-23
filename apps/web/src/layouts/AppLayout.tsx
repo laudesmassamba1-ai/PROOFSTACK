@@ -363,7 +363,11 @@ export function AppLayout() {
       <div className="app-shell">
         <div className="app-frame">
           <header className="app-topbar">
-            <NavLink to="/app" className="app-brand-lockup" aria-label="PROOFCORE workspace">
+            <NavLink
+              to="/app"
+              className="app-brand-lockup"
+              aria-label={locale === "fr" ? "PROOFCORE espace de travail" : "PROOFCORE workspace"}
+            >
               <Mark size={34} variant="onLight" />
               <span className="wordmark app-brand-word">PROOFCORE</span>
               <span className="app-beta">{t("ws.shell.beta")}</span>
@@ -446,7 +450,11 @@ export function AppLayout() {
     <div className="app-shell">
       <div className="app-frame">
         <header className="app-topbar">
-          <NavLink to="/app" className="app-brand-lockup" aria-label="PROOFCORE workspace">
+          <NavLink
+            to="/app"
+            className="app-brand-lockup"
+            aria-label={locale === "fr" ? "PROOFCORE espace de travail" : "PROOFCORE workspace"}
+          >
             <Mark size={34} variant="onLight" />
             <span className="wordmark app-brand-word">PROOFCORE</span>
             <span className="app-beta">{t("ws.shell.beta")}</span>
@@ -513,6 +521,9 @@ export function AppLayout() {
                       </NavLink>
                       <NavLink to="/app/scan" className="app-nav-popover-link" role="menuitem">
                         {locale === "fr" ? "Scanner une adresse" : "Scan an address"}
+                      </NavLink>
+                      <NavLink to="/app/interact" className="app-nav-popover-link" role="menuitem">
+                        {locale === "fr" ? "Interaction navigateur" : "Browser interaction"}
                       </NavLink>
                     </div>
                   ) : null}
@@ -709,7 +720,7 @@ export function AppLayout() {
         </main>
 
         <footer className="app-footer">
-          <span>PROOFCORE / {workspace?.name ?? "workspace"}</span>
+          <span>PROOFCORE / {workspace?.name ?? (locale === "fr" ? "espace" : "workspace")}</span>
           <span>WORLD · FLOW · EXIT · FAIL · CLEAN</span>
         </footer>
       </div>
@@ -739,7 +750,9 @@ export function AppLayout() {
           <nav className="app-mobile-nav" aria-label={t("ws.nav.menu")}>
             {routes.map((entry, index) => (
               <NavLink key={entry.to} to={entry.to} className="app-mobile-link">
-                <span className="app-mobile-index">{String(index + 1).padStart(2, "0")}</span>
+                <span className="app-mobile-index" aria-hidden="true">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
                 {entry.label}
               </NavLink>
             ))}

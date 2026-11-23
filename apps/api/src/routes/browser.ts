@@ -2,8 +2,9 @@ import { ProofCoreError, shortId } from "@proofcore/core";
 import { Hono } from "hono";
 import { z } from "zod";
 import { clientAddress, HttpError, RateLimiter } from "../http/errors.js";
-import { readBody } from "../http/guards.js";
+import { readBody, requireWorkspace } from "../http/guards.js";
 import type { AppEnv, Services } from "../http/services.js";
+import { defaultScenario, runScenario, unavailableReport } from "../scenario.js";
 
 /**
  * The interactive browser, beside the chat.
@@ -180,6 +181,36 @@ async function capture(
   };
 }
 
+/** A scenario runs many actions in one request; keep it bounded and explicit. */
+const scenarioSchema = z.object({
+  workspaceId: z.string().min(1).max(64),
+  url: z.string().min(1).max(2048),
+  allowDestructive: z.boolean().default(false),
+  steps: z
+    .array(
+      z.object({
+        id: z.string().min(1).max(60),
+        kind: z.enum(["navigate", "click", "type", "press", "scroll", "assert"]),
+        label: z.string().min(1).max(160),
+        target: z.string().max(160).optional(),
+        value: z.string().max(2000).optional(),
+        expect: z
+          .object({
+            urlContains: z.string().max(300).optional(),
+            textContains: z.string().max(300).optional(),
+            textNotContains: z.string().max(300).optional(),
+            headingContains: z.string().max(300).optional(),
+          })
+          .strict()
+          .optional(),
+        destructive: z.boolean().default(false),
+        settleMs: z.number().int().min(0).max(10_000).default(0),
+      })
+    )
+    .max(20)
+    .optional(),
+});
+
 export function browserRoutes(services: Services): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
   // Each action is a round trip to a Chromium: keep it deliberate, not unlimited.
@@ -349,6 +380,53 @@ export function browserRoutes(services: Services): Hono<AppEnv> {
     } finally {
       // The session stays alive for the next action; only the connection is dropped.
       await browser.disconnect?.().catch(() => undefined);
+    }
+  });
+
+  /**
+   * Full browser interaction, in the Worker.
+   *
+   * This is the deployed counterpart of `proofcore audit interact`: the same scenario
+   * semantics, driven through Cloudflare Browser Rendering. No separate runner and no
+   * new infrastructure — the browser binding already exists for the manual panel.
+   */
+  app.post("/scenario", async (c) => {
+    const user = c.get("user");
+    const binding = c.env?.BROWSER;
+    if (!binding) {
+      return c.json(
+        unavailableReport("Ce déploiement n'a pas de navigateur (liaison BROWSER absente)."),
+        503
+      );
+    }
+    const body = await readBody(c, scenarioSchema);
+    const target = assertPublicUrl(normalizeUrl(body.url));
+    await requireWorkspace(c, services, body.workspaceId, ["owner", "admin", "member"]);
+
+    const puppeteer = await puppeteerModule();
+    const browser = await puppeteer.launch(binding);
+    try {
+      const page = (await browser.pages())[0] ?? (await browser.newPage());
+      await page.setViewport({ width: 1280, height: 800 });
+      const steps = body.steps ?? defaultScenario(target.toString());
+      const report = await runScenario(page, steps, {
+        name: "Browser interaction",
+        allowDestructive: body.allowDestructive,
+      });
+      await services.store.appendAudit({
+        workspaceId: body.workspaceId,
+        actor: user.id,
+        action: "browser.scenario",
+        detail: {
+          url: target.toString(),
+          stepsRun: report.stepsRun,
+          failed: report.findings.filter((f) => f.status === "FAIL").length,
+          destructive: body.allowDestructive,
+        },
+      });
+      return c.json(report);
+    } finally {
+      await browser.close().catch(() => undefined);
     }
   });
 
