@@ -191,6 +191,14 @@ interface ScanStep {
   detail?: string;
 }
 
+/** What the server withheld from a free analysis. Results are never sent to the browser. */
+interface ScanPreview {
+  sharePercent: number;
+  shownCount: number;
+  totalCount: number;
+  locked: { module: string; id: string }[];
+}
+
 type StreamMessage = {
   type?: string;
   id?: string;
@@ -201,6 +209,7 @@ type StreamMessage = {
   code?: string;
   audit?: ScanResult & { id: string; projectId?: string | null };
   comparison?: ScanComparison | null;
+  preview?: ScanPreview;
 };
 
 /**
@@ -216,6 +225,7 @@ async function streamScan(
 ): Promise<{
   audit: ScanResult & { id: string; projectId?: string | null };
   comparison: ScanComparison | null;
+  preview: ScanPreview | null;
 }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 60_000);
@@ -283,7 +293,11 @@ async function streamScan(
     if (!final?.audit) {
       throw new ApiError("The scan stream ended without a result.", 502, "stream_incomplete");
     }
-    return { audit: final.audit, comparison: final.comparison ?? null };
+    return {
+      audit: final.audit,
+      comparison: final.comparison ?? null,
+      preview: final.preview ?? null,
+    };
   } finally {
     clearTimeout(timer);
   }
@@ -353,6 +367,7 @@ export function ScanPage(): React.ReactElement {
   } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [scan, setScan] = useState<ScanResult | null>(null);
+  const [preview, setPreview] = useState<ScanPreview | null>(null);
   const [auditId, setAuditId] = useState<string | null>(null);
   // A scan belongs to a project only when it was started from one. Tracking, comparison
   // and re-control are project features: a pasted URL has no baseline to compare to.
@@ -562,6 +577,7 @@ export function ScanPage(): React.ReactElement {
     setBusy(true);
     setError(null);
     setScan(null);
+    setPreview(null);
     setExplanation(null);
     setExplainError(null);
     setSteps([
@@ -610,6 +626,7 @@ export function ScanPage(): React.ReactElement {
           })
       );
       setScan(body.audit);
+      setPreview(body.preview ?? null);
       setAuditId(body.audit.id);
       const project = body.audit.projectId ?? scanProjectId;
       if (project) setScanProjectId(project);
@@ -1051,6 +1068,39 @@ export function ScanPage(): React.ReactElement {
               </li>
             ))}
           </ol>
+        </Card>
+      ) : null}
+
+      {scan && preview ? (
+        <Card className="scan-paywall">
+          <p className="app-eyebrow">{fr ? "ANALYSE GRATUITE" : "FREE ANALYSIS"}</p>
+          <h2 className="scan-paywall-title">
+            {preview.shownCount} / {preview.totalCount} {fr ? "tests visibles" : "tests visible"} —{" "}
+            {preview.sharePercent} %
+          </h2>
+          <p className="scan-paywall-body">
+            {fr
+              ? "Les autres résultats n'ont jamais quitté le serveur : ils ne sont ni stockés ni affichés. Un abonnement débloque l'analyse complète et toutes les fonctionnalités."
+              : "The other results never left the server: they are neither stored nor displayed. A subscription unlocks the full analysis and every feature."}
+          </p>
+          {preview.locked.length > 0 ? (
+            <details className="scan-paywall-locked">
+              <summary>
+                {preview.locked.length} {fr ? "tests restants" : "remaining tests"}
+              </summary>
+              <ul>
+                {preview.locked.slice(0, 40).map((item) => (
+                  <li key={`${item.module}:${item.id}`}>
+                    <code>{item.module.toUpperCase()}</code> {item.id}
+                  </li>
+                ))}
+              </ul>
+              {preview.locked.length > 40 ? <p>+ {preview.locked.length - 40} …</p> : null}
+            </details>
+          ) : null}
+          <Link to="/app/billing" className="app-btn app-btn-primary">
+            {fr ? "Voir les offres" : "See plans"} <ArrowRight size={14} />
+          </Link>
         </Card>
       ) : null}
 

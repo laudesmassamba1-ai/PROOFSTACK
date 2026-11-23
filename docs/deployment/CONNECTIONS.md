@@ -140,9 +140,9 @@ pnpm cli:publish                          # ou colle-le à la saisie masquée
 Vérification : `npm view proofcore version` doit répondre la version de l'étiquette, puis
 `npm install -g proofcore && proofcore --version` sur une machine vierge.
 
-État au 22 novembre 2026 : la release `v0.6.2` est publiée avec les quatre plateformes,
-mais **le registre public est encore à `0.6.0`** — `npm i -g proofcore` installe donc la
-version d'avant. C'est le seul écart de version qui reste, et il se ferme avec ce jeton.
+État au 23 novembre 2026 : la release `v0.6.3` est publiée avec les quatre plateformes,
+mais **le registre public est encore à `0.6.0`** (`npm view proofcore version`) — `npm i -g proofcore`
+installe donc la version d'avant. C'est le seul écart de version qui reste, et il se ferme avec ce jeton.
 
 ## Priorité 1 — l'app est utilisable, il manque la finition
 
@@ -271,7 +271,7 @@ d'opérateur quand elle existe.
 | Réinitialisation de mot de passe        | jeton créé, message en file, interface honnête    | e-mail livré                | **P0**   |
 | Fichiers de projet + audits IA de code  | `503 neon_not_configured` (déjà branché, vérifié) | fonctionne                  | ✔        |
 | Assistant IA                            | fonctionne avec la clé du compte (BYOK)           | —                           | ✔        |
-| Commande `proofcore` sur npm            | registre à 0.1.0, `npm i -g` installe du vieux    | 0.6.0, connexion navigateur | **P0**   |
+| Commande `proofcore` sur npm            | registre à 0.6.0, `npm i -g` installe du vieux    | 0.6.3, connexion navigateur | **P0**   |
 | Flux des versions sur `/download`       | instantané, parfois périmé                        | direct, 5 000 appels/h      | P1       |
 | Pages légales                           | publiées, 5 emplacements visibles                 | prêtes à publier            | P1       |
 | Domaine                                 | `.pages.dev` + `.vercel.app`                      | domaine à toi               | P1       |

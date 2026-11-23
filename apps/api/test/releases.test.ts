@@ -174,7 +174,10 @@ describe("releases", () => {
   });
 
   it("keeps asset URLs on our origin when the answer comes from the cache", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => json(RELEASE)));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => json(RELEASE))
+    );
     const local = releaseRoutes({ ttlMs: 60_000, baseUrl: "https://api.example" });
     await local.request("http://localhost/releases/latest");
     const cached = await local.request("http://localhost/releases/latest");

@@ -37,6 +37,9 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     if (!window.sessionStorage.getItem("e2e.localePinned")) {
       window.localStorage.setItem("proofcore.locale", "en");
+      // A first visit opens the art-direction comparer over the home page, which blocks
+      // every click on the nav. Pin a remembered choice, as a returning visitor has.
+      window.localStorage.setItem("proofcore.da", "dark");
       window.sessionStorage.setItem("e2e.localePinned", "1");
     }
   });
@@ -77,11 +80,12 @@ test.describe("marketing site", () => {
 
   test("pricing shows real plan prices, not placeholders", async ({ page }) => {
     await page.goto("/pricing");
-    // $12 / $29 / $79 are the catalogue prices. A page that shows none of them is
-    // either broken or inventing its own numbers.
-    await expect(page.getByText(/\$\s?12/).first()).toBeVisible();
-    await expect(page.getByText(/\$\s?29/).first()).toBeVisible();
-    await expect(page.getByText(/\$\s?79/).first()).toBeVisible();
+    // $15 / $39 / $99 are the monthly USD prices in packages/billing/src/plans.ts
+    // (developer / studio / agency). A page that shows none of them is either broken
+    // or inventing its own numbers. Update these together with plans.ts.
+    await expect(page.getByText(/\$\s?15\b/).first()).toBeVisible();
+    await expect(page.getByText(/\$\s?39\b/).first()).toBeVisible();
+    await expect(page.getByText(/\$\s?99\b/).first()).toBeVisible();
   });
 
   test("no page logs a console error on load", async ({ page }) => {

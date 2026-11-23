@@ -40,6 +40,13 @@ interface GuidedModule {
   verdict: string;
 }
 
+interface ScanPreview {
+  sharePercent: number;
+  shownCount: number;
+  totalCount: number;
+  locked: { module: string; id: string }[];
+}
+
 interface GuidedScan {
   url: string;
   finalUrl: string;
@@ -47,7 +54,8 @@ interface GuidedScan {
   bytes: number;
   durationMs: number;
   findings: GuidedFinding[];
-  modules: GuidedModule[];
+  /** Absent on a free analysis: module scores would reveal the withheld 40 %. */
+  modules?: GuidedModule[];
   clientRendered: boolean;
 }
 
@@ -65,7 +73,7 @@ function report(scan: GuidedScan): string {
     `Scan de ${scan.finalUrl} (HTTP ${scan.status}, ${Math.round(scan.bytes / 1024)} kB, ${scan.durationMs} ms).`,
     "",
     "Résumé par famille :",
-    ...scan.modules.map(
+    ...(scan.modules ?? []).map(
       (item) =>
         `- ${item.module.toUpperCase()}: ${item.verdict} — ${item.passed} pass, ${item.warnings} warn, ${item.failed} fail, ${item.skipped} skipped (score ${item.score}/100)`
     ),
@@ -88,6 +96,7 @@ export function StartPage(): React.ReactElement {
   const fr = locale === "fr";
   const [url, setUrl] = useState("");
   const [scan, setScan] = useState<GuidedScan | null>(null);
+  const [preview, setPreview] = useState<ScanPreview | null>(null);
   const [auditId, setAuditId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | Error | null>(null);
@@ -145,15 +154,20 @@ export function StartPage(): React.ReactElement {
     setBusy(true);
     setError(null);
     setScan(null);
+    setPreview(null);
     setAuditId(null);
     setExplanation(null);
     setExplainError(null);
     try {
-      const body = await apiFetch<{ audit: GuidedScan & { id: string } }>("/api/v1/audits", {
+      const body = await apiFetch<{
+        audit: GuidedScan & { id: string };
+        preview?: ScanPreview;
+      }>("/api/v1/audits", {
         method: "POST",
         body: { workspaceId: session.workspaceId, url: target },
       });
       setScan(body.audit);
+      setPreview(body.preview ?? null);
       setAuditId(body.audit.id);
       void interpret(body.audit);
     } catch (caught) {
@@ -234,8 +248,39 @@ export function StartPage(): React.ReactElement {
             description={`HTTP ${scan.status} · ${Math.round(scan.bytes / 1024)} kB · ${scan.durationMs} ms`}
           >
             <div className="space-y-4 px-5 py-4">
+              {preview ? (
+                <div className="scan-paywall">
+                  <p className="app-eyebrow">{fr ? "ANALYSE GRATUITE" : "FREE ANALYSIS"}</p>
+                  <h2 className="scan-paywall-title">
+                    {preview.shownCount} / {preview.totalCount}{" "}
+                    {fr ? "tests visibles" : "tests visible"} — {preview.sharePercent} %
+                  </h2>
+                  <p className="scan-paywall-body">
+                    {fr
+                      ? "Les autres résultats n'ont jamais quitté le serveur. Un abonnement débloque l'analyse complète et toutes les fonctionnalités."
+                      : "The other results never left the server. A subscription unlocks the full analysis and every feature."}
+                  </p>
+                  {preview.locked.length > 0 ? (
+                    <details className="scan-paywall-locked">
+                      <summary>
+                        {preview.locked.length} {fr ? "tests restants" : "remaining tests"}
+                      </summary>
+                      <ul>
+                        {preview.locked.slice(0, 40).map((item) => (
+                          <li key={`${item.module}:${item.id}`}>
+                            <code>{item.module.toUpperCase()}</code> {item.id}
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  ) : null}
+                  <Link to="/app/billing" className="app-btn app-btn-primary">
+                    {fr ? "Voir les offres" : "See plans"} <ArrowRight size={14} />
+                  </Link>
+                </div>
+              ) : null}
               <div className="grid gap-3 sm:grid-cols-5">
-                {scan.modules.map((item) => {
+                {(scan.modules ?? []).map((item) => {
                   const label = LABELS[item.module];
                   return (
                     <div

@@ -1,3 +1,4 @@
+import { plansForDisplay, resolveEntitlements } from "@proofcore/billing";
 import {
   assertScannableUrl,
   auditSite,
@@ -10,11 +11,54 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { z } from "zod";
 import type { AppConfig } from "../env.js";
+import { buildPreview, FREE_PREVIEW_LIMIT } from "../free-preview.js";
 import { quotaErrorFromDecision, quotaErrorFromMeter } from "../http/entitlement-http.js";
 import { HttpError, RateLimiter } from "../http/errors.js";
 import { readBody, requireWorkspace } from "../http/guards.js";
 import { pageBody, readPage } from "../http/pagination.js";
 import type { AppEnv, Services } from "../http/services.js";
+
+/**
+ * Decides whether this scan is a free analysis.
+ *
+ * A workspace with a paid subscription runs as before, metered against its plan. Anyone
+ * else gets two single-page analyses per person, reported at 60 %. Returns true for a
+ * free analysis; throws when the person has none left or asks for a crawl or a login,
+ * which only the paid analysis includes.
+ */
+async function freeAnalysisGate(
+  services: Services,
+  userId: string,
+  workspaceId: string,
+  body: { crawl?: unknown; login?: unknown }
+): Promise<boolean> {
+  const effective = await resolveEntitlements(services.billing, workspaceId, services.clock());
+  if (effective.entitled) return false;
+  if (body.crawl !== undefined || body.login !== undefined) {
+    throw new HttpError(
+      403,
+      "plan_required",
+      "L'analyse gratuite porte sur une seule page, sans connexion ni exploration du site. Un abonnement donne accès à l'analyse complète."
+    );
+  }
+  const used = await services.store.countFreePreviews(userId);
+  if (used >= FREE_PREVIEW_LIMIT) {
+    // Free is an internal state, not a plan a person can buy. Offer the cheapest
+    // *purchasable* plan instead of pointing at a catalogue entry that no longer exists.
+    const cheapest = plansForDisplay().find((plan) => plan.publiclyAvailable && plan.active)?.key;
+    throw new HttpError(
+      403,
+      "free_analysis_used",
+      `Tu as utilisé tes ${FREE_PREVIEW_LIMIT} analyses gratuites. Un abonnement donne accès à l'analyse complète.`,
+      {
+        limit: FREE_PREVIEW_LIMIT,
+        used,
+        ...(cheapest ? { requiredPlanKey: cheapest } : {}),
+      }
+    );
+  }
+  return true;
+}
 
 /**
  * Scanning a URL from the app.
@@ -390,6 +434,10 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
         "Viewers cannot start a scan. Ask for member rights."
       );
     }
+    // Decided before any work: a free analysis is one page, at 60 %, twice per person.
+    // A paid workspace keeps the full scan and its normal metering.
+    const isFree = await freeAnalysisGate(services, user.id, workspace.id, body);
+
     // Checked before the scan runs: a scan billed to the workspace and then refused for a
     // project that does not exist here would cost a unit for nothing.
     if (body.projectId && !(await services.store.getProject(workspace.id, body.projectId))) {
@@ -404,13 +452,16 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
     // the gate is a pure check (nothing recorded), and the meter below only writes
     // once the page has actually been read.
     const auditId = `aud_${crypto.randomUUID().replaceAll("-", "").slice(0, 20)}`;
-    const gate = await services.meter.authorize({
-      workspaceId: workspace.id,
-      check: { key: "monthly_ai_audits", requested: 1 },
-      subjectId: auditId,
-      quantity: 0,
-    });
-    if (!gate.allowed) {
+    // A free analysis is not billed to the workspace: it has its own, personal limit.
+    const gate = isFree
+      ? { allowed: true as const }
+      : await services.meter.authorize({
+          workspaceId: workspace.id,
+          check: { key: "monthly_ai_audits", requested: 1 },
+          subjectId: auditId,
+          quantity: 0,
+        });
+    if (!gate.allowed && "decision" in gate) {
       throw quotaErrorFromDecision(gate.decision, "AI-audit");
     }
 
@@ -445,16 +496,32 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
       );
     }
 
+    // A free analysis is cut here, on the server. The full findings are never stored,
+    // never returned and never rendered: CSS cannot reveal what was never sent.
+    const report = isFree ? buildPreview(result) : result;
+    const preview = isFree ? (report as ReturnType<typeof buildPreview>).preview : null;
+
     // The scan happened and produced a report: only now does it consume the
     // workspace's monthly AI-audit quota. A scan that failed above (502) is a
     // harness problem and is never billed — same policy as a failed test run.
-    const metered = await services.meter.meter({
-      workspaceId: workspace.id,
-      kind: "ai_audit",
-      subjectId: auditId,
-      quantity: 1,
-      at: services.clock(),
-    });
+    // A free analysis is limited per person by freeAnalysisGate, not by the workspace's
+    // paid quota: metering it here would consume a unit the visitor never bought.
+    const metered = isFree
+      ? {
+          reason: "recorded" as const,
+          counted: false,
+          usage: 0,
+          limit: 0,
+          remaining: 0,
+          decision: { allowed: true },
+        }
+      : await services.meter.meter({
+          workspaceId: workspace.id,
+          kind: "ai_audit",
+          subjectId: auditId,
+          quantity: 1,
+          at: services.clock(),
+        });
     if (metered.reason === "quota_exhausted") {
       // Race window between the gate and the meter (a concurrent scan consumed the
       // last unit): deny here rather than record an over-quota report.
@@ -479,7 +546,7 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
       // The payload is the report: one page's findings, the site section when a crawl ran,
       // the computed scores, and the login outcome (never a credential).
       payload: JSON.stringify({
-        ...result,
+        ...report,
         ...(site === null
           ? {}
           : { site: site.site, scores: site.scores, score: site.score, login: site.login }),
@@ -487,6 +554,7 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
       ownership: result.ownership,
       redacted: result.redacted,
       projectId: body.projectId ?? null,
+      freePreview: isFree,
     });
 
     // The comparison is computed from two stored scans, not from a promise: a finding is
@@ -531,11 +599,12 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
         audit: {
           id,
           projectId: body.projectId ?? null,
-          ...result,
+          ...report,
           ...(site === null
             ? {}
             : { site: site.site, scores: site.scores, score: site.score, login: site.login }),
         },
+        ...(preview ? { preview } : {}),
         comparison,
       },
       201
@@ -586,14 +655,18 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
       ? (await services.store.latestPageAudits(workspace.id, body.projectId, 1))[0]
       : undefined;
 
+    const isFree = await freeAnalysisGate(services, user.id, workspace.id, body);
     const auditId = `aud_${crypto.randomUUID().replaceAll("-", "").slice(0, 20)}`;
-    const gate = await services.meter.authorize({
-      workspaceId: workspace.id,
-      check: { key: "monthly_ai_audits", requested: 1 },
-      subjectId: auditId,
-      quantity: 0,
-    });
-    if (!gate.allowed) throw quotaErrorFromDecision(gate.decision, "AI-audit");
+    const gate = isFree
+      ? { allowed: true as const }
+      : await services.meter.authorize({
+          workspaceId: workspace.id,
+          check: { key: "monthly_ai_audits", requested: 1 },
+          subjectId: auditId,
+          quantity: 0,
+        });
+    if (!gate.allowed && "decision" in gate)
+      throw quotaErrorFromDecision(gate.decision, "AI-audit");
 
     let target: URL;
     try {
@@ -628,7 +701,10 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
             () => undefined
           );
         });
-        const result = run.result;
+        const fullResult = run.result;
+        const report = isFree ? buildPreview(fullResult) : fullResult;
+        const preview = isFree ? (report as ReturnType<typeof buildPreview>).preview : null;
+        const result = report;
         await step(
           "fetch",
           fetchLabel,
@@ -657,13 +733,15 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
         );
 
         await step("save", "Enregistrement du scan et comparaison", "running");
-        const metered = await services.meter.meter({
-          workspaceId: workspace.id,
-          kind: "ai_audit",
-          subjectId: auditId,
-          quantity: 1,
-          at: services.clock(),
-        });
+        const metered = isFree
+          ? { reason: "recorded" as const }
+          : await services.meter.meter({
+              workspaceId: workspace.id,
+              kind: "ai_audit",
+              subjectId: auditId,
+              quantity: 1,
+              at: services.clock(),
+            });
         if (metered.reason === "quota_exhausted") {
           throw quotaErrorFromMeter(metered, "AI-audit");
         }
@@ -693,6 +771,7 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
           ownership: result.ownership,
           redacted: result.redacted,
           projectId: body.projectId ?? null,
+          freePreview: isFree,
         });
 
         let comparison: ReturnType<typeof compareScans> | null = null;
@@ -737,7 +816,8 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
         );
         await emit({
           type: "result",
-          audit: { id, projectId: body.projectId ?? null, ...result },
+          audit: { id, projectId: body.projectId ?? null, ...report },
+          ...(preview ? { preview } : {}),
           comparison,
         });
       } catch (error) {
@@ -826,6 +906,7 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
       // whether the detail it is about to display is complete.
       ownership: String(row.ownership ?? "unverified"),
       redacted: Boolean(Number(row.redacted ?? 1)),
+      freePreview: Boolean(Number(row.free_preview ?? 0)),
       projectId: row.project_id ? String(row.project_id) : null,
       result: JSON.parse(String(row.payload)),
     });

@@ -1617,13 +1617,15 @@ export class AppStore {
     redacted: boolean;
     /** The project the scan was run from, when there was one. */
     projectId?: string | null;
+    /** True for a free analysis: the payload is already cut to its 60 % share. */
+    freePreview?: boolean;
   }): Promise<void> {
     await this.db
       .prepare(
         `INSERT INTO page_audits
            (id, workspace_id, project_id, created_by, url, final_url, status, duration_ms,
-            worst_verdict, failed, warnings, payload, ownership, redacted, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            worst_verdict, failed, warnings, payload, ownership, redacted, created_at, free_preview)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         input.id,
@@ -1640,9 +1642,21 @@ export class AppStore {
         input.payload,
         input.ownership,
         input.redacted ? 1 : 0,
-        iso(this.clock())
+        iso(this.clock()),
+        input.freePreview ? 1 : 0
       )
       .run();
+  }
+
+  /** How many free analyses this person has already run, across all their workspaces. */
+  async countFreePreviews(userId: string): Promise<number> {
+    const row = await this.db
+      .prepare(
+        "SELECT COUNT(*) AS count FROM page_audits WHERE created_by = ? AND free_preview = 1"
+      )
+      .bind(userId)
+      .first<Row>();
+    return row ? num(row, "count") : 0;
   }
 
   async getPageAudit(workspaceId: string, id: string): Promise<Row | null> {

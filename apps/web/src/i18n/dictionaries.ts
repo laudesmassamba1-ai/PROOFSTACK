@@ -178,7 +178,7 @@ export const en = {
   "pricing.perMonth": "/ month",
   "pricing.perYear": "/ year",
   "pricing.save": "Save {percent}%",
-  "pricing.free": "Free",
+  "pricing.free": "One free site analysis",
   "pricing.founding":
     "Founding-member pricing: your rate stays locked as long as you keep the subscription.",
   "pricing.guarantee":
@@ -468,7 +468,7 @@ export const fr: Messages = {
   "pricing.perMonth": "/ mois",
   "pricing.perYear": "/ an",
   "pricing.save": "Économisez {percent} %",
-  "pricing.free": "Gratuit",
+  "pricing.free": "1 analyse de site gratuite",
   "pricing.founding":
     "Prix membre fondateur : votre tarif reste gelé tant que vous gardez l'abonnement.",
   "pricing.guarantee":

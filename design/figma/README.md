@@ -4,11 +4,11 @@ Ce dossier contient les fichiers source du design, à importer dans Figma. Il se
 
 ## Contenu
 
-| Fichier | Rôle |
-| --- | --- |
-| `tokens.json` | Couleurs, polices et rayons, extraits de `apps/web/src/styles/global.css`. |
-| `landing-hero.svg` | Maquette de la page d'accueil (1440 × 900). |
-| `pricing-card.svg` | Maquette des plans tarifaires (1200 × 720). |
+| Fichier            | Rôle                                                                       |
+| ------------------ | -------------------------------------------------------------------------- |
+| `tokens.json`      | Couleurs, polices et rayons, extraits de `apps/web/src/styles/global.css`. |
+| `landing-hero.svg` | Maquette de la page d'accueil (1440 × 900).                                |
+| `pricing-card.svg` | Maquette des plans tarifaires (1200 × 720).                                |
 
 ## Importer dans Figma
 

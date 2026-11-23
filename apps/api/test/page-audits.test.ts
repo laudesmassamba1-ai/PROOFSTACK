@@ -84,6 +84,39 @@ async function signUp(email: string): Promise<{ cookie: string; workspaceId: str
   const session = (await (
     await harness.request("/api/auth/session", { headers: { cookie } })
   ).json()) as { workspaceId: string };
+
+  // These tests verify paid behaviour (workspace quota, ownership, full reports). A
+  // workspace without a subscription now gets the two free analyses instead, so seed an
+  // active paid subscription through the real billing store.
+  const now = new Date();
+  // The subscription references a customer row: create it first, through the store.
+  await harness.services.billing.saveCustomer({
+    id: `cus_test_${email}`,
+    email,
+    emailNormalized: email.toLowerCase(),
+    name: "Tester",
+    country: null,
+    createdAt: now.toISOString(),
+  });
+  await harness.services.billing.saveSubscription({
+    id: `sub_test_${email}`,
+    workspaceId: session.workspaceId,
+    customerId: `cus_test_${email}`,
+    planKey: "developer",
+    currency: "USD",
+    period: "monthly",
+    state: "ACTIVE",
+    currentPeriodStart: now.toISOString(),
+    currentPeriodEnd: new Date(now.getTime() + 30 * 86_400_000).toISOString(),
+    cancelAtPeriodEnd: false,
+    trialEndsAt: null,
+    provider: "sandbox",
+    pendingPlanKey: null,
+    fundedByIntentIds: [],
+    createdAt: now.toISOString(),
+    updatedAt: now.toISOString(),
+  });
+
   return { cookie, workspaceId: session.workspaceId };
 }
 
@@ -683,7 +716,8 @@ describe("page audit quota (monthly_ai_audits)", () => {
     expect(body.error.details).toMatchObject({
       limit,
       used: limit,
-      requiredPlanKey: "developer",
+      // The workspace already has Developer; the next plan up is Studio.
+      requiredPlanKey: "studio",
     });
 
     // A denied scan never creates a report: nothing billed, nothing stored.

@@ -9909,3 +9909,53 @@ p {
 .app-badge-accent {
   color: color-mix(in srgb, var(--accent) 62%, var(--ink));
 }
+
+/* ---- Free analysis paywall ------------------------------------------------ */
+
+.scan-paywall {
+  margin-bottom: 1.25rem;
+  padding: 1.25rem;
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+}
+
+.scan-paywall-title {
+  margin-top: 0.4rem;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.scan-paywall-body {
+  margin-top: 0.5rem;
+  max-width: 68ch;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.scan-paywall-locked {
+  margin: 0.75rem 0 1rem;
+  font-size: 0.78rem;
+}
+
+.scan-paywall-locked summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.scan-paywall-locked ul {
+  margin-top: 0.5rem;
+  max-height: 12rem;
+  overflow-y: auto;
+  display: grid;
+  gap: 0.25rem;
+  color: var(--text-secondary);
+}
+
+.scan-paywall-locked code {
+  margin-right: 0.4rem;
+  font-size: 0.7rem;
+}
