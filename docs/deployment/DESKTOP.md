@@ -57,9 +57,9 @@ explain that it needs the network cannot say "no network".
 
 The plan had one. There are two different artifacts with two lifetimes:
 
-| What                         | Updater            | Mechanism                                                                         |
-| ---------------------------- | ------------------ | --------------------------------------------------------------------------------- |
-| Engine (`sidecar/proofcore`) | `proofcore update` | release `manifest.json`, sha256 verified, old binary renamed aside first          |
+| What                         | Updater            | Mechanism                                                                                                                        |
+| ---------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| Engine (`sidecar/proofcore`) | `proofcore update` | release `manifest.json`, sha256 verified, old binary renamed aside first                                                         |
 | Window (the app)             | `electron-updater` | electron-builder's `latest*.yml`, served by our own API (`/api/v1/releases/assets/latest.yml`), silent download, install on quit |
 
 A single updater would leave a window speaking a protocol the engine no longer has. Both are

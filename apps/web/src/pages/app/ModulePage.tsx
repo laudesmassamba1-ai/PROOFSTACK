@@ -247,11 +247,11 @@ export function ModulePage() {
           to change it. That link is the difference between a dashboard and a fix. */}
       <section className="mt-4 flex flex-wrap items-center gap-3 rounded-[var(--radius)] border border-black/10 px-4 py-3">
         <Brain size={18} className="shrink-0 text-primary" aria-hidden />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">
+        <div className="min-w-0 flex-1 break-words">
+          <p className="text-sm font-medium break-words">
             {fr ? "Passer du verdict à la correction" : "From verdict to correction"}
           </p>
-          <p className="mt-0.5 text-xs leading-relaxed text-muted">
+          <p className="mt-0.5 text-xs leading-relaxed text-muted break-words">
             {fr
               ? `L'IA lit les fichiers du projet, cite la ligne et propose le changement. Le résultat ${meta.name} reste la mesure de référence.`
               : `AI reads the project files, names the line and proposes the change. The ${meta.name} result stays the measurement of record.`}

@@ -2,12 +2,12 @@
 
 ## 1. Viewports de référence (testés ou à tester)
 
-| Classe | Viewports | État |
-|--------|-----------|------|
-| Téléphone | 320×700, 360×800, 375×812, 390×844, 430×932 | 390×844 testé sur 35 pages (audit 2026-11-21) |
-| Tablette | 768×1024, 820×1180 | Partiels : app AI + chat vérifiés en session précédente |
-| Laptop | 1024×768, 1280×800, 1366×768, 1440×900 | 1440×900 testé sur 35 pages |
-| Desktop | 1600×900, 1920×1080, 2560×1440 | 1920 vérifié en session précédente (site marketing) |
+| Classe    | Viewports                                   | État                                                    |
+| --------- | ------------------------------------------- | ------------------------------------------------------- |
+| Téléphone | 320×700, 360×800, 375×812, 390×844, 430×932 | 390×844 testé sur 35 pages (audit 2026-11-21)           |
+| Tablette  | 768×1024, 820×1180                          | Partiels : app AI + chat vérifiés en session précédente |
+| Laptop    | 1024×768, 1280×800, 1366×768, 1440×900      | 1440×900 testé sur 35 pages                             |
+| Desktop   | 1600×900, 1920×1080, 2560×1440              | 1920 vérifié en session précédente (site marketing)     |
 
 ## 2. Règles structurelles (déjà en place)
 

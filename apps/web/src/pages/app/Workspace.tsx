@@ -361,7 +361,7 @@ export function WorkspacePage(): React.ReactElement {
                     {workspace.name.slice(0, 1).toUpperCase()}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold">
+                    <p className="text-sm font-semibold break-words">
                       {workspace.name}
                       {active ? (
                         <span className="app-badge app-badge-success ml-2">
@@ -369,7 +369,7 @@ export function WorkspacePage(): React.ReactElement {
                         </span>
                       ) : null}
                     </p>
-                    <p className="mt-0.5 truncate text-xs text-muted">
+                    <p className="mt-0.5 text-xs text-muted break-words">
                       {workspace.slug} · {roleLabel(workspace.role, fr)} ·{" "}
                       {formatDay(workspace.createdAt, locale)}
                     </p>
@@ -555,13 +555,13 @@ export function WorkspacePage(): React.ReactElement {
                       {member.name.slice(0, 1).toUpperCase()}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">
+                      <p className="text-sm font-medium break-words">
                         {member.name}
                         {self ? (
                           <span className="ml-2 text-xs text-muted">({fr ? "vous" : "you"})</span>
                         ) : null}
                       </p>
-                      <p className="truncate text-xs text-muted">{member.email}</p>
+                      <p className="text-xs text-muted break-words">{member.email}</p>
                     </div>
                     {canTouch && !(self && detail?.myRole !== "owner") ? (
                       <>
@@ -632,8 +632,8 @@ export function WorkspacePage(): React.ReactElement {
                         {invitation.name.slice(0, 1).toUpperCase()}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{invitation.name}</p>
-                        <p className="truncate text-xs text-muted">{invitation.email}</p>
+                        <p className="text-sm font-medium break-words">{invitation.name}</p>
+                        <p className="text-xs text-muted break-words">{invitation.email}</p>
                       </div>
                       <span className="app-badge">{roleLabel(invitation.role, fr)}</span>
                       <button

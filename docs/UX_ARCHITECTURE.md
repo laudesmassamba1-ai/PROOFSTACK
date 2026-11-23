@@ -2,11 +2,11 @@
 
 ## 1. Les trois surfaces
 
-| Surface | URL | Rôle |
-|---------|-----|------|
-| Site public | `/`, `/product`, `/world…clean`, `/platform`, `/pricing`, `/download`, `/docs`, `/changelog`, `/security`, pages légales | Comprendre, comparer, télécharger |
-| Espace de travail | `/app/*` | Travailler : projets, analyses, modules, IA, terminal, facturation |
-| Compte | `/signin`, `/signup`, `/device`, récupérations | Accéder |
+| Surface           | URL                                                                                                                      | Rôle                                                               |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| Site public       | `/`, `/product`, `/world…clean`, `/platform`, `/pricing`, `/download`, `/docs`, `/changelog`, `/security`, pages légales | Comprendre, comparer, télécharger                                  |
+| Espace de travail | `/app/*`                                                                                                                 | Travailler : projets, analyses, modules, IA, terminal, facturation |
+| Compte            | `/signin`, `/signup`, `/device`, récupérations                                                                           | Accéder                                                            |
 
 ## 2. Navigation espace de travail (constatée dans le code, `AppLayout`)
 
@@ -23,6 +23,7 @@
 ## 3. Parcours principaux
 
 ### Première visite → première preuve
+
 1. `/` : la promesse + le mur des modules + l'audit IA enregistré.
 2. `/pricing` : offres lues depuis `@proofcore/billing` (jamais recopiées).
 3. `/signup` → `/app` : onboarding « Démarrer » (3 étapes, projet → CLI → première
@@ -31,6 +32,7 @@
 4. `/app/scan` : une adresse, cinq lectures, sans configuration.
 
 ### Utilisateur actif
+
 1. `/app` : situation en tête (« AUCUNE EXÉCUTION. » ou l'état réel), cartes modules
    avec dernier état par module, prochaine action, exécutions récentes, échecs
    ouverts, usage.
@@ -40,6 +42,7 @@
    auto-curée, navigateur intégré.
 
 ### Décision de facturation
+
 `/app/billing` : offre, état, usage par compteur avec la règle de comptage
 affichée (never colour-only), changement d'offre, historique, reçus, fournisseur.
 

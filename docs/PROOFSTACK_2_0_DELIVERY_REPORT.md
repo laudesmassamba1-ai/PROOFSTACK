@@ -5,14 +5,14 @@ une décision de ta part. Il ne décrit aucun travail futur comme acquis.
 
 État au moment de l'écriture :
 
-| Contrôle | Commande | Résultat |
-| --- | --- | --- |
-| Tests | `npx vitest run` | **674 passés**, 55 fichiers (653 avant ce tour, +21) |
-| Lint / format | `npx biome check .` | 0 erreur |
-| Types web | `npx tsc --noEmit -p apps/web` | 0 erreur |
-| Types API | `npx tsc --noEmit -p apps/api` | 0 erreur |
-| Build | `node tooling/scripts/build.mjs` | complet |
-| Vérification navigateur | Playwright sur `/app/billing` (FR) | capture `/tmp/billing-verify.png` |
+| Contrôle                | Commande                           | Résultat                                             |
+| ----------------------- | ---------------------------------- | ---------------------------------------------------- |
+| Tests                   | `npx vitest run`                   | **674 passés**, 55 fichiers (653 avant ce tour, +21) |
+| Lint / format           | `npx biome check .`                | 0 erreur                                             |
+| Types web               | `npx tsc --noEmit -p apps/web`     | 0 erreur                                             |
+| Types API               | `npx tsc --noEmit -p apps/api`     | 0 erreur                                             |
+| Build                   | `node tooling/scripts/build.mjs`   | complet                                              |
+| Vérification navigateur | Playwright sur `/app/billing` (FR) | capture `/tmp/billing-verify.png`                    |
 
 ---
 
@@ -77,33 +77,33 @@ garantissait pas. Un fichier analysé pouvait écrire `--- END FILE` puis un fau
 
 ## 2. État réel des phases
 
-| Phase | Ce qui est vrai | Verdict |
-| --- | --- | --- |
-| **1 — Stabilisation** | Tests, lint, types, build verts. Fichiers générés retirés du dépôt. Versions : paquets internes en 0.1.0, produits livrés (`cli`, `desktop`) en 0.5.0. Le dépôt tient la route. | **Fait**, sauf la publication npm du CLI |
-| **2 — Cartographie** | Matrice livrée. Registre de contrôles : les contrôles existent et sont nommés, mais il n'existe pas de registre unique déclaratif (objectif, prérequis, complexité, risque) par contrôle. | **Moitié** |
-| **3 — UX** | Chemin Simple, configuration guidée et états vides existent partiellement ; le scan en un champ et le board de corrections sont réels. Pas d'assistant d'accueil qui prend un débutant par la main jusqu'au premier résultat. | **Partiel** |
-| **4 — IA** | Conversations, mémoire d'espace, effort→sous-agents, audit IA de projet, blog de corrections : réels. **Clé fournisseur par utilisateur : obligatoire.** | **Partiel, avec un conflit** |
-| **5 — Refonte des cinq modules** | Les 46 contrôles sont réels et testés. La sélection par objectif et les profils combinés (général, sécurité, contenu, parcours, API) n'existent pas. | **Partiel** |
-| **6 — Correction** | Board de corrections avec états par constat et comparaison au scan précédent : réel. Pas de boucle « vérifier après correction » automatisée. | **Partiel** |
-| **7 — Distribution** | Web, CLI, desktop, installateurs Linux, mises à jour, facturation, support : réels. Pas d'e-mail sortant, pas de signature de code, pas de sauvegardes. | **Partiel** |
-| **8 — QA final** | Non exécuté. Les 10 tests de validation ne sont pas passés en entier. | **Non fait** |
+| Phase                            | Ce qui est vrai                                                                                                                                                                                                               | Verdict                                  |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| **1 — Stabilisation**            | Tests, lint, types, build verts. Fichiers générés retirés du dépôt. Versions : paquets internes en 0.1.0, produits livrés (`cli`, `desktop`) en 0.5.0. Le dépôt tient la route.                                               | **Fait**, sauf la publication npm du CLI |
+| **2 — Cartographie**             | Matrice livrée. Registre de contrôles : les contrôles existent et sont nommés, mais il n'existe pas de registre unique déclaratif (objectif, prérequis, complexité, risque) par contrôle.                                     | **Moitié**                               |
+| **3 — UX**                       | Chemin Simple, configuration guidée et états vides existent partiellement ; le scan en un champ et le board de corrections sont réels. Pas d'assistant d'accueil qui prend un débutant par la main jusqu'au premier résultat. | **Partiel**                              |
+| **4 — IA**                       | Conversations, mémoire d'espace, effort→sous-agents, audit IA de projet, blog de corrections : réels. **Clé fournisseur par utilisateur : obligatoire.**                                                                      | **Partiel, avec un conflit**             |
+| **5 — Refonte des cinq modules** | Les 46 contrôles sont réels et testés. La sélection par objectif et les profils combinés (général, sécurité, contenu, parcours, API) n'existent pas.                                                                          | **Partiel**                              |
+| **6 — Correction**               | Board de corrections avec états par constat et comparaison au scan précédent : réel. Pas de boucle « vérifier après correction » automatisée.                                                                                 | **Partiel**                              |
+| **7 — Distribution**             | Web, CLI, desktop, installateurs Linux, mises à jour, facturation, support : réels. Pas d'e-mail sortant, pas de signature de code, pas de sauvegardes.                                                                       | **Partiel**                              |
+| **8 — QA final**                 | Non exécuté. Les 10 tests de validation ne sont pas passés en entier.                                                                                                                                                         | **Non fait**                             |
 
 ---
 
 ## 3. Les dix tests de validation
 
-| # | Test | Statut | Ce qui bloque |
-| - | ---- | ------ | ------------- |
-| 1 | Débutant complet, sans clé IA ni CLI | **Passe pour l'essentiel** | Un scan s'explique sans clé (registre) ; il reste à guider un débutant jusqu'au premier résultat sans qu'il cherche le champ |
-| 2 | Intelligence contextuelle | **Passe partiellement** | Le contexte projet est injecté ; la lecture d'un rapport précédent n'est pas prouvée de bout en bout |
-| 3 | Configuration assistée WORLD | **Échoue** | Pas de génération de config par l'IA avec validation avant écriture |
-| 4 | Constructeur FLOW | **Échoue** | Les parcours s'écrivent à la main dans la config |
-| 5 | EXIT | **Passe** | Fidélité d'aller-retour prouvée par tests, à condition d'avoir une source |
-| 6 | FAIL et CLEAN | **Passe** | Contrôles, scores, limites HTML-serveur assumées |
-| 7 | Historique et comparaison | **Passe** | Deux scans comparés, et un contrôle peut être re-vérifié à la demande sans attendre le scan suivant |
-| 8 | Cohérence Web et CLI | **Passe partiellement** | Même API, mêmes statuts ; le partage de config Web→CLI n'est pas outillé |
-| 9 | Assistant sans fournisseur | **Passe** | Sans clé : constats, scores, rapports, explication, correctif, vérification et boucle de re-vérification fonctionnent. Ce qui manque sans clé est nommé, pas simulé |
-| 10 | Sécurité | **Passe sur le cloisonnement, la faille d'injection fermée** | Restent à prouver : appels IA, approbations d'actions, commandes sensibles de bout en bout |
+| #   | Test                                 | Statut                                                       | Ce qui bloque                                                                                                                                                       |
+| --- | ------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Débutant complet, sans clé IA ni CLI | **Passe pour l'essentiel**                                   | Un scan s'explique sans clé (registre) ; il reste à guider un débutant jusqu'au premier résultat sans qu'il cherche le champ                                        |
+| 2   | Intelligence contextuelle            | **Passe partiellement**                                      | Le contexte projet est injecté ; la lecture d'un rapport précédent n'est pas prouvée de bout en bout                                                                |
+| 3   | Configuration assistée WORLD         | **Échoue**                                                   | Pas de génération de config par l'IA avec validation avant écriture                                                                                                 |
+| 4   | Constructeur FLOW                    | **Échoue**                                                   | Les parcours s'écrivent à la main dans la config                                                                                                                    |
+| 5   | EXIT                                 | **Passe**                                                    | Fidélité d'aller-retour prouvée par tests, à condition d'avoir une source                                                                                           |
+| 6   | FAIL et CLEAN                        | **Passe**                                                    | Contrôles, scores, limites HTML-serveur assumées                                                                                                                    |
+| 7   | Historique et comparaison            | **Passe**                                                    | Deux scans comparés, et un contrôle peut être re-vérifié à la demande sans attendre le scan suivant                                                                 |
+| 8   | Cohérence Web et CLI                 | **Passe partiellement**                                      | Même API, mêmes statuts ; le partage de config Web→CLI n'est pas outillé                                                                                            |
+| 9   | Assistant sans fournisseur           | **Passe**                                                    | Sans clé : constats, scores, rapports, explication, correctif, vérification et boucle de re-vérification fonctionnent. Ce qui manque sans clé est nommé, pas simulé |
+| 10  | Sécurité                             | **Passe sur le cloisonnement, la faille d'injection fermée** | Restent à prouver : appels IA, approbations d'actions, commandes sensibles de bout en bout                                                                          |
 
 Un test sur dix échoue encore, et un seul dépend d'une clé : **le parcours guidé d'un
 débutant** (test 3 et 4 restent bloqués par la génération de configuration, qui elle exige un

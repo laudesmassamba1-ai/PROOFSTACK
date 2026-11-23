@@ -800,7 +800,7 @@ export function Settings() {
                     className="flex flex-wrap items-center gap-3 rounded-[var(--radius)] border border-line px-3 py-2"
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-medium">
+                      <p className="text-xs font-medium break-words">
                         {describeUserAgent(entry.userAgent, fr)}
                         {entry.current ? (
                           <span className="app-badge app-badge-success ml-2">
@@ -808,7 +808,7 @@ export function Settings() {
                           </span>
                         ) : null}
                       </p>
-                      <p className="truncate text-xs text-muted">
+                      <p className="text-xs text-muted break-words">
                         {entry.lastSeenAt
                           ? `${fr ? "vue" : "seen"} ${relativeTime(entry.lastSeenAt)}`
                           : `${fr ? "ouverte" : "opened"} ${relativeTime(entry.createdAt)}`}

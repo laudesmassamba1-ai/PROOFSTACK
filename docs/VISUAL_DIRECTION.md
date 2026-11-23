@@ -16,14 +16,14 @@ actuelle est la synthèse : **la chorégraphie existe, elle est subordonnée au 
 
 ### Ce que la direction interdit (et pourquoi)
 
-| Interdit | Raison |
-|----------|--------|
-| Dégradé violet/bleu global, blobs flottants | Aucun lien avec la mission ; identité de template |
-| Icône étincelle/IA générique (`Sparkles`) | Vague à voiture-balai ; retirée du produit |
-| Chiffres inventés, jauges décoratives | Le produit vend la preuve ; une décoration mensongère le tue |
-| Cartes empilées identiques en grille symétrique | La répétition masque l'absence de hiérarchie |
-| Animation permanente (halo pulsant, particules hors héro) | L'instrument ne vibre pas sans signal |
-| Glassmorphism systématique | La profondeur vient des ombres en couches et des filets, pas du flou |
+| Interdit                                                  | Raison                                                               |
+| --------------------------------------------------------- | -------------------------------------------------------------------- |
+| Dégradé violet/bleu global, blobs flottants               | Aucun lien avec la mission ; identité de template                    |
+| Icône étincelle/IA générique (`Sparkles`)                 | Vague à voiture-balai ; retirée du produit                           |
+| Chiffres inventés, jauges décoratives                     | Le produit vend la preuve ; une décoration mensongère le tue         |
+| Cartes empilées identiques en grille symétrique           | La répétition masque l'absence de hiérarchie                         |
+| Animation permanente (halo pulsant, particules hors héro) | L'instrument ne vibre pas sans signal                                |
+| Glassmorphism systématique                                | La profondeur vient des ombres en couches et des filets, pas du flou |
 
 ### Ce que la direction exige
 
@@ -40,13 +40,13 @@ actuelle est la synthèse : **la chorégraphie existe, elle est subordonnée au 
 
 ## 2. Références absorbées (et comment)
 
-| Référence | Ce qui a été retenu | Ce qui a été écarté |
-|-----------|--------------------|---------------------|
-| `ref_visuelles/da1.png` (CAYLENT) | Fond noir, champ de points menthe ondé entrant par le bord, wordmark espacé | Le logo au centre ; le nôtre converge en P puis se dissout |
-| `ref_visuelles/exp2.webp` (Freebuff) | Héro sombre, phrase d'accent colorée dans le titre, grande stat calme, CTA pilule discret | Le globe de « développeurs » ; nos chiffres sont des faits structurels |
-| `ref_visuelles/da2.png` (cartes 3D) | Ombres profondes en couches, objets détachés du fond | Le dégradé arc-en-ciel de fond ; nos surfaces restent noires |
-| `ref_visuelles/z1–z3` | Typographie display massive, lignes décalées | Le collage aléatoire ; notre grille reste lisible |
-| Images jointes (bento, dashboards) | Densité maîtrisée, données colorées portant du sens | Le look « admin SaaS » pour l'espace de travail : il reste Ink & Object |
+| Référence                            | Ce qui a été retenu                                                                       | Ce qui a été écarté                                                     |
+| ------------------------------------ | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `ref_visuelles/da1.png` (CAYLENT)    | Fond noir, champ de points menthe ondé entrant par le bord, wordmark espacé               | Le logo au centre ; le nôtre converge en P puis se dissout              |
+| `ref_visuelles/exp2.webp` (Freebuff) | Héro sombre, phrase d'accent colorée dans le titre, grande stat calme, CTA pilule discret | Le globe de « développeurs » ; nos chiffres sont des faits structurels  |
+| `ref_visuelles/da2.png` (cartes 3D)  | Ombres profondes en couches, objets détachés du fond                                      | Le dégradé arc-en-ciel de fond ; nos surfaces restent noires            |
+| `ref_visuelles/z1–z3`                | Typographie display massive, lignes décalées                                              | Le collage aléatoire ; notre grille reste lisible                       |
+| Images jointes (bento, dashboards)   | Densité maîtrisée, données colorées portant du sens                                       | Le look « admin SaaS » pour l'espace de travail : il reste Ink & Object |
 
 ## 3. Les deux mondes, une même identité
 

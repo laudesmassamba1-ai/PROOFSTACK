@@ -9854,3 +9854,58 @@ p {
   font: 700 9px / 1 var(--font-mono, ui-monospace, monospace);
   letter-spacing: -0.02em;
 }
+
+/* ============================================================================
+   Readability fixes from the automated DOM audit (16 routes × 5 viewports)
+   ============================================================================ */
+
+/*
+ * 10px microtext failed the 4.5:1 contrast target once rendered and was hard to read
+ * on a phone. 11px is the smallest size that stays legible, and the darker ink keeps
+ * the ratio above 4.5:1 on the paper surface.
+ */
+.app-eyebrow {
+  font-size: 11px;
+  color: var(--ink);
+}
+
+/* Badges follow the same rule: no 9px labels in a professional interface. */
+.app-badge {
+  font-size: 11px;
+}
+
+/* A label or a short caption must wrap, not be clipped by a fixed-width parent. */
+.app-label,
+.app-cell-state,
+.app-object-state,
+.app-object-question,
+.app-module-state {
+  overflow-wrap: anywhere;
+  word-break: normal;
+  white-space: normal;
+}
+
+/*
+ * Tables scroll horizontally inside their own wrapper. The audit's "offscreen"
+ * findings were cells inside that scroll area, which is correct behaviour — but the
+ * wrapper must never let the whole document scroll sideways.
+ */
+.overflow-x-auto {
+  max-width: 100%;
+  contain: inline-size;
+}
+
+/* The account avatar is a letter, not a 12px speck. */
+.app-account-avatar,
+.app-avatar,
+[data-testid="account-avatar"] {
+  font-size: 13px;
+  min-width: 28px;
+  min-height: 28px;
+}
+
+/* The accent green on paper measured 3.73:1 — below AA for an 11px badge. A darker
+   shade keeps the same hue and clears 4.5:1. */
+.app-badge-accent {
+  color: color-mix(in srgb, var(--accent) 62%, var(--ink));
+}

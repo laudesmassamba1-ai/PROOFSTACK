@@ -17,10 +17,10 @@ code is sent anywhere to be "processed for you" unless you ask for a cloud featu
 | `proofcore-<version>-installer-linux-x64.run` | Linux x64 (Mint, Ubuntu, Debian) | `chmod +x` then run. Installs to `~/.local/share/proofcore`, adds one `PATH` line to your shell profile.           |
 | `proofcore_<version>_amd64.deb`               | Debian, Ubuntu, Linux Mint       | `sudo dpkg -i proofcore_<version>_amd64.deb`                                                                       |
 | `proofcore-<version>-installer-darwin-*.run`  | macOS Intel and Apple Silicon    | Same as Linux.                                                                                                     |
-| `PROOFCORE-<version>-x64.exe`                 | Windows 10/11, x64               | The desktop app. Same installer flow, opens a window instead of a terminal.                                         |
-| `PROOFCORE-<version>-amd64.deb` / `.AppImage` | Debian, Ubuntu, Linux Mint       | `dpkg -i` or `chmod +x` then run.                                                                                   |
-| `PROOFCORE-<version>-arm64.dmg` / `.zip`      | macOS Apple Silicon              | `dmg` to install, `zip` for the updater to replace.                                                                 |
-| `release.json`                                | the download page                | What the build produced, with sizes and sha256. Not for people; the page reads it.                                   |
+| `PROOFCORE-<version>-x64.exe`                 | Windows 10/11, x64               | The desktop app. Same installer flow, opens a window instead of a terminal.                                        |
+| `PROOFCORE-<version>-amd64.deb` / `.AppImage` | Debian, Ubuntu, Linux Mint       | `dpkg -i` or `chmod +x` then run.                                                                                  |
+| `PROOFCORE-<version>-arm64.dmg` / `.zip`      | macOS Apple Silicon              | `dmg` to install, `zip` for the updater to replace.                                                                |
+| `release.json`                                | the download page                | What the build produced, with sizes and sha256. Not for people; the page reads it.                                 |
 
 Everything above comes from one tag, in one run of `.github/workflows/release.yml`, and the
 download page offers it from our own domain — `https://proofcore-api.laudesmassamba1.workers.dev/api/v1/releases/assets/<name>`
