@@ -39,6 +39,10 @@ const STATUS_LABELS = {
 
 export function StatusBadge({ status }: { status: string }) {
   const { t } = useI18n();
+  // A badge with no status is not information: it rendered as an empty pill and read
+  // as a stray dash in the accessible text of a card. Callers that have no verdict
+  // should render the "not tested" badge instead of an empty one.
+  if (!status.trim()) return null;
   const normalized = status.toUpperCase();
   const labelKey = STATUS_LABELS[normalized as keyof typeof STATUS_LABELS];
   const tone =

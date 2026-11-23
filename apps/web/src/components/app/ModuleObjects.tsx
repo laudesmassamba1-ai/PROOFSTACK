@@ -452,7 +452,11 @@ function AuditObject({
       viewBox="0 0 200 140"
       className={`module-object module-object-audit audit-${variant} ${running ? "is-running" : ""}`}
       role="img"
-      aria-label={`${variant} audit score`}
+      aria-label={
+        variant === "fail"
+          ? "Jauge de sécurité FAIL, aucune mesure"
+          : "Jauge de qualité d'interface CLEAN, aucune mesure"
+      }
     >
       <path
         d="M40 110 A60 60 0 0 1 160 110"
@@ -496,7 +500,7 @@ function AuditObject({
         fontWeight="700"
         className="audit-score"
       >
-        {total > 0 ? `${Math.round(rate * 100)}` : "—"}
+        {total > 0 ? `${Math.round(rate * 100)}` : ""}
       </text>
     </svg>
   );
