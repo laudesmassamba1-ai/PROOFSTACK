@@ -173,6 +173,18 @@ describe("releases", () => {
     expect(((await second.json()) as { release: { tag: string } }).release.tag).toBe("v0.6.0");
   });
 
+  it("keeps asset URLs on our origin when the answer comes from the cache", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json(RELEASE)));
+    const local = releaseRoutes({ ttlMs: 60_000, baseUrl: "https://api.example" });
+    await local.request("http://localhost/releases/latest");
+    const cached = await local.request("http://localhost/releases/latest");
+    const body = (await cached.json()) as { release: { assets: { url: string }[] } };
+    expect(body.release.assets.length).toBeGreaterThan(0);
+    for (const asset of body.release.assets) {
+      expect(asset.url.startsWith("https://api.example/api/v1/releases/assets/")).toBe(true);
+    }
+  });
+
   it("serves the cached answer without calling the source twice", async () => {
     const fetchMock = vi.fn(async () => json(RELEASE));
     vi.stubGlobal("fetch", fetchMock);

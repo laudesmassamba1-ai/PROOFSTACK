@@ -577,7 +577,7 @@ export function releaseRoutes(options: ReleaseOptions = {}): Hono<AppEnv> {
     const hit = cache.get(REPO);
     if (hit && Date.now() - hit.at < ttlMs) {
       c.header("Cache-Control", "public, max-age=60");
-      return c.json(hit.body);
+      return c.json({ release: hit.body.release === null ? null : localise(hit.body.release) });
     }
     try {
       const body = await fetchLatest(options.token);
