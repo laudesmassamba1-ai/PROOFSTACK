@@ -41,6 +41,12 @@ API_ORIGIN = "https://proofcore-api.laudesmassamba1.workers.dev"
 # "first user is admin" fallback:
 #   wrangler secret put ADMIN_EMAILS
 
+# This production deployment runs the deterministic sandbox provider (no SasPay
+# credentials are configured). The owner explicitly opted in to fictitious payments so
+# plans can be tested end to end. Without this flag production refuses to credit a
+# sandbox checkout, because a missing provider key would otherwise be a free upgrade.
+ALLOW_SANDBOX_BILLING = "true"
+
 # Assistant requests per hour, per account and address. High on purpose: a person working
 # with their own assistant must never meet it; it stops a runaway loop, not a conversation.
 AI_RATE_LIMIT_PER_HOUR = "5000"

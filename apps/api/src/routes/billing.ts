@@ -244,6 +244,7 @@ export function billingRoutes(services: Services): Hono<AppEnv> {
         slug: capabilities.provider,
         automatedRecurring: capabilities.automatedRecurring,
         refunds: capabilities.refunds,
+        currencies: capabilities.currencies,
         webhookSignatureScheme: capabilities.webhookSignatureScheme,
         notes: capabilities.notes,
       },

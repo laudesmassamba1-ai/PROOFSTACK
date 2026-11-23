@@ -298,6 +298,37 @@ describe("workspace invitations", () => {
     expect(response.status).toBe(403);
   });
 
+  it("deletes a sole workspace that still holds memory and correction state", async () => {
+    const owner = await signUp(harness, "owner-delete@example.com");
+    const workspaceId = await workspaceIdOf(harness, owner);
+
+    // Both tables are workspace-scoped. `workspace_memory` has a foreign key to
+    // `workspaces`, so forgetting it in the deletion walk makes the final DELETE fail
+    // with a constraint error — the owner then cannot delete their only workspace.
+    await harness.store.rememberWorkspaceFact({
+      workspaceId,
+      kind: "convention",
+      text: "Prices are in XOF.",
+    });
+    await harness.store.setAuditFindingState({
+      workspaceId,
+      projectId: "prj_delete_walk",
+      findingKey: "world:headers",
+      state: "todo",
+    });
+
+    const deleted = await harness.request(`/api/v1/workspaces/${workspaceId}`, {
+      method: "DELETE",
+      headers: { cookie: owner },
+    });
+    expect(deleted.status).toBe(200);
+    expect(await harness.store.getWorkspace(workspaceId)).toBeNull();
+    expect(await harness.store.listWorkspaceMemory(workspaceId)).toHaveLength(0);
+    expect(await harness.store.listAuditFindingStates(workspaceId, "prj_delete_walk")).toHaveLength(
+      0
+    );
+  });
+
   it("takes pending invitations with it when the workspace is deleted", async () => {
     const owner = await signUp(harness, "owner@example.com");
     const guest = await signUp(harness, "guest@example.com");

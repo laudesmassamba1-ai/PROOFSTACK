@@ -211,6 +211,37 @@ test.describe("dashboard", () => {
     await expect(page.getByText(/receipt|reçu/i).first()).toBeVisible();
   });
 
+  test("a plan can be chosen and settled with the test payment provider", async ({ page }) => {
+    await signUp(page, uniqueEmail("checkout-sandbox"));
+    await page.goto("/app/billing");
+
+    await page.getByRole("button", { name: /Upgrade to Developer/i }).click();
+    await expect(page.getByText("Sandbox outcome:")).toBeVisible();
+    await page.getByRole("button", { name: /^success$/i }).click();
+
+    // The subscription comes from the provider verification, not from the button click.
+    await expect(page.getByText(/Developer plan activated/i)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/Paid access is active/i)).toBeVisible();
+  });
+
+  test("an owner can delete their only workspace", async ({ page }) => {
+    await signUp(page, uniqueEmail("delete-only-workspace"));
+    await page.goto("/app/workspace");
+
+    await page.getByRole("button", { name: "Delete workspace" }).click();
+    await page.getByRole("button", { name: "Confirm delete" }).click();
+    await expect(page.getByText(/Workspace deleted/i)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("No workspace yet.")).toBeVisible();
+
+    // The account must remain usable once its only workspace is gone: the owner can
+    // create a replacement instead of being stuck on a dead page.
+    await page.getByLabel("New workspace name").fill("Replacement workspace");
+    await page.getByRole("button", { name: "Create" }).click();
+    await expect(page.getByText(/Workspace “Replacement workspace” created/i)).toBeVisible({
+      timeout: 15_000,
+    });
+  });
+
   test("CLI documentation stays inside the app shell", async ({ page }) => {
     await signUp(page, uniqueEmail("cli-docs"));
     await page.goto("/app/cli");

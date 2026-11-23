@@ -1583,6 +1583,8 @@ export class AppStore {
       "support_messages",
       "workspace_invitations",
       "page_audits",
+      "workspace_memory",
+      "audit_finding_states",
       "notifications",
     ];
     for (const table of tables) {

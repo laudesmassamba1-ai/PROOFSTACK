@@ -5,6 +5,13 @@ import { Card, Empty, ErrorState, Loading, Metric, StatusBadge } from "../../com
 import { useI18n } from "../../i18n/index.js";
 import { PageHeader } from "../../layouts/AppLayout.js";
 import { type ApiError, apiFetch, postJson } from "../../lib/api.js";
+import {
+  periodLabel,
+  planLabel,
+  providerNote,
+  sandboxOutcomeLabel,
+  statusLabel,
+} from "../../lib/appLabels.js";
 import { formatDate, formatDay, formatMinor } from "../../lib/format.js";
 import { useSession } from "../../lib/session.js";
 
@@ -48,6 +55,7 @@ interface BillingData {
     slug: string;
     automatedRecurring: boolean;
     refunds: boolean;
+    currencies: string[];
     webhookSignatureScheme: string;
     notes: string[];
   };
@@ -142,6 +150,22 @@ function usageCopy(
   return { label: key, counted: fallbackCounted };
 }
 
+/**
+ * The monthly price the configured provider can actually charge.
+ *
+ * SasPay declares XOF/XAF only; the catalogue also carries USD and EUR for display.
+ * Sending the first catalogue price (USD) made every test/live SasPay checkout fail with
+ * `no_chargeable_currency` before the provider was even called.
+ */
+function monthlyPriceFor(
+  plan: PlanOption,
+  currencies: readonly string[]
+): PlanOption["prices"][number] | undefined {
+  return plan.prices.find(
+    (price) => price.period === "monthly" && currencies.includes(price.amount.currency)
+  );
+}
+
 export function Billing() {
   const { workspaceId } = useSession();
   const { locale, t } = useI18n();
@@ -203,6 +227,16 @@ export function Billing() {
    */
   const choosePlan = async (plan: PlanOption) => {
     if (!workspaceId) return;
+    const price = monthlyPriceFor(plan, data?.provider.currencies ?? []);
+    if (!price) {
+      setNotice({
+        tone: "bad",
+        text: fr
+          ? "Aucun tarif mensuel n'est configuré dans une devise acceptée par le fournisseur de paiement."
+          : "No monthly price is configured in a currency the payment provider accepts.",
+      });
+      return;
+    }
     const isUpgrade = plan.rank > currentRank;
     if (!isUpgrade) {
       await act(
@@ -217,8 +251,7 @@ export function Billing() {
     setBusy(plan.key);
     setNotice(null);
     try {
-      const currency =
-        plan.prices.find((price) => price.period === "monthly")?.amount.currency ?? "USD";
+      const currency = price.amount.currency;
       const start = await postJson<{ intent: { id: string }; redirectUrl?: string }>(
         "/api/v1/checkout/start",
         {
@@ -390,7 +423,7 @@ export function Billing() {
               <p className="flex items-center gap-2 text-sm font-semibold text-accent">
                 <PartyPopper size={15} />
                 {fr
-                  ? `Abonnement ${celebrate.planKey} activé`
+                  ? `Abonnement ${planLabel(celebrate.planKey, celebrate.planKey, true)} activé`
                   : `${celebrate.planKey} plan activated`}
               </p>
               <p className="mt-0.5 text-xs text-muted">
@@ -434,7 +467,8 @@ export function Billing() {
         >
           <div className="px-5 py-4">
             <p className="text-sm">
-              {fr ? "Offre" : "Plan"} <strong>{checkout.planKey}</strong> ·{" "}
+              {fr ? "Offre" : "Plan"}{" "}
+              <strong>{planLabel(checkout.planKey, checkout.planKey, fr)}</strong> ·{" "}
               {fr ? "tentative" : "attempt"}{" "}
               <code className="app-mono text-xs">{checkout.intentId}</code>
             </p>
@@ -452,7 +486,7 @@ export function Billing() {
                       disabled={busy !== null}
                       onClick={() => void settleSandbox(outcome)}
                     >
-                      {outcome}
+                      {sandboxOutcomeLabel(outcome, fr)}
                     </button>
                   ))}
                 </>
@@ -482,14 +516,14 @@ export function Billing() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Metric
           label={fr ? "Offre" : "Plan"}
-          value={sub.planName}
+          value={planLabel(sub.planKey, sub.planName, fr)}
           hint={
             sub.entitled
               ? fr
                 ? "L'accès payant est actif"
                 : "Paid access is active"
               : fr
-                ? "Retour à Free"
+                ? `Retour à ${planLabel("free", "Free", true)}`
                 : "Resolving to Free"
           }
         />
@@ -507,7 +541,11 @@ export function Billing() {
                 : "Cancels at period end"
               : sub.pendingPlanKey
                 ? fr
-                  ? `Changement en attente : ${sub.pendingPlanKey}`
+                  ? `Changement en attente : ${planLabel(
+                      sub.pendingPlanKey,
+                      sub.pendingPlanKey,
+                      true
+                    )}`
                   : `Change queued: ${sub.pendingPlanKey}`
                 : fr
                   ? "Aucun changement en attente"
@@ -556,7 +594,9 @@ export function Billing() {
             <TriangleAlert size={17} className="mt-0.5 shrink-0 text-warning" />
             <div>
               <p className="text-sm font-medium">
-                {fr ? "Cet espace est sur Free" : "This workspace is on Free"}
+                {fr
+                  ? `Cet espace est sur ${planLabel("free", "Free", true)}`
+                  : "This workspace is on Free"}
               </p>
               <p className="mt-1 text-xs leading-relaxed text-muted">
                 {sub.reason === "period_ended_awaiting_renewal"
@@ -641,7 +681,7 @@ export function Billing() {
           {plans
             .filter((plan) => plan.rank > 0)
             .map((plan) => {
-              const monthly = plan.prices.find((price) => price.period === "monthly");
+              const monthly = monthlyPriceFor(plan, data.provider.currencies ?? []);
               const isCurrent = plan.key === sub.planKey;
               const isUpgrade = plan.rank > currentRank;
               return (
@@ -669,7 +709,7 @@ export function Billing() {
                   <button
                     type="button"
                     className={`app-btn mt-3 w-full ${isUpgrade ? "app-btn-primary" : ""}`}
-                    disabled={isCurrent || busy !== null}
+                    disabled={isCurrent || busy !== null || !monthly}
                     onClick={() => void choosePlan(plan)}
                   >
                     {isCurrent
@@ -726,8 +766,10 @@ export function Billing() {
                   <tr key={payment.id}>
                     <td className="whitespace-nowrap text-xs">{formatDate(payment.createdAt)}</td>
                     <td>
-                      {payment.planKey}
-                      <span className="ml-1 text-xs text-muted">/ {payment.period}</span>
+                      {planLabel(payment.planKey, payment.planKey, fr)}
+                      <span className="ml-1 text-xs text-muted">
+                        / {periodLabel(payment.period, fr)}
+                      </span>
                     </td>
                     <td className="text-right tabular-nums">
                       {formatMinor(payment.amount.minor, payment.amount.currency)}
@@ -798,7 +840,9 @@ export function Billing() {
                       <button
                         type="button"
                         className="app-btn"
-                        onClick={() => downloadReceipt(invoice, sub.planName)}
+                        onClick={() =>
+                          downloadReceipt(invoice, planLabel(sub.planKey, sub.planName, fr), fr)
+                        }
                       >
                         <Download size={13} /> {fr ? "Reçu" : "Receipt"}
                       </button>
@@ -859,7 +903,7 @@ export function Billing() {
         <ul className="border-t border-line px-5 py-3 text-xs leading-relaxed text-muted">
           {data.provider.notes.map((note) => (
             <li key={note} className="mt-1 first:mt-0">
-              · {note}
+              · {providerNote(note, fr)}
             </li>
           ))}
         </ul>
@@ -901,7 +945,11 @@ export function Billing() {
             </button>
             <p className="mt-3 text-xs leading-relaxed text-muted">
               {fr
-                ? "Aucun nouveau débit n'est créé. L'offre repasse à Free le"
+                ? `Aucun nouveau débit n'est créé. L'offre repasse à ${planLabel(
+                    "free",
+                    "Free",
+                    true
+                  )} le`
                 : "No further charge is created. The plan drops to Free at"}{" "}
               {formatDay(sub.currentPeriodEnd)}
               {fr ? ", et vos données sont conservées." : ", and your data is kept."}
@@ -920,22 +968,42 @@ export function Billing() {
  * document whose legal status is "receipt, not tax invoice". A plain, printable file
  * that states exactly what happened is more honest and more useful.
  */
-function downloadReceipt(invoice: BillingData["invoices"][number], planName: string): void {
-  const lines = [
-    "PROOFCORE — PAYMENT RECEIPT",
-    "",
-    `Receipt number : ${invoice.number}`,
-    `Issued         : ${formatDate(invoice.issuedAt)}`,
-    `Plan           : ${planName}`,
-    `Service period : ${formatDay(invoice.periodStart)} to ${formatDay(invoice.periodEnd)}`,
-    `Amount         : ${formatMinor(invoice.total.minor, invoice.total.currency)}`,
-    `Status         : ${invoice.status}`,
-    "",
-    "This document is a payment receipt. It is not a tax invoice.",
-    invoice.taxNote ??
-      "VAT/GST treatment depends on the jurisdiction of the seller and the buyer and has not been assessed for this document.",
-    "",
-  ];
+function downloadReceipt(
+  invoice: BillingData["invoices"][number],
+  planName: string,
+  fr: boolean
+): void {
+  const lines = fr
+    ? [
+        "PROOFCORE — REÇU DE PAIEMENT",
+        "",
+        `Numéro de reçu : ${invoice.number}`,
+        `Émis le         : ${formatDate(invoice.issuedAt)}`,
+        `Offre           : ${planName}`,
+        `Période        : du ${formatDay(invoice.periodStart)} au ${formatDay(invoice.periodEnd)}`,
+        `Montant         : ${formatMinor(invoice.total.minor, invoice.total.currency)}`,
+        `État            : ${statusLabel(invoice.status, true)}`,
+        "",
+        "Ce document est un reçu de paiement. Ce n'est pas une facture fiscale.",
+        invoice.taxNote ??
+          "Le traitement TVA/GST dépend de la juridiction du vendeur et de l'acheteur ; il n'a pas été évalué pour ce document.",
+        "",
+      ]
+    : [
+        "PROOFCORE — PAYMENT RECEIPT",
+        "",
+        `Receipt number : ${invoice.number}`,
+        `Issued         : ${formatDate(invoice.issuedAt)}`,
+        `Plan           : ${planName}`,
+        `Service period : ${formatDay(invoice.periodStart)} to ${formatDay(invoice.periodEnd)}`,
+        `Amount         : ${formatMinor(invoice.total.minor, invoice.total.currency)}`,
+        `Status         : ${invoice.status}`,
+        "",
+        "This document is a payment receipt. It is not a tax invoice.",
+        invoice.taxNote ??
+          "VAT/GST treatment depends on the jurisdiction of the seller and the buyer and has not been assessed for this document.",
+        "",
+      ];
   const blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
