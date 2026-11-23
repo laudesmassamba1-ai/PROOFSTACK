@@ -24,32 +24,19 @@ import { rememberFact } from "./memory.js";
  * same handlers over stdio; `proofcore agent` reaches them in-process.
  */
 
-/** Tools that change the machine. They need an explicit yes, or `--yes`. */
-export const MUTATING_TOOLS = new Set([
-  "write_file",
-  "apply_patch",
-  "edit_file",
-  "delete_path",
-  "move_path",
-  "copy_path",
-  "make_directory",
-  "run_command",
-  "run_shell",
-  "run_sandboxed",
-  "run_tests",
-  "http_request",
-  "generate_svg",
-  "debug_script",
-  "git_commit",
-  "git_branch",
-  "git_stage",
-  "git_unstage",
-  "browser_interact",
-  "browser_eval",
-  "browser_pdf",
-  "browser_cookies",
-  "build_semantic_index",
-]);
+/**
+ * Tools that change the machine. They need an explicit yes, or `--yes`.
+ *
+ * Derived from the registry's `readOnlyHint` instead of kept as a second list: a new
+ * mutating tool that is added to the MCP server but forgotten here would otherwise run
+ * without approval. An unannotated tool is treated as mutating, which is the safe
+ * default the product promises.
+ */
+export const MUTATING_TOOLS = new Set(
+  mcpToolDescriptors()
+    .filter((descriptor) => descriptor.annotations?.readOnlyHint !== true)
+    .map((descriptor) => descriptor.name)
+);
 
 export interface AgentProvider {
   baseUrl: string;
@@ -662,31 +649,25 @@ export class AgentSession {
     if ((this.options.allowDelegate ?? true) === false) {
       return "This session cannot delegate: sub-agents may not start their own sub-agents.";
     }
-    const sub = new AgentSession(
-      {
-        root: this.options.root,
-        provider: this.options.provider,
-        // Read-only: every mutating call is refused, and the sub-agent is told why.
-        approve: async () => false,
-        maxSteps: Math.min(8, this.options.maxSteps ?? 8),
-        allowDelegate: false,
-        ...(this.options.signal ? { signal: this.options.signal } : {}),
-        extraInstructions: [
-          "Tu es un sous-agent de relecture. Tu ne modifies rien : tu lis, tu vérifies, tu rapportes.",
-          "Tu n'as aucun souvenir de la conversation qui t'a convoqué. La question ci-dessous est tout ce que tu sais.",
-          "Réponds en faits vérifiés, chacun avec son fichier et sa ligne quand ils existent. Si tu n'as pas pu vérifier, écris-le.",
-          scope ? `Périmètre : ${scope}` : "",
-        ]
-          .filter((part) => part.trim())
-          .join("\n"),
-      },
-      [
-        {
-          role: "user",
-          content: question,
-        },
+    const sub = new AgentSession({
+      root: this.options.root,
+      provider: this.options.provider,
+      // Read-only: every mutating call is refused, and the sub-agent is told why.
+      approve: async () => false,
+      maxSteps: Math.min(8, this.options.maxSteps ?? 8),
+      allowDelegate: false,
+      ...(this.options.signal ? { signal: this.options.signal } : {}),
+      extraInstructions: [
+        "Tu es un sous-agent de relecture. Tu ne modifies rien : tu lis, tu vérifies, tu rapportes.",
+        "Tu n'as aucun souvenir de la conversation qui t'a convoqué. La question ci-dessous est tout ce que tu sais.",
+        "Réponds en faits vérifiés, chacun avec son fichier et sa ligne quand ils existent. Si tu n'as pas pu vérifier, écris-le.",
+        scope ? `Périmètre : ${scope}` : "",
       ]
-    );
+        .filter((part) => part.trim())
+        .join("\n"),
+    });
+    // `send` adds the question exactly once. Passing it as constructor history too made
+    // every sub-agent receive the same prompt twice and answer a duplicated request.
     const result = await sub.send(question);
     const text = result.text.trim();
     return text.length > 0

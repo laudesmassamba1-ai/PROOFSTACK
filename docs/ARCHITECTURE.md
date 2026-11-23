@@ -83,10 +83,12 @@ implementation is smaller to audit and runs unchanged on Workers and Node. If so
 login, MFA or organisations are added, migrating to Better Auth (or Managed Better
 Auth on Neon) remains possible; the session table is ordinary data.
 
-Email verification is **not implemented**, because no email provider is configured.
-The API says `emailVerification: "not_configured"` instead of claiming an email was
-sent. The adapter boundary is documented in
-`docs/deployment/ENVIRONMENT_VARIABLES.md`.
+Email verification and password recovery are **not implemented**. Transactional email
+has two adapters: EmailJS (preferred) and Resend (fallback). They are selected at call
+time and journal to `email_outbox` with `unconfigured` when neither is set. No production
+credentials were supplied, so real delivery is unverified; the API still says
+`emailVerification: "not_configured"` instead of claiming an email was sent. The adapter
+boundary is documented in `docs/deployment/ENVIRONMENT_VARIABLES.md`.
 
 ### Scanning someone else's site
 
@@ -236,9 +238,10 @@ farm.
 
 ## Known limitations
 
-- No email provider: no verification, password reset or invitations.
-- No team invitation endpoint: membership rows exist, adding a member without
-  delivery would be a fake feature.
+- No email verification or password reset. EmailJS/Resend adapters exist, but real
+  delivery was not verified without credentials.
+- Invitations are persisted and shown in-app; their email depends on the configured
+  provider, and there is no fallback that pretends it was sent.
 - Plans are defined in `packages/billing/src/plans.ts` and seeded once; the database
   does not yet let an operator change a price without a deploy.
 - No admin billing UI; refunds are administrative because SasPay has no refund route.

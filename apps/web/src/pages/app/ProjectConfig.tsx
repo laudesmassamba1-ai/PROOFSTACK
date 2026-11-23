@@ -87,6 +87,13 @@ interface FlowConfig {
   journeys: Journey[];
   baseUrl?: string;
   webhookEndpoint?: string;
+  target?: {
+    checkoutUrl?: string;
+    orderUrlTemplate?: string;
+    webhookUrl?: string;
+    refundUrl?: string;
+    tokenEnvVar?: string;
+  };
   [key: string]: unknown;
 }
 
@@ -668,6 +675,81 @@ export function ProjectConfigPage(): React.ReactElement {
                 onChange={(event) => updateFlow({ webhookEndpoint: event.target.value })}
               />
             </Field>
+          </div>
+          <div className="border-t border-[var(--border)] pt-4">
+            <p className="text-sm font-medium">
+              {fr ? "Surface de paiement HTTP" : "HTTP payment surface"}
+            </p>
+            <p className="mb-3 mt-1 text-xs text-muted">
+              {fr
+                ? "Les endpoints de votre application que FLOW appelle réellement. Laissez vide ce que vous n'exposez pas : la capacité correspondante sera ignorée, jamais inventée."
+                : "Your application's endpoints that FLOW actually calls. Leave empty what you do not expose: that capability is skipped, never invented."}
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label={fr ? "URL de paiement" : "Checkout URL"}>
+                <input
+                  className="app-input"
+                  value={flow.target?.checkoutUrl ?? ""}
+                  placeholder="https://exemple.com/api/checkout"
+                  onChange={(event) =>
+                    updateFlow({
+                      target: { ...flow.target, checkoutUrl: event.target.value },
+                    })
+                  }
+                />
+              </Field>
+              <Field label={fr ? "Lecture d'une commande" : "Order readback"}>
+                <input
+                  className="app-input"
+                  value={flow.target?.orderUrlTemplate ?? ""}
+                  placeholder="https://exemple.com/api/orders/{reference}"
+                  onChange={(event) =>
+                    updateFlow({
+                      target: { ...flow.target, orderUrlTemplate: event.target.value },
+                    })
+                  }
+                />
+              </Field>
+              <Field label={fr ? "Réception des webhooks" : "Webhook receiver"}>
+                <input
+                  className="app-input"
+                  value={flow.target?.webhookUrl ?? ""}
+                  placeholder="https://exemple.com/api/webhooks/payments"
+                  onChange={(event) =>
+                    updateFlow({
+                      target: { ...flow.target, webhookUrl: event.target.value },
+                    })
+                  }
+                />
+              </Field>
+              <Field label={fr ? "Remboursement (facultatif)" : "Refund (optional)"}>
+                <input
+                  className="app-input"
+                  value={flow.target?.refundUrl ?? ""}
+                  placeholder="https://exemple.com/api/refunds"
+                  onChange={(event) =>
+                    updateFlow({ target: { ...flow.target, refundUrl: event.target.value } })
+                  }
+                />
+              </Field>
+              <Field
+                label={fr ? "Variable du jeton" : "Token environment variable"}
+                hint={
+                  fr
+                    ? "Le nom de la variable, jamais le jeton. Exemple : FLOW_TOKEN."
+                    : "The variable name, never the token. Example: FLOW_TOKEN."
+                }
+              >
+                <input
+                  className="app-input"
+                  value={flow.target?.tokenEnvVar ?? ""}
+                  placeholder="FLOW_TOKEN"
+                  onChange={(event) =>
+                    updateFlow({ target: { ...flow.target, tokenEnvVar: event.target.value } })
+                  }
+                />
+              </Field>
+            </div>
           </div>
           <div className="border-t border-[var(--border)] pt-4">
             <div className="mb-1 flex flex-wrap items-center justify-between gap-2">

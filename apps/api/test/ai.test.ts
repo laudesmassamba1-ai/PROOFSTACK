@@ -5,6 +5,7 @@ import { createApp } from "../src/app.js";
 import { migrate } from "../src/db/d1.js";
 import { migrationFiles, NodeSqliteDatabase } from "../src/db/node-sqlite.js";
 import type { Services } from "../src/http/services.js";
+import type { ProjectKnowledge } from "../src/project-knowledge.js";
 
 /**
  * In-app AI experience.
@@ -548,6 +549,134 @@ describe("ai chat", () => {
     const { cookie } = await signUp("ai-404@example.com");
     const response = await request("/api/v1/ai/conversations/aic_missing", { cookie });
     expect(response.status).toBe(404);
+  });
+
+  it("reads uploaded project code through a tenant-scoped tool", async () => {
+    const { request, signUp, services } = harness;
+    const { cookie, workspaceId } = await signUp("ai-code@example.com");
+    const created = await request("/api/v1/projects", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({
+        workspaceId,
+        name: "Code project",
+        baseUrl: "https://code.example",
+        environment: "staging",
+      }),
+    });
+    expect(created.status).toBe(201);
+    const project = ((await created.json()) as { project: { id: string } }).project;
+
+    const now = "2026-11-23T10:00:00.000Z";
+    services.projectKnowledge = {
+      listSources: async () => [
+        {
+          id: "src_test",
+          workspaceId,
+          projectId: project.id,
+          name: "uploaded-repo",
+          kind: "folder" as const,
+          ref: null,
+          fileCount: 1,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+      listFiles: async () => [
+        {
+          id: "fil_test",
+          path: "src/index.ts",
+          language: "typescript",
+          size: 26,
+          sha256: "a".repeat(64),
+        },
+      ],
+      readFile: async () => ({
+        path: "src/index.ts",
+        content: "export const answer = 42;\n",
+      }),
+      metrics: async () => ({
+        sources: 1,
+        files: 1,
+        audits: 0,
+        averageScore: null,
+        findingsBySeverity: [],
+        scoreTrend: [],
+      }),
+      listAudits: async () => [],
+    } as unknown as ProjectKnowledge;
+
+    await request("/api/v1/ai/profile", {
+      method: "PUT",
+      cookie,
+      body: JSON.stringify({
+        providerId: "custom",
+        baseUrl: upstreamBase,
+        model: "test-model",
+        apiKey: "sk-code-key-1234",
+      }),
+    });
+
+    upstreamState.respond = (attempt) => {
+      if (attempt === 1) {
+        return {
+          status: 200,
+          body: {
+            choices: [
+              {
+                message: {
+                  role: "assistant",
+                  content: null,
+                  tool_calls: [
+                    {
+                      id: "call_code",
+                      type: "function",
+                      function: {
+                        name: "project_code",
+                        arguments: JSON.stringify({
+                          projectId: project.id,
+                          sourceId: "src_test",
+                          path: "src/index.ts",
+                        }),
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        };
+      }
+      // The trace assertion below proves the tool ran; the fake model's prose is not
+      // evidence, so it does not decide whether the test passes.
+      return {
+        status: 200,
+        body: {
+          choices: [
+            {
+              message: {
+                role: "assistant",
+                content: "The uploaded source contains src/index.ts.",
+              },
+            },
+          ],
+        },
+      };
+    };
+
+    const chat = await request("/api/v1/ai/chat", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({
+        workspaceId,
+        message: "What is in my uploaded source?",
+        effort: "quick",
+      }),
+    });
+    expect(chat.status).toBe(200);
+    const body = (await chat.json()) as { message: string; trace: { tool: string }[] };
+    expect(body.message, JSON.stringify(body.trace)).toContain("src/index.ts");
+    expect(body.trace.some((item) => item.tool === "project_code")).toBe(true);
   });
 });
 

@@ -8,6 +8,7 @@ import {
   type CheckoutResponse,
   createFlowProvider,
   executeJourney,
+  HttpPaymentTarget,
   type JourneyPage,
   looksPaid,
   type OrderState,
@@ -197,6 +198,43 @@ function caseFor(run: Awaited<ReturnType<typeof runFlow>>, id: string) {
   if (!found) throw new Error(`case ${id} not found in run`);
   return found;
 }
+
+describe("FLOW HTTP target", () => {
+  it("does not call an HTTP 200 with field errors an accepted checkout", async () => {
+    const parsed = proofcoreConfigSchema.parse({
+      project: { name: "FLOW target", baseUrl: "http://localhost:3000" },
+      environment: "staging",
+      modules: {
+        world: { enabled: false, target: { kind: "none" } },
+        flow: {
+          enabled: true,
+          target: { checkoutUrl: "https://shop.example.test/checkout" },
+        },
+        exit: { enabled: false },
+      },
+      enabledModules: ["flow"],
+    });
+    const target = new HttpPaymentTarget({
+      config: parsed,
+      fetchImpl: (async () =>
+        ({
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify({ errors: { amount: "invalid amount" } }),
+        }) as Response) as typeof fetch,
+    });
+
+    const result = await target.checkout({
+      amount: "2500.00",
+      currency: "XOF",
+      orderReference: "order-1",
+      scenario: "checkout_declined",
+      idempotencyKey: "idem-1",
+    });
+    expect(result.accepted).toBe(false);
+    expect(result.errors?.amount).toBe("invalid amount");
+  });
+});
 
 describe("FLOW harness primitives", () => {
   it("signs and verifies a webhook the documented way", async () => {

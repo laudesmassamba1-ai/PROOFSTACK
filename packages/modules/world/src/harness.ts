@@ -81,6 +81,29 @@ export class HttpProductUnderTest implements ProductUnderTest {
     if (this.cfg.sortUrl !== undefined) this.capabilities.sorted = true;
   }
 
+  /**
+   * Every request after submit gets the same deadline. Without it a readback or a sort
+   * endpoint that never answers hangs the whole engine run, and the case timeout only
+   * stops waiting — a leaked socket keeps the process alive.
+   */
+  private async request(url: string, init: RequestInit): Promise<Response> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.cfg.timeoutMs);
+    try {
+      return await this.fetchImpl(url, { ...init, signal: controller.signal });
+    } catch (error) {
+      throw new ProofCoreError({
+        message: `WORLD could not reach the product: ${error instanceof Error ? error.message : String(error)}`,
+        category: "NETWORK",
+        code: "world_target_unreachable",
+        retryable: true,
+        cause: error,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   private headers(): Record<string, string> {
     const out: Record<string, string> = { "content-type": "application/json", ...this.cfg.headers };
     if (this.cfg.tokenEnvVar) {
@@ -143,7 +166,7 @@ export class HttpProductUnderTest implements ProductUnderTest {
     const url = template.includes("{recordId}")
       ? template.replace("{recordId}", encodeURIComponent(recordId))
       : `${template}${template.includes("?") ? "&" : "?"}recordId=${encodeURIComponent(recordId)}`;
-    const response = await this.fetchImpl(url, { headers: this.headers() });
+    const response = await this.request(url, { headers: this.headers() });
     if (!response.ok) return undefined;
     const parsed = safeJson(await response.text());
     return storedOf(parsed);
@@ -157,7 +180,7 @@ export class HttpProductUnderTest implements ProductUnderTest {
         category: "CONFIGURATION",
         code: "world_sort_url_missing",
       });
-    const response = await this.fetchImpl(url, {
+    const response = await this.request(url, {
       method: "POST",
       headers: this.headers(),
       body: JSON.stringify(input),

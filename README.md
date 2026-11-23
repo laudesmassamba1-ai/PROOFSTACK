@@ -44,9 +44,10 @@ navigation, state-driven display type and one data-bound object per module. Desi
 records and real captures live under [`docs/design`](docs/design), including
 [`WORKSPACE_VISUAL_AUDIT.md`](docs/design/WORKSPACE_VISUAL_AUDIT.md).
 
-Not yet true: no email provider is configured (verification, reset and invitations are
-therefore absent), SasPay's live path is untested without credentials, and prices
-still require a deploy to change. See
+Not yet true: email verification and password recovery are absent; transactional email
+has EmailJS and Resend adapters but no production credentials were supplied, so delivery
+is unverified. SasPay's live path is untested without credentials, and prices still
+require a deploy to change. See
 [`docs/DEVELOPMENT_STATUS.md`](docs/DEVELOPMENT_STATUS.md) for the full, unvarnished
 list.
 

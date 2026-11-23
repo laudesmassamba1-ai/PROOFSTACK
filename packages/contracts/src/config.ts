@@ -189,6 +189,24 @@ export const flowConfigSchema = z
           .strict()
       )
       .default([]),
+    /**
+     * The customer's own payment surface. This block was read by FLOW but absent from
+     * the strict schema, so any config that declared it was rejected before the module
+     * could run. URLs are optional because a missing capability is SKIPPED, not a pass.
+     */
+    target: z
+      .object({
+        checkoutUrl: z.string().url().optional(),
+        orderUrlTemplate: z.string().url().optional(),
+        webhookUrl: z.string().url().optional(),
+        refundUrl: z.string().url().optional(),
+        /** Name of the env var holding the bearer token. Never the token itself. */
+        tokenEnvVar: z.string().optional(),
+        headers: z.record(z.string(), z.string()).default({}),
+        timeoutMs: z.number().int().positive().max(120_000).default(15_000),
+      })
+      .strict()
+      .optional(),
     /** Webhook endpoint the engine posts forged/duplicated events to. */
     webhookEndpoint: z.string().url().optional(),
     /** Base URL of the app under test (defaults to project.baseUrl). */

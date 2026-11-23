@@ -540,6 +540,24 @@ const TOOLS: { name: string; description: string; parameters: Record<string, unk
     },
   },
   {
+    name: "project_code",
+    description:
+      "Read the code a person uploaded to a project, and the AI code audits already run on it. Without sourceId it lists sources, file counts, scores and recent audit findings; with sourceId it lists files; with sourceId and path it returns that exact file. Uploaded code only, never the server's own disk.",
+    parameters: {
+      type: "object",
+      properties: {
+        projectId: { type: "string", description: "Project id from list_projects." },
+        sourceId: { type: "string", description: "Uploaded source id, to inspect one source." },
+        path: {
+          type: "string",
+          description: "File path inside the source, returned only together with sourceId.",
+        },
+      },
+      required: ["projectId"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "fetch_web",
     description:
       "Fetch one public web page or API response as text (HTML is reduced to text). Use for research and documentation, never as proof about the user's app.",
@@ -718,6 +736,8 @@ function systemPrompt(
     "- A passing check is also information. Never claim a check ran that did not.",
     "- For FAIL and CLEAN audits: lead with the score and the ordered issue list, each with",
     "  its location and the exact observed value.",
+    "- For questions about uploaded project code, call `project_code` before answering. Read",
+    "  the file or audit you cite; an uploaded source is not the same thing as the live site.",
     "- When the question is about a site and not one page, call site_audit once, then read",
     "  its page list: a defect that names the pages it affects is evidence, a count is not.",
     "- A site score is never quoted alone: give the coverage and, when the crawl stopped",
@@ -1720,6 +1740,8 @@ async function executeTool(
         }
         return { content: stableStringify(report, 2), summary: "report payload" };
       }
+      case "project_code":
+        return projectCode(args, workspaceId, services, maxFetchChars);
       case "fetch_web":
         return fetchWeb(args, maxFetchChars);
       case "read_repo":
@@ -2262,6 +2284,131 @@ async function siteAudit(args: Record<string, unknown>, workspaceId: string, ser
       `${result.site.pages.filter((page) => page.measured).length} page(s) measured · ` +
       `score ${result.score.score}/100 · coverage ${Math.round(result.score.coverage * 100)}% · ` +
       `${defects.length} site defect(s)`,
+  };
+}
+
+/**
+ * `project_code` — the bridge between the assistant and the code a person uploaded.
+ *
+ * Project intelligence is stored in Neon, separately from D1, so the assistant could not
+ * see the files it had just audited. This tool only reads the tenant's project, and it
+ * caps what returns to the model: one file at a time, never a whole repository.
+ */
+async function projectCode(
+  args: Record<string, unknown>,
+  workspaceId: string,
+  services: Services,
+  maxChars: number
+): Promise<{ content: string; summary: string }> {
+  const projectId = typeof args.projectId === "string" ? args.projectId : "";
+  if (!projectId) {
+    return {
+      content: stableStringify({ error: "projectId is required; call list_projects first" }),
+      summary: "missing project",
+    };
+  }
+  if (!services.projectKnowledge) {
+    return {
+      content: stableStringify({
+        error: "project intelligence is not configured on this deployment (NEON_DATABASE_URL)",
+      }),
+      summary: "neon not configured",
+    };
+  }
+  const project = await services.store.getProject(workspaceId, projectId);
+  if (!project) {
+    return {
+      content: stableStringify({ error: "project not found in this workspace" }),
+      summary: "project not found",
+    };
+  }
+
+  const knowledge = services.projectKnowledge;
+  const sources = await knowledge.listSources(workspaceId, projectId);
+  const sourceId = typeof args.sourceId === "string" ? args.sourceId : "";
+  const path = typeof args.path === "string" ? args.path : "";
+
+  if (sourceId) {
+    const source = sources.find((item) => item.id === sourceId);
+    if (!source) {
+      return {
+        content: stableStringify({ error: "source not found in this project", projectId }),
+        summary: "source not found",
+      };
+    }
+    if (path) {
+      const file = await knowledge.readFile(workspaceId, projectId, sourceId, path);
+      if (!file) {
+        return {
+          content: stableStringify({
+            error: `no file ${path} in source ${source.name}`,
+            projectId,
+          }),
+          summary: "file not found",
+        };
+      }
+      return {
+        content: stableStringify(
+          {
+            projectId,
+            source: { id: source.id, name: source.name },
+            path: file.path,
+            content: file.content.slice(0, maxChars),
+            truncated: file.content.length > maxChars,
+            bytes: file.content.length,
+          },
+          2
+        ),
+        summary: `${source.name}/${file.path}`,
+      };
+    }
+    const files = await knowledge.listFiles(workspaceId, projectId, sourceId);
+    return {
+      content: stableStringify(
+        {
+          projectId,
+          source: { id: source.id, name: source.name, kind: source.kind, files: source.fileCount },
+          files: files.slice(0, 250),
+        },
+        2
+      ),
+      summary: `${files.length} file(s) in ${source.name}`,
+    };
+  }
+
+  const [metrics, audits] = await Promise.all([
+    knowledge.metrics(workspaceId, projectId),
+    knowledge.listAudits(workspaceId, projectId, 10),
+  ]);
+  return {
+    content: stableStringify(
+      {
+        projectId,
+        sources: sources.map((source) => ({
+          id: source.id,
+          name: source.name,
+          kind: source.kind,
+          files: source.fileCount,
+          createdAt: source.createdAt,
+        })),
+        metrics,
+        recentAudits: audits.map((audit) => ({
+          id: audit.id,
+          scope: audit.scope,
+          mode: audit.mode,
+          status: audit.status,
+          score: audit.score,
+          model: audit.model,
+          provider: audit.provider,
+          filesAnalyzed: audit.filesAnalyzed,
+          findings: audit.findings.length,
+          createdAt: audit.createdAt,
+        })),
+        next: "Call project_code again with sourceId, then with sourceId and path, to read a file.",
+      },
+      2
+    ),
+    summary: `${sources.length} source(s), ${metrics.files} file(s), ${metrics.audits} code audit(s)`,
   };
 }
 

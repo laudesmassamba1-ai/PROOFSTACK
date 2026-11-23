@@ -407,6 +407,10 @@ describe("sub-agents", () => {
     );
     expect(report?.content).toContain("exports `hello = 1`");
     expect(result.text).toContain("confirms");
+    // The sub-agent receives its question once, not once as history and again as the
+    // turn being sent.
+    const subRequest = received[1] as { messages: { role: string; content: string }[] };
+    expect(subRequest.messages.filter((message) => message.role === "user")).toHaveLength(1);
   });
 
   it("refuses every mutation inside a sub-agent, so it reviews instead of editing", async () => {

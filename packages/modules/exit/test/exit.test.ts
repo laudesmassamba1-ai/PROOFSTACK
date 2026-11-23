@@ -1,3 +1,6 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { proofcoreConfigSchema } from "@proofcore/contracts";
 import { FixedClock, Logger } from "@proofcore/core";
 import { runEngine } from "@proofcore/engine";
@@ -9,6 +12,7 @@ import {
   type ExportArtifact,
   type ExportFormat,
   type ExportSource,
+  FileExportSource,
   findDuplicates,
   findOrphans,
   parseCsv,
@@ -139,6 +143,18 @@ describe("EXIT parsing primitives", () => {
     expect(entries).toHaveLength(1);
     expect(entries[0]?.name).toBe("hello.txt");
     expect(entries[0]?.bytes).toBe(2);
+  });
+
+  it("reads export.<format> from a directory, as the source contract promises", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "proofcore-exit-"));
+    try {
+      await writeFile(join(directory, "export.json"), GOOD_JSON, "utf8");
+      const artifact = await new FileExportSource({ path: directory }).fetch("json");
+      expect(artifact.records).toHaveLength(3);
+      expect(artifact.records?.[0]?.id).toBe("p1");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   it("rejects a file that is not a zip", () => {

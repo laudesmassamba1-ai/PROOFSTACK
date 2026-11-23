@@ -58,10 +58,11 @@ uses the Ink & Object direction; this file records what is true and what remains
 
 The full, evidence-based list lives in `docs/AUDIT_2026-11.md`. The short version:
 
-- No password recovery, no email verification and no transactional email provider:
-  a user who forgets a password cannot recover the account.
+- No password recovery and no email verification: a user who forgets a password cannot
+  recover the account. Transactional email has EmailJS and Resend adapters, but no
+  production credentials were supplied, so real delivery remains unverified.
 - No OAuth (Google, GitHub) and no two-factor authentication.
-- No support channel, no legal pages (terms, privacy, cookies).
+- No legal pages (terms, privacy, cookies).
 - Four sold entitlements have no implementation (GitHub integration, client sharing,
   advanced reports, priority support). The pricing table now labels them "coming".
 - FAIL/CLEAN audit results are not yet uploaded as runs, so the two module pages stay
@@ -69,7 +70,8 @@ The full, evidence-based list lives in `docs/AUDIT_2026-11.md`. The short versio
 - CLEAN scores server HTML, which is structurally wrong for client-rendered apps.
 - No CI. No tests for the WORLD module or the payment adapters.
 - No retention job, no backup procedure, no pagination, no search.
-- No email provider: verification, password reset and invitations are absent, not faked.
+- EmailJS/Resend delivery is implemented but unverified without credentials; email
+  verification and password reset flows are still absent.
 - The CLI is distributable as a self-contained global tarball (`pnpm cli:install`), but
   `@proofcore/cli` is not published on the npm registry yet.
 - SasPay live path is untested without credentials; sandbox payments are tested.

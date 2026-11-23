@@ -1,8 +1,10 @@
+import { proofcoreConfigSchema } from "@proofcore/contracts";
 import { Money, resolveWallClock, unicodeEquals } from "@proofcore/core";
 import { describe, expect, it } from "vitest";
 import { buildWorldSuites, preview } from "../src/checks.js";
 import { parseWithAnyPattern, parseWithPattern, toAsciiDigits } from "../src/dateformat.js";
 import { buildFixtures } from "../src/fixtures.js";
+import { type FetchLike, HttpProductUnderTest } from "../src/harness.js";
 import { ar_EG, fr_BJ, ja_JP, PROFILES, pt_BR } from "../src/profiles/base.js";
 
 /**
@@ -203,6 +205,42 @@ describe("suites", () => {
     });
     expect(narrowed[0]?.cases.length).toBeGreaterThanOrEqual(1);
     expect(narrowed[0]?.cases[0]?.id).toBe(firstCase?.id);
+  });
+
+  it("times out readback and collation requests instead of hanging the run", async () => {
+    const config = proofcoreConfigSchema.parse({
+      project: { name: "WORLD timeout", baseUrl: "http://localhost:3000" },
+      environment: "staging",
+      modules: {
+        world: {
+          enabled: true,
+          target: {
+            kind: "http",
+            submitUrl: "http://target.test/submit",
+            readbackUrl: "http://target.test/records/{recordId}",
+            sortUrl: "http://target.test/sort",
+            timeoutMs: 100,
+          },
+        },
+        flow: { enabled: false },
+        exit: { enabled: false },
+      },
+      enabledModules: ["world"],
+    });
+    // Never resolves on its own; only the request deadline can end it. This is the
+    // failure mode that used to leave the engine waiting forever.
+    const hanging: FetchLike = (_url, init) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new Error("aborted")), {
+          once: true,
+        });
+      });
+    const target = new HttpProductUnderTest({ config, fetchImpl: hanging });
+
+    await expect(target.readback("rec_1")).rejects.toThrow(/WORLD could not reach/);
+    await expect(
+      target.sorted({ profile: "fr-FR", field: "name", values: ["b", "a"] })
+    ).rejects.toThrow(/WORLD could not reach/);
   });
 
   it("truncates long values in a report so a failure stays readable", () => {

@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { promisify } from "node:util";
 import { ProofCoreError } from "@proofcore/core";
 import {
@@ -108,9 +108,15 @@ export class FileExportSource implements ExportSource {
   }
 
   async fetch(format: ExportFormat): Promise<ExportArtifact> {
-    const path = this.options.path.includes("<format>")
+    let path = this.options.path.includes("<format>")
       ? this.options.path.replaceAll("<format>", format)
       : this.options.path;
+    // The documented contract accepts a directory containing `export.<format>`. Without
+    // this branch that contract failed with EISDIR, which looked like a missing export.
+    if (!this.options.path.includes("<format>")) {
+      const info = await stat(path).catch(() => undefined);
+      if (info?.isDirectory()) path = `${path.replace(/[\\/]+$/, "")}/export.${format}`;
+    }
 
     let buffer: Uint8Array;
     try {

@@ -102,14 +102,17 @@ export class HttpPaymentTarget implements PaymentUnderTest {
       idempotency_key: input.idempotencyKey,
     });
     const body = await parseBody(response);
+    // A 200 can still carry a per-field refusal. Treating it as accepted made a declined
+    // checkout look successful and hid the product's own error payload.
+    const errors = isRecord(body.errors) ? (body.errors as Record<string, string>) : undefined;
     return {
-      accepted: response.ok,
+      accepted: response.ok && errors === undefined,
       ...(typeof body.order_id === "string" ? { orderId: body.order_id } : {}),
       ...(typeof body.payment_id === "string" ? { paymentId: body.payment_id } : {}),
       ...(typeof body.redirect_url === "string" ? { redirectUrl: body.redirect_url } : {}),
       ...(typeof body.state === "string" ? { state: body.state } : {}),
       httpStatus: response.status,
-      ...(isRecord(body.errors) ? { errors: body.errors as Record<string, string> } : {}),
+      ...(errors === undefined ? {} : { errors }),
       rawSample: JSON.stringify(body).slice(0, 2_000),
     };
   }
