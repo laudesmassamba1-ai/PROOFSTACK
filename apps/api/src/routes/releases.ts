@@ -487,7 +487,10 @@ export function releaseRoutes(options: ReleaseOptions = {}): Hono<AppEnv> {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 400 * attempt));
       try {
-        upstream = await fetch(asset.url, {
+        // Follow the redirect by hand: the signed storage URL it leads to rejects a
+        // request that also carries an Authorization header, so the token only goes to
+        // the release host itself.
+        const first = await fetch(asset.url, {
           headers: {
             "user-agent": "proofstack-download",
             // A token raises the release host's per-address limit. Workers share their
@@ -496,8 +499,21 @@ export function releaseRoutes(options: ReleaseOptions = {}): Hono<AppEnv> {
             ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
             ...(range ? { range } : {}),
           },
-          redirect: "follow",
+          redirect: "manual",
         });
+        const location = first.headers.get("location");
+        if (first.status >= 300 && first.status < 400 && location) {
+          await first.body?.cancel();
+          upstream = await fetch(new URL(location, asset.url), {
+            headers: {
+              "user-agent": "proofstack-download",
+              ...(range ? { range } : {}),
+            },
+            redirect: "follow",
+          });
+        } else {
+          upstream = first;
+        }
       } catch {
         upstream = null;
       }
