@@ -334,6 +334,12 @@ pnpm cloud:deploy --dry-run
 - **Textes faux retirés.** L'onboarding CLI de l'app disait encore « Le paquet npm n'est pas encore publié » et faisait cloner le dépôt (`git clone … && pnpm cli:install`) : remplacé par `npm i -g proofcore`. `download.lede` ignorait macOS, `download.cli.body` renvoyait « sur la page des versions », `download.fallback` disait « Ouvrez la page des versions ». `--help` ne mentionnait pas `scan`, la commande que le site conseille.
 - **Reste un seul écart : npm est à `0.6.0`, la release à `0.6.2`.** `NPM_TOKEN` manque toujours. Le workflow de release gagne une étape « Publish the CLI to npm », sautée quand le secret est absent : `gh secret set NPM_TOKEN` puis re-run de la dernière étiquette suffisent, et les suivantes resteront synchrones sans intervention.
 
+## 2026-11-23 (release 0.6.3 : le manifeste ne tombe plus, les installés se mettent à jour)
+
+- **Version courante : 0.6.3** (`packages/cli`, `apps/desktop`, `version.ts`). Release `v0.6.3` publiée et `latest`. npm `proofcore` reste à **0.6.0** : `NPM_TOKEN` n'est pas défini.
+- **Le 503 de `/releases/assets/manifest.json` venait du Worker.** Les assets issus de l'index avaient une URL relative ; la route de téléchargement la passait à `fetch()` (`Invalid URL`). Corrigé : l'URL GitHub reste interne, et `localise()` réécrit toute sortie, y compris la réponse en cache de `/releases/latest`, qui ne l'était pas. Test ajouté. Vérifié : manifeste 200 sur 5 appels, `proofcore update` 0.6.2 → 0.6.3 avec sha256 confirmé.
+- **Leçon** : une route de téléchargement doit être testée avec un asset réel (URL relative ou absolue), pas seulement avec le chemin de sortie.
+
 ## 2026-11-22 (Vercel bloquait le site : protection de déploiement)
 
 - **Symptôme** : « Vercel bloque le site ». Les URLs de déploiement (`proofstack-l60pa18ig-…vercel.app`, `proofstack-pyn4po6q7`) répondaient `302` vers l'écran d'authentification Vercel, alors que l'alias de production servait la page. Cause exacte : `ssoProtection.deploymentType = "all_except_custom_domains"` sur le projet `proofstack` (`prj_KHv33Dil9FBeANTqyITxLL8gAsht`). J'avais cité les deux types d'URL dans les rapports, donc la moitié des liens envoyés demandaient une connexion.
