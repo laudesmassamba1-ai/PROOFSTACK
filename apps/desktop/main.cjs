@@ -43,6 +43,15 @@ const { createBrowserHost } = require("./src/browser.cjs");
 const SMOKE = process.env.PROOFCORE_SMOKE === "1";
 const SITE_API =
   process.env.PROOFCORE_API_URL ?? "https://proofcore-api.laudesmassamba1.workers.dev";
+/**
+ * The public web origin. It used to be hardcoded to the old Vercel deployment, so
+ * "open site" kept sending people to a stale host after a rename. One env var, read at
+ * startup, keeps every link in the window pointing at the same place.
+ */
+const SITE_WEB = (process.env.PROOFCORE_WEB_URL ?? "https://proofcore-iota.vercel.app").replace(
+  /\/+$/,
+  ""
+);
 
 /** One window, one sidecar: a second launch focuses the first instead of starting another. */
 if (!SMOKE && !app.requestSingleInstanceLock()) {
@@ -427,7 +436,9 @@ function showLoginWindow(state) {
     },
   });
   loginWindow.setMenuBarVisibility(false);
-  loginWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(loginPageHtml(state))}`);
+  loginWindow.loadURL(
+    `data:text/html;charset=utf-8,${encodeURIComponent(loginPageHtml(state, { site: SITE_WEB }))}`
+  );
   // Create this window before destroying the splash. Otherwise there is an instant with
   // zero windows, and `window-all-closed` quits the app before sign-in can even appear.
   closeSplash();
@@ -803,10 +814,10 @@ ipcMain.handle("proofcore:action", async (_event, action) => {
     case "about":
       return { ok: true, output: aboutText() };
     case "open-site":
-      await shell.openExternal("https://proofstack-iota.vercel.app");
+      await shell.openExternal(SITE_WEB);
       return { ok: true, output: "Site ouvert dans le navigateur." };
     case "open-releases":
-      await shell.openExternal("https://github.com/laudesmassamba1-ai/PROOFSTACK/releases/latest");
+      await shell.openExternal("https://github.com/laudesmassamba1-ai/PROOFCORE/releases/latest");
       return { ok: true, output: "Versions ouvertes dans le navigateur." };
     case "reload":
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.reload();

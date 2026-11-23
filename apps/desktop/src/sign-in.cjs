@@ -19,7 +19,7 @@ const SESSION_COOKIE = "ps_session";
 
 /**
  * @param {object} input
- * @param {string} input.apiUrl     the site origin, e.g. https://proofstack-iota.vercel.app
+ * @param {string} input.apiUrl     the site origin, e.g. https://proofcore-iota.vercel.app
  * @param {string} input.email
  * @param {string} input.password
  * @param {(url: string, init: object) => Promise<{status: number, headers: object, body: string}>} [input.post]

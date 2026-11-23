@@ -15,7 +15,7 @@ const { pageCss } = require("./theme.cjs");
 
 /** Kept as a function of the state so the page never shows a stale reason. */
 function loginPageHtml(state, options = {}) {
-  const site = options.site ?? "https://proofstack-iota.vercel.app";
+  const site = options.site ?? "https://proofcore-iota.vercel.app";
   const esc = (value) =>
     String(value ?? "").replace(
       /[&<>"']/g,
