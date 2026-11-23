@@ -21,6 +21,17 @@ export {
   findChromium,
 } from "./discovery.js";
 export {
+  genericAppScenario,
+  type InteractionFinding,
+  type InteractionOptions,
+  type InteractionReport,
+  type InteractionScenario,
+  type InteractionStatus,
+  type InteractionStep,
+  runInteractionScenario,
+  summarizeInteraction,
+} from "./interaction.js";
+export {
   type LaunchedBrowser,
   type LaunchOptions,
   launchBrowser,

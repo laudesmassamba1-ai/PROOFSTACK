@@ -58,6 +58,7 @@ import {
 } from "./agent-runtime.js";
 import { pickPositional, positionalWords } from "./argv.js";
 import { printAuditHelp } from "./audit.js";
+import { commandAuditInteract, printAuditInteractHelp } from "./audit-interact.js";
 import { mapArchitecture } from "./code-tools.js";
 import { evaluate, findInstalls, inspectMachine, summarize } from "./doctor-env.js";
 import { effortProfile, parseEffort, subagentPrompt } from "./effort.js";
@@ -382,8 +383,12 @@ async function main(argv: string[]): Promise<number> {
       return commandScan(flags, args, ["fail", "clean"]);
     case "audit": {
       const kind = (args[0] ?? "").toLowerCase();
+      if (kind === "interact") {
+        return commandAuditInteract(args.slice(1));
+      }
       if (kind !== "fail" && kind !== "clean") {
         printAuditHelp(flags);
+        if (kind === "help") printAuditInteractHelp();
         return kind ? 2 : 0;
       }
       const target = args.slice(1).find((arg) => !arg.startsWith("-"));
