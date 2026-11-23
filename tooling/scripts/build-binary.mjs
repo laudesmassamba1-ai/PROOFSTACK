@@ -47,25 +47,25 @@ const TARGETS = {
   "linux-x64": {
     node: `https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz`,
     extract: "tar.xz",
-    binary: "node",
+    binary: "bin/node",
     name: "proofcore-linux-x64",
   },
   "linux-arm64": {
     node: `https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-arm64.tar.xz`,
     extract: "tar.xz",
-    binary: "node",
+    binary: "bin/node",
     name: "proofcore-linux-arm64",
   },
   "darwin-x64": {
     node: `https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-darwin-x64.tar.gz`,
     extract: "tar.gz",
-    binary: "node",
+    binary: "bin/node",
     name: "proofcore-darwin-x64",
   },
   "darwin-arm64": {
     node: `https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-darwin-arm64.tar.gz`,
     extract: "tar.gz",
-    binary: "node",
+    binary: "bin/node",
     name: "proofcore-darwin-arm64",
   },
   "win-x64": {
@@ -178,6 +178,23 @@ async function runtimeFor(target) {
 
 const runtimeCache = join(root, "artifacts", ".cache");
 
+/**
+ * macOS ships `codesign`; Linux and Windows need `rcodesign` to produce the ad-hoc
+ * signature a cross-built macOS binary needs. Failing loudly is better than shipping an
+ * unsigned arm64 binary that refuses to start.
+ */
+function macSignTool() {
+  if (process.platform === "darwin") return "codesign";
+  const candidates = [process.env.RCODESIGN, join(runtimeCache, "tools", "rcodesign")];
+  const found = candidates.find((candidate) => candidate && existsSync(candidate));
+  if (!found) {
+    throw new Error(
+      "macOS cross-build needs rcodesign: set RCODESIGN or place it at artifacts/.cache/tools/rcodesign (https://github.com/indygreg/apple-platform-rs/releases)"
+    );
+  }
+  return found;
+}
+
 /** Keeps the downloaded runtime around: the installer builder embeds the same binary. */
 function cacheRuntime(target, runtime) {
   mkdirSync(runtimeCache, { recursive: true });
@@ -196,9 +213,11 @@ async function buildTarget(target, blob) {
   chmodSync(output, 0o755);
 
   // macOS refuses to run a signed binary whose signature no longer matches, so the
-  // signature goes before the injection and comes back after.
+  // signature goes before the injection and comes back after. On macOS, `codesign`
+  // removes and recreates it; elsewhere `rcodesign` signs the mutated Mach-O directly.
   const isMac = target.startsWith("darwin");
-  if (isMac) run("codesign", ["--remove-signature", output]);
+  const signTool = isMac ? macSignTool() : null;
+  if (isMac && signTool === "codesign") run("codesign", ["--remove-signature", output]);
 
   run(process.execPath, [
     packageBin("postject", "postject"),
@@ -210,7 +229,10 @@ async function buildTarget(target, blob) {
     ...(isMac ? ["--macho-segment-name", "NODE_SEA"] : []),
   ]);
 
-  if (isMac) run("codesign", ["--sign", "-", output]);
+  if (isMac) {
+    if (signTool === "codesign") run("codesign", ["--sign", "-", output]);
+    else run(signTool, ["sign", output]);
+  }
 
   const digest = createHash("sha256").update(readFileSync(output)).digest("hex");
   writeFileSync(`${output}.sha256`, `${digest}  ${spec.name}\n`);
