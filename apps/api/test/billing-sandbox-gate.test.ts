@@ -108,3 +108,53 @@ describe("sandbox billing is closed by default in production", () => {
     expect(result.outcome).toBe("credited");
   });
 });
+
+describe("sandbox settlement across isolates", () => {
+  it("settles a checkout created by a different Worker isolate", async () => {
+    // Cloudflare does not pin two requests to one isolate. The second app below has a
+    // fresh SandboxProvider, exactly like the isolate that answered the production
+    // settle request; it must not depend on the first app's in-memory transaction map.
+    const db = NodeSqliteDatabase.open(":memory:");
+    try {
+      await migrate(db, migrationFiles());
+      const env = { NODE_ENV: "production", WEB_ORIGIN, ALLOW_SANDBOX_BILLING: "true" };
+      const first = createApp({ db, env });
+
+      const signUp = await first.app.request("http://localhost/api/auth/sign-up/email", {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: WEB_ORIGIN },
+        body: JSON.stringify({
+          email: "isolate@example.com",
+          password: "correct horse battery",
+          name: "Ada Lovelace",
+          workspace: "Acme",
+        }),
+      });
+      expect(signUp.status).toBe(201);
+      const cookie = signUp.headers.get("set-cookie")?.split(";")[0] ?? "";
+      const { workspace } = (await signUp.json()) as { workspace: { id: string } };
+
+      const start = await first.app.request("http://localhost/api/v1/checkout/start", {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: WEB_ORIGIN, cookie },
+        body: JSON.stringify({ workspaceId: workspace.id, ...START }),
+      });
+      expect(start.status).toBe(201);
+      const { intent } = (await start.json()) as { intent: { id: string } };
+
+      const second = createApp({ db, env });
+      const settle = await second.app.request(
+        `http://localhost/api/v1/checkout/${intent.id}/sandbox/settle?workspaceId=${workspace.id}`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json", origin: WEB_ORIGIN, cookie },
+          body: JSON.stringify({ outcome: "success" }),
+        }
+      );
+      expect(settle.status).toBe(200);
+      expect(((await settle.json()) as { outcome: string }).outcome).toBe("credited");
+    } finally {
+      await db.close();
+    }
+  });
+});
