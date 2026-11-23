@@ -67,7 +67,9 @@ The full, evidence-based list lives in `docs/AUDIT_2026-11.md`. The short versio
   advanced reports, priority support). The pricing table now labels them "coming".
 - FAIL/CLEAN audit results are not yet uploaded as runs, so the two module pages stay
   empty until `proofcore audit --sync` exists.
-- CLEAN scores server HTML, which is structurally wrong for client-rendered apps.
+- CLEAN still reads server HTML and does not execute JavaScript. On a client-rendered
+  shell it now skips DOM-dependent checks and reports the module `not_measured` instead
+  of presenting the shell as the interface; metadata checks remain measured.
 - No CI. No tests for the WORLD module or the payment adapters.
 - No retention job, no backup procedure, no pagination, no search.
 - EmailJS/Resend delivery is implemented but unverified without credentials; email

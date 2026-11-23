@@ -290,7 +290,7 @@ describe("scanPage", () => {
   });
 
   it("judges a client-rendered shell without pretending to have seen the page", async () => {
-    const shell = `<html><head><title>app</title></head><body><div id="root"></div><script src="/app.js"></script></body></html>`;
+    const shell = `<html lang="en"><head><title>app</title><meta name="viewport" content="width=device-width"><meta name="description" content="An app"></head><body><div id="root"></div><script src="/app.js"></script></body></html>`;
     const result = await scanPage("https://app.example/", {
       fetchImpl: fetchOnce(shell),
       ownershipHint: "local",
@@ -298,6 +298,25 @@ describe("scanPage", () => {
     const rendered = result.findings.find((item) => item.id === "rendered_dom");
     expect(rendered?.status).toBe("SKIPPED");
     expect(result.clientRendered).toBe(true);
+
+    // The shell's metadata is real and stays measured; the interface is not there yet.
+    const clean = result.modules.find((item) => item.module === "clean");
+    expect(clean?.verdict).toBe("not_measured");
+    expect(clean?.failed).toBe(0);
+    for (const id of ["landmarks", "headings", "image_alt", "field_labels"]) {
+      expect(result.findings.find((item) => item.id === id)?.status, id).toBe("SKIPPED");
+    }
+  });
+
+  it("does not count a bare id as an accessible label", async () => {
+    const page = `<html lang="en"><head><title>Form</title><meta name="viewport" content="width=device-width"></head><body><main><h1>Form</h1><input id="email" name="email"><label for="phone">Phone</label><input id="phone" name="phone"></main></body></html>`;
+    const result = await scanPage("https://form.example/", {
+      fetchImpl: fetchOnce(page),
+      ownershipHint: "local",
+    });
+    const labels = result.findings.find((item) => item.id === "field_labels");
+    expect(labels?.observed).toBe("1 of 2 unlabelled");
+    expect(labels?.status).toBe("WARN");
   });
 
   it("treats an error status as a finding, not a crash", async () => {

@@ -1,4 +1,4 @@
-import { ArrowRight, Loader2, ScanLine } from "lucide-react";
+import { ArrowRight, Info, Loader2, ScanLine } from "lucide-react";
 import type React from "react";
 import { useCallback, useState } from "react";
 import { Link } from "react-router";
@@ -250,11 +250,28 @@ export function StartPage(): React.ReactElement {
                         {item.verdict === "not_measured" ? "—" : item.score}
                       </p>
                       <p className="text-xs text-muted tabular-nums">
-                        {item.failed} échec{item.failed === 1 ? "" : "s"} · {item.warnings} avert.
+                        {item.verdict === "not_measured"
+                          ? fr
+                            ? "Non mesuré"
+                            : "Not measured"
+                          : `${item.failed} échec${item.failed === 1 ? "" : "s"} · ${item.warnings} avert.`}
                       </p>
                     </div>
                   );
                 })}
+              </div>
+
+              <div className="flex items-start gap-2 rounded-[var(--radius)] border border-black/10 bg-surface-alt px-3 py-2">
+                <Info size={15} className="mt-0.5 shrink-0 text-primary" aria-hidden />
+                <p className="text-xs leading-relaxed text-muted">
+                  {scan.clientRendered
+                    ? fr
+                      ? "Cette page se construit dans le navigateur. Les contrôles de contenu et de mise en page sont marqués « non mesurés », pas réussis. Le rapport complet liste ce qui n'a pas pu être lu."
+                      : "This page is built in the browser. Content and layout checks are marked “not measured”, not passed. The full report lists what could not be read."
+                    : fr
+                      ? "Le scan lit le HTML public, les en-têtes et les ressources visibles. Il ne se connecte pas, ne clique pas et ne teste pas un paiement réel."
+                      : "The scan reads public HTML, headers and visible resources. It does not sign in, click, or test a real payment."}
+                </p>
               </div>
 
               <p className="text-sm font-medium">

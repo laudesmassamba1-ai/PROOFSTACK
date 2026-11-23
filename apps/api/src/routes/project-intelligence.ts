@@ -159,11 +159,21 @@ interface AuditChunk {
   content: string;
 }
 
-function batchesOf(files: AuditChunk[]): AuditChunk[][] {
+interface BatchPlan {
+  batches: AuditChunk[][];
+  /** Files that were actually placed in a batch sent to the provider. */
+  included: number;
+  /** Files left out by the batch cap. Reported, never silently presented as read. */
+  omitted: number;
+}
+
+function batchesOf(files: AuditChunk[]): BatchPlan {
   const batches: AuditChunk[][] = [];
   let current: AuditChunk[] = [];
   let chars = 0;
+  let included = 0;
   for (const file of files) {
+    if (batches.length >= MAX_BATCHES) break;
     const content =
       file.content.length > MAX_BATCH_CHARS
         ? `${file.content.slice(0, MAX_BATCH_CHARS)}\n\n[file truncated by PROOFCORE]`
@@ -172,13 +182,14 @@ function batchesOf(files: AuditChunk[]): AuditChunk[][] {
       batches.push(current);
       current = [];
       chars = 0;
+      if (batches.length >= MAX_BATCHES) break;
     }
     current.push({ path: file.path, content });
     chars += content.length;
-    if (batches.length >= MAX_BATCHES) break;
+    included += 1;
   }
   if (current.length > 0 && batches.length < MAX_BATCHES) batches.push(current);
-  return batches;
+  return { batches, included, omitted: files.length - included };
 }
 
 async function callModel(input: {
@@ -497,8 +508,13 @@ export function projectIntelligenceRoutes(services: Services): Hono<AppEnv> {
       throw new HttpError(404, "scope_empty", `No file matches “${scope}”.`);
     }
 
-    const batches = batchesOf(selected);
+    const plan = batchesOf(selected);
+    const batches = plan.batches;
     if (batches.length === 0) throw new HttpError(400, "empty_scope", "No readable file.");
+    const coverageNote =
+      plan.omitted > 0
+        ? ` ${plan.omitted} fichier(s) non lu(s) : limite de ${MAX_BATCHES} lots. Les constats ne portent que sur les ${plan.included} fichier(s) analysés.`
+        : "";
     const auditId = `aia_${crypto.randomUUID().replaceAll("-", "").slice(0, 20)}`;
     const gate = await services.meter.authorize({
       workspaceId: workspace.id,
@@ -523,6 +539,7 @@ export function projectIntelligenceRoutes(services: Services): Hono<AppEnv> {
           : "projet complet";
     const instructions = body.instructions?.trim();
     const results = [];
+    let analyzedFiles = 0;
     try {
       for (const batch of batches) {
         const answer = await callModel({
@@ -542,6 +559,7 @@ export function projectIntelligenceRoutes(services: Services): Hono<AppEnv> {
             .join("\n"),
         });
         results.push(parseJsonAnswer(answer));
+        analyzedFiles += batch.length;
       }
 
       const findings = results
@@ -562,8 +580,8 @@ export function projectIntelligenceRoutes(services: Services): Hono<AppEnv> {
           : null;
       const summary =
         results.length === 1
-          ? (results[0]?.summary ?? "Audit terminé.")
-          : `Audit de ${selected.length} fichier(s) en ${results.length} passe(s). ${findings.length} constat(s) consolidé(s).`;
+          ? `${results[0]?.summary ?? "Audit terminé."}${coverageNote}`
+          : `Audit de ${analyzedFiles} fichier(s) en ${results.length} passe(s). ${findings.length} constat(s) consolidé(s).${coverageNote}`;
       const audit = await knowledge.createAudit({
         workspaceId: workspace.id,
         projectId: c.req.param("projectId"),
@@ -575,7 +593,7 @@ export function projectIntelligenceRoutes(services: Services): Hono<AppEnv> {
         summary,
         model: profile.providerModel,
         provider: profile.providerId,
-        filesAnalyzed: selected.length,
+        filesAnalyzed: analyzedFiles,
         findings,
       });
       await services.meter.meter({
@@ -597,8 +615,8 @@ export function projectIntelligenceRoutes(services: Services): Hono<AppEnv> {
           status: "failed",
           model: profile.providerModel,
           provider: profile.providerId,
-          filesAnalyzed: selected.length,
-          error: message.slice(0, 1000),
+          filesAnalyzed: analyzedFiles,
+          error: `${message}${coverageNote}`.slice(0, 1000),
         })
         .catch(() => undefined);
       if (error instanceof HttpError) throw error;

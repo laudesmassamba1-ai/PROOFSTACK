@@ -1507,11 +1507,53 @@ describe("project code and AI code audits", () => {
     expect(store.created).toHaveLength(1);
     expect(store.created[0]).toMatchObject({
       status: "failed",
-      filesAnalyzed: 1,
+      // The provider refused before returning an analysis: no file was actually analyzed.
+      filesAnalyzed: 0,
       model: "test-model",
       provider: "custom",
     });
     expect(store.created[0]?.score).toBeUndefined();
     expect(store.created[0]?.error).toContain("HTTP 500");
+  });
+
+  it("reports the files the batch cap left unread instead of claiming the whole source", async () => {
+    const { request, signUp } = harness;
+    const { cookie, workspaceId } = await signUp("ai-code-batches@example.com");
+    const projectId = await createProject(request, cookie, workspaceId, "Large source");
+    const files = Array.from({ length: 13 }, (_, index) => ({
+      path: `src/file-${index}.ts`,
+      content: `export const value${index} = "${index}";\n`.padEnd(46_000, " "),
+    }));
+    const store = installKnowledge({
+      workspaceId,
+      projectId,
+      sources: [{ id: "src_large", name: "large-repo", fileCount: files.length, kind: "repo" }],
+      files,
+    });
+    await connectProvider(request, cookie);
+    upstreamState.respond = () => ({
+      status: 200,
+      body: {
+        choices: [
+          {
+            message: {
+              role: "assistant",
+              content: JSON.stringify({ score: 80, summary: "Nothing critical.", findings: [] }),
+            },
+          },
+        ],
+      },
+    });
+
+    const response = await request(`/api/v1/projects/${projectId}/ai-audit`, {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({ workspaceId, sourceId: "src_large" }),
+    });
+    expect(response.status).toBe(201);
+    expect(store.created[0]?.filesAnalyzed).toBe(12);
+    expect(store.created[0]?.summary).toContain("1 fichier(s) non lu(s)");
+    expect(store.created[0]?.summary).toContain("12 fichier(s) analysés");
+    expect(upstreamState.requests).toHaveLength(12);
   });
 });

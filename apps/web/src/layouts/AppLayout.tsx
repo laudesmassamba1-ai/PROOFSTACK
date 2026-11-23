@@ -1,6 +1,7 @@
 import {
   BadgeCheck,
   Bell,
+  BookOpen,
   Boxes,
   Brain,
   ChevronDown,
@@ -273,7 +274,8 @@ export function AppLayout() {
     const list: Array<[string, string, ReactNode]> = [
       [t("ws.nav.overview"), "/app", <LayoutDashboard key="overview" size={15} />],
       [t("ws.nav.projects"), "/app/projects", <FolderKanban key="projects" size={15} />],
-      [locale === "fr" ? "Démarrer" : "Start", "/app/start", <Search key="start" size={15} />],
+      [locale === "fr" ? "Analyser" : "Scan", "/app/start", <Search key="start" size={15} />],
+      [locale === "fr" ? "Guide" : "Guide", "/app/guide", <BookOpen key="guide" size={15} />],
       [t("ws.nav.workspace"), "/app/workspace", <Boxes key="workspace" size={15} />],
       ["WORLD", "/app/modules/world", <Globe2 key="world" size={15} />],
       ["FLOW", "/app/modules/flow", <RouteIcon key="flow" size={15} />],
@@ -293,7 +295,10 @@ export function AppLayout() {
     }
     const visible =
       uiMode === "simple"
-        ? list.filter(([, to]) => to === "/app" || to === "/app/projects" || to === "/app/start")
+        ? list.filter(
+            ([, to]) =>
+              to === "/app" || to === "/app/projects" || to === "/app/start" || to === "/app/guide"
+          )
         : list;
     return visible.map(([label, to, icon]) => ({ label, to, icon, group: "routes" as const }));
   }, [session.isAdmin, t, uiMode, locale]);
@@ -455,7 +460,10 @@ export function AppLayout() {
               {t("ws.nav.projects")}
             </NavLink>
             <NavLink to="/app/start" className="app-toplink">
-              {locale === "fr" ? "Démarrer" : "Start"}
+              {locale === "fr" ? "Analyser" : "Scan"}
+            </NavLink>
+            <NavLink to="/app/guide" className="app-toplink">
+              {locale === "fr" ? "Guide" : "Guide"}
             </NavLink>
             {/* Simple mode hides the expert surfaces from the menu; every route stays
                 reachable, and Studio restores the full navigation without a page reload. */}
@@ -601,14 +609,14 @@ export function AppLayout() {
                     ? "Afficher les outils avancés (modules, CLI, IA)"
                     : "Show advanced tools (modules, CLI, AI)"
                   : locale === "fr"
-                    ? "Revenir à l'interface simplifiée"
-                    : "Return to the simplified interface"
+                    ? "Revenir à l'interface simple"
+                    : "Return to the simple interface"
               }
             >
               {uiMode === "simple"
                 ? locale === "fr"
-                  ? "Mode Studio"
-                  : "Studio mode"
+                  ? "Mode expert"
+                  : "Expert mode"
                 : locale === "fr"
                   ? "Mode simple"
                   : "Simple mode"}
@@ -740,8 +748,8 @@ export function AppLayout() {
             <button type="button" className="app-btn app-btn-sm" onClick={toggleMode}>
               {uiMode === "simple"
                 ? locale === "fr"
-                  ? "Afficher le mode Studio"
-                  : "Show Studio mode"
+                  ? "Afficher le mode expert"
+                  : "Show expert mode"
                 : locale === "fr"
                   ? "Revenir au mode simple"
                   : "Return to simple mode"}

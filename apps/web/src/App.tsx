@@ -71,6 +71,9 @@ const ScanPage = lazy(() =>
 const StartPage = lazy(() =>
   import("./pages/app/Start.js").then((module) => ({ default: module.StartPage }))
 );
+const GuidePage = lazy(() =>
+  import("./pages/app/Guide.js").then((module) => ({ default: module.GuidePage }))
+);
 const ModulesIndex = lazy(() =>
   import("./pages/app/ModulesIndex.js").then((m) => ({ default: m.ModulesIndexPage }))
 );
@@ -169,6 +172,7 @@ export function App() {
           <Route path="modules" element={<ModulesIndex />} />
           <Route path="scan" element={<ScanPage />} />
           <Route path="start" element={<StartPage />} />
+          <Route path="guide" element={<GuidePage />} />
           <Route path="modules/:module" element={<AppModulePage />} />
           <Route path="cli" element={<Cli />} />
           <Route path="cli/docs" element={<CliDocs />} />

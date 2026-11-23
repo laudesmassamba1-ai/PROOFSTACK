@@ -521,6 +521,13 @@ function analyse(body: {
   );
 
   // ---------------------------------------------------------------- CLEAN
+  // A shell has no DOM yet: its landmarks, headings, images and labels are created by
+  // JavaScript. Judging them here would report the absence of a page that was never
+  // rendered as a defect of the interface. They are SKIPPED and the module is marked
+  // `not_measured`; the server-decidable metadata checks still run.
+  const shellOnly =
+    text.length < 300 && /<script\b[^>]*\bsrc=/i.test(html) && !/<main\b/i.test(html);
+  const shellObservation = "client-rendered shell; this requires a browser to measure";
   const lang = attrTags(html, "html")[0] ? attr(attrTags(html, "html")[0] as string, "lang") : null;
   findings.push(
     finding(
@@ -573,8 +580,8 @@ function analyse(body: {
     finding(
       "clean",
       "landmarks",
-      landmarks.length >= 3 ? "PASS" : "WARN",
-      landmarks.length > 0 ? landmarks.join(", ") : "none",
+      shellOnly ? "SKIPPED" : landmarks.length >= 3 ? "PASS" : "WARN",
+      shellOnly ? shellObservation : landmarks.length > 0 ? landmarks.join(", ") : "none",
       "Landmarks are how a screen-reader user jumps between regions."
     )
   );
@@ -584,14 +591,20 @@ function analyse(body: {
     finding(
       "clean",
       "image_alt",
-      images.length === 0
+      shellOnly
         ? "SKIPPED"
-        : withoutAlt === 0
-          ? "PASS"
-          : withoutAlt <= images.length / 4
-            ? "WARN"
-            : "FAIL",
-      images.length === 0 ? "no images" : `${withoutAlt} of ${images.length} without alt`,
+        : images.length === 0
+          ? "SKIPPED"
+          : withoutAlt === 0
+            ? "PASS"
+            : withoutAlt <= images.length / 4
+              ? "WARN"
+              : "FAIL",
+      shellOnly
+        ? shellObservation
+        : images.length === 0
+          ? "no images"
+          : `${withoutAlt} of ${images.length} without alt`,
       "An image with no alt is silence to a screen reader."
     )
   );
@@ -601,8 +614,8 @@ function analyse(body: {
     finding(
       "clean",
       "headings",
-      h1 === 0 ? "FAIL" : h1 > 1 ? "WARN" : "PASS",
-      `${h1} h1, ${headings.length} heading(s)`,
+      shellOnly ? "SKIPPED" : h1 === 0 ? "FAIL" : h1 > 1 ? "WARN" : "PASS",
+      shellOnly ? shellObservation : `${h1} h1, ${headings.length} heading(s)`,
       "One h1 and an ordered outline is how the page is navigated without a mouse."
     )
   );
@@ -629,34 +642,47 @@ function analyse(body: {
   const inputs = attrTags(html, "input").filter(
     (tag) => !["hidden", "submit", "button"].includes((attr(tag, "type") ?? "text").toLowerCase())
   );
-  const labelled = inputs.filter(
-    (tag) =>
+  // An id is not a label. The accessible name comes from aria-*, a <label for="id">,
+  // a wrapping <label>, or a title. Counting the bare id made an unlabelled input pass.
+  const labelTargets = new Set(
+    [...html.matchAll(/<label\b[^>]*\bfor\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/gi)].map(
+      (match) => match[2] ?? match[3] ?? match[4] ?? ""
+    )
+  );
+  const labelBlocks = [...html.matchAll(/<label\b[^>]*>([\s\S]*?)<\/label>/gi)].map(
+    (match) => match[0]
+  );
+  const labelled = inputs.filter((tag) => {
+    const id = attr(tag, "id");
+    return Boolean(
       attr(tag, "aria-label") ||
-      attr(tag, "aria-labelledby") ||
-      attr(tag, "id") ||
-      attr(tag, "title")
-  ).length;
+        attr(tag, "aria-labelledby") ||
+        attr(tag, "title") ||
+        (id && labelTargets.has(id)) ||
+        labelBlocks.some((block) => block.includes(tag))
+    );
+  }).length;
   findings.push(
     finding(
       "clean",
       "field_labels",
-      inputs.length === 0
+      shellOnly
         ? "SKIPPED"
-        : labelled === inputs.length
-          ? "PASS"
-          : labelled >= inputs.length / 2
-            ? "WARN"
-            : "FAIL",
-      inputs.length === 0
-        ? "no form fields"
-        : `${inputs.length - labelled} of ${inputs.length} unlabelled`,
+        : inputs.length === 0
+          ? "SKIPPED"
+          : labelled === inputs.length
+            ? "PASS"
+            : labelled >= inputs.length / 2
+              ? "WARN"
+              : "FAIL",
+      shellOnly
+        ? shellObservation
+        : inputs.length === 0
+          ? "no form fields"
+          : `${inputs.length - labelled} of ${inputs.length} unlabelled`,
       "A field without a label is unusable with a screen reader."
     )
   );
-  // A shell is: almost no text, a script that would draw the page, and no main landmark.
-  // The byte size is deliberately not a condition — a 120-byte shell is still a shell.
-  const shellOnly =
-    text.length < 300 && /<script\b[^>]*\bsrc=/i.test(html) && !/<main\b/i.test(html);
   findings.push(
     finding(
       "clean",
@@ -957,8 +983,19 @@ function summarise(findings: ScanFinding[], module: ScanModule): ScanModuleSumma
   const skipped = own.filter((item) => item.status === "SKIPPED").length;
   const judged = passed + warnings + failed;
   const score = judged === 0 ? 0 : Math.round(((passed + warnings * 0.5) / judged) * 100);
+  // A client-rendered shell can have valid metadata checks but no interface to judge.
+  // It must not be shown as a passing CLEAN score: the DOM-dependent checks were skipped.
+  const shellLimited =
+    module === "clean" &&
+    own.some((item) => item.id === "rendered_dom" && item.status === "SKIPPED");
   const verdict =
-    judged === 0 ? "not_measured" : failed > 0 ? "fail" : warnings > 0 ? "warnings" : "pass";
+    failed > 0
+      ? "fail"
+      : shellLimited || judged === 0
+        ? "not_measured"
+        : warnings > 0
+          ? "warnings"
+          : "pass";
   return { module, passed, warnings, failed, skipped, score, verdict };
 }
 

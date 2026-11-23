@@ -81,6 +81,29 @@ interface Overview {
 type ModuleId = "world" | "flow" | "exit" | "fail" | "clean";
 const MODULE_IDS: ModuleId[] = ["world", "flow", "exit", "fail", "clean"];
 
+const MODULE_QUESTIONS: Record<ModuleId, { fr: string; en: string }> = {
+  world: {
+    fr: "Les données internationales passent-elles ?",
+    en: "Does international data survive?",
+  },
+  flow: {
+    fr: "Un utilisateur peut-il aller au bout ?",
+    en: "Can a user complete the journey?",
+  },
+  exit: {
+    fr: "Les données ressortent-elles intactes ?",
+    en: "Does the data come back intact?",
+  },
+  fail: {
+    fr: "Le site expose-t-il des failles ?",
+    en: "Does the site expose weaknesses?",
+  },
+  clean: {
+    fr: "L'interface est-elle structurée ?",
+    en: "Is the interface structured?",
+  },
+};
+
 const EMPTY_TOTALS = { passed: 0, failed: 0, warnings: 0, errors: 0, skipped: 0, total: 0 };
 
 export function Overview() {
@@ -176,6 +199,10 @@ export function Overview() {
             </p>
             <h1 className="app-display app-situation-headline">{headline}</h1>
             <p className="app-support">{support}</p>
+            <Link to="/app/guide" className="app-text-link mt-3 inline-flex">
+              {fr ? "Comprendre l'app en 2 minutes" : "Understand the app in 2 minutes"}{" "}
+              <ArrowRight size={13} />
+            </Link>
           </div>
           <aside
             className="app-situation-stamp"
@@ -212,15 +239,17 @@ export function Overview() {
       {!hasProjects ? (
         <section className="app-section" aria-labelledby="start-choices-title">
           <div className="app-section-head">
-            <p className="app-eyebrow">01 / {fr ? "PREMIER PAS" : "FIRST STEP"}</p>
-            <h2 id="start-choices-title" className="app-section-title">
-              {fr ? "Que souhaitez-vous faire aujourd'hui ?" : "What would you like to do today?"}
-            </h2>
-            <p className="app-support">
-              {fr
-                ? "Choisissez une entrée. Tout se fait depuis cette page, sans commande ni fichier de configuration."
-                : "Pick an entry point. Everything happens here, with no command and no configuration file."}
-            </p>
+            <div>
+              <p className="app-eyebrow">01 / {fr ? "PREMIER PAS" : "FIRST STEP"}</p>
+              <h2 id="start-choices-title" className="app-section-title">
+                {fr ? "Que souhaitez-vous faire aujourd'hui ?" : "What would you like to do today?"}
+              </h2>
+              <p className="app-support">
+                {fr
+                  ? "Choisissez une entrée. Tout se fait depuis cette page, sans commande ni fichier de configuration."
+                  : "Pick an entry point. Everything happens here, with no command and no configuration file."}
+              </p>
+            </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <Link
@@ -241,20 +270,20 @@ export function Overview() {
               </span>
             </Link>
             <Link
-              to="/app/modules/flow"
+              to="/app/projects"
               className="rounded-[var(--radius)] border border-black/10 px-5 py-4 transition-colors hover:border-black/30"
             >
               <span className="app-eyebrow">02</span>
               <h3 className="mt-1 text-base font-semibold">
-                {fr ? "Vérifier une application Web" : "Check a web application"}
+                {fr ? "Suivre une application" : "Track an application"}
               </h3>
               <p className="mt-1 text-sm text-muted">
                 {fr
-                  ? "Parcours de connexion, de commande et de paiement : ce que l'utilisateur traverse réellement."
-                  : "Sign-in, checkout and payment journeys: what the user actually goes through."}
+                  ? "Créez un projet pour garder l'historique, les constats et les corrections. À utiliser quand vous voulez vérifier plusieurs fois."
+                  : "Create a project to keep history, findings and fixes. Use it when you want to check repeatedly."}
               </p>
               <span className="app-text-link mt-3 inline-flex">
-                {fr ? "Voir le module FLOW" : "See the FLOW module"} <ArrowRight size={13} />
+                {fr ? "Créer un projet" : "Create a project"} <ArrowRight size={13} />
               </span>
             </Link>
             <Link
@@ -263,32 +292,103 @@ export function Overview() {
             >
               <span className="app-eyebrow">03</span>
               <h3 className="mt-1 text-base font-semibold">
-                {fr ? "Tester un projet de développement" : "Test a development project"}
+                {fr ? "Automatiser avec la CLI" : "Automate with the CLI"}
               </h3>
               <p className="mt-1 text-sm text-muted">
                 {fr
-                  ? "Les cinq modules sur une base de code : en local ou dans la CI, sans rien installer ici."
-                  : "The five modules against a codebase: locally or in CI, nothing to install here."}
+                  ? "Les mêmes contrôles sur votre machine ou dans la CI, avec un rapport téléversé seulement quand vous le décidez."
+                  : "The same checks on your machine or in CI, with a report uploaded only when you decide."}
               </p>
               <span className="app-text-link mt-3 inline-flex">
                 {fr ? "Ouvrir le guide CLI" : "Open the CLI guide"} <ArrowRight size={13} />
               </span>
             </Link>
             <Link
-              to="/app/modules"
+              to="/app/guide"
               className="rounded-[var(--radius)] border border-black/10 px-5 py-4 transition-colors hover:border-black/30"
             >
               <span className="app-eyebrow">04</span>
               <h3 className="mt-1 text-base font-semibold">
-                {fr ? "Découvrir PROOFCORE" : "Discover PROOFCORE"}
+                {fr ? "Comprendre les cinq contrôles" : "Understand the five checks"}
               </h3>
               <p className="mt-1 text-sm text-muted">
                 {fr
-                  ? "Ce que chaque module vérifie, et ce qu'il ne vérifie pas. Aucune donnée de démonstration n'est inventée."
-                  : "What each module checks, and what it does not. No demonstration data is invented."}
+                  ? "Le guide explique chaque question, chaque statut et ce que l'app ne vérifie pas. Aucune donnée de démonstration n'est inventée."
+                  : "The guide explains each question, each status and what the app does not check. No demonstration data is invented."}
               </p>
               <span className="app-text-link mt-3 inline-flex">
-                {fr ? "Voir les modules" : "See the modules"} <ArrowRight size={13} />
+                {fr ? "Lire le guide" : "Read the guide"} <ArrowRight size={13} />
+              </span>
+            </Link>
+          </div>
+        </section>
+      ) : null}
+
+      {hasProjects ? (
+        <section className="app-section" aria-labelledby="how-it-works-title">
+          <div className="app-section-head">
+            <div>
+              <p className="app-eyebrow">{fr ? "MODE D'EMPLOI" : "HOW IT WORKS"}</p>
+              <h2 id="how-it-works-title" className="app-section-title">
+                {fr ? "Trois façons d'utiliser PROOFCORE." : "Three ways to use PROOFCORE."}
+              </h2>
+              <p className="app-support">
+                {fr
+                  ? "Un scan ne demande rien. Un projet garde l'historique. La CLI automatise les mêmes contrôles."
+                  : "A scan needs nothing. A project keeps history. The CLI automates the same checks."}
+              </p>
+            </div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <Link
+              to="/app/start"
+              className="rounded-[var(--radius)] border border-black/10 px-5 py-4 transition-colors hover:border-black/30"
+            >
+              <span className="app-eyebrow">01</span>
+              <h3 className="mt-1 text-sm font-semibold">
+                {fr ? "Analyser une adresse" : "Scan an address"}
+              </h3>
+              <p className="mt-1 text-xs leading-relaxed text-muted">
+                {fr
+                  ? "Pour un premier verdict immédiat, sans projet ni installation."
+                  : "For an immediate first verdict, with no project or install."}
+              </p>
+              <span className="app-text-link mt-2 inline-flex">
+                {fr ? "Ouvrir le scan" : "Open the scan"} <ArrowRight size={12} />
+              </span>
+            </Link>
+            <Link
+              to="/app/projects"
+              className="rounded-[var(--radius)] border border-black/10 px-5 py-4 transition-colors hover:border-black/30"
+            >
+              <span className="app-eyebrow">02</span>
+              <h3 className="mt-1 text-sm font-semibold">
+                {fr ? "Suivre une application" : "Track an application"}
+              </h3>
+              <p className="mt-1 text-xs leading-relaxed text-muted">
+                {fr
+                  ? "Un projet garde les exécutions, les constats et les corrections dans le temps."
+                  : "A project keeps runs, findings and fixes over time."}
+              </p>
+              <span className="app-text-link mt-2 inline-flex">
+                {fr ? "Voir les projets" : "See projects"} <ArrowRight size={12} />
+              </span>
+            </Link>
+            <Link
+              to="/app/guide"
+              className="rounded-[var(--radius)] border border-black/10 px-5 py-4 transition-colors hover:border-black/30"
+            >
+              <span className="app-eyebrow">03</span>
+              <h3 className="mt-1 text-sm font-semibold">
+                {fr ? "Comprendre les contrôles" : "Understand the checks"}
+              </h3>
+              <p className="mt-1 text-xs leading-relaxed text-muted">
+                {fr
+                  ? "La question derrière chaque module, les statuts et ce que l'app ne fait pas."
+                  : "The question behind each module, the statuses and what the app does not do."}
+              </p>
+              <span className="app-text-link mt-2 inline-flex">
+                {fr ? "Lire le guide" : "Read the guide"} <ArrowRight size={12} />
               </span>
             </Link>
           </div>
@@ -334,6 +434,9 @@ export function Overview() {
                 </div>
                 <div className="app-object-card-foot">
                   <h3 className="app-object-name">{module.toUpperCase()}</h3>
+                  <p className="min-h-[2.7em] max-w-[30ch] text-[0.76rem] font-medium leading-[1.35] text-ink">
+                    {fr ? MODULE_QUESTIONS[module].fr : MODULE_QUESTIONS[module].en}
+                  </p>
                   <p className="app-object-state">
                     {covered
                       ? t("ws.module.latestSummary", {
@@ -429,7 +532,7 @@ export function Overview() {
 
       <section className="app-next-action">
         <div>
-          <p className="app-eyebrow">03 / {t("ws.overview.next")}</p>
+          <p className="app-eyebrow">{t("ws.overview.next")}</p>
           <h2 className="app-next-title">{nextAction.label}</h2>
           <p className="app-next-body">
             {!hasProjects
