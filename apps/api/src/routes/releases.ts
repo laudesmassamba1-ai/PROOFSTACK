@@ -481,21 +481,28 @@ export function releaseRoutes(options: ReleaseOptions = {}): Hono<AppEnv> {
     }
 
     const range = c.req.header("range");
+    // The release host fails now and then (network reset, 429 on a shared Worker egress
+    // address). Retry those, briefly, before telling the visitor to try again.
     let upstream: Response | null = null;
-    try {
-      upstream = await fetch(asset.url, {
-        headers: {
-          "user-agent": "proofstack-download",
-          // A token raises the release host's per-address limit. Workers share their
-          // egress addresses, so the anonymous limit is spent by everyone on the account
-          // before a visitor ever clicks.
-          ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
-          ...(range ? { range } : {}),
-        },
-        redirect: "follow",
-      });
-    } catch {
-      upstream = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 400 * attempt));
+      try {
+        upstream = await fetch(asset.url, {
+          headers: {
+            "user-agent": "proofstack-download",
+            // A token raises the release host's per-address limit. Workers share their
+            // egress addresses, so the anonymous limit is spent by everyone on the account
+            // before a visitor ever clicks.
+            ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
+            ...(range ? { range } : {}),
+          },
+          redirect: "follow",
+        });
+      } catch {
+        upstream = null;
+      }
+      if (upstream !== null && (upstream.ok || upstream.status === 206)) break;
+      if (upstream !== null && upstream.status !== 429 && upstream.status < 500) break;
     }
     if (upstream === null || (!upstream.ok && upstream.status !== 206)) {
       // The visitor never leaves the site for a download. When the release host refuses

@@ -48,7 +48,7 @@ const SITE_API =
  * "open site" kept sending people to a stale host after a rename. One env var, read at
  * startup, keeps every link in the window pointing at the same place.
  */
-const SITE_WEB = (process.env.PROOFCORE_WEB_URL ?? "https://proofcore-iota.vercel.app").replace(
+const SITE_WEB = (process.env.PROOFCORE_WEB_URL ?? "https://proofstack-iota.vercel.app").replace(
   /\/+$/,
   ""
 );
