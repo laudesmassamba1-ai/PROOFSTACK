@@ -218,7 +218,9 @@ async function releaseFromIndex(tag: string): Promise<ReleaseBody["release"]> {
     if (!name) continue;
     assets.push({
       name,
-      url: `https://github.com/${REPO}/releases/download/${encodeURIComponent(tag)}/${encodeURIComponent(name)}`,
+      // Our own route, so a download never leaves the site for the release host. The Worker
+      // streams the file (see GET /releases/assets/:name); Vercel forwards /api/* to it.
+      url: `/api/v1/releases/assets/${encodeURIComponent(name)}`,
       size: typeof file.size === "number" ? file.size : 0,
       digest:
         typeof file.sha256 === "string" && file.sha256.length > 0 ? `sha256:${file.sha256}` : null,
@@ -496,13 +498,15 @@ export function releaseRoutes(options: ReleaseOptions = {}): Hono<AppEnv> {
       upstream = null;
     }
     if (upstream === null || (!upstream.ok && upstream.status !== 206)) {
-      // The mirror is a convenience, not a single point of failure: when the release host
-      // refuses the Worker (429 is its per-address limit, and Workers share addresses),
-      // the browser is sent to fetch the file itself. It still never lands on a GitHub
-      // page — it downloads, with the right name, from the release host's asset URL.
+      // The visitor never leaves the site for a download. When the release host refuses
+      // the Worker (429 is its per-address limit) or cannot be reached, say so and let the
+      // page retry, instead of sending the browser to the release host.
       const status = upstream?.status ?? 0;
-      c.header("x-download-fallback", status === 0 ? "unreachable" : String(status));
-      return c.redirect(asset.url, 302);
+      throw new HttpError(
+        503,
+        "download_unavailable",
+        `${name} cannot be fetched right now (upstream ${status === 0 ? "unreachable" : status}). Try again in a minute.`
+      );
     }
 
     const isText = /\.(json|ya?ml|txt|sha256)$/.test(name);
