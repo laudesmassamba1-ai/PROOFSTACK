@@ -47,26 +47,12 @@ export const FREE_ENTITLEMENTS: Record<EntitlementKey, number | boolean> = {
 
 export const UNLIMITED = -1;
 
+/**
+ * There is no free plan to buy. A workspace without a paid subscription resolves to the
+ * FREE_ENTITLEMENTS baseline above (internal state `free`, never sold or listed). The free
+ * tier offered to visitors is a limited scan, not a plan.
+ */
 const PLAN_SEEDS: PlanSeed[] = [
-  {
-    id: "plan_free",
-    key: "free",
-    name: "Free",
-    rank: 0,
-    description: "One project, the five modules at basic depth, standard reports.",
-    trialDays: 0,
-    graceDays: 0,
-    renewalReminderDays: 0,
-    publiclyAvailable: true,
-    prepaidOnly: false,
-    active: true,
-    prices: [],
-    entitlements: { ...FREE_ENTITLEMENTS },
-    // FAIL and CLEAN audits are included on every plan; the in-chat audit tools
-    // are free, while metered AI audits (page scans) count against
-    // monthly_ai_audits via the `ai_audit` usage kind.
-    modules: ["world", "flow", "exit", "fail", "clean"],
-  },
   {
     id: "plan_developer",
     key: "developer",

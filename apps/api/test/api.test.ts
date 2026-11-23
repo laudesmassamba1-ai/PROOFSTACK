@@ -248,7 +248,8 @@ describe("health and public catalogue", () => {
       recurringSupported: boolean;
       billingModelNote: string;
     }>(await h.request("/api/v1/plans"));
-    expect(body.items.map((plan) => plan.key)).toEqual(["free", "developer", "studio", "agency"]);
+    // No free plan is sold: the catalogue lists only the paid plans.
+    expect(body.items.map((plan) => plan.key)).toEqual(["developer", "studio", "agency"]);
     expect(body.recurringSupported).toBe(false);
     expect(body.billingModelNote).toContain("renewed manually");
   });
