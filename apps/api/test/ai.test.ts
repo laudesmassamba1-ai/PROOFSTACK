@@ -1121,3 +1121,397 @@ describe("insights", () => {
     void services;
   });
 });
+
+describe("project code and AI code audits", () => {
+  type AuditInput = Parameters<ProjectKnowledge["createAudit"]>[0];
+  const NOW = "2026-11-23T10:00:00.000Z";
+
+  async function createProject(
+    request: Harness["request"],
+    cookie: string,
+    workspaceId: string,
+    name: string
+  ): Promise<string> {
+    const response = await request("/api/v1/projects", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({
+        workspaceId,
+        name,
+        baseUrl: "https://code.example",
+        environment: "staging",
+      }),
+    });
+    expect(response.status).toBe(201);
+    return ((await response.json()) as { project: { id: string } }).project.id;
+  }
+
+  async function connectProvider(request: Harness["request"], cookie: string): Promise<void> {
+    const response = await request("/api/v1/ai/profile", {
+      method: "PUT",
+      cookie,
+      body: JSON.stringify({
+        providerId: "custom",
+        baseUrl: upstreamBase,
+        model: "test-model",
+        apiKey: "sk-code-key-1234",
+      }),
+    });
+    expect(response.status).toBe(200);
+  }
+
+  interface KnowledgeOptions {
+    workspaceId: string;
+    projectId: string;
+    sources?: {
+      id: string;
+      name: string;
+      fileCount: number;
+      kind: "folder" | "repo";
+    }[];
+    files?: { path: string; content: string }[];
+    audits?: {
+      id: string;
+      scope: string;
+      score: number | null;
+      summary: string;
+      findings: {
+        severity: "critical" | "high" | "medium" | "low";
+        file: string;
+        line: number | null;
+        title: string;
+        evidence: string;
+        fix: string;
+      }[];
+    }[];
+  }
+
+  /** A store that records what the route tried to write, so the test can read it back. */
+  function installKnowledge(options: KnowledgeOptions): {
+    created: AuditInput[];
+    listAuditsCalls: { workspaceId: string; projectId: string }[];
+    readFilesCalls: { workspaceId: string; projectId: string; sourceId: string }[];
+  } {
+    const created: AuditInput[] = [];
+    const listAuditsCalls: { workspaceId: string; projectId: string }[] = [];
+    const readFilesCalls: { workspaceId: string; projectId: string; sourceId: string }[] = [];
+    const files = options.files ?? [];
+    const sources = (options.sources ?? []).map((source) => ({
+      ...source,
+      workspaceId: options.workspaceId,
+      projectId: options.projectId,
+      ref: null,
+      createdAt: NOW,
+      updatedAt: NOW,
+    }));
+    const audits = (options.audits ?? []).map((audit) => ({
+      ...audit,
+      workspaceId: options.workspaceId,
+      projectId: options.projectId,
+      sourceId: sources[0]?.id ?? null,
+      mode: "file" as const,
+      status: "done" as const,
+      model: "test-model",
+      provider: "custom",
+      filesAnalyzed: 1,
+      error: null,
+      createdAt: NOW,
+    }));
+
+    harness.services.projectKnowledge = {
+      configured: true,
+      ping: async () => true,
+      createSource: async () => {
+        throw new Error("not used by this test");
+      },
+      listSources: async () => sources,
+      deleteSource: async () => false,
+      listFiles: async () =>
+        files.map((file, index) => ({
+          id: `fil_${index}`,
+          path: file.path,
+          language: "typescript",
+          size: file.content.length,
+          sha256: "a".repeat(64),
+        })),
+      readFile: async (_workspaceId, _projectId, _sourceId, path) =>
+        files.find((file) => file.path === path) ?? null,
+      readFiles: async (workspaceId, projectId, sourceId) => {
+        readFilesCalls.push({ workspaceId, projectId, sourceId });
+        return files;
+      },
+      createAudit: async (input) => {
+        created.push(input);
+        return {
+          id: "aia_test",
+          workspaceId: input.workspaceId,
+          projectId: input.projectId,
+          sourceId: input.sourceId,
+          scope: input.scope,
+          mode: input.mode,
+          status: input.status,
+          score: input.score ?? null,
+          summary: input.summary ?? null,
+          model: input.model ?? null,
+          provider: input.provider ?? null,
+          filesAnalyzed: input.filesAnalyzed,
+          findings: input.findings ?? [],
+          error: input.error ?? null,
+          createdAt: NOW,
+        };
+      },
+      listAudits: async (workspaceId, projectId) => {
+        listAuditsCalls.push({ workspaceId, projectId });
+        return audits;
+      },
+      metrics: async () => ({
+        sources: sources.length,
+        files: files.length,
+        audits: audits.length,
+        averageScore: audits[0]?.score ?? null,
+        findingsBySeverity: [],
+        scoreTrend: [],
+      }),
+    } as unknown as ProjectKnowledge;
+
+    return { created, listAuditsCalls, readFilesCalls };
+  }
+
+  function answerWithTool(name: string, args: Record<string, unknown>): void {
+    upstreamState.respond = (attempt) =>
+      attempt === 1
+        ? {
+            status: 200,
+            body: {
+              choices: [
+                {
+                  message: {
+                    role: "assistant",
+                    content: null,
+                    tool_calls: [
+                      {
+                        id: "call_project_code",
+                        type: "function",
+                        function: { name, arguments: JSON.stringify(args) },
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          }
+        : {
+            status: 200,
+            body: {
+              choices: [{ message: { role: "assistant", content: "Done." } }],
+            },
+          };
+  }
+
+  it("shows the assistant the sources, metrics and prior code-audit findings", async () => {
+    const { request, signUp } = harness;
+    const { cookie, workspaceId } = await signUp("ai-code-list@example.com");
+    const projectId = await createProject(request, cookie, workspaceId, "Uploaded code");
+    const store = installKnowledge({
+      workspaceId,
+      projectId,
+      sources: [{ id: "src_test", name: "uploaded-repo", fileCount: 1, kind: "folder" }],
+      files: [{ path: "src/index.ts", content: "export const answer = 42;\n" }],
+      audits: [
+        {
+          id: "aia_prior",
+          scope: "src/index.ts",
+          score: 61,
+          summary: "One authentication gap.",
+          findings: [
+            {
+              severity: "high",
+              file: "src/index.ts",
+              line: 4,
+              title: "Route has no authorization check",
+              evidence: "router.get('/admin', handler)",
+              fix: "Require an owner session before calling the handler.",
+            },
+          ],
+        },
+      ],
+    });
+    await connectProvider(request, cookie);
+    answerWithTool("project_code", { projectId });
+
+    const response = await request("/api/v1/ai/chat", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({
+        workspaceId,
+        message: "What did the last code audit find?",
+        effort: "quick",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      trace: { tool: string; summary?: string }[];
+    };
+    const trace = body.trace.find((item) => item.tool === "project_code");
+    expect(trace?.summary).toContain("1 source(s), 1 file(s), 1 code audit(s)");
+
+    expect(store.listAuditsCalls).toEqual([{ workspaceId, projectId }]);
+    const toolTurn = JSON.parse(upstreamState.requests[1]?.body ?? "{}") as {
+      messages: { role: string; content: string }[];
+    };
+    const toolContent = toolTurn.messages.find((message) => message.role === "tool")?.content;
+    const toolPayload = JSON.parse((toolContent ?? "").split("\n").slice(1).join("\n")) as {
+      sources: { id: string }[];
+      recentAudits: { id: string; findings: number }[];
+    };
+    expect(toolPayload.sources[0]?.id).toBe("src_test");
+    expect(toolPayload.recentAudits[0]?.id).toBe("aia_prior");
+    expect(toolPayload.recentAudits[0]?.findings).toBe(1);
+  });
+
+  it("refuses a project that belongs to another workspace, before reading any source", async () => {
+    const { request, signUp } = harness;
+    const owner = await signUp("ai-code-owner@example.com");
+    const projectId = await createProject(request, owner.cookie, owner.workspaceId, "Private code");
+    const stranger = await signUp("ai-code-stranger@example.com");
+    let touched = false;
+    harness.services.projectKnowledge = {
+      listSources: async () => {
+        touched = true;
+        return [];
+      },
+    } as unknown as ProjectKnowledge;
+    await connectProvider(request, stranger.cookie);
+    answerWithTool("project_code", { projectId, sourceId: "src_private" });
+
+    const response = await request("/api/v1/ai/chat", {
+      method: "POST",
+      cookie: stranger.cookie,
+      body: JSON.stringify({
+        workspaceId: stranger.workspaceId,
+        message: "Read the other workspace's project.",
+        effort: "quick",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      trace: { tool: string; summary?: string }[];
+    };
+    expect(body.trace.find((item) => item.tool === "project_code")?.summary).toBe(
+      "project not found"
+    );
+    expect(touched).toBe(false);
+    expect(upstreamState.requests[1]?.body ?? "").toContain("project not found in this workspace");
+  });
+
+  it("runs a fenced AI code audit and records the provider, score and findings", async () => {
+    const { request, signUp } = harness;
+    const { cookie, workspaceId } = await signUp("ai-code-audit@example.com");
+    const projectId = await createProject(request, cookie, workspaceId, "Audit target");
+    const source =
+      "import { db } from './db';\nexport function find(id: string) {\n  return db.query('select * from users where id = ' + id);\n}\n";
+    const store = installKnowledge({
+      workspaceId,
+      projectId,
+      sources: [{ id: "src_test", name: "audit-repo", fileCount: 1, kind: "folder" }],
+      files: [{ path: "src/index.ts", content: source }],
+    });
+    await connectProvider(request, cookie);
+    upstreamState.respond = () => ({
+      status: 200,
+      body: {
+        choices: [
+          {
+            message: {
+              role: "assistant",
+              content: JSON.stringify({
+                score: 64,
+                summary: "The query concatenates untrusted input.",
+                findings: [
+                  {
+                    severity: "critical",
+                    file: "src/index.ts",
+                    line: 3,
+                    title: "SQL injection through string concatenation",
+                    evidence: "db.query('select * from users where id = ' + id)",
+                    fix: "Pass id as a bound parameter.",
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+      },
+    });
+
+    const response = await request(`/api/v1/projects/${projectId}/ai-audit`, {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({
+        workspaceId,
+        sourceId: "src_test",
+        path: "src/index.ts",
+      }),
+    });
+    expect(response.status).toBe(201);
+    expect(store.readFilesCalls).toEqual([{ workspaceId, projectId, sourceId: "src_test" }]);
+    expect(store.created).toHaveLength(1);
+    expect(store.created[0]).toMatchObject({
+      workspaceId,
+      projectId,
+      sourceId: "src_test",
+      mode: "file",
+      scope: "src/index.ts",
+      status: "done",
+      score: 64,
+      model: "test-model",
+      provider: "custom",
+      filesAnalyzed: 1,
+    });
+    expect(store.created[0]?.findings?.[0]).toMatchObject({
+      severity: "critical",
+      file: "src/index.ts",
+      line: 3,
+      title: "SQL injection through string concatenation",
+    });
+
+    const requestBody = upstreamState.requests[0]?.body ?? "";
+    expect(requestBody).toContain("FILE: src/index.ts");
+    expect(requestBody).toContain("<<<PROOFSTACK-UNTRUSTED-DATA-");
+    expect(requestBody).toContain("db.query");
+    const chatCall = upstreamState.calls.find((call) => call.url.endsWith("/chat/completions"));
+    expect(chatCall?.headers.authorization).toBe("Bearer sk-code-key-1234");
+  });
+
+  it("stores a failed audit, without inventing a score, when the provider refuses", async () => {
+    const { request, signUp } = harness;
+    const { cookie, workspaceId } = await signUp("ai-code-failure@example.com");
+    const projectId = await createProject(request, cookie, workspaceId, "Failing audit");
+    const store = installKnowledge({
+      workspaceId,
+      projectId,
+      sources: [{ id: "src_test", name: "audit-repo", fileCount: 1, kind: "folder" }],
+      files: [{ path: "src/index.ts", content: "export const value = 1;\n" }],
+    });
+    await connectProvider(request, cookie);
+    upstreamState.respond = () => ({ status: 500, body: { error: "provider down" } });
+
+    const response = await request(`/api/v1/projects/${projectId}/ai-audit`, {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({ workspaceId, sourceId: "src_test" }),
+    });
+    expect(response.status).toBe(502);
+    const body = (await response.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("ai_provider_error");
+    expect(store.created).toHaveLength(1);
+    expect(store.created[0]).toMatchObject({
+      status: "failed",
+      filesAnalyzed: 1,
+      model: "test-model",
+      provider: "custom",
+    });
+    expect(store.created[0]?.score).toBeUndefined();
+    expect(store.created[0]?.error).toContain("HTTP 500");
+  });
+});
