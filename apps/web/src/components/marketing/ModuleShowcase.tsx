@@ -1,5 +1,6 @@
 import { ArrowUpRight, BadgeCheck, Globe2, PackageOpen, Route, ShieldAlert } from "lucide-react";
 import { Link } from "react-router";
+import { EngineObjectArt, ModuleObjectArt } from "../../components/brand/ModuleArt.js";
 import { useI18n } from "../../i18n/index.js";
 
 /**
@@ -63,7 +64,6 @@ export function ModuleShowcase() {
     <div className="module-wall" data-dark>
       <div className="module-wall-grid">
         {MODULES.map((module, index) => {
-          const Icon = module.icon;
           return (
             <Link
               key={module.id}
@@ -74,8 +74,8 @@ export function ModuleShowcase() {
             >
               <span className="module-panel-glow" aria-hidden="true" />
               <div className="module-panel-head">
-                <span className="module-panel-icon">
-                  <Icon size={18} />
+                <span className="module-panel-art">
+                  <ModuleObjectArt id={module.id} />
                 </span>
                 <span className="module-panel-id">{module.id.toUpperCase()}</span>
                 <ArrowUpRight size={16} className="module-panel-arrow" />
@@ -99,6 +99,9 @@ export function ModuleShowcase() {
         {/* The sixth cell: the engine that carries the five. Filling it keeps the wall a
             complete rectangle instead of ending on a hole. */}
         <div className="module-panel module-wall-foot">
+          <span className="module-panel-art module-panel-art-engine">
+            <EngineObjectArt />
+          </span>
           <p className="module-panel-id">{t("mkt.wall.foot.kicker")}</p>
           <p className="module-wall-foot-title">{t("mkt.wall.foot.title")}</p>
           <p className="module-wall-foot-body">{t("mkt.wall.foot.body")}</p>

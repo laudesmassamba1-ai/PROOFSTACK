@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "../../i18n/index.js";
-import { type DAMode, inIframe, readDAChoice, rememberDAMode } from "../../lib/da.js";
+import { type DAMode, inIframe, rememberDAMode } from "../../lib/da.js";
 import { FilamentStream } from "./FilamentStream.js";
 
 /**
@@ -18,9 +18,11 @@ const MOBILE_QUERY = "(max-width: 767px)"; // phones get a plain toggle button
 export function DaComparer() {
   const { locale } = useI18n();
   const fr = locale === "fr";
-  // Auto-open only until the visitor has made a choice; afterwards the site
-  // continues in the kept direction and a discreet chip reopens the comparison.
-  const [open, setOpen] = useState(() => !inIframe() && !readDAChoice());
+  // The comparer is an art-direction tool, not the visitor's first impression. It used
+  // to auto-open for every new visitor, which put a split-screen decision in front of
+  // the product before anyone had seen it. The site now opens in its chosen (or default)
+  // direction; the discreet chip still reopens the comparison for whoever wants it.
+  const [open, setOpen] = useState(false);
   // phones don't get the split: a plain toggle button switches the direction
   const [mobile, setMobile] = useState(
     () => typeof window !== "undefined" && window.matchMedia?.(MOBILE_QUERY).matches === true
