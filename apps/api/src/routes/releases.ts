@@ -514,7 +514,8 @@ export function releaseRoutes(options: ReleaseOptions = {}): Hono<AppEnv> {
         } else {
           upstream = first;
         }
-      } catch {
+      } catch (error) {
+        console.error(`release download ${name}: ${error instanceof Error ? error.message : String(error)}`);
         upstream = null;
       }
       if (upstream !== null && (upstream.ok || upstream.status === 206)) break;
