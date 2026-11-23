@@ -16,7 +16,7 @@ const EDGE = 64; // px from an edge where the bar commits the choice
 const MOBILE_QUERY = "(max-width: 767px)"; // phones get a plain toggle button
 
 export function DaComparer() {
-  const { t, locale } = useI18n();
+  const { locale } = useI18n();
   const fr = locale === "fr";
   // Auto-open only until the visitor has made a choice; afterwards the site
   // continues in the kept direction and a discreet chip reopens the comparison.

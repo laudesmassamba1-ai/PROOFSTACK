@@ -197,7 +197,6 @@ export function FilamentStream(): React.ReactElement {
         const prev = i > 0 ? points[i - 1] : undefined;
         if (!prev) ctx.moveTo(point.x, point.y);
         else {
-          const mx = (prev.x + point.x) / 2 + (point.x - prev.x) * 0.2;
           const my = (prev.y + point.y) / 2;
           ctx.quadraticCurveTo(prev.x, my, point.x, point.y);
         }
@@ -258,5 +257,5 @@ export function FilamentStream(): React.ReactElement {
     };
   }, []);
 
-  return <canvas ref={canvasRef} className="da-bar-canvas" aria-hidden="true" />;
+  return <canvas ref={canvasRef} className="da-bar-canvas" aria-hidden="true" tabIndex={-1} />;
 }

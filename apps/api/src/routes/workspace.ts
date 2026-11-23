@@ -15,6 +15,7 @@ import { HttpError } from "../http/errors.js";
 import { readBody, requireUser, requireWorkspace } from "../http/guards.js";
 import { pageBody, readPage } from "../http/pagination.js";
 import type { AppEnv, Services } from "../http/services.js";
+import { notifyAudit } from "../notifications.js";
 import { isValidWebhookUrl, WEBHOOK_EVENTS } from "../outbound.js";
 import {
   blockingIssues,
@@ -219,6 +220,20 @@ export function workspaceRoutes(services: Services): Hono<AppEnv> {
       action: "invitation.sent",
       detail: { invitationId: invitation.id, userId: user.id, email: user.email, role: body.role },
     });
+    // The invitee is not a member yet, so the default "all members" audience would
+    // miss the one person this request concerns. Address it to them personally.
+    await notifyAudit(
+      services,
+      workspace.id,
+      await latestAuditId(services, workspace.id, "invitation.sent", invitation.id),
+      {
+        recipients: [user.id],
+        kind: "invitation.request",
+        title: `Workspace request: ${workspace.name}`,
+        body: `${inviter.name} invited you to join ${workspace.name} as ${body.role}. Nothing is granted until you answer.`,
+        link: "/app",
+      }
+    );
 
     // The email is a courtesy, not the authority: the invitation exists in the database
     // either way, and the reply says whether a message was actually accepted by a provider.
@@ -273,6 +288,7 @@ export function workspaceRoutes(services: Services): Hono<AppEnv> {
       action: "invitation.revoked",
       detail: { invitationId: c.req.param("invitationId") },
     });
+    await notifyLatestAudit(services, workspace.id, "invitation.revoked");
     return c.json({ ok: true });
   });
 
@@ -737,6 +753,43 @@ export function workspaceRoutes(services: Services): Hono<AppEnv> {
   });
 
   return app;
+}
+
+/** Project the audit row a route has just committed into the workspace inbox. */
+async function notifyLatestAudit(
+  services: Services,
+  workspaceId: string,
+  action: string
+): Promise<void> {
+  const rows = await services.db
+    .prepare(
+      "SELECT id FROM audit_logs WHERE workspace_id = ? AND action = ? ORDER BY at DESC LIMIT 1"
+    )
+    .bind(workspaceId, action)
+    .all<{ id: string }>();
+  const auditId = rows[0]?.id;
+  if (auditId) await notifyAudit(services, workspaceId, auditId);
+}
+
+/**
+ * The audit id of the row just written. `appendAudit` returns void, so the bridge
+ * looks up the newest matching row: the detail carries the invitation id, which makes
+ * the match exact even if two invitations are sent in the same second.
+ */
+async function latestAuditId(
+  services: Services,
+  workspaceId: string,
+  action: string,
+  invitationId: string
+): Promise<string> {
+  const rows = await services.db
+    .prepare(
+      "SELECT id, detail FROM audit_logs WHERE workspace_id = ? AND action = ? ORDER BY at DESC LIMIT 20"
+    )
+    .bind(workspaceId, action)
+    .all<{ id: string; detail: string }>();
+  const match = rows.find((row) => row.detail.includes(invitationId));
+  return match?.id ?? "";
 }
 
 function escapeHtml(value: string): string {

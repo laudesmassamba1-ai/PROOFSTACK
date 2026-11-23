@@ -28,9 +28,23 @@
   --brand-pink: #e967a6;
   --brand-orange: #f28a49;
 
-  --font-sans: "Archivo", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: "Archivo", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  /* Type. These must name the families @fontsource actually registers, or the
+     browser silently falls back to a system sans and the whole display scale
+     loses its voice. "Archivo" was never imported: the hero rendered in the
+     system UI font at 71px, which is why the type read as generic. */
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display:
+    "Bricolage Grotesque Variable", "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  /* Motion. One family, three intensities. `--ease-anticipate` is the entrance
+     curve the choreography engine documents: it starts slightly against the
+     motion, then commits — the "drawn, not faded" feel. It was referenced by
+     name in this file but never defined, so every consumer fell back to `ease`. */
+  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-emphasized: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-anticipate: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 0.9, 0.4);
 
   /* Ink & Object workspace palette */
   --paper: #f6f6f4;
@@ -185,6 +199,7 @@ h1,
 h2,
 h3,
 h4 {
+  font-family: var(--font-display);
   font-weight: 560;
   letter-spacing: -0.02em;
   margin: 0;
@@ -271,10 +286,14 @@ p {
  * laptop and still dominates the viewport.
  */
 .hero-title {
-  font-size: clamp(2.1rem, 5.6vw, 4.8rem);
-  line-height: 0.96;
-  letter-spacing: -0.012em;
-  font-weight: 780;
+  /* The display face is explicit: body inherits --font-sans, so without this the
+     brand's giant type silently rendered in the UI face. Bricolage is wider at
+     the same size, hence the tighter cap and tracking below. */
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 5.1vw, 4.4rem);
+  line-height: 0.92;
+  letter-spacing: -0.045em;
+  font-weight: 760;
   font-stretch: 118%;
   text-transform: uppercase;
   text-wrap: balance;
@@ -9661,4 +9680,150 @@ p {
 
 .brand-panel.is-detected {
   border-color: color-mix(in srgb, var(--mint, #5cf2c4) 42%, transparent);
+}
+
+/* ==========================================================================
+   BRAND MOTION — the CSS half of lib/motion.ts.
+
+   The engine writes --tilt-*, --magnet-*, --parallax-y and adds `.is-in`.
+   Until this block existed none of those variables were read by a single CSS
+   rule: the spring integrator ran at 60fps for nothing, and the 37 word masks
+   in the hero rendered as ordinary inline text. Everything below is scoped to
+   the dark brand shell so the light edition and the workspace keep their own
+   motion vocabulary. Only transform/opacity/clip-path animate — no layout reads
+   and no paint-heavy properties in a frame.
+   ========================================================================== */
+
+.brand-shell:not([data-da="light"]) {
+  --motion-enter: 780ms;
+}
+
+/* ---- masked word reveal (SplitWords) ---- */
+.brand-shell:not([data-da="light"]) .m-word {
+  display: inline-block;
+  overflow: clip;
+  vertical-align: top;
+  /* Descenders must survive the mask: the box is padded and pulled back. */
+  padding-bottom: 0.12em;
+  margin-bottom: -0.12em;
+}
+
+.brand-shell:not([data-da="light"]) .m-word-inner {
+  display: inline-block;
+  transform: translate3d(0, 112%, 0);
+  opacity: 0;
+  will-change: transform;
+}
+
+.brand-shell:not([data-da="light"]) [data-motion].is-in .m-word-inner {
+  transform: translate3d(0, 0, 0);
+  opacity: 1;
+  transition:
+    transform var(--motion-enter) var(--ease-anticipate),
+    opacity 420ms var(--ease-standard);
+  transition-delay: var(--w-delay, 0ms);
+}
+
+/* ---- spring tilt + specular glare (data-tilt) ---- */
+.brand-shell:not([data-da="light"]) [data-tilt] {
+  transform: perspective(900px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+  transform-style: preserve-3d;
+  transition: box-shadow 220ms var(--ease-standard);
+}
+
+.brand-shell:not([data-da="light"]) [data-tilt]:hover {
+  box-shadow:
+    0 26px 60px -36px rgba(0, 0, 0, 0.9),
+    0 0 0 1px rgba(120, 227, 203, 0.18);
+}
+
+/* A pseudo-element keeps the glare composited: no extra DOM, no layout. */
+.brand-shell:not([data-da="light"]) [data-tilt]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: calc(var(--tilt-glow, 0) * 0.55);
+  background: radial-gradient(
+    38% 46% at var(--glare-x, 50%) var(--glare-y, 50%),
+    rgba(255, 255, 255, 0.16),
+    transparent 78%
+  );
+}
+
+/* ---- magnetic controls (data-magnet) ---- */
+.brand-shell:not([data-da="light"]) [data-magnet] {
+  transform: translate3d(var(--magnet-x, 0px), var(--magnet-y, 0px), 0);
+}
+
+/* ---- scroll drift (data-parallax) ---- */
+.brand-shell:not([data-da="light"]) [data-parallax] {
+  transform: translate3d(0, var(--parallax-y, 0px), 0);
+}
+
+/* ---- clip-path wipe for large panels (data-motion="mask") ---- */
+.brand-shell:not([data-da="light"]) [data-motion="mask"] {
+  clip-path: inset(0 0 100% 0);
+  opacity: 0;
+}
+
+.brand-shell:not([data-da="light"]) [data-motion="mask"].is-in {
+  clip-path: inset(0 0 0 0);
+  opacity: 1;
+  transition:
+    clip-path 900ms var(--ease-emphasized),
+    opacity 320ms var(--ease-standard);
+}
+
+/* ---- entrance choreography for the hero's supporting copy ---- */
+.brand-shell:not([data-da="light"]) .hero-section .eyebrow,
+.brand-shell:not([data-da="light"]) .hero-section .rise {
+  animation-timing-function: var(--ease-anticipate);
+}
+
+.brand-shell:not([data-da="light"]) .hero-module-link {
+  animation-timing-function: var(--ease-anticipate);
+}
+
+/* The module wall is the proof, not decoration: stagger each cell as it enters.
+   The wall itself carries [data-reveal], so its children inherit the reveal
+   timing without a second observer. */
+.brand-shell:not([data-da="light"]) [data-reveal].is-in .module-panel {
+  animation: panel-settle 620ms var(--ease-anticipate) both;
+  animation-delay: calc(var(--i, 0) * 70ms + 120ms);
+}
+
+@keyframes panel-settle {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* ---- reduced motion: every entrance resolves to its final state ---- */
+@media (prefers-reduced-motion: reduce) {
+  .brand-shell:not([data-da="light"]) .m-word-inner,
+  .brand-shell:not([data-da="light"]) [data-motion="mask"],
+  .brand-shell:not([data-da="light"]) [data-reveal].is-in .module-panel {
+    transform: none;
+    opacity: 1;
+    clip-path: none;
+    animation: none;
+  }
+
+  .brand-shell:not([data-da="light"]) [data-tilt],
+  .brand-shell:not([data-da="light"]) [data-magnet],
+  .brand-shell:not([data-da="light"]) [data-parallax] {
+    transform: none;
+  }
+
+  .brand-shell:not([data-da="light"]) [data-tilt]::after {
+    display: none;
+  }
 }

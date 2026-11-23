@@ -15,20 +15,20 @@ export function SplitChars({ text, from = 0 }: { text: string; from?: number }):
   const words = text.split(/\s+/).filter(Boolean);
   let charIndex = from;
   return (
-    <span aria-label={text}>
+    <>
+      {/* Screen readers get the whole string once; the animated letters are visual only. */}
+      <span className="sr-only">{text}</span>
       {words.map((word, wordIndex) => {
         const start = charIndex;
         charIndex += word.length + 1;
         return (
-          <>
-            <span
-              key={`${wordIndex}\u0000${word}`}
-              aria-hidden="true"
-              style={{ display: "inline-block", whiteSpace: "nowrap" }}
-            >
+          // The key belongs on the outermost returned node: a bare fragment cannot
+          // hold one, which made React warn on every render of this component.
+          <span key={`${wordIndex}\u0000${word}`} aria-hidden="true">
+            <span style={{ display: "inline-block", whiteSpace: "nowrap" }}>
               {[...word].map((char, i) => (
                 <span
-                  key={i}
+                  key={`${char}-${i}`}
                   className="m-char"
                   style={
                     {
@@ -42,9 +42,9 @@ export function SplitChars({ text, from = 0 }: { text: string; from?: number }):
               ))}
             </span>
             {wordIndex < words.length - 1 ? " " : null}
-          </>
+          </span>
         );
       })}
-    </span>
+    </>
   );
 }

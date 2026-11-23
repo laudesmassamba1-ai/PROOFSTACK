@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 /**
  * Vendor the brand typefaces into `apps/web/public/fonts`.
  *
@@ -15,8 +16,8 @@
  *   node tooling/scripts/fetch-fonts.mjs
  */
 
-import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
+import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const OUT_DIR = "apps/web/public/fonts";
@@ -70,7 +71,7 @@ for (const family of FAMILIES) {
     // The name comes from the content, so a re-run over the same font keeps the same file
     // and browsers keep their cached copy.
     const hash = createHash("sha256").update(data).digest("hex").slice(0, 12);
-    const name = `${(rule.match(/font-family:\s*'([^']+)'/) ?? [, "font"])[1]
+    const name = `${(rule.match(/font-family:\s*'([^']+)'/) ?? [undefined, "font"])[1]
       .toLowerCase()
       .replace(/\s+/g, "-")}-${subset}-${hash}.woff2`;
     await writeFile(path.join(OUT_DIR, name), data);

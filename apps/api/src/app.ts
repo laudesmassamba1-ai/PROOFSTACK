@@ -17,6 +17,7 @@ import { browserRoutes } from "./routes/browser.js";
 import { controlRoutes } from "./routes/controls.js";
 import { deviceRoutes } from "./routes/device.js";
 import { machineRoutes } from "./routes/machine.js";
+import { notificationRoutes } from "./routes/notifications.js";
 import { projectIntelligenceRoutes } from "./routes/project-intelligence.js";
 import { releaseRoutes } from "./routes/releases.js";
 import { webhookRoutes } from "./routes/webhooks.js";
@@ -177,6 +178,7 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
   // mounted before the workspace router that guards `/api/v1/*`.
   app.route("/api/v1", controlRoutes());
   app.route("/api/v1", workspaceRoutes(services));
+  app.route("/api/v1", notificationRoutes(services));
   app.route("/api/v1", projectIntelligenceRoutes(services));
   app.route("/api/v1/ai", aiRoutes(services));
   app.route("/api/v1", auditRoutes(services));

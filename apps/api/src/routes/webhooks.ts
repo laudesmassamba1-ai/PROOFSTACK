@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { notifyPaymentEvent } from "../automation.js";
 import { HttpError } from "../http/errors.js";
 import type { AppEnv, Services } from "../http/services.js";
+import { notifyFinalize } from "./billing.js";
 
 /**
  * Webhook ingestion.
@@ -46,6 +47,26 @@ export function webhookRoutes(services: Services): Hono<AppEnv> {
     try {
       const outcome = await services.webhooks.handle({ body, headers });
       if (outcome.body.ok && !outcome.body.duplicate) {
+        // A verified webhook can credit (or fail) a payment. The billing engine wrote the
+        // audit row; project it into the inbox of the workspace members. Duplicates do
+        // not reach here, so the dedupe key is a second line of defence, not the first.
+        if (
+          outcome.body.result === "credited" ||
+          outcome.body.result === "failed" ||
+          outcome.body.result === "already_credited"
+        ) {
+          const intent = outcome.body.intentId
+            ? await services.billing.getIntent(outcome.body.intentId)
+            : null;
+          if (intent) {
+            await notifyFinalize(
+              services,
+              intent.workspaceId,
+              outcome.body.result === "failed" ? "failed" : "credited",
+              intent.planKey
+            );
+          }
+        }
         const task = notifyPaymentEvent(services.config, {
           event: "payment.webhook.processed",
           provider,

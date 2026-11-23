@@ -243,6 +243,7 @@ export function NightSky({ className }: { className?: string }) {
       ref={canvasRef}
       className={className}
       aria-hidden="true"
+      tabIndex={-1}
       style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
     />
   );

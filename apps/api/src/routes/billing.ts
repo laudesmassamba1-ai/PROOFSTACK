@@ -15,6 +15,7 @@ import { entitlementMap, subscriptionView, usageCounters } from "../http/dto.js"
 import { HttpError } from "../http/errors.js";
 import { readBody, requireUser, requireWorkspace } from "../http/guards.js";
 import type { AppEnv, Services } from "../http/services.js";
+import { notifyAudit } from "../notifications.js";
 import { isSandbox } from "../providers.js";
 
 const startCheckoutSchema = z
@@ -216,6 +217,11 @@ export function billingRoutes(services: Services): Hono<AppEnv> {
     const body = await readBody(c, settleSchema);
     services.provider.settle(intent.providerReference, body.outcome);
     const result = await services.checkout.finalize(intent.id, { source: "return" });
+    // The billing engine writes the real audit row (finalize.credited or
+    // finalize.payment_failed). Project it into the inbox of the workspace members.
+    if (result.outcome === "credited" || result.outcome === "failed") {
+      await notifyFinalize(services, workspace.id, result.outcome, intent.planKey);
+    }
     return c.json({ outcome: result.outcome, state: result.intent.state });
   });
 
@@ -402,6 +408,7 @@ export function billingRoutes(services: Services): Hono<AppEnv> {
       action: "api_key.created",
       detail: { keyId: key.id, label: key.label, scopes: key.scopes },
     });
+    await notifyLatestAudit(services, workspace.id, "api_key.created");
 
     return c.json(
       {
@@ -431,10 +438,27 @@ export function billingRoutes(services: Services): Hono<AppEnv> {
       action: "api_key.revoked",
       detail: { keyId: c.req.param("keyId") },
     });
+    await notifyLatestAudit(services, workspace.id, "api_key.revoked");
     return c.json({ ok: true });
   });
 
   return app;
+}
+
+/** Project the audit row a route has just committed into the workspace inbox. */
+async function notifyLatestAudit(
+  services: Services,
+  workspaceId: string,
+  action: string
+): Promise<void> {
+  const rows = await services.db
+    .prepare(
+      "SELECT id FROM audit_logs WHERE workspace_id = ? AND action = ? ORDER BY at DESC LIMIT 1"
+    )
+    .bind(workspaceId, action)
+    .all<{ id: string }>();
+  const auditId = rows[0]?.id;
+  if (auditId) await notifyAudit(services, workspaceId, auditId);
 }
 
 /** Plans are public: the marketing page and the dashboard read the same catalogue. */
@@ -457,6 +481,37 @@ export function planRoutes(services: Services): Hono<AppEnv> {
 }
 
 /** Local/test deployments settle the sandbox freely; production needs an explicit opt-in. */
+/**
+ * Find the billing audit row written by the finalisation just performed and project it.
+ * The action is the authority: a payment is only called credited when the billing engine
+ * wrote `finalize.credited`, never from a browser redirect or a provider claim.
+ */
+export async function notifyFinalize(
+  services: Services,
+  workspaceId: string,
+  outcome: "credited" | "failed",
+  planKey: string
+): Promise<void> {
+  const action = outcome === "credited" ? "finalize.credited" : "finalize.payment_failed";
+  const rows = await services.db
+    .prepare(
+      "SELECT id FROM audit_logs WHERE workspace_id = ? AND action = ? ORDER BY at DESC LIMIT 1"
+    )
+    .bind(workspaceId, action)
+    .all<{ id: string }>();
+  const auditId = rows[0]?.id;
+  if (!auditId) return;
+  await notifyAudit(services, workspaceId, auditId, {
+    kind: outcome === "credited" ? "payment.credited" : "payment.failed",
+    title: outcome === "credited" ? "Payment verified" : "Payment failed",
+    body:
+      outcome === "credited"
+        ? `Payment for ${planKey} was verified and credited.`
+        : `The payment for ${planKey} was not credited. No paid access was granted.`,
+    link: "/app/billing",
+  });
+}
+
 function sandboxBillingAllowed(services: Services): boolean {
   return services.config.environment !== "production" || services.config.allowSandboxBilling;
 }

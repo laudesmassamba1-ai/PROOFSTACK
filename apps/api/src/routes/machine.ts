@@ -4,6 +4,7 @@ import { hashToken } from "../auth.js";
 import { HttpError } from "../http/errors.js";
 import { readBody } from "../http/guards.js";
 import type { AppEnv, Services } from "../http/services.js";
+import { notifyAudit } from "../notifications.js";
 import { deliverWorkspaceEvent } from "../outbound.js";
 import type { ApiKeyRecord, RunTotals } from "../store/app-store.js";
 
@@ -159,6 +160,25 @@ export function machineRoutes(services: Services): Hono<AppEnv> {
         modules: run.modules,
       },
     });
+    // Every member learns about the upload in the in-app inbox. The failure count is
+    // recomputed here from the same stored totals the webhook used, not invented.
+    const failedOrErrored = totalsFailed(totals);
+    const runFailed = run.status !== "COMPLETED" || failedOrErrored > 0;
+    const rows = await services.db
+      .prepare(
+        "SELECT id FROM audit_logs WHERE workspace_id = ? AND action = 'run.uploaded' ORDER BY at DESC LIMIT 1"
+      )
+      .bind(key.workspaceId)
+      .all<{ id: string }>();
+    const auditId = rows[0]?.id;
+    if (auditId) {
+      await notifyAudit(services, key.workspaceId, auditId, {
+        kind: runFailed ? "run.failed" : "run.completed",
+        title: runFailed ? `Run ${run.status.toLowerCase()}` : "Run completed",
+        body: `Run ${saved.runId} of ${project.name}: ${failedOrErrored} failed or errored case(s), ${run.status}.`,
+        link: `/app/projects/${run.projectId}`,
+      });
+    }
 
     // Outbound webhooks fire after the commit: receivers observe truth, they
     // never gate it. A slow endpoint must not delay the CLI response, so the
@@ -184,7 +204,6 @@ export function machineRoutes(services: Services): Hono<AppEnv> {
     // The people IN the app learn about a failed run too, not just the webhook
     // receivers: every non-viewer member gets one email, best-effort, only when
     // the sender is configured. It never gates the CLI response.
-    const runFailed = run.status !== "COMPLETED" || totalsFailed(totals) > 0;
     const emailTask = runFailed
       ? notifyRunFailure(services, key.workspaceId, {
           runId: saved.runId,

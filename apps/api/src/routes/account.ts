@@ -17,6 +17,7 @@ import { renderEmail, resetUrl, verifyUrl } from "../email.js";
 import { clientAddress, HttpError, RateLimiter } from "../http/errors.js";
 import { readBody, requireUser } from "../http/guards.js";
 import type { AppEnv, Services } from "../http/services.js";
+import { notifyAudit } from "../notifications.js";
 
 /**
  * Account lifecycle: password recovery, address verification, support.
@@ -456,6 +457,7 @@ export function accountRoutes(services: Services): Hono<AppEnv> {
       action: "invitation.accepted",
       detail: { invitationId: invitation.id, role: invitation.role },
     });
+    await notifyLatestInvitationAudit(services, workspace.id, "invitation.accepted");
     return c.json({
       ok: true,
       workspace: { id: workspace.id, name: workspace.name, role: invitation.role },
@@ -629,6 +631,21 @@ export function accountRoutes(services: Services): Hono<AppEnv> {
   });
 
   return app;
+}
+
+async function notifyLatestInvitationAudit(
+  services: Services,
+  workspaceId: string,
+  action: string
+): Promise<void> {
+  const rows = await services.db
+    .prepare(
+      "SELECT id FROM audit_logs WHERE workspace_id = ? AND action = ? ORDER BY at DESC LIMIT 1"
+    )
+    .bind(workspaceId, action)
+    .all<{ id: string }>();
+  const auditId = rows[0]?.id;
+  if (auditId) await notifyAudit(services, workspaceId, auditId);
 }
 
 function isAdmin(services: Services, email: string): boolean {

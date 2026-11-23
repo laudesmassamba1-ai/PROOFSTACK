@@ -162,6 +162,7 @@ export function SeismoStrip({ className }: { className?: string }) {
       ref={canvasRef}
       className={className}
       aria-hidden="true"
+      tabIndex={-1}
       style={{ display: "block", width: "100%", height: "88px" }}
     />
   );

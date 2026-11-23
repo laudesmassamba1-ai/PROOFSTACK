@@ -205,6 +205,23 @@ export interface ApiKeyRecord {
   expiresAt: string | null;
 }
 
+/**
+ * One person's inbox row. `title`/`body` are plain facts recorded at event time: the
+ * client maps `kind` to its own bilingual copy but never invents the underlying event.
+ */
+export interface NotificationRecord {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  kind: string;
+  title: string;
+  body: string;
+  link: string | null;
+  dedupeKey: string;
+  readAt: string | null;
+  createdAt: string;
+}
+
 export class AppStore {
   constructor(
     readonly db: Database,
@@ -1566,6 +1583,7 @@ export class AppStore {
       "support_messages",
       "workspace_invitations",
       "page_audits",
+      "notifications",
     ];
     for (const table of tables) {
       await this.db.prepare(`DELETE FROM ${table} WHERE workspace_id = ?`).bind(workspaceId).run();
@@ -2341,6 +2359,123 @@ export class AppStore {
       .run();
   }
 
+  // ----------------------------------------------------------- notifications
+
+  /**
+   * Insert one inbox row. A duplicate `dedupeKey` is a no-op, not an error: payment
+   * finalisation and webhook replay can reach the same event from different paths.
+   */
+  async createNotification(input: {
+    workspaceId: string;
+    userId: string;
+    kind: string;
+    title: string;
+    body: string;
+    link?: string;
+    dedupeKey: string;
+  }): Promise<NotificationRecord | null> {
+    const record: NotificationRecord = {
+      id: `ntf_${uuid().replaceAll("-", "").slice(0, 20)}`,
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      kind: input.kind,
+      title: input.title,
+      body: input.body,
+      link: input.link ?? null,
+      dedupeKey: input.dedupeKey,
+      readAt: null,
+      createdAt: iso(this.clock()),
+    };
+    const result = await this.db
+      .prepare(
+        `INSERT OR IGNORE INTO notifications (id, workspace_id, user_id, kind, title, body, link,
+                                             dedupe_key, read_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)`
+      )
+      .bind(
+        record.id,
+        record.workspaceId,
+        record.userId,
+        record.kind,
+        record.title,
+        record.body,
+        record.link,
+        record.dedupeKey,
+        record.createdAt
+      )
+      .run();
+    return result.changes > 0 ? record : null;
+  }
+
+  /**
+   * Inbox of one member of one workspace. `unreadOnly` filters in SQL, so an unread
+   * count is an exact `COUNT(*)` over the same predicate — never the length of a page.
+   */
+  async listNotifications(
+    workspaceId: string,
+    userId: string,
+    options: { unreadOnly?: boolean; limit?: number; offset?: number } = {}
+  ): Promise<NotificationRecord[]> {
+    const rows = await this.db
+      .prepare(
+        `SELECT * FROM notifications WHERE workspace_id = ? AND user_id = ?
+         ${options.unreadOnly ? "AND read_at IS NULL" : ""}
+         ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`
+      )
+      .bind(workspaceId, userId, options.limit ?? 25, options.offset ?? 0)
+      .all<Row>();
+    return rows.map(mapNotification);
+  }
+
+  async countNotifications(
+    workspaceId: string,
+    userId: string,
+    options: { unreadOnly?: boolean } = {}
+  ): Promise<number> {
+    const row = await this.db
+      .prepare(
+        `SELECT COUNT(*) AS count FROM notifications WHERE workspace_id = ? AND user_id = ?
+         ${options.unreadOnly ? "AND read_at IS NULL" : ""}`
+      )
+      .bind(workspaceId, userId)
+      .first<Row>();
+    return row ? num(row, "count") : 0;
+  }
+
+  /** Mark one row read. The workspace and recipient are part of the predicate. */
+  async markNotificationRead(
+    workspaceId: string,
+    userId: string,
+    notificationId: string
+  ): Promise<NotificationRecord | null> {
+    const at = iso(this.clock());
+    const result = await this.db
+      .prepare(
+        `UPDATE notifications SET read_at = ?
+         WHERE id = ? AND workspace_id = ? AND user_id = ? AND read_at IS NULL`
+      )
+      .bind(at, notificationId, workspaceId, userId)
+      .run();
+    if (result.changes === 0) return null;
+    const row = await this.db
+      .prepare("SELECT * FROM notifications WHERE id = ?")
+      .bind(notificationId)
+      .first<Row>();
+    return row ? mapNotification(row) : null;
+  }
+
+  /** Mark every unread row of this recipient in this workspace read. */
+  async markAllNotificationsRead(workspaceId: string, userId: string): Promise<number> {
+    const result = await this.db
+      .prepare(
+        `UPDATE notifications SET read_at = ?
+         WHERE workspace_id = ? AND user_id = ? AND read_at IS NULL`
+      )
+      .bind(iso(this.clock()), workspaceId, userId)
+      .run();
+    return result.changes;
+  }
+
   // ------------------------------------------------------------------ audit
 
   async appendAudit(entry: {
@@ -2366,6 +2501,21 @@ export class AppStore {
 }
 
 // -------------------------------------------------------------------- mappers
+
+function mapNotification(row: Row): NotificationRecord {
+  return {
+    id: str(row, "id"),
+    workspaceId: str(row, "workspace_id"),
+    userId: str(row, "user_id"),
+    kind: str(row, "kind"),
+    title: str(row, "title"),
+    body: str(row, "body"),
+    link: nullableStr(row, "link"),
+    dedupeKey: str(row, "dedupe_key"),
+    readAt: nullableStr(row, "read_at"),
+    createdAt: str(row, "created_at"),
+  };
+}
 
 function mapUser(row: Row): UserRecord {
   return {
