@@ -817,8 +817,9 @@ ipcMain.handle("proofcore:action", async (_event, action) => {
       await shell.openExternal(SITE_WEB);
       return { ok: true, output: "Site ouvert dans le navigateur." };
     case "open-releases":
-      await shell.openExternal("https://github.com/laudesmassamba1-ai/PROOFCORE/releases/latest");
-      return { ok: true, output: "Versions ouvertes dans le navigateur." };
+      // Downloads come from the site, never from the repository page.
+      await shell.openExternal(`${SITE_WEB}/download`);
+      return { ok: true, output: "Page de téléchargement ouverte dans le navigateur." };
     case "reload":
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.reload();
       return { ok: true, output: "Interface rechargée." };
