@@ -80,6 +80,9 @@ const TerminalPage = lazy(() =>
 );
 const CliDocs = lazy(() => import("./pages/app/CliDocs.js").then((m) => ({ default: m.CliDocs })));
 const Billing = lazy(() => import("./pages/app/Billing.js").then((m) => ({ default: m.Billing })));
+const Notifications = lazy(() =>
+  import("./pages/app/Notifications.js").then((m) => ({ default: m.NotificationsPage }))
+);
 const Settings = lazy(() =>
   import("./pages/app/Settings.js").then((m) => ({ default: m.Settings }))
 );
@@ -170,6 +173,7 @@ export function App() {
           <Route path="cli" element={<Cli />} />
           <Route path="cli/docs" element={<CliDocs />} />
           <Route path="terminal" element={<TerminalPage />} />
+          <Route path="notifications" element={<Notifications />} />
           <Route path="billing" element={<Billing />} />
           <Route path="settings" element={<Settings />} />
           <Route path="ai" element={<AiChat />} />

@@ -1,5 +1,6 @@
 import {
   BadgeCheck,
+  Bell,
   Boxes,
   Brain,
   ChevronDown,
@@ -58,6 +59,7 @@ export function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [projects, setProjects] = useState<ShellProject[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
@@ -160,6 +162,39 @@ export function AppLayout() {
       dialog.close();
     }
   }, [paletteOpen]);
+
+  // A read action in the inbox changes the count; refresh without a page reload.
+  useEffect(() => {
+    const onChange = (event: Event) => {
+      const detail = (event as CustomEvent<{ unreadCount?: number }>).detail;
+      if (typeof detail?.unreadCount === "number") {
+        setUnreadCount(detail.unreadCount);
+      }
+    };
+    window.addEventListener("proofcore:notifications-changed", onChange);
+    return () => window.removeEventListener("proofcore:notifications-changed", onChange);
+  }, []);
+
+  // The badge and the inbox page read the same endpoint, so they cannot disagree.
+  useEffect(() => {
+    if (!session.workspaceId) {
+      setUnreadCount(0);
+      return;
+    }
+    let active = true;
+    apiFetch<{ unreadCount: number }>(
+      `/api/v1/notifications?workspaceId=${encodeURIComponent(session.workspaceId)}&limit=1`
+    )
+      .then((body) => {
+        if (active) setUnreadCount(body.unreadCount);
+      })
+      .catch(() => {
+        // An unreachable API is not "zero notifications"; keep the last known value.
+      });
+    return () => {
+      active = false;
+    };
+  }, [session.workspaceId]);
 
   useEffect(() => {
     if (!accountOpen) return;
@@ -325,7 +360,7 @@ export function AppLayout() {
           <header className="app-topbar">
             <NavLink to="/app" className="app-brand-lockup" aria-label="PROOFCORE workspace">
               <Mark size={34} variant="onLight" />
-              <span className="wordmark app-brand-word">ROOFCORE</span>
+              <span className="wordmark app-brand-word">PROOFCORE</span>
               <span className="app-beta">{t("ws.shell.beta")}</span>
             </NavLink>
             <div className="app-top-actions">
@@ -408,7 +443,7 @@ export function AppLayout() {
         <header className="app-topbar">
           <NavLink to="/app" className="app-brand-lockup" aria-label="PROOFCORE workspace">
             <Mark size={34} variant="onLight" />
-            <span className="wordmark app-brand-word">ROOFCORE</span>
+            <span className="wordmark app-brand-word">PROOFCORE</span>
             <span className="app-beta">{t("ws.shell.beta")}</span>
           </NavLink>
 
@@ -530,6 +565,19 @@ export function AppLayout() {
                 </div>
               </>
             ) : null}
+
+            <NavLink
+              to="/app/notifications"
+              className="app-shell-pill app-notification-bell"
+              aria-label={locale === "fr" ? "Notifications" : "Notifications"}
+            >
+              <Bell size={14} />
+              {unreadCount > 0 ? (
+                <span className="app-notification-badge" aria-hidden="true">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              ) : null}
+            </NavLink>
 
             <button
               type="button"
@@ -669,7 +717,7 @@ export function AppLayout() {
           <div className="app-mobile-head">
             <div className="app-brand-lockup">
               <Mark size={38} variant="onLight" />
-              <span className="wordmark app-brand-word">ROOFCORE</span>
+              <span className="wordmark app-brand-word">PROOFCORE</span>
             </div>
             <button
               type="button"

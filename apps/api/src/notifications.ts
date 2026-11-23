@@ -235,7 +235,11 @@ export async function notifyAudit(
   const members = await services.store.listMembers(workspaceId);
   const recipients = options.recipients ?? members.map((member) => member.userId);
   for (const userId of new Set(recipients)) {
-    if (userId === entry.actor) continue;
+    // An actor is excluded only when the caller addressed someone else explicitly (an
+    // invitation to a future member). For workspace events — a key created, a payment
+    // verified, a run uploaded — the actor is usually the only member, and skipping them
+    // produced an inbox that stayed empty after real actions.
+    if (userId === entry.actor && options.recipients?.length) continue;
     await services.store.createNotification({
       workspaceId,
       userId,
