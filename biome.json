@@ -71,5 +71,25 @@
       "semicolons": "always",
       "trailingCommas": "es5"
     }
-  }
+  },
+  "overrides": [
+    {
+      "include": [
+        "apps/web/src/components/app/Dock.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noArrayIndexKey": "off",
+            "useIterableCallbackReturn": "off"
+          },
+          "a11y": {
+            "noSvgWithoutTitle": "off",
+            "useSemanticElements": "off",
+            "useAriaPropsSupportedByRole": "off"
+          }
+        }
+      }
+    }
+  ]
 }

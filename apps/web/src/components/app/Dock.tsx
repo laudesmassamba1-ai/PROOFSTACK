@@ -1,5 +1,8 @@
 "use client";
 
+// Composant tiers (React Bits, MIT) — repris presque tel quel ; les règles
+// biome pointées dessous sont acceptées dans le code d'origine.
+
 import type React from "react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
