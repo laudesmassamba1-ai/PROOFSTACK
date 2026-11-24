@@ -10126,3 +10126,185 @@ hairline,
   border-color: color-mix(in srgb, var(--vermillon, #e4381f) 30%, var(--rule));
   box-shadow: 0 10px 28px -18px rgba(228, 56, 31, 0.25);
 }
+
+/* ── Portes du premier pas ─────────────────────────────────────────────────
+   Quatre entrées réelles : papier, index mono qui vire au vermillon, flèche
+   qui s'élance, un coin qui se dessine. Entrée en cascade via --i. */
+.app-door {
+  position: relative;
+  display: block;
+  border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 1.1rem 1.25rem 1.2rem;
+  color: inherit;
+  text-decoration: none;
+  animation: app-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 80ms + 120ms);
+  transition: border-color 0.2s ease, transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.25s ease;
+}
+
+.app-door:hover {
+  border-color: color-mix(in srgb, var(--vermillon, #e4381f) 45%, var(--rule));
+  box-shadow: 0 16px 36px -22px rgba(228, 56, 31, 0.32);
+  transform: translateY(-3px);
+}
+
+.app-door:active {
+  transform: translateY(-1px);
+}
+
+/* l'index 01–04 : encre faible, vermillon au passage */
+.app-door .app-eyebrow {
+  transition: color 0.2s ease;
+}
+
+.app-door:hover .app-eyebrow {
+  color: var(--vermillon, #e4381f);
+}
+
+/* la flèche s'élance au passage */
+.app-door svg {
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.app-door:hover svg {
+  transform: translateX(4px);
+}
+
+/* le bouton-intérieur de la première porte glisse avec elle */
+.app-door-cta {
+  background: var(--surface-alt);
+}
+
+/* ── Boutons : réponse animée ─────────────────────────────────────────────
+   Même geste partout : l'icône s'élance, le bouton s'enfonce à la pression,
+   le focus dessine l'anneau vermillon, le primaire porte un balayage clair. */
+.app-btn {
+  transition:
+    background 140ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 140ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 140ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 200ms ease;
+}
+
+.app-btn svg {
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.app-btn:hover svg {
+  transform: translateX(2px);
+}
+
+.app-btn:active {
+  transform: scale(0.97);
+}
+
+.app-btn:focus-visible {
+  outline: 2px solid var(--vermillon, #e4381f);
+  outline-offset: 2px;
+}
+
+.app-btn-primary {
+  position: relative;
+  overflow: hidden;
+}
+
+.app-btn-primary:hover {
+  box-shadow: 0 10px 24px -14px rgba(228, 56, 31, 0.45);
+}
+
+/* balayage clair sur le primaire — le même geste que le titre de situation */
+.app-btn-primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  translate: -120% 0;
+  width: 60%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.22), transparent);
+  animation: btn-sheen 4.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes btn-sheen {
+  0%, 60% {
+    translate: -120% 0;
+  }
+
+  85% {
+    translate: 220% 0;
+  }
+
+  100% {
+    translate: 220% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-btn-primary::after,
+  .app-door,
+  .app-door svg,
+  .app-btn svg {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* ── Tête de page : l'index vermillon ───────────────────────────────────── */
+.app-page-head .app-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-page-head .app-eyebrow::before {
+  content: "";
+  width: 18px;
+  height: 1px;
+  background: var(--vermillon, #e4381f);
+}
+
+/* ── Fond de l'application : trame millimétrée ────────────────────────────
+   Un papier quadrillé à peine visible — la salle d'instrument, pas la feuille
+   vierge. Suit le thème. */
+.app-shell {
+  background-image:
+    radial-gradient(
+      color-mix(in srgb, var(--ink) 5%, transparent) 1px,
+      transparent 1.1px
+    );
+  background-size: 22px 22px;
+}
+
+[data-theme="dark"] .app-shell {
+  background-image:
+    radial-gradient(
+      rgba(243, 240, 232, 0.04) 1px,
+      transparent 1.1px
+    );
+}
+
+/* ── QuickDock : la barre d'accès rapide ──────────────────────────────────
+   Le dock flotte au-dessus de tout le shell, au centre bas, au-dessus des
+   cartes comme du bandeau cookies. */
+.app-shell .quick-dock.dock--bottom {
+  position: fixed;
+  bottom: 14px;
+  z-index: 60;
+}
+
+/* le contenu garde la place du dock : rien ne se cachera derrière lui */
+.app-shell {
+  padding-bottom: 92px;
+}
+
+@media (max-width: 640px) {
+  .app-shell .quick-dock.dock--bottom {
+    bottom: 8px;
+  }
+
+  .quick-dock .dock-label {
+    display: none;
+  }
+}

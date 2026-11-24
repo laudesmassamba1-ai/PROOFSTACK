@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { ModulePassRates, RunsTrend, SeverityBreakdown } from "../../components/app/Insights.js";
 import { KpiRow } from "../../components/app/KpiCards.js";
-import { ModuleGlyph } from "../../components/brand/GlyphArt.js";
 import { Empty, ErrorState, Loading, StatusBadge } from "../../components/app/ui.js";
+import { ModuleGlyph } from "../../components/brand/GlyphArt.js";
 import { EnhancedCard } from "../../components/common/EnhancedCard.js";
 import { useI18n } from "../../i18n/index.js";
 import { type ApiError, apiFetch } from "../../lib/api.js";
@@ -307,7 +307,8 @@ export function Overview() {
           <div className="grid gap-3 sm:grid-cols-2">
             <Link
               to="/app/start"
-              className="rounded-[var(--radius)] border border-black/10 bg-surface-alt px-5 py-4 transition-colors hover:border-black/30"
+              className="app-door app-door-cta"
+              style={{ "--i": "0" } as React.CSSProperties}
             >
               <span className="app-eyebrow">01</span>
               <h3 className="mt-1 text-base font-semibold">
@@ -324,7 +325,8 @@ export function Overview() {
             </Link>
             <Link
               to="/app/projects"
-              className="rounded-[var(--radius)] border border-black/10 px-5 py-4 transition-colors hover:border-black/30"
+              className="app-door"
+              style={{ "--i": "1" } as React.CSSProperties}
             >
               <span className="app-eyebrow">02</span>
               <h3 className="mt-1 text-base font-semibold">
@@ -339,10 +341,7 @@ export function Overview() {
                 {fr ? "Créer un projet" : "Create a project"} <ArrowRight size={13} />
               </span>
             </Link>
-            <Link
-              to="/app/cli"
-              className="rounded-[var(--radius)] border border-black/10 px-5 py-4 transition-colors hover:border-black/30"
-            >
+            <Link to="/app/cli" className="app-door" style={{ "--i": "2" } as React.CSSProperties}>
               <span className="app-eyebrow">03</span>
               <h3 className="mt-1 text-base font-semibold">
                 {fr ? "Automatiser avec la CLI" : "Automate with the CLI"}
@@ -358,7 +357,8 @@ export function Overview() {
             </Link>
             <Link
               to="/app/guide"
-              className="rounded-[var(--radius)] border border-black/10 px-5 py-4 transition-colors hover:border-black/30"
+              className="app-door"
+              style={{ "--i": "3" } as React.CSSProperties}
             >
               <span className="app-eyebrow">04</span>
               <h3 className="mt-1 text-base font-semibold">

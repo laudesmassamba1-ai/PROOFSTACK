@@ -28,6 +28,7 @@ import { AppSidebar } from "../components/app/AppSidebar.js";
 import { CookieConsent } from "../components/app/CookieConsent.js";
 import { DesktopTools } from "../components/app/DesktopTools.js";
 import { InvitationBanner } from "../components/app/InvitationBanner.js";
+import { QuickDock } from "../components/app/QuickDock.js";
 import { WindowControls } from "../components/app/WindowControls.js";
 import { Mark } from "../components/brand/Logo.js";
 import { useI18n } from "../i18n/index.js";
@@ -454,6 +455,7 @@ export function AppLayout() {
         workspaceName={workspace?.name}
         roleLabel={workspace ? workspace.role.toUpperCase() : undefined}
       />
+      <QuickDock unreadCount={unreadCount} />
       <div className="app-frame">
         <header className="app-topbar">
           <NavLink
