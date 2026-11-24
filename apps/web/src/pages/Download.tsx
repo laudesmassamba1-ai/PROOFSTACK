@@ -1,5 +1,6 @@
 import { Download as DownloadIcon, Monitor, Package, Terminal } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { TechText } from "../components/brand/TechText.js";
 import { useI18n } from "../i18n/index.js";
 import { Section, SectionHeading } from "../layouts/BrandLayout.js";
 import { apiFetch } from "../lib/api.js";
@@ -140,7 +141,32 @@ export function DownloadPage() {
       <SectionHeading
         as="h1"
         eyebrow={t("download.eyebrow")}
+        /* The wordmark as an instrument sits between the heading and the file list:
+           the product inspects software, so the mark inspecting itself belongs on the
+           page whose whole job is handing over the inspected thing. Guides show what
+           the engine reports for every page it reads — baseline, x-height, cap height. */
         title={t("download.title")}
+        tech={
+          <div className="tech-band" aria-hidden="true">
+            <TechText
+              text="PROOFCORE"
+              fontFamily='"Archivo", ui-sans-serif, system-ui, sans-serif'
+              fontWeight={780}
+              fontSize={150}
+              letterSpacing={-0.04}
+              align="center"
+              reach={180}
+              dashLength={4}
+              dashGap={2}
+              strokeWidth={1.4}
+              specks={12}
+              intro="metrics"
+              introDuration={1.6}
+              guides
+              className="h-[190px] w-full"
+            />
+          </div>
+        }
         lede={
           fr
             ? "L'application de bureau pour Windows, macOS et Linux, avec le navigateur intégré, le terminal et les outils de l'assistant. Le fichier se télécharge depuis ce site."

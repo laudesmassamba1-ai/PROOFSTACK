@@ -1,8 +1,7 @@
+import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router";
 import { WindowControls } from "../components/app/WindowControls.js";
-import { DaComparer } from "../components/brand/DaComparer.js";
-import { DaToggleChip } from "../components/brand/DaToggleChip.js";
 import { Mark } from "../components/brand/Logo.js";
 import { SplitWords } from "../components/brand/SplitWords.js";
 import { Footer } from "../components/marketing/Footer.js";
@@ -107,8 +106,6 @@ export function BrandLayout() {
         <Outlet />
       </main>
       <Footer />
-      {pathname === "/" ? <DaComparer /> : null}
-      <DaToggleChip />
     </div>
   );
 }
@@ -151,6 +148,7 @@ export function SectionHeading({
   eyebrow,
   title,
   lede,
+  tech,
 }: {
   /** Page-level headings must be h1 (WCAG 1.3.1): the primary SectionHeading of a
    *  route declares `as="h1"`, every following one keeps the section default. */
@@ -158,6 +156,9 @@ export function SectionHeading({
   eyebrow?: string;
   title: string;
   lede?: string;
+  /** A full-width visual that belongs to the heading but must break out of the
+   *  62ch column: rendered under the heading, outside the text measure. */
+  tech?: ReactNode;
 }) {
   const Heading = as ?? "h2";
   return (
@@ -174,6 +175,7 @@ export function SectionHeading({
       {lede ? (
         <p className="mt-4 max-w-[64ch] text-[1rem] leading-relaxed text-white/56">{lede}</p>
       ) : null}
+      {tech ? <div className="-mx-2 mt-4 sm:-mx-6 lg:-mx-10">{tech}</div> : null}
     </header>
   );
 }

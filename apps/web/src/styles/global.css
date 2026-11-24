@@ -10049,3 +10049,1180 @@ p {
   height: 68px;
   margin-top: -0.6rem;
 }
+
+/* ======================================================================
+   Recuperation du 24/11 : les regles suivantes viennent de la refonte en
+   cours (galerie peinte, heros ASCII, apercu CLI, fiches moteur), extraites
+   completes et equilibrees depuis la copie de travail, puis verifiees.
+   ====================================================================== */
+
+.brand-shell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  pointer-events: none;
+  opacity: 0.1;
+  mix-blend-mode: screen;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
+}
+
+.peint-hero {
+  position: relative;
+  background: var(--galerie-paper);
+  color: var(--galerie-ink);
+  padding: clamp(3rem, 8vh, 5rem) 0 clamp(2.5rem, 6vh, 4.5rem);
+}
+
+.peint-hero-inner {
+  margin-inline: auto;
+  max-width: 1440px;
+  padding-inline: clamp(1.25rem, 4vw, 4rem);
+  display: grid;
+  gap: clamp(2rem, 5vh, 3.5rem);
+  align-items: center;
+}
+
+@media (min-width: 1024px) {
+  .peint-hero-inner {
+    grid-template-columns: 0.82fr 1.18fr;
+  }
+}
+
+.peint-scene-wrap {
+  position: relative;
+  min-width: 0;
+  animation: peint-entree 1.1s var(--ease-standard) both;
+}
+
+.peint-scene {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+/* chaque forme filtrée vit dans un groupe animé */
+
+.peint-scene g {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* --- ACTE 1: les pigments s'assemblent en P --- */
+
+.peint-p-fut {
+  animation: peint-cyc-fut 16s linear infinite;
+}
+
+@keyframes peint-cyc-fut {
+  0% {
+    opacity: 0;
+    transform: translate(-540px, 150px) rotate(-28deg);
+  }
+
+  2% {
+    opacity: 1;
+  }
+
+  9% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0deg);
+  }
+
+  17% {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+
+  20% {
+    opacity: 0;
+    transform: translate(0, -36px);
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+.peint-p-panse {
+  animation: peint-cyc-panse 16s linear infinite;
+}
+
+@keyframes peint-cyc-panse {
+  0% {
+    opacity: 0;
+    transform: translate(430px, 320px) rotate(42deg) scale(0.5);
+  }
+
+  3% {
+    opacity: 1;
+  }
+
+  9% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0deg) scale(1);
+  }
+
+  17% {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+
+  20% {
+    opacity: 0;
+    transform: scale(1.06);
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+.peint-p-lune {
+  animation: peint-cyc-lune 16s linear infinite;
+}
+
+@keyframes peint-cyc-lune {
+  0% {
+    opacity: 0;
+    transform: translate(-640px, -300px) rotate(-60deg);
+  }
+
+  4% {
+    opacity: 1;
+  }
+
+  11% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0deg);
+  }
+
+  19% {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+
+  23% {
+    opacity: 0;
+    transform: translate(30px, -24px);
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+/* --- ACTE 2: la Terre qui tourne --- */
+
+.peint-terre-g {
+  opacity: 0;
+  animation: peint-cyc-terre 16s linear infinite;
+}
+
+@keyframes peint-cyc-terre {
+  0%,
+  19% {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+
+  23% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  55% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  58%,
+  100% {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+/* le ruban des continents défile: la planète tourne */
+
+.peint-ruban {
+  animation: peint-ruban 13s linear infinite;
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+
+@keyframes peint-ruban {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-600px);
+  }
+}
+
+/* --- ACTE 3: la scène devient chaque module --- */
+
+.peint-mod {
+  opacity: 0;
+}
+
+.peint-mod-flow {
+  animation: peint-cyc-flow 16s linear infinite;
+}
+
+@keyframes peint-cyc-flow {
+  0%,
+  60% {
+    opacity: 0;
+    transform: translateY(26px);
+  }
+
+  62% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  68% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  70%,
+  100% {
+    opacity: 0;
+    transform: translateY(-18px);
+  }
+}
+
+.peint-mod-exit {
+  animation: peint-cyc-exit 16s linear infinite;
+}
+
+@keyframes peint-cyc-exit {
+  0%,
+  71% {
+    opacity: 0;
+    transform: translateY(26px);
+  }
+
+  73% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  79% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  81%,
+  100% {
+    opacity: 0;
+    transform: translateY(-18px);
+  }
+}
+
+.peint-mod-fail {
+  animation: peint-cyc-fail 16s linear infinite;
+}
+
+@keyframes peint-cyc-fail {
+  0%,
+  83% {
+    opacity: 0;
+    transform: translateY(26px);
+  }
+
+  85% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  89% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  91%,
+  100% {
+    opacity: 0;
+    transform: translateY(-18px);
+  }
+}
+
+.peint-mod-clean {
+  animation: peint-cyc-clean 16s linear infinite;
+}
+
+@keyframes peint-cyc-clean {
+  0%,
+  93% {
+    opacity: 0;
+    transform: translateY(26px);
+  }
+
+  95% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- le discours posé à gauche --- */
+
+.peint-copy {
+  position: relative;
+  z-index: 2;
+  opacity: 0;
+  animation: peint-apparait 0.9s var(--ease-standard) 0.9s forwards;
+}
+
+.peint-surtitre {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--vermillon);
+}
+
+.peint-lede {
+  margin-top: 1.1rem;
+  font-size: 1.13rem;
+  line-height: 1.6;
+  max-width: 54ch;
+  color: rgba(22, 19, 15, 0.82);
+}
+
+.peint-cli {
+  margin-top: 1.2rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: rgba(22, 19, 15, 0.52);
+}
+
+.peint-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1.7rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 3px solid var(--vermillon);
+  color: var(--galerie-ink);
+  font-weight: 600;
+  font-size: 1.02rem;
+  transition: color 0.3s var(--ease-standard);
+}
+
+.peint-cta:hover {
+  color: var(--vermillon);
+}
+
+.peint-cta svg {
+  transition: transform 0.3s var(--ease-standard);
+}
+
+.peint-cta:hover svg {
+  transform: translateX(4px);
+}
+
+@keyframes peint-apparait {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes peint-entree {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* étiquettes des modules: microtexte mono, encre */
+
+.peint-etiquette text {
+  font-family: var(--font-mono);
+  fill: var(--galerie-ink);
+  font-weight: 600;
+}
+
+/* Mobile: la scène passe au-dessus, la copie en dessous, recomposée. */
+@media (max-width: 1023px) {
+  .peint-hero-inner {
+    grid-template-columns: 1fr;
+  }
+
+  .peint-scene-wrap {
+    order: -1;
+    margin-top: 1rem;
+  }
+
+  .peint-copy {
+    text-align: left;
+  }
+}
+
+/* Tout statique si le mouvement est réduit: la Terre reste posée. */
+@media (prefers-reduced-motion: reduce) {
+  .peint-scene-wrap,
+  .peint-copy {
+    animation: none;
+    opacity: 1;
+  }
+
+  .peint-p-fut,
+  .peint-p-panse,
+  .peint-p-lune {
+    animation: none;
+    opacity: 0;
+  }
+
+  .peint-terre-g {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .peint-ruban {
+    animation: none;
+  }
+
+  .peint-mod {
+    animation: none;
+    opacity: 0;
+  }
+
+  .peint-mod-flow {
+    opacity: 1;
+  }
+}
+
+/* ------------------------------------------------------------
+   Reference artifacts (ref_visuelles, 2026-11).
+   Pure CSS, no assets: a halftone dot field for the editorial cream
+
+}
+
+/* Editorial metadata row: mono microtext above a warm hairline (ref REPORT). */
+
+.meta-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  border-top: 1px solid rgba(110, 43, 52, 0.18);
+  padding-top: 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(110, 43, 52, 0.72);
+}
+
+/* Microtext label, ref 2: small cool-grey sans caps, quiet but present. */
+
+.engine-frame,
+.terminal-preview,
+.ai-sample {
+  --fiche-bg: #0d0e10;
+  --fiche-line: rgba(255, 255, 255, 0.09);
+  --fiche-line-soft: rgba(255, 255, 255, 0.06);
+  --fiche-band: rgba(255, 255, 255, 0.03);
+  --fiche-hi: rgba(255, 255, 255, 0.88);
+  --fiche-mid: rgba(255, 255, 255, 0.56);
+  --fiche-lo: rgba(255, 255, 255, 0.4);
+  --fiche-chip-line: rgba(255, 255, 255, 0.13);
+}
+
+.ef-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid var(--fiche-line);
+  background: var(--fiche-band);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+}
+
+.ef-row-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid var(--fiche-chip-line);
+  border-radius: 8px;
+  color: var(--fiche-hi);
+}
+
+.ef-row-title {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--fiche-hi);
+}
+.ef-row-sub {
+  font-family: var(--font-mono);
+  font-size: 0.67rem;
+  color: var(--fiche-mid);
+}
+.ef-row-tag {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--fiche-lo);
+}
+
+.ef-core {
+  border: 1px solid var(--fiche-line);
+  background: var(--fiche-band);
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.ef-core p {
+  color: var(--fiche-hi);
+}
+.ef-core .ef-row-sub {
+  color: var(--fiche-mid);
+}
+
+.ef-status {
+  border: 1px solid var(--fiche-chip-line);
+  background: transparent;
+  color: var(--fiche-mid);
+  border-radius: 4px;
+  padding: 0.25rem 0.375rem;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+}
+
+.ef-link {
+  border-left: 2px dashed var(--fiche-chip-line);
+}
+
+.ef-connect {
+  margin-left: 1.5rem;
+  height: 1.25rem;
+  border-left: 1px dashed var(--fiche-line);
+}
+
+.module-card .module-note {
+  font-family: var(--font-mono);
+  font-size: 0.63rem;
+  color: var(--fiche-mid);
+}
+
+.ai-sample-bar svg {
+  color: var(--fiche-mid);
+}
+
+[class*="text-white/42"],
+[class*="text-white/44"],
+[class*="text-white/45"],
+[class*="text-white/46"],
+[class*="text-white/54"],
+[class*="text-white/56"],
+[class*="text-white/58"],
+[class*="text-white/68"],
+[class*="text-white/70"],
+[class*="text-white/72"],
+[class*="text-white/78"],
+[class*="border-white/8"],
+[class*="border-white/10"],
+[class*="bg-brand-mint/"],
+/* Dark instrument zones keep their black identity inside the light page: they
+   re-establish light ink by inheritance (their text has no explicit colour of
+   its own) and carry their own dark surface,
+since the light shell no longer
+   supplies the black behind them. */
+
+  /* les fiches instrument suivent la DA via leurs variables — pas d'override ici */
+
+  /* Carte Assistance : un instrument noir sur la coque sombre,
+une feuille
+   blanche sur le papier. Les tokens workspace sont re-résolus localement
+   pour que le formulaire,
+les champs et le CTA basculent avec elle. */
+
+  .brand-shell[data-da="dark"]
+  .support-card
+  :is(input, textarea):focus {
+  border-color: var(--vermillon, #e4381f);
+}
+
+/* the stat strip sits on the light shell: its whites become ink */
+
+/* In the light DA the hero is light too: the wave stays,
+redrawn in deep teal
+   (palette prop),
+the scrim fades white,
+the copy reads in ink. */
+
+/* the paper edition's footer: cream,
+hairline,
+/* the closing argument */
+
+/* the divider carries its story: the evidence passing from the run to the
+   report. The headline names the exercise: this is what CLEAN grades. */
+
+.nav-site[data-on-paper="true"] nav ul a,
+.nav-site[data-on-paper="true"] nav ul button {
+  color: rgba(22, 19, 15, 0.72);
+}
+
+.nav-site[data-on-paper="true"] nav ul a:hover,
+.nav-site[data-on-paper="true"] nav ul button:hover,
+.nav-site[data-on-paper="true"] nav ul a[data-status="active"],
+.nav-site[data-on-paper="true"] nav ul button[aria-expanded="true"] {
+  color: var(--galerie-ink);
+}
+
+.nav-site[data-on-paper="true"] nav ul a {
+  background-image: none;
+}
+
+.nav-site[data-on-paper="true"] nav div button[aria-label] {
+  border-color: rgba(22, 19, 15, 0.25);
+  color: rgba(22, 19, 15, 0.75);
+}
+
+/* CTA boutons: pigment outremer, plat, dans toute la galerie. */
+
+.nav-site[data-on-paper="true"] .btn-ghost {
+  border-color: rgba(22, 19, 15, 0.28);
+  background: transparent;
+  color: var(--galerie-ink);
+}
+
+.nav-site[data-on-paper="true"] .btn-ghost:hover {
+  border-color: rgba(22, 19, 15, 0.5);
+  background: rgba(22, 19, 15, 0.05);
+  color: var(--galerie-ink);
+}
+
+/* Le panneau final: un seul aplat vermillon, texte papier, boutons papier. */
+
+.peint-final {
+  background: var(--vermillon);
+  border-radius: 24px;
+}
+
+.peint-final,
+.peint-final h2,
+.peint-final p,
+.peint-final .eyebrow {
+  color: var(--galerie-paper);
+}
+
+.peint-final .eyebrow {
+  color: rgba(242, 235, 220, 0.9);
+}
+
+.peint-final .btn-primary {
+  background: var(--galerie-paper);
+  color: var(--galerie-ink);
+}
+
+.peint-final .btn-primary:hover {
+  background: #ffffff;
+}
+
+.peint-final .btn-ghost {
+  border-color: rgba(242, 235, 220, 0.45);
+  background: transparent;
+  color: var(--galerie-paper);
+}
+
+.peint-final .btn-ghost:hover {
+  border-color: var(--galerie-paper);
+  background: rgba(242, 235, 220, 0.12);
+  color: var(--galerie-paper);
+}
+
+.peint-grain {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* respiration individuelle: chaque grain grossit et rétrécit, déphasé */
+@keyframes peint-vie {
+  from {
+    scale: 0.82;
+  }
+  to {
+    scale: 1.3;
+  }
+}
+
+/* ACTE 1 — le P: converger, tenir, se disperser */
+
+.peint-ph-P .peint-grain {
+  animation:
+    peint-grains-P 16s linear infinite,
+    peint-vie var(--od, 2.6s) ease-in-out infinite alternate;
+}
+
+@keyframes peint-grains-P {
+  0% {
+    opacity: 0;
+    transform: translate(var(--sx), var(--sy)) scale(0.2);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  3% {
+    opacity: 1;
+  }
+
+  10% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+
+  17% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+    animation-timing-function: var(--ease-standard);
+  }
+
+  21%,
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--sx) * 0.2), -16px) scale(0.4);
+  }
+}
+
+/* ACTE 2 — la Terre: le pourtour et l'océan convergent puis tiennent;
+   la carte (ruban de grains) défile — c'est la rotation de la planète. */
+
+.peint-ph-terre {
+  opacity: 0;
+  animation: peint-cyc-terre 16s linear infinite;
+}
+
+.peint-ph-terre .peint-ocean .peint-grain,
+.peint-ph-terre .peint-contour .peint-grain {
+  animation:
+    peint-grains-terre 16s linear infinite,
+    peint-vie var(--od, 2.6s) ease-in-out infinite alternate;
+}
+
+@keyframes peint-grains-terre {
+  0%,
+  20% {
+    opacity: 0;
+    transform: translate(var(--sx), var(--sy)) scale(0.2);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  25% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+
+  55% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+    animation-timing-function: var(--ease-standard);
+  }
+
+  59%,
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--sx) * 0.2), -14px) scale(0.4);
+  }
+}
+
+/* les grains des continents suivent le ruban (la carte tourne) */
+
+.peint-ph-terre .peint-ruban {
+  animation: peint-ruban 13s linear infinite;
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+
+.peint-ph-terre .peint-ruban .peint-grain {
+  animation:
+    peint-grains-terre 16s linear infinite,
+    peint-vie var(--od, 2.6s) ease-in-out infinite alternate;
+}
+
+@keyframes peint-ruban {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-600px);
+  }
+}
+
+/* ACTE 3 — les modules: la nuée rassemble la silhouette, pulse, se dissout */
+
+.peint-mod .peint-grain {
+  animation: peint-vie var(--od, 2.6s) ease-in-out infinite alternate;
+}
+
+.peint-mod-flow .peint-grain {
+  animation:
+    peint-grains-flow 16s linear infinite,
+    peint-vie var(--od, 2.6s) ease-in-out infinite alternate;
+}
+
+@keyframes peint-grains-flow {
+  0%,
+  60% {
+    opacity: 0;
+    transform: translate(var(--sx), var(--sy)) scale(0.2);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  64% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+
+  68% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+
+  71%,
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--sx) * 0.2), -14px) scale(0.4);
+  }
+}
+
+.peint-mod-exit .peint-grain {
+  animation:
+    peint-grains-exit 16s linear infinite,
+    peint-vie var(--od, 2.6s) ease-in-out infinite alternate;
+}
+
+@keyframes peint-grains-exit {
+  0%,
+  73% {
+    opacity: 0;
+    transform: translate(var(--sx), var(--sy)) scale(0.2);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  77% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+
+  81% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+
+  84%,
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--sx) * 0.2), -14px) scale(0.4);
+  }
+}
+
+.peint-mod-fail .peint-grain {
+  animation:
+    peint-grains-fail 16s linear infinite,
+    peint-vie var(--od, 2.6s) ease-in-out infinite alternate;
+}
+
+@keyframes peint-grains-fail {
+  0%,
+  86% {
+    opacity: 0;
+    transform: translate(var(--sx), var(--sy)) scale(0.2);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  89% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+
+  91% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+
+  94%,
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--sx) * 0.2), -14px) scale(0.4);
+  }
+}
+
+.peint-mod-clean .peint-grain {
+  animation:
+    peint-grains-clean 16s linear infinite,
+    peint-vie var(--od, 2.6s) ease-in-out infinite alternate;
+}
+
+@keyframes peint-grains-clean {
+  0%,
+  96% {
+    opacity: 0;
+    transform: translate(var(--sx), var(--sy)) scale(0.2);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  99% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+}
+
+/* la poussière scintille toujours */
+
+.peint-poussiere circle {
+  animation: peint-vie var(--od, 3s) ease-in-out infinite alternate;
+}
+
+/* étiquettes: microtexte mono, encre */
+
+.peint-etiquette text {
+  font-family: var(--font-mono);
+  fill: var(--galerie-ink);
+  font-weight: 600;
+}
+
+/* statique si le mouvement est réduit: la Terre reste posée */
+@media (prefers-reduced-motion: reduce) {
+  .peint-ph-P .peint-grain,
+  .peint-mod .peint-grain {
+    animation: none;
+    opacity: 0;
+  }
+
+  .peint-ph-terre,
+  .peint-ph-terre .peint-grain,
+  .peint-poussiere circle {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .peint-ph-terre .peint-ruban {
+    animation: none;
+  }
+}
+
+/* ── Champs de la carte d'authentification (modern-login-signup, fond noir) ── */
+
+.field-dark {
+  width: 100%;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #000;
+  color: #fff;
+  font-size: 0.9rem;
+  padding: 0.65rem 0.85rem;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.field-dark::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.field-dark:focus {
+  border-color: rgba(255, 255, 255, 0.32);
+}
+
+/* ── Héros ASCII (photo redessinée en glyphes, Canvas2D) ─────────────────── */
+
+.ascii-hero {
+  --ascii-ink: #f4f6fb;
+  /* remonte sous la nav fixe, comme le héros papier d'avant */
+  margin-top: -6rem;
+}
+
+.ascii-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--vermillon, #e4381f);
+  text-shadow: 0 0 18px rgba(228, 56, 31, 0.45);
+}
+
+.ascii-title {
+  margin: 0.7em 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(2.2rem, 5.6vw, 4.6rem);
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  color: #fff;
+  text-shadow: 0 2px 30px rgba(0, 0, 0, 0.85);
+  text-wrap: balance;
+}
+
+.ascii-title-soft {
+  color: rgba(255, 255, 255, 0.66);
+}
+.ascii-title-accent {
+  color: var(--vermillon, #e4381f);
+}
+.ascii-lede {
+  margin: 1.1em auto 0;
+  max-width: 34rem;
+  font-size: clamp(0.95rem, 1.35vw, 1.12rem);
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.7);
+  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.9);
+}
+
+.ascii-cli {
+  margin-top: 1.1em;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.ascii-cta {
+  margin-top: 1.6em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  border-radius: 999px;
+  background: var(--galerie-paper, #f2ebdc);
+  color: var(--galerie-ink, #16130f);
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 0.85em 1.5em;
+  transition: transform 0.15s ease;
+}
+
+.ascii-cta:hover {
+  transform: translateY(-1px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ascii-hero {
+    min-height: 70vh;
+  }
+}
+
+/* ── Nav posée sur le héros ASCII noir (accueil, en haut de page) ────────── */
+
+.nav-site[data-on-dark="true"] nav ul a,
+.nav-site[data-on-dark="true"] nav ul button {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.nav-site[data-on-dark="true"] nav ul a:hover,
+.nav-site[data-on-dark="true"] nav ul button:hover,
+.nav-site[data-on-dark="true"] nav ul a[data-status="active"],
+.nav-site[data-on-dark="true"] nav ul button[aria-expanded="true"] {
+  color: #fff;
+}
+
+.nav-site[data-on-dark="true"] nav div button[aria-label],
+.nav-site[data-on-dark="true"] nav a[href="/signin"] {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.nav-site[data-on-dark="true"] .btn-ghost {
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.nav-site[data-on-dark="true"] .btn-ghost:hover {
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.nav-site[data-on-dark="true"] {
+  background: transparent;
+  border-bottom-color: transparent;
+}
+
+.nav-site[data-on-dark="true"] a[href="/"] svg,
+.nav-site[data-on-dark="true"] a[href="/"] span {
+  color: #fff;
+}
+
+/* classes sémantiques du rapport CLI (plus de couleurs codées dans le tsx) */
+
+.tp-bar-txt {
+  color: var(--fiche-mid);
+}
+.tp-copy {
+  color: var(--fiche-mid);
+  transition: color 0.15s ease;
+}
+.tp-copy:hover {
+  color: var(--fiche-hi);
+}
+.tp-cmd {
+  font-family: var(--font-mono);
+  font-size: 0.79rem;
+  color: var(--fiche-hi);
+}
+.tp-cmd .tp-dollar {
+  color: var(--fiche-lo);
+}
+.tp-out {
+  margin-top: 1rem;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.69rem;
+  line-height: 1.85;
+  color: var(--fiche-mid);
+  white-space: pre;
+}
+
+.tp-copied {
+  margin-top: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--vermillon, #e4381f);
+}
+
+/* ── TechText dans le héros : le mot-marque que le pointeur dissèque ───────
+   Le produit inspecte du logiciel ; la marque qui s'inspecte elle-même est
+   la blague, dessinée plutôt qu'écrite. La bande vit entre le titre et la
+   lede : assez grande pour être prise à la souris, assez sobre pour ne pas
+   voler le rôle du titre. La bande est `aria-hidden` — le h1 au-dessus dit
+   déjà le nom. */
+
+.ascii-tech {
+  margin: 0.9em auto 0;
+  width: min(92vw, 720px);
+  height: clamp(120px, 16vw, 190px);
+  color: inherit;
+  pointer-events: auto;
+}
+
+.ascii-tech .tech-text {
+  color: #fff;
+}
+
+.ascii-tech .tech-text-canvas {
+  cursor: crosshair;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ascii-tech {
+    /* Under reduced motion the canvas renders static letters and answers the
+       pointer only; the band keeps its place without any idle animation. */
+    height: clamp(110px, 14vw, 170px);
+  }
+}
