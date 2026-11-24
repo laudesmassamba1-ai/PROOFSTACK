@@ -9151,3 +9151,375 @@ hairline,
   outline: 2px solid var(--vermillon, #e4381f);
   outline-offset: 2px;
 }
+
+/* ── Barre latérale repliable (inspiration shadcn sidebar-07) ──────────────
+   Un rail d'icônes avec infobulles ↔ un panneau étendu avec libellés et
+   sous-modules ; la largeur est portée par --sbw, posée sur :root par le
+   composant, et le contenu se décale d'elle-même sur grand écran. */
+.app-sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 40;
+  display: none;
+  flex-direction: column;
+  width: var(--sbw, 238px);
+  border-right: 1px solid var(--rule);
+  background: #0a0b0d;
+  transition: width 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+  overflow: hidden;
+}
+
+@media (min-width: 1024px) {
+  .app-sidebar {
+    display: flex;
+  }
+
+  .app-shell {
+    padding-left: var(--sbw, 238px);
+    transition: padding-left 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  /* la barre du haut reprend la navigation : elle se recentre sur les actions */
+  .app-desktop-nav {
+    display: none;
+  }
+}
+
+.app-sidebar-nav {
+  flex: 1;
+  padding: 18px 10px 8px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.sb-group + .sb-group {
+  margin-top: 20px;
+}
+
+.sb-group-label {
+  padding: 0 12px;
+  margin-bottom: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.3);
+  white-space: nowrap;
+  transition: opacity 0.18s ease;
+}
+
+.app-sidebar.is-rail .sb-group-label {
+  opacity: 0;
+  height: 10px;
+  overflow: hidden;
+}
+
+.sb-list,
+.sb-sublist {
+  display: grid;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sb-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 8px 12px;
+  border-radius: 9px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.82rem;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.16s ease, color 0.16s ease, padding-left 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.sb-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.9);
+  padding-left: 15px;
+}
+
+.sb-item.is-active {
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+}
+
+.sb-item.is-active::before {
+  content: "";
+  position: absolute;
+  inset: 6px auto 6px 0;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--vermillon, #e4381f);
+}
+
+.sb-icon {
+  flex-shrink: 0;
+  color: inherit;
+  opacity: 0.85;
+}
+
+.sb-item.is-active .sb-icon {
+  color: var(--vermillon, #e4381f);
+  opacity: 1;
+}
+
+.sb-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.sb-badge {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--vermillon, #e4381f);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+
+.sb-caret {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 1rem;
+  cursor: pointer;
+  transform: rotate(90deg);
+  transition: transform 0.2s ease, color 0.16s ease;
+}
+
+.sb-caret[aria-expanded="true"] {
+  transform: rotate(-90deg);
+}
+
+.sb-caret:hover {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.sb-sublist {
+  margin: 2px 0 4px 18px;
+  padding-left: 10px;
+  border-left: 1px dashed rgba(255, 255, 255, 0.12);
+}
+
+.sb-item-sub {
+  padding: 5px 10px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+}
+
+.sb-toggle {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 8px 10px 12px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 9px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.sb-toggle:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* rail : icônes seules, libellés masqués, infobulle au survol */
+.app-sidebar.is-rail {
+  --rail-w: 60px;
+}
+
+.app-sidebar.is-rail .app-sidebar-nav,
+.app-sidebar.is-rail .sb-toggle {
+  padding-left: 0;
+  padding-right: 0;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.app-sidebar.is-rail .sb-item,
+.app-sidebar.is-rail .sb-toggle {
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.app-sidebar.is-rail .sb-item:hover,
+.app-sidebar.is-rail .sb-toggle:hover {
+  padding-left: 0;
+}
+
+.app-sidebar.is-rail .sb-label,
+.app-sidebar.is-rail .sb-badge,
+.app-sidebar.is-rail .sb-sublist,
+.app-sidebar.is-rail .sb-caret {
+  display: none;
+}
+
+.app-sidebar.is-rail .sb-item::after,
+.app-sidebar.is-rail .sb-toggle::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  translate: 0 -50%;
+  padding: 5px 9px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #131417;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.72rem;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-4px);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+  z-index: 50;
+}
+
+.app-sidebar.is-rail .sb-item:hover::after,
+.app-sidebar.is-rail .sb-item:focus-visible::after,
+.app-sidebar.is-rail .sb-toggle:hover::after,
+.app-sidebar.is-rail .sb-toggle:focus-visible::after {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* ── Cartes KPI contrastées + halo réactif (SpotlightCard / Number Ticker) ── */
+.kpi-grid {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 900px) {
+  .kpi-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.kpi-card {
+  --mx: 50%;
+  --my: 50%;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.008)),
+    #0b0c0e;
+  padding: 16px 18px 14px;
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.22s ease;
+}
+
+.kpi-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(220px circle at var(--mx) var(--my), rgba(255, 255, 255, 0.07), transparent 65%);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+
+.kpi-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.kpi-card:hover::before {
+  opacity: 1;
+}
+
+.kpi-card::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: 2px;
+  background: currentColor;
+  opacity: 0.85;
+}
+
+.kpi-label {
+  margin: 4px 0 10px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.kpi-value {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-family: var(--font-display);
+  font-size: 2.05rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #fff;
+  line-height: 1;
+}
+
+.kpi-suffix {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.kpi-note {
+  margin-top: 8px;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.48);
+}
+
+.kpi-meter {
+  display: block;
+  margin-top: 10px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.kpi-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: currentColor;
+  transition: width 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.kpi-neutral { color: rgba(255, 255, 255, 0.55); }
+.kpi-success { color: var(--brand-emerald, #73d68b); }
+.kpi-danger { color: var(--vermillon, #e4381f); }
+.kpi-cyan { color: var(--brand-cyan, #70c9db); }
+
+.kpi-danger .kpi-value { color: #fff; }

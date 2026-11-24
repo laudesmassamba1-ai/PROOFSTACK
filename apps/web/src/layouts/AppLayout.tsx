@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router";
+import { AppSidebar } from "../components/app/AppSidebar.js";
 import { CookieConsent } from "../components/app/CookieConsent.js";
 import { DesktopTools } from "../components/app/DesktopTools.js";
 import { InvitationBanner } from "../components/app/InvitationBanner.js";
@@ -447,6 +448,7 @@ export function AppLayout() {
 
   return (
     <div className="app-shell">
+      <AppSidebar unreadCount={unreadCount} advanced={uiMode === "studio"} />
       <div className="app-frame">
         <header className="app-topbar">
           <NavLink

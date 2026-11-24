@@ -3,6 +3,7 @@ import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { ModulePassRates, RunsTrend, SeverityBreakdown } from "../../components/app/Insights.js";
+import { KpiRow } from "../../components/app/KpiCards.js";
 import { ModuleObject } from "../../components/app/ModuleObjects.js";
 import { Empty, ErrorState, Loading, StatusBadge } from "../../components/app/ui.js";
 import { EnhancedCard } from "../../components/common/EnhancedCard.js";
@@ -233,6 +234,54 @@ export function Overview() {
           </aside>
         </section>
       </EnhancedCard>
+
+      <KpiRow
+        kpis={[
+          {
+            key: "projects",
+            label: fr ? "Projets" : "Projects",
+            value: data.projects.length,
+            tone: "neutral",
+            note: latest
+              ? `${latest.projectName} · ${relativeTime(latest.startedAt)}`
+              : fr
+                ? "Aucun projet suivi"
+                : "No tracked project",
+          },
+          {
+            key: "checks",
+            label: fr ? "Vérifications · 14 j" : "Checks · 14d",
+            value: insights ? insights.runsPerDay.reduce((total, day) => total + day.total, 0) : 0,
+            tone: "success",
+            note: fr ? "Sur les quatorze derniers jours" : "Over the last fourteen days",
+          },
+          {
+            key: "failures",
+            label: fr ? "Constats ouverts" : "Open findings",
+            value: failures,
+            tone: failures > 0 ? "danger" : "neutral",
+            note: firstFailure
+              ? `${firstFailure.module.toUpperCase()} · ${relativeTime(firstFailure.detectedAt)}`
+              : fr
+                ? "Aucun défaut ouvert"
+                : "No open defect",
+          },
+          {
+            key: "quota",
+            label: fr ? "Quota du plan" : "Plan quota",
+            value: percent,
+            suffix: "%",
+            tone: "cyan",
+            meter: percent,
+            note:
+              quota === -1
+                ? fr
+                  ? "Illimité ce mois-ci"
+                  : "Unlimited this month"
+                : `${used} / ${quota} · ${data.subscription.planName}`,
+          },
+        ]}
+      />
 
       {/* The beginner's first screen: four real doors, not a wall of statistics. It only
           appears while the workspace has no project, so it never hides real work. */}
