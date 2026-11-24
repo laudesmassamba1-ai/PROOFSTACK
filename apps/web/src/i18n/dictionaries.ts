@@ -302,6 +302,15 @@ export const en = {
   "app.nav.settings": "Settings",
   "app.nav.notifications": "Notifications",
   "app.signout": "Sign out",
+  "pricing.calc.eyebrow": "Usage calculator",
+  "pricing.calc.slider":
+    "Drag to your monthly volume — the plan follows the catalogue, not a guess.",
+  "pricing.calc.runs": "test runs",
+  "pricing.calc.month": "month",
+  "pricing.calc.recommended": "Your volume fits the {plan} plan.",
+  "pricing.calc.custom": "Let's talk",
+  "pricing.calc.contact": "Above the catalogue: tell us the volume and we size it with you.",
+  "pricing.calc.talk": "Talk to us",
   "cookie.title": "We use cookies.",
   "cookie.body": "We use cookies to ensure that we give you the best experience on our website.",
   "cookie.policy": "Read the cookies policy",
@@ -622,6 +631,16 @@ export const fr: Messages = {
   "app.nav.settings": "Paramètres",
   "app.nav.notifications": "Notifications",
   "app.signout": "Se déconnecter",
+  "pricing.calc.eyebrow": "Calculateur d'usage",
+  "pricing.calc.slider":
+    "Glissez jusqu'à votre volume mensuel — le plan suit le catalogue, pas une estimation.",
+  "pricing.calc.runs": "exécutions",
+  "pricing.calc.month": "mois",
+  "pricing.calc.recommended": "Votre volume correspond au plan {plan}.",
+  "pricing.calc.custom": "Parlons-en",
+  "pricing.calc.contact":
+    "Au-delà du catalogue : dites-nous le volume, nous le dimensionnons avec vous.",
+  "pricing.calc.talk": "Nous écrire",
   "cookie.title": "Nous utilisons des cookies.",
   "cookie.body":
     "Nous utilisons des cookies pour vous garantir la meilleure expérience sur notre site.",

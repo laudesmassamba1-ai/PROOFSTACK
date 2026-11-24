@@ -11,12 +11,13 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
-import { ModuleObject } from "../../components/app/ModuleObjects.js";
+import { ModuleGlyph } from "../../components/brand/GlyphArt.js";
 import { Empty, ErrorState, Loading, StatusBadge } from "../../components/app/ui.js";
 import { useI18n } from "../../i18n/index.js";
 import { type ApiError, apiFetch } from "../../lib/api.js";
 import { duration, relativeTime } from "../../lib/format.js";
 import { useSession } from "../../lib/session.js";
+import { useTheme } from "../../lib/theme.js";
 
 /**
  * A module workbench.
@@ -110,6 +111,7 @@ export function ModulePage() {
   const { workspaceId } = useSession();
   const { locale, t } = useI18n();
   const fr = locale === "fr";
+  const { theme } = useTheme();
   const [runs, setRuns] = useState<ModuleRun[] | null>(null);
   const [findings, setFindings] = useState<Finding[]>([]);
   const [error, setError] = useState<ApiError | Error | null>(null);
@@ -191,11 +193,9 @@ export function ModulePage() {
           </p>
         </div>
         <div className="app-module-object-stage">
-          <ModuleObject
-            module={module}
-            passed={latestTotals.passed}
-            failed={latestTotals.failed}
-            total={latestTotals.total}
+          <ModuleGlyph
+            kind={module as "world" | "flow" | "exit" | "fail" | "clean"}
+            tone={theme === "dark" ? "dark" : "ink"}
           />
         </div>
         <div className="app-module-figures">

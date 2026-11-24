@@ -70,19 +70,42 @@ function useGlyphLoop(
 }
 
 const GLYPHS = "▓▒░#*+=·";
+
+/** Deux palettes : "dark" pour les surfaces noires du site, "ink" pour les
+ *  feuilles papier de l'application. Le clignotement est vermillon dans les
+ *  deux — l'indigo d'origine n'existe plus dans la DA. */
+const GLYPH_TONES = {
+  dark: {
+    dim: "rgba(255,255,255,0.34)",
+    bright: (alpha: number) => `rgba(255,255,255,${0.62 + 0.3 * (alpha / 255)})`,
+    flickDim: "rgba(228,56,31,0.55)",
+    flickBright: "rgba(228,56,31,0.9)",
+  },
+  ink: {
+    dim: "rgba(10,10,11,0.3)",
+    bright: (alpha: number) => `rgba(10,10,11,${0.55 + 0.35 * (alpha / 255)})`,
+    flickDim: "rgba(228,56,31,0.5)",
+    flickBright: "rgba(228,56,31,0.85)",
+  },
+} as const;
+
+type GlyphTone = keyof typeof GLYPH_TONES;
+
 const cell = (
   alpha: number,
   scramble: number,
   x: number,
   y: number,
-  t: number
+  t: number,
+  tone: GlyphTone = "dark"
 ): { ch: string | undefined; color: string | undefined } => {
   if (alpha < 40) return { ch: undefined, color: undefined };
+  const palette = GLYPH_TONES[tone];
   const flick = scramble > 0 ? Math.floor((x * 31 + y * 17 + t * 11) % 9) % 4 === 0 : false;
   if (alpha < 120) {
     return {
       ch: scramble > 0.5 ? GLYPHS[(x * 7 + y * 13) % GLYPHS.length] : "·",
-      color: flick ? "rgba(99,102,241,0.55)" : "rgba(255,255,255,0.34)",
+      color: flick ? palette.flickDim : palette.dim,
     };
   }
   const pick =
@@ -91,10 +114,7 @@ const cell = (
       : "▓";
   return {
     ch: pick,
-    color:
-      flick && scramble > 0.5
-        ? "rgba(99,102,241,0.9)"
-        : `rgba(255,255,255,${0.62 + 0.3 * (alpha / 255)})`,
+    color: flick && scramble > 0.5 ? palette.flickBright : palette.bright(alpha),
   };
 };
 
@@ -112,7 +132,13 @@ function rasterize(
   if (!c) return new Uint8ClampedArray(0);
   c.strokeStyle = "#fff";
   c.fillStyle = "#fff";
-  c.lineWidth = Math.max(1.5, step * 0.34);
+  c.lineWidth = Math.max(2, step * 0.5);
+  /* Les sceaux sont dessinés dans une boîte fixe de 200 unités : on l'ajuste
+   * au canvas pour que le glyphe occupe la pièce, quelle que soit sa taille —
+   * sinon le sceau flotte, minuscule, au coin d'une grande carte. */
+  const fit = Math.min(w, h) / 224;
+  c.translate((w - 200 * fit) / 2, (h - 200 * fit) / 2);
+  c.scale(fit, fit);
   paint(c);
   return c.getImageData(0, 0, off.width, off.height).data;
 }
@@ -125,7 +151,8 @@ function paintGrid(
   iw: number,
   step: number,
   t: number,
-  scramble = 0
+  scramble = 0,
+  tone: GlyphTone = "dark"
 ): void {
   ctx.clearRect(0, 0, w, h);
   ctx.font = `${step + 1}px ui-monospace, monospace`;
@@ -137,7 +164,7 @@ function paintGrid(
       const idx = (py * iw + px) * 4;
       const a = data[idx + 3] ?? 0;
       if (a < 40) continue;
-      const g = cell(a, scramble, gx / step, gy / step, t);
+      const g = cell(a, scramble, gx / step, gy / step, t, tone);
       if (!g.ch || !g.color) continue;
       ctx.fillStyle = g.color;
       ctx.fillText(g.ch, gx, gy - step * 0.12);
@@ -290,12 +317,21 @@ function sigil(kind: GlyphKind, t: number): (c: CanvasRenderingContext2D) => voi
   };
 }
 
-export function ModuleGlyph({ kind, className = "" }: { kind: GlyphKind; className?: string }) {
+export function ModuleGlyph({
+  kind,
+  tone = "dark",
+  className = "",
+}: {
+  kind: GlyphKind;
+  /** "dark" pour une surface noire, "ink" pour une feuille papier. */
+  tone?: GlyphTone;
+  className?: string;
+}) {
   const ref = useRef<HTMLCanvasElement | null>(null);
   useGlyphLoop(ref, (ctx, w, h, t) => {
-    const step = Math.max(4, Math.round(Math.min(w, h) / 26));
+    const step = Math.max(4, Math.round(Math.min(w, h) / 36));
     const data = rasterize(w, h, step, sigil(kind, t));
-    paintGrid(ctx, w, h, data, Math.ceil(w), step, t, 0.06);
+    paintGrid(ctx, w, h, data, Math.ceil(w), step, t, 0.06, tone);
   });
   return <canvas ref={ref} className={`block h-full w-full ${className}`} aria-hidden="true" />;
 }

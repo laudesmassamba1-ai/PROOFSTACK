@@ -4,13 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { ModulePassRates, RunsTrend, SeverityBreakdown } from "../../components/app/Insights.js";
 import { KpiRow } from "../../components/app/KpiCards.js";
-import { ModuleObject } from "../../components/app/ModuleObjects.js";
+import { ModuleGlyph } from "../../components/brand/GlyphArt.js";
 import { Empty, ErrorState, Loading, StatusBadge } from "../../components/app/ui.js";
 import { EnhancedCard } from "../../components/common/EnhancedCard.js";
 import { useI18n } from "../../i18n/index.js";
 import { type ApiError, apiFetch } from "../../lib/api.js";
 import { duration, formatDate, relativeTime } from "../../lib/format.js";
 import { useSession } from "../../lib/session.js";
+import { useTheme } from "../../lib/theme.js";
 
 interface Insights {
   runsPerDay: { day: string; total: number; passed: number; failed: number }[];
@@ -111,6 +112,7 @@ export function Overview() {
   const { workspaceId } = useSession();
   const { locale, t } = useI18n();
   const fr = locale === "fr";
+  const { theme } = useTheme();
   const [data, setData] = useState<Overview | null>(null);
   const [insights, setInsights] = useState<Insights | null>(null);
   const [error, setError] = useState<ApiError | Error | null>(null);
@@ -476,11 +478,9 @@ export function Overview() {
                   )}
                 </div>
                 <div className="app-object-stage">
-                  <ModuleObject
-                    module={module}
-                    passed={totals.passed}
-                    failed={totals.failed}
-                    total={totals.total}
+                  <ModuleGlyph
+                    kind={module as "world" | "flow" | "exit" | "fail" | "clean"}
+                    tone={theme === "dark" ? "dark" : "ink"}
                   />
                 </div>
                 <div className="app-object-card-foot">

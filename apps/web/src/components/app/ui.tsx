@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useI18n } from "../../i18n/index.js";
 import type { ApiError } from "../../lib/api.js";
 import { errorText } from "../../lib/errorText.js";
+import { AsciiEmpty } from "./AsciiEmpty.js";
 import { TesterScene, type TesterVariant } from "./Testers.js";
 
 /**
@@ -171,7 +172,7 @@ export function Empty({
 }) {
   return (
     <div className="app-empty">
-      {tester ? <TesterScene variant={tester} /> : null}
+      {tester ? <AsciiEmpty /> : null}
       {title ? <p className="app-empty-title">{title}</p> : null}
       <p className="app-empty-body">{body}</p>
       {action ? <div className="app-empty-action">{action}</div> : null}

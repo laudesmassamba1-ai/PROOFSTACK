@@ -101,15 +101,17 @@ function DotShaderBackground({ className = "" }: { className?: string }) {
     const uniforms = {
       u_time: { value: 0 },
       u_resolution: { value: new THREE.Vector2(2, 2) },
+      // Trame assagie : la version d'origine saturait l'écran de points blancs
+      // pleins — un fond, pas un projecteur.
       u_opacities: {
-        value: [0.3, 0.3, 0.3, 0.5, 0.5, 0.5, 0.8, 0.8, 0.8, 1.0],
+        value: [0.12, 0.12, 0.12, 0.2, 0.2, 0.2, 0.32, 0.32, 0.32, 0.45],
       },
       // Monochrome dans la version d'origine : six vecteurs blancs.
       u_colors: {
         value: [0, 1, 2, 3, 4, 5].map(() => new THREE.Vector3(1, 1, 1)),
       },
-      u_total_size: { value: 20.0 },
-      u_dot_size: { value: 6.0 },
+      u_total_size: { value: 26.0 },
+      u_dot_size: { value: 4.5 },
       u_reverse: { value: 0 },
     };
 

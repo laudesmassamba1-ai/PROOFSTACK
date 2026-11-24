@@ -1,12 +1,13 @@
 import { ArrowRight, ScanLine, Terminal } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
-import { ModuleObject } from "../../components/app/ModuleObjects.js";
 import { Empty, ErrorState, Loading, StatusBadge } from "../../components/app/ui.js";
+import { ModuleGlyph } from "../../components/brand/GlyphArt.js";
 import { useI18n } from "../../i18n/index.js";
 import { PageHeader } from "../../layouts/AppLayout.js";
 import { type ApiError, apiFetch } from "../../lib/api.js";
 import { useSession } from "../../lib/session.js";
+import { useTheme } from "../../lib/theme.js";
 
 interface Overview {
   workspace: { id: string; name: string };
@@ -19,19 +20,7 @@ interface Overview {
     errors: number;
     lastRunAt?: string;
   }[];
-  recentRuns: {
-    totals: Record<
-      string,
-      {
-        passed: number;
-        failed: number;
-        warnings: number;
-        errors: number;
-        skipped: number;
-        total: number;
-      }
-    >;
-  }[];
+  recentRuns: unknown[];
 }
 
 const MODULES = [
@@ -72,12 +61,11 @@ const MODULES = [
   },
 ] as const;
 
-const EMPTY_TOTALS = { passed: 0, failed: 0, warnings: 0, errors: 0, skipped: 0, total: 0 };
-
 export function ModulesIndexPage() {
   const session = useSession();
   const { locale } = useI18n();
   const fr = locale === "fr";
+  const { theme } = useTheme();
   const [data, setData] = useState<Overview | null>(null);
   const [error, setError] = useState<ApiError | Error | null>(null);
 
@@ -146,7 +134,6 @@ export function ModulesIndexPage() {
       <div className="app-object-grid">
         {MODULES.map((module, index) => {
           const record = data.modules.find((item) => item.module === module.id);
-          const totals = data.recentRuns[0]?.totals[module.id] ?? EMPTY_TOTALS;
           const covered = Boolean(record?.lastRunAt);
           return (
             <Link
@@ -163,11 +150,9 @@ export function ModulesIndexPage() {
                 )}
               </div>
               <div className="app-object-stage">
-                <ModuleObject
-                  module={module.id}
-                  passed={totals.passed}
-                  failed={totals.failed}
-                  total={totals.total}
+                <ModuleGlyph
+                  kind={module.id as "world" | "flow" | "exit" | "fail" | "clean"}
+                  tone={theme === "dark" ? "dark" : "ink"}
                 />
               </div>
               <div className="app-object-card-foot">
