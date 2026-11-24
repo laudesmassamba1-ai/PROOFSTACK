@@ -10,11 +10,11 @@ import {
   Globe2,
   LayoutDashboard,
   PackageOpen,
+  Radar,
   Route as RouteIcon,
   Settings as SettingsIcon,
   ShieldAlert,
   ShieldCheck,
-  Sparkles,
   Terminal,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -73,7 +73,7 @@ const GROUPS: Group[] = [
       {
         to: "/app/start",
         fallback: { fr: "Analyser", en: "Scan" },
-        icon: Sparkles,
+        icon: Radar,
       },
       {
         to: "/app/interact",
@@ -145,9 +145,13 @@ const MODULE_ITEMS: Item[] = [
 export function AppSidebar({
   unreadCount = 0,
   advanced,
+  workspaceName,
+  roleLabel,
 }: {
   unreadCount?: number;
   advanced: boolean;
+  workspaceName?: string;
+  roleLabel?: string;
 }) {
   const { t, locale } = useI18n();
   const fr = locale === "fr";
@@ -181,6 +185,15 @@ export function AppSidebar({
 
   return (
     <aside className={`app-sidebar${rail ? " is-rail" : ""}`} data-rail={rail ? "true" : "false"}>
+      <div className="sb-head" data-tip={workspaceName ?? "PROOFCORE"}>
+        <span className="sb-head-mark">
+          <ShieldCheck size={15} />
+        </span>
+        <span className="sb-head-name">
+          {workspaceName ?? "PROOFCORE"}
+          <span className="sb-head-role">{roleLabel ?? (fr ? "ESPACE" : "WORKSPACE")}</span>
+        </span>
+      </div>
       <nav
         className="app-sidebar-nav"
         aria-label={fr ? "Navigation de l'espace" : "Workspace navigation"}

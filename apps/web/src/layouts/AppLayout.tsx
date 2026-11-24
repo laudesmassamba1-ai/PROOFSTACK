@@ -448,7 +448,12 @@ export function AppLayout() {
 
   return (
     <div className="app-shell">
-      <AppSidebar unreadCount={unreadCount} advanced={uiMode === "studio"} />
+      <AppSidebar
+        unreadCount={unreadCount}
+        advanced={uiMode === "studio"}
+        workspaceName={workspace?.name}
+        roleLabel={workspace ? workspace.role.toUpperCase() : undefined}
+      />
       <div className="app-frame">
         <header className="app-topbar">
           <NavLink

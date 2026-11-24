@@ -194,11 +194,12 @@ export function Overview() {
     <div className="app-page app-overview">
       <EnhancedCard className="pk-enter" enable3d={undefined}>
         <section className="app-situation">
+          <span className="dot-field" aria-hidden />
           <div className="app-situation-copy">
             <p className="app-eyebrow">
               {t("ws.overview.eyebrow")} / {data.workspace.name}
             </p>
-            <h1 className="app-display app-situation-headline">{headline}</h1>
+            <h1 className="app-display app-situation-headline shiny-text">{headline}</h1>
             <p className="app-support">{support}</p>
             <Link to="/app/guide" className="app-text-link mt-3 inline-flex">
               {fr ? "Comprendre l'app en 2 minutes" : "Understand the app in 2 minutes"}{" "}
@@ -253,6 +254,7 @@ export function Overview() {
             label: fr ? "Vérifications · 14 j" : "Checks · 14d",
             value: insights ? insights.runsPerDay.reduce((total, day) => total + day.total, 0) : 0,
             tone: "success",
+            spark: insights?.runsPerDay.map((day) => day.total),
             note: fr ? "Sur les quatorze derniers jours" : "Over the last fourteen days",
           },
           {
@@ -699,8 +701,8 @@ export function Overview() {
               <Empty title={null} body={t("ws.overview.failures.empty")} />
             ) : (
               <ul className="app-failure-list">
-                {data.recentFailures.slice(0, 5).map((finding) => (
-                  <li key={finding.id}>
+                {data.recentFailures.slice(0, 5).map((finding, findingIndex) => (
+                  <li key={finding.id} style={{ "--i": findingIndex } as React.CSSProperties}>
                     <Link to={`/app/modules/${finding.module}`} className="app-failure-row">
                       <span className="app-failure-glyph" aria-hidden>
                         ×

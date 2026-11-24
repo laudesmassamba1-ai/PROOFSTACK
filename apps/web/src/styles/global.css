@@ -9169,6 +9169,71 @@ hairline,
   overflow: hidden;
 }
 
+/* en-tête : le nom de l'espace, posé comme un instrument */
+.sb-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 14px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.sb-head-mark {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--vermillon, #e4381f);
+}
+
+.sb-head-name {
+  min-width: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sb-head-role {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.36);
+}
+
+/* la barre active respire : elle se lève puis reste, avec une lueur faible */
+.sb-item.is-active::before {
+  transform-origin: top;
+  animation: sb-bar-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes sb-bar-in {
+  0% {
+    transform: scaleY(0);
+  }
+
+  100% {
+    transform: scaleY(1);
+  }
+}
+
+.sb-item:hover .sb-icon {
+  transform: translateX(1px);
+}
+
+.sb-icon {
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
 @media (min-width: 1024px) {
   .app-sidebar {
     display: flex;
@@ -9376,8 +9441,15 @@ hairline,
 .app-sidebar.is-rail .sb-label,
 .app-sidebar.is-rail .sb-badge,
 .app-sidebar.is-rail .sb-sublist,
-.app-sidebar.is-rail .sb-caret {
+.app-sidebar.is-rail .sb-caret,
+.app-sidebar.is-rail .sb-head-name {
   display: none;
+}
+
+.app-sidebar.is-rail .sb-head {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .app-sidebar.is-rail .sb-item::after,
@@ -9435,6 +9507,77 @@ hairline,
     #0b0c0e;
   padding: 16px 18px 14px;
   transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.22s ease;
+}
+
+/* le faisceau qui court le long du bord — Magic UI BorderBeam, réécrit en CSS
+   (offset-path + keyframes) plutôt qu'avec motion ; vermillon et blanc, dans
+   la palette de la DA. Tournant en continu, lent, discret. */
+.kpi-beam {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid transparent;
+  mask-image: linear-gradient(transparent, transparent), linear-gradient(#000, #000);
+  mask-clip: padding-box, border-box;
+  mask-composite: intersect;
+  overflow: hidden;
+}
+
+.kpi-beam::before {
+  content: "";
+  position: absolute;
+  width: 64px;
+  aspect-ratio: 1;
+  offset-path: rect(0 auto auto 0 round 64px);
+  background: linear-gradient(to left, rgba(255, 255, 255, 0), var(--beam-to, var(--vermillon, #e4381f)), rgba(255, 255, 255, 0));
+  animation: kpi-beam-run 7s linear infinite;
+  animation-delay: var(--beam-delay, 0s);
+  filter: blur(0.4px);
+}
+
+@keyframes kpi-beam-run {
+  0% {
+    offset-distance: 0%;
+  }
+
+  100% {
+    offset-distance: 100%;
+  }
+}
+
+.kpi-success .kpi-beam::before {
+  --beam-to: var(--brand-emerald, #73d68b);
+}
+
+.kpi-cyan .kpi-beam::before {
+  --beam-to: var(--brand-cyan, #70c9db);
+}
+
+/* la mini-courbe (données réelles) sous la valeur */
+.kpi-spark {
+  display: block;
+  margin-top: 10px;
+  width: 100%;
+  height: 26px;
+  overflow: visible;
+}
+
+.kpi-spark polyline {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.kpi-spark area {
+  fill: currentColor;
+  opacity: 0.12;
+}
+
+.kpi-spark circle {
+  fill: currentColor;
 }
 
 .kpi-card::before {
@@ -9523,3 +9666,78 @@ hairline,
 .kpi-cyan { color: var(--brand-cyan, #70c9db); }
 
 .kpi-danger .kpi-value { color: #fff; }
+
+/* ── ShinyText (React Bits, adapté CSS pur) : un balayage clair traverse le
+   titre de situation, en boucle lente. Blanc sur blanc — jamais décoratif. */
+.shiny-text {
+  position: relative;
+  color: rgba(255, 255, 255, 0.82);
+  background: linear-gradient(
+    120deg,
+    rgba(255, 255, 255, 0.55) 40%,
+    #fff 50%,
+    rgba(255, 255, 255, 0.55) 60%
+  );
+  background-size: 240% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shiny-sweep 5.2s ease-in-out infinite;
+}
+
+@keyframes shiny-sweep {
+  0%,
+  55%,
+  100% {
+    background-position: 110% 0;
+  }
+
+  25% {
+    background-position: -10% 0;
+  }
+}
+
+/* ── DotPattern (Magic UI, adapté CSS) : une trame de points derrière la
+   situation — l'écho discret de la grille ASCII du site. ── */
+.dot-field {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.075) 1px, transparent 1.2px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(120% 90% at 78% 20%, #000 30%, transparent 72%);
+}
+
+/* entrée décalée des constats : chaque ligne se lève après la précédente */
+.app-failure-list li {
+  animation: failure-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+@keyframes failure-in {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.app-failure-row {
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.app-failure-row:hover {
+  transform: translateX(3px);
+}
+
+.app-failure-row:hover .app-failure-glyph {
+  transform: rotate(90deg) scale(1.08);
+}
+
+.app-failure-glyph {
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}

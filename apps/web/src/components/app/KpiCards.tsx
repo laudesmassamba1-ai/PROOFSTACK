@@ -18,6 +18,7 @@ export function KpiCard({
   tone = "neutral",
   note,
   meter,
+  spark,
 }: {
   label: string;
   value: number;
@@ -25,6 +26,8 @@ export function KpiCard({
   tone?: Tone;
   note?: ReactNode;
   meter?: number;
+  /** mini-courbe des données réelles (ex. vérifications par jour) */
+  spark?: number[];
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const move = (event: React.PointerEvent<HTMLDivElement>): void => {
@@ -44,11 +47,29 @@ export function KpiCard({
         event.currentTarget.style.removeProperty("--my");
       }}
     >
+      <span className="kpi-beam" aria-hidden />
       <p className="kpi-label">{label}</p>
       <p className="kpi-value">
         <CountUp value={value} />
         {suffix ? <span className="kpi-suffix">{suffix}</span> : null}
       </p>
+      {spark && spark.length > 1 ? (
+        <svg
+          className="kpi-spark"
+          viewBox={`0 0 ${Math.max(spark.length - 1, 1) * 12} 26`}
+          preserveAspectRatio="none"
+          aria-hidden
+        >
+          <polyline
+            points={spark
+              .map((point, index) => {
+                const max = Math.max(...spark, 1);
+                return `${index * 12},${24 - (point / max) * 21}`;
+              })
+              .join(" ")}
+          />
+        </svg>
+      ) : null}
       {typeof meter === "number" ? (
         <span className="kpi-meter" aria-hidden>
           <span style={{ width: `${Math.min(100, Math.max(0, meter))}%` }} />
@@ -70,6 +91,7 @@ export function KpiRow({
     tone?: Tone;
     note?: ReactNode;
     meter?: number;
+    spark?: number[];
   }[];
 }) {
   return (
@@ -83,6 +105,7 @@ export function KpiRow({
           tone={kpi.tone}
           note={kpi.note}
           meter={kpi.meter}
+          spark={kpi.spark}
         />
       ))}
     </div>
