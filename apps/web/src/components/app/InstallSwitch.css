@@ -10,6 +10,10 @@
  */
 
 .insw-label {
+  /* A host on a dark surface sets these to its own pair; the workspace defaults
+     to ink-on-surface. */
+  --insw-ink: var(--ink);
+  --insw-surface: var(--surface, #fff);
   position: relative;
   display: flex;
   align-items: center;
@@ -20,7 +24,7 @@
   border-radius: 50px;
   cursor: pointer;
   transition: all 0.4s ease;
-  color: var(--ink);
+  color: var(--insw-ink);
 }
 
 .insw-label::before {
@@ -30,7 +34,7 @@
   width: 8px;
   height: 8px;
   margin: auto;
-  background: var(--surface, #fff);
+  background: var(--insw-surface);
   border-radius: 100%;
   opacity: 0;
   visibility: hidden;
@@ -49,7 +53,7 @@
   bottom: 14px;
   font-size: 15px;
   font-weight: 600;
-  color: var(--ink);
+  color: var(--insw-ink);
   text-align: center;
   transition: all 0.4s ease;
 }
@@ -90,7 +94,7 @@
   width: 15px;
   aspect-ratio: 1;
   border-radius: 2px;
-  background: var(--surface, #fff);
+  background: var(--insw-surface);
   opacity: 0;
   visibility: hidden;
   transform: translate(-50%, -50%);
@@ -292,4 +296,15 @@
     visibility: visible;
     right: 56px;
   }
+}
+
+/* Hosted on the dark brand surface (the download page): light ink, deep glass. */
+.tech-pill-host.insw-label {
+  --insw-ink: #f5f2ea;
+  --insw-surface: rgba(255, 255, 255, 0.08);
+  background: transparent;
+}
+
+.tech-pill-host .insw-error {
+  color: #ff8a80;
 }

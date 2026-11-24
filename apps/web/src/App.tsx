@@ -2,10 +2,6 @@ import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router";
 import { useI18n } from "./i18n/index.js";
 import { BrandLayout } from "./layouts/BrandLayout.js";
-import { useDAMode } from "./lib/da.js";
-import { HomeLight } from "./pages/HomeLight.js";
-import { ModuleLightPage } from "./pages/ModuleLightPage.js";
-import { ProductLight } from "./pages/ProductLight.js";
 
 /** Route-level splitting keeps marketing, docs, the workspace and admin apart. */
 const Home = lazy(() => import("./pages/Home.js").then((m) => ({ default: m.Home })));
@@ -13,7 +9,6 @@ const Product = lazy(() => import("./pages/Product.js").then((m) => ({ default: 
 const MarketingModulePage = lazy(() =>
   import("./pages/ModulePage.js").then((m) => ({ default: m.ModulePage }))
 );
-const Platform = lazy(() => import("./pages/Platform.js").then((m) => ({ default: m.Platform })));
 const Pricing = lazy(() => import("./pages/Pricing.js").then((m) => ({ default: m.Pricing })));
 const DownloadPage = lazy(() =>
   import("./pages/Download.js").then((m) => ({ default: m.DownloadPage }))
@@ -111,20 +106,18 @@ function RouteFallback() {
   );
 }
 
-/** The landing speaks one of two identities; the comparer's choice decides. */
+/** The gallery is the site: every route uses the shared, DA-aware pages.
+    The dark mode remains available as the alternate "instrument noir". */
 function HomeGate() {
-  const da = useDAMode();
-  return da === "light" ? <HomeLight /> : <Home />;
+  return <Home />;
 }
 
 function ProductGate() {
-  const da = useDAMode();
-  return da === "light" ? <ProductLight /> : <Product />;
+  return <Product />;
 }
 
 function ModuleGate({ name }: { name: "world" | "flow" | "exit" | "fail" | "clean" }) {
-  const da = useDAMode();
-  return da === "light" ? <ModuleLightPage name={name} /> : <MarketingModulePage name={name} />;
+  return <MarketingModulePage name={name} />;
 }
 
 export function App() {
@@ -146,13 +139,11 @@ export function App() {
           <Route path="exit" element={<ModuleGate name="exit" />} />
           <Route path="fail" element={<ModuleGate name="fail" />} />
           <Route path="clean" element={<ModuleGate name="clean" />} />
-          <Route path="platform" element={<Platform />} />
           <Route path="pricing" element={<Pricing />} />
           <Route path="download" element={<DownloadPage />} />
           <Route path="docs" element={<Docs />} />
           <Route path="changelog" element={<Changelog />} />
           <Route path="security" element={<Security />} />
-          <Route path="signin" element={<Auth mode="in" />} />
           <Route path="forgot-password" element={<ForgotPassword />} />
           <Route path="reset-password" element={<ResetPassword />} />
           <Route path="verify-email" element={<VerifyEmail />} />
@@ -161,11 +152,14 @@ export function App() {
           <Route path="legal/privacy" element={<Privacy />} />
           <Route path="legal/cookies" element={<Cookies />} />
           <Route path="device" element={<DeviceApproval />} />
-          <Route path="signup" element={<Auth mode="up" />} />
           <Route path="*" element={<NotFound />} />
         </Route>
 
         {/* Authenticated application. AppLayout redirects when there is no session. */}
+        {/* Écrans d'authentification plein écran (composant modern-login-signup). */}
+        <Route path="signin" element={<Auth mode="in" />} />
+        <Route path="signup" element={<Auth mode="up" />} />
+
         <Route path="/app" element={<AppLayout />}>
           <Route index element={<Overview />} />
           <Route path="projects" element={<Projects />} />

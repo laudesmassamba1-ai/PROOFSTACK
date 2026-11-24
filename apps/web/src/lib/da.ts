@@ -1,48 +1,26 @@
 /**
- * The two art directions of the marketing site.
- *
- * "dark"  — the instrument on black: the original identity, particle wave on
- *           brand-black, mint accents.
- * "light" — the report edition: flat light surface, white cards, hairline
- *           ink borders, the dark zones kept as embedded instruments.
- *
- * The visitor chooses between them with the split comparer: a draggable bar
- * shows both identities side by side; pushing the bar to an edge eliminates
- * one of them and the choice is remembered. A `?da=` URL parameter overrides
- * the remembered choice (the comparer's two panes use it to force each side).
+ * Une seule direction artistique : l'instrument noir ASCII.
+ * L'ancienne édition papier (galerie) a été retirée — plus de comparateur,
+ * plus de `?da=`, plus de choix mémorisé.
  */
-export type DAMode = "dark" | "light";
+export type DAMode = "dark";
 
-const STORAGE_KEY = "proofcore.da";
-
-export function readDAFromSearch(): DAMode | null {
-  if (typeof window === "undefined") return null;
-  const value = new URLSearchParams(window.location.search).get("da");
-  return value === "light" || value === "dark" ? value : null;
-}
-
-export function readDAChoice(): DAMode | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const value = window.localStorage.getItem(STORAGE_KEY);
-    return value === "light" || value === "dark" ? value : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Resolve the mode: URL parameter wins, then the remembered choice, then dark. */
+/** La DA est fixe : dark, partout, toujours. */
 export function resolveDAMode(): DAMode {
-  return readDAFromSearch() ?? readDAChoice() ?? "dark";
+  return "dark";
 }
 
-/** Remember the visitor's choice (only called by an explicit elimination). */
-export function rememberDAMode(mode: DAMode): void {
+export function inIframe(): boolean {
   try {
-    window.localStorage.setItem(STORAGE_KEY, mode);
+    return window.self !== window.top;
   } catch {
-    /* private mode: the choice lives for this session only */
+    return true;
   }
+}
+
+/** Ancien point d'entrée du choix visitateur — ne choisit plus rien. */
+export function rememberDAMode(_mode: DAMode): void {
+  /* une seule DA : rien à retenir */
 }
 
 import { useEffect, useState } from "react";
@@ -60,13 +38,4 @@ export function useDAMode(): DAMode {
     };
   }, []);
   return mode;
-}
-
-/** True when this page runs inside the comparer's own pane. */
-export function inIframe(): boolean {
-  try {
-    return window.self !== window.top;
-  } catch {
-    return true;
-  }
 }

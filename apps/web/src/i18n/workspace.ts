@@ -242,9 +242,6 @@ export const workspaceEn = {
   "ws.cli.what.3": "The cloud stores results you explicitly sync; no silent upload.",
   "ws.cli.what.4": "Every failed finding includes a reproducible command.",
   "ws.cli.copied": "Copied.",
-  "ws.cli.installed": "Installed",
-  "ws.cli.install.body":
-    "Downloads the standalone CLI installer from this site — no Node needed. Prefer npm? The command below does the same.",
   "ws.cli.copy": "Copy {title} command",
   "ws.cli.trouble.title": "Installation troubleshooting",
   "ws.cli.trouble.command.title": "Command not found?",
@@ -647,9 +644,6 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
     "Le cloud stocke les résultats que vous synchronisez explicitement ; aucun envoi silencieux.",
   "ws.cli.what.4": "Chaque constat en échec inclut une commande reproductible.",
   "ws.cli.copied": "Copié.",
-  "ws.cli.installed": "Installée",
-  "ws.cli.install.body":
-    "Télécharge l'installateur autonome du CLI depuis ce site — sans Node. Tu préfères npm ? La commande ci-dessous fait la même chose.",
   "ws.cli.copy": "Copier la commande {title}",
   "ws.cli.trouble.title": "Dépannage de l'installation",
   "ws.cli.trouble.command.title": "Commande introuvable ?",

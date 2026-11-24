@@ -22,15 +22,18 @@ export interface LogoLayer {
 }
 
 export const LOGO_LAYERS: readonly LogoLayer[] = [
-  { offset: 9, color: "#70C9DB", opacity: 0.58 },
-  { offset: 4.5, color: "#78E3CB", opacity: 0.86 },
-  { offset: 0, color: "#73D68B", opacity: 1 },
+  /* Flat geometric edition: the three-layer P speaks the hero's blue family,
+     the front plate goes white — no violet, no glow. */
+  { offset: 9, color: "#274690", opacity: 0.6 },
+  { offset: 4.5, color: "#2f6bff", opacity: 0.9 },
+  { offset: 0, color: "#f4f7ff", opacity: 1 },
 ] as const;
 
 export const LOGO_LIGHT_LAYERS: readonly LogoLayer[] = [
-  { offset: 9, color: "#2B6F8F", opacity: 0.42 },
-  { offset: 4.5, color: "#2C7A67", opacity: 0.7 },
-  { offset: 0, color: "#185B49", opacity: 1 },
+  /* Galerie: ocre, outremer, encre. */
+  { offset: 9, color: "#E9A21B", opacity: 0.55 },
+  { offset: 4.5, color: "#2A3FD1", opacity: 0.85 },
+  { offset: 0, color: "#16130F", opacity: 1 },
 ] as const;
 
 export const LOGO_MONO_LAYERS: readonly LogoLayer[] = [

@@ -25,6 +25,19 @@ arbitrary hex values. The marketing site keeps its dark brand surfaces.
 Status colour is never the only signal. Every badge carries a word; object states are
 also stated in the adjacent sentence.
 
+## Reference adaptation tokens (marketing shell, 2026-11)
+
+| Token              | Value     | Role                                        |
+| ------------------ | --------- | ------------------------------------------- |
+| `--ref-navy`       | `#070B1C` | Dark marketing field                        |
+| `--ref-indigo`     | `#4338CA` | Nebula glow (bottom-left)                   |
+| `--ref-violet`     | `#8B5CF6` | Nebula glow, logo layer 1                   |
+| `--ref-violet-soft`| `#A78BFA` | Headline accent word                        |
+| `--ref-lime`       | `#C9F24F` | Dark-surface primary CTA, logo front plate  |
+| `--lh-paper`       | `#F2E4D5` | Light edition field (was `#F7F6F2`)         |
+| `--lh-accent`      | `#6E2B34` | Light edition accent (was `#4F46E5`)        |
+| `--ref-amber`      | `#FFB612` | Yellow/black pop, badges only               |
+
 ## Type
 
 - Display: `"Bricolage Grotesque Variable"`, weight 600–800, line-height 0.86–0.92,

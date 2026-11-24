@@ -72,7 +72,7 @@ interface Particle {
   r3: number;
 }
 
-const DEFAULT_PALETTE: ParticlePalette = ["#70C9DB", "#78E3CB", "#73D68B"];
+const DEFAULT_PALETTE: ParticlePalette = ["#8FA7FF", "#2F6BFF", "#F4F7FF"];
 
 function hash(index: number, salt: number): number {
   const value = Math.sin(index * 12.9898 + salt * 78.233) * 43758.5453;

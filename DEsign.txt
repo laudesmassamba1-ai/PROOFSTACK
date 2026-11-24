@@ -1,0 +1,15 @@
+parametres de l'app :Add the "Settings Form 1" block from React Bits Pro to my project.
+
+Settings page with a sticky save bar
+
+Steps:
+1. Ensure my components.json has the React Bits Pro registries configured (see https://pro.reactbits.dev/docs/installation), including the Authorization header with my REACTBITS_LICENSE_KEY environment variable.
+2. Install the block with:
+   npx shadcn@latest add @reactbits-pro/settings-form-1
+3. Import it where needed and adapt it to my project's content and design tokens.
+
+Docs page for reference: https://pro.reactbits.dev/docs/app-ui/settings-form/settings-form-1
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                        chat avec AI :npx shadcn@latest add @reactbits-pro/ai-chat-2

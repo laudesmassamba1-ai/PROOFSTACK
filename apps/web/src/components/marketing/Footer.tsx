@@ -1,17 +1,15 @@
 import { Link } from "react-router";
 import { useI18n } from "../../i18n/index.js";
-import { useDAMode } from "../../lib/da.js";
 import { Wordmark } from "../brand/Logo.js";
 
 export function Footer() {
-  const da = useDAMode();
   const { t } = useI18n();
   const year = new Date().getFullYear();
   return (
     <footer className="border-t border-white/8 bg-[#050708]">
       <div className="mx-auto grid max-w-[1240px] gap-10 px-5 py-14 md:grid-cols-[1.4fr_1fr_1fr_1fr] lg:px-8">
         <div>
-          <Wordmark size={14} variant={da === "light" ? "onLight" : "default"} />
+          <Wordmark size={14} />
           <p className="mt-4 max-w-[34ch] text-[0.86rem] leading-relaxed text-white/48">
             {t("footer.tagline")}
           </p>
@@ -33,7 +31,6 @@ export function Footer() {
           title={t("footer.developers")}
           items={[
             { to: "/docs", label: t("nav.docs") },
-            { to: "/platform", label: t("nav.platform") },
             { to: "/changelog", label: t("nav.changelog") },
             { to: "/security", label: t("nav.security") },
           ]}

@@ -24,6 +24,8 @@ export function InstallSwitch({
   installedLabel = "Installed",
   installLabel = "Install",
   installedHref,
+  errorHint,
+  className = "",
 }: {
   /** Starts the real download. Return a promise that resolves when it is done. */
   onInstall: () => Promise<void>;
@@ -31,6 +33,10 @@ export function InstallSwitch({
   installLabel?: string;
   /** Where the "open" side leads once the story ends. */
   installedHref?: string;
+  /** What a failed download should tell the person to do instead. */
+  errorHint?: string;
+  /** Extra classes on the label, for the host's surface theme. */
+  className?: string;
 }): ReactElement {
   const [checked, setChecked] = useState(false);
   const [done, setDone] = useState(false);
@@ -48,7 +54,7 @@ export function InstallSwitch({
     };
   }, [checked, onInstall]);
 
-  const labelClass = `insw-label${checked ? " is-checked" : ""}${done ? " is-done" : ""}${error ? " is-error" : ""}`;
+  const labelClass = `insw-label${className ? ` ${className}` : ""}${checked ? " is-checked" : ""}${done ? " is-done" : ""}${error ? " is-error" : ""}`;
 
   if (done && installedHref) {
     // The story is over; the promise itself is now a link. A button that only
@@ -118,11 +124,7 @@ export function InstallSwitch({
           {checked && !done ? installLabel : ""}
         </span>
       </label>
-      {error ? (
-        <p className="insw-error">
-          The download could not start. Try again, or use the command below.
-        </p>
-      ) : null}
+      {error ? <p className="insw-error">{errorHint}</p> : null}
     </>
   );
 }

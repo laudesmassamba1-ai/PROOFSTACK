@@ -538,7 +538,7 @@ export function printConversation(
   .tok-num { color: #a05a12; }
   .tok-fn, .tok-tag, .tok-sel { color: #1d4ed8; }
   .tok-bif, .tok-prop, .tok-attr, .tok-flag { color: #0e6e59; }
-  .tok-var { color: #6d28d9; }
+  .tok-var { color: var(--vermillon-dark, #f04b31); }
   .tok-com { color: #9a927c; font-style: italic; }
   .tok-punc { color: #6b6350; }
   table { border-collapse: collapse; width: 100%; margin: 0.8rem 0; font-size: 9.5pt; page-break-inside: avoid; }

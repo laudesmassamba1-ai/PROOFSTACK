@@ -16,7 +16,6 @@ import { Wordmark } from "../brand/Logo.js";
  */
 const LINKS = [
   { to: "/product", key: "nav.product" as const },
-  { to: "/platform", key: "nav.platform" as const },
   { to: "/pricing", key: "nav.pricing" as const },
   { to: "/docs", key: "nav.docs" as const },
 ];
@@ -47,6 +46,21 @@ export function Nav() {
   const [modulesOpen, setModulesOpen] = useState(false);
   const modulesRef = useRef<HTMLLIElement | null>(null);
   const location = useLocation();
+
+  /* Le héros de l'accueil est un écran noir (grille ASCII) : la barre y reste
+     transparente, puis prend son fond plein au scroll. */
+  const [heroDark, setHeroDark] = useState(false);
+  useEffect(() => {
+    const update = (): void => {
+      const top = window.scrollY < window.innerHeight * 0.6;
+      const home = location.pathname === "/";
+
+      setHeroDark(home && top);
+    };
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    return () => window.removeEventListener("scroll", update);
+  }, [location.pathname]);
 
   useEffect(() => {
     const onScroll = (): void => setScrolled(window.scrollY > 12);
@@ -81,15 +95,14 @@ export function Nav() {
 
   return (
     <header
-      className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
-        scrolled
-          ? "border-b border-white/10 bg-[#050708]/82 backdrop-blur-xl"
-          : "border-b border-transparent"
+      data-on-dark={heroDark ? "true" : undefined}
+      className={`nav-site fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
+        scrolled ? "border-b border-white/10 bg-[#050708]" : "border-b border-transparent"
       }`}
     >
       <nav className="mx-auto flex max-w-[1240px] items-center gap-3 px-5 py-3.5 lg:px-8">
         <Link to="/" aria-label={t("mkt.homeLabel")} className="shrink-0">
-          <Wordmark size={15} variant={da === "light" ? "onLight" : "default"} />
+          <Wordmark size={15} variant={heroDark ? "default" : "default"} />
         </Link>
 
         <ul className="ml-3 hidden items-center gap-0.5 lg:flex">
@@ -242,3 +255,6 @@ function linkClass({ isActive }: { isActive: boolean }): string {
     isActive ? "bg-white/10 text-white" : "text-white/62 hover:text-white"
   }`;
 }
+
+/* Sur le poster clair, tous les liens passent à l'encre (une règle non
+   en couches l'emporte sur les utilitaires Tailwind). */

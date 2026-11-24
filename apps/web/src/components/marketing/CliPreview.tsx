@@ -28,6 +28,8 @@ Next: proofcore report`;
  * This is intentionally a static example. The browser cannot execute a local
  * command, and the copy never suggests that it did. The label is part of the UI,
  * not a footnote hidden at the bottom.
+ *
+ * The fiche follows the art direction through the `--fiche-*` variables.
  */
 export function CliPreview({ className = "" }: { className?: string }) {
   const [copied, setCopied] = useState(false);
@@ -43,36 +45,27 @@ export function CliPreview({ className = "" }: { className?: string }) {
   };
 
   return (
-    <div className={`terminal-preview ${className}`} data-dark>
+    <div className={`terminal-preview ${className}`}>
       <div className="terminal-preview-bar flex items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-2">
-          <span className="size-2 rounded-full bg-[#e967a6]" />
-          <span className="size-2 rounded-full bg-[#f28a49]" />
-          <span className="size-2 rounded-full bg-[#73d68b]" />
-          <span className="ml-2 flex items-center gap-1.5 font-mono text-[0.66rem] text-white/38">
-            <Terminal size={12} /> example output · not a live run
-          </span>
-        </div>
+        <span className="tp-bar-txt ml-1 flex items-center gap-1.5 font-mono text-[0.66rem]">
+          <Terminal size={12} /> exemple enregistré · pas un appel réel
+        </span>
         <button
           type="button"
           onClick={() => void copy()}
-          className="rounded p-1 text-white/38 transition-colors hover:text-brand-mint"
+          className="tp-copy rounded p-1"
           aria-label="Copy example command"
         >
           <Copy size={13} />
         </button>
       </div>
       <div className="terminal-grid px-4 py-5 sm:px-6">
-        <p className="font-mono text-[0.79rem] text-brand-mint">
-          <span className="text-white/30">$ </span>
+        <p className="tp-cmd">
+          <span className="tp-dollar">$ </span>
           {COMMAND}
         </p>
-        {copied ? (
-          <p className="mt-2 font-mono text-[0.65rem] text-brand-emerald">command copied</p>
-        ) : null}
-        <pre className="mt-4 overflow-x-auto font-mono text-[0.69rem] leading-[1.85] text-white/58">
-          {OUTPUT}
-        </pre>
+        {copied ? <p className="tp-copied">commande copiée</p> : null}
+        <pre className="tp-out">{OUTPUT}</pre>
       </div>
     </div>
   );

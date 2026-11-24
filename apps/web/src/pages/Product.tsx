@@ -1,29 +1,25 @@
-import { Boxes, GitBranch, Layers, Monitor, ShieldCheck, Terminal, Wrench } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Link } from "react-router";
-import { ModuleShowcase } from "../components/marketing/ModuleShowcase.js";
+import { type GlyphKind, ModuleGlyph, NameStrip } from "../components/brand/GlyphArt.js";
 import { useI18n } from "../i18n/index.js";
 import { Section, SectionHeading } from "../layouts/BrandLayout.js";
 
 /**
- * The product page carries the art direction's second movement: after the brand
- * hero proves the instrument exists, this page shows the machinery. The layout
- * is deliberately asymmetric (the shared machinery gets the wide cell, the
- * assistant gets a bento with one dominant panel), every card is a spot-lit
- * spring-tilted surface, and the deeper band carries the corner-anchored aurora
- * from the reference board. No invented numbers, no decoration without duty.
+ * La page produit refaite : une seule DA (l'instrument noir), deux assets
+ * neufs dessinés en glyphes (la bande de noms, les sceaux de modules), des
+ * rangées à filets au lieu de cartes, et l'assistant comme un seul panneau.
+ * Rien de décoratif : chaque ligne est un fait du produit.
  */
-const SHARED: { key: "project" | "engine" | "report" | "workspace"; icon: typeof Boxes }[] = [
-  { key: "project", icon: Boxes },
-  { key: "engine", icon: Layers },
-  { key: "report", icon: GitBranch },
-  { key: "workspace", icon: ShieldCheck },
+const ROWS: { key: "world" | "flow" | "exit" | "fail" | "clean"; kind: GlyphKind }[] = [
+  { key: "world", kind: "world" },
+  { key: "flow", kind: "flow" },
+  { key: "exit", kind: "exit" },
+  { key: "fail", kind: "fail" },
+  { key: "clean", kind: "clean" },
 ];
 
-const ASSISTANT: { key: "browser" | "terminal" | "tools"; icon: typeof Monitor }[] = [
-  { key: "browser", icon: Monitor },
-  { key: "terminal", icon: Terminal },
-  { key: "tools", icon: Wrench },
-];
+const ASSISTANT = ["browser", "terminal", "tools"] as const;
+const SHARED = ["project", "engine", "report", "workspace"] as const;
 
 export function Product() {
   const { t } = useI18n();
@@ -32,75 +28,107 @@ export function Product() {
       <Section>
         <SectionHeading
           as="h1"
-          eyebrow={t("modules.eyebrow")}
+          eyebrow={t("product.eyebrow")}
           title={t("product.title")}
           lede={t("product.lede")}
         />
-        <div className="mt-10" data-reveal>
-          <ModuleShowcase />
+        <div data-reveal className="mt-10">
+          <NameStrip />
         </div>
       </Section>
 
-      <Section tone="deeper" className="aurora-band">
+      {/* ---------- les cinq modules : rangées à filets, sceaux en glyphes ---------- */}
+      <Section>
+        <SectionHeading eyebrow={t("modules.eyebrow")} title={t("modules.title")} />
+        <div data-reveal className="mt-9 border-t border-white/8">
+          {ROWS.map(({ key, kind }) => (
+            <Link
+              key={key}
+              to={`/${key}`}
+              className="group grid grid-cols-[72px_1fr] items-center gap-5 border-b border-white/8 px-2 py-6 transition-colors hover:bg-white/[0.03] sm:grid-cols-[104px_1fr_1fr_auto] sm:gap-8 sm:px-4"
+            >
+              <div className="h-16 w-16 sm:h-[104px] sm:w-[104px]">
+                <ModuleGlyph kind={kind} />
+              </div>
+              <div>
+                <p className="font-mono text-[0.62rem] tracking-[0.2em] text-white/34">
+                  {key.toUpperCase()}
+                </p>
+                <h3 className="mt-1 text-[1.02rem] font-semibold text-white/92">
+                  {t(`product.rows.${key}.t` as const)}
+                </h3>
+                <p className="mt-1.5 max-w-[46ch] text-[0.86rem] leading-relaxed text-white/52">
+                  {t(`product.rows.${key}.d` as const)}
+                </p>
+              </div>
+              <p className="hidden font-mono text-[0.62rem] leading-loose tracking-[0.12em] text-white/30 md:block">
+                {t(`product.rows.${key}.k` as const)}
+              </p>
+              <ArrowRight
+                size={16}
+                className="hidden text-white/30 transition-transform group-hover:translate-x-1 group-hover:text-white/70 sm:block"
+              />
+            </Link>
+          ))}
+        </div>
+      </Section>
+
+      {/* ---------- l'assistant : un seul panneau, trois faits ---------- */}
+      <Section tone="deeper">
         <SectionHeading
           eyebrow={t("product.assistant.eyebrow")}
           title={t("product.assistant.title")}
           lede={t("product.assistant.lede")}
         />
-        {/* Bento: the browser panel is the claim's proof, so it takes the wide cell;
-            terminal and tools stack beside it. Equal thirds would read as filler. */}
-        <div className="mt-9 grid gap-5 lg:grid-cols-[1.35fr_1fr]">
-          <article className="brand-panel spot-card p-7" data-tilt data-reveal>
-            <Monitor size={20} className="text-brand-mint" />
-            <h3 className="mt-4 text-[1.05rem] font-semibold">
-              {t("product.assistant.browser.t")}
-            </h3>
-            <p className="mt-2 max-w-[52ch] text-[0.88rem] leading-relaxed text-white/54">
-              {t("product.assistant.browser.d")}
-            </p>
-            <p className="mt-5 font-mono text-[0.66rem] tracking-[0.14em] text-white/32">
-              CHROMIUM · TABS · COOKIES · ZOOM · FIND
-            </p>
-          </article>
-          <div className="grid gap-5">
-            {ASSISTANT.slice(1).map(({ key, icon: Icon }) => (
-              <article key={key} className="brand-panel spot-card p-6" data-tilt data-reveal>
-                <Icon size={20} className="text-brand-mint" />
-                <h3 className="mt-4 text-[1rem] font-semibold">
+        <div
+          data-reveal
+          className="mt-9 rounded-2xl border border-white/8 bg-white/[0.02] p-7 sm:p-9"
+        >
+          <div className="grid gap-8 md:grid-cols-3">
+            {ASSISTANT.map((key) => (
+              <div
+                key={key}
+                className="border-t border-white/10 pt-5 first:border-t-0 first:pt-0 md:border-t-0 md:pt-0"
+              >
+                <p className="font-mono text-[0.62rem] tracking-[0.2em] text-white/34">
+                  {key.toUpperCase()}
+                </p>
+                <h3 className="mt-2 text-[1rem] font-semibold text-white/90">
                   {t(`product.assistant.${key}.t`)}
                 </h3>
-                <p className="mt-2 text-[0.88rem] leading-relaxed text-white/54">
+                <p className="mt-2 text-[0.86rem] leading-relaxed text-white/52">
                   {t(`product.assistant.${key}.d`)}
                 </p>
-              </article>
+              </div>
             ))}
           </div>
+          <p className="mt-8 border-t border-white/8 pt-5 font-mono text-[0.62rem] tracking-[0.14em] text-white/30">
+            CHROMIUM · TABS · COOKIES · ZOOM · FIND — SESSION SUIVIE À LA NAVIGATION
+          </p>
         </div>
       </Section>
 
+      {/* ---------- le socle partagé : définitions à filets, pas des cartes ---------- */}
       <Section>
         <SectionHeading eyebrow={t("product.shared.eyebrow")} title={t("product.shared.title")} />
-        {/* 2×2 but not a filler grid: each card is a real architectural fact, and the
-            spotlight border + layered shadow give them the reference's depth. */}
-        <div className="mt-9 grid gap-5 md:grid-cols-2">
-          {SHARED.map(({ key, icon: Icon }) => (
-            <article key={key} className="brand-panel spot-card p-6" data-tilt data-reveal>
-              <Icon size={20} className="text-brand-mint" />
-              <h3 className="mt-4 text-[1rem] font-semibold">{t(`product.shared.${key}.t`)}</h3>
-              <p className="mt-2 text-[0.88rem] leading-relaxed text-white/54">
+        <div data-reveal className="mt-9 grid gap-x-14 border-t border-white/8 md:grid-cols-2">
+          {SHARED.map((key) => (
+            <div key={key} className="border-b border-white/8 py-6">
+              <h3 className="text-[0.98rem] font-semibold text-white/90">
+                {t(`product.shared.${key}.t`)}
+              </h3>
+              <p className="mt-2 max-w-[56ch] text-[0.86rem] leading-relaxed text-white/52">
                 {t(`product.shared.${key}.d`)}
               </p>
-            </article>
+            </div>
           ))}
         </div>
-        <div data-reveal className="mt-8 flex flex-wrap gap-3">
-          {(["world", "flow", "exit", "fail", "clean"] as const).map((module) => (
-            <Link key={module} to={`/${module}`} className="btn btn-ghost" data-magnet>
-              {module.toUpperCase()}
-            </Link>
-          ))}
-          <Link to="/platform" className="btn btn-primary" data-magnet>
-            {t("nav.platform")}
+        <div data-reveal className="mt-9 flex flex-wrap gap-3">
+          <Link to="/signup" className="btn btn-primary" data-magnet>
+            {t("home.cta.primary")} <ArrowRight size={16} />
+          </Link>
+          <Link to="/docs" className="btn btn-ghost" data-magnet>
+            {t("nav.docs")}
           </Link>
         </div>
       </Section>

@@ -1,5 +1,6 @@
 import { Download as DownloadIcon, Monitor, Package, Terminal } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { InstallSwitch } from "../components/app/InstallSwitch.js";
 import { TechText } from "../components/brand/TechText.js";
 import { useI18n } from "../i18n/index.js";
 import { Section, SectionHeading } from "../layouts/BrandLayout.js";
@@ -237,6 +238,7 @@ export function DownloadPage() {
               ? "Installe pour l'utilisateur courant, sans élévation. Se met à jour toute seule."
               : "Installs for the current user, no elevation. Updates itself."
           }
+          fr={fr}
         />
         <DownloadCard
           icon={Package}
@@ -253,6 +255,7 @@ export function DownloadPage() {
               ? "Apple Silicon et Intel. Une image non signée demande un clic droit → Ouvrir au premier lancement."
               : "Apple Silicon and Intel. An unsigned image needs right-click → Open the first time."
           }
+          fr={fr}
         />
         <DownloadCard
           icon={Package}
@@ -269,6 +272,7 @@ export function DownloadPage() {
               ? "chmod +x pour l'AppImage, dpkg -i pour le .deb. Se met à jour toute seule."
               : "chmod +x for the AppImage, dpkg -i for the .deb. Updates itself."
           }
+          fr={fr}
         />
       </div>
 
@@ -322,6 +326,7 @@ function DownloadCard({
   loading,
   cta,
   note,
+  fr,
 }: {
   icon: typeof Monitor;
   title: string;
@@ -333,6 +338,7 @@ function DownloadCard({
   loading: boolean;
   cta: string;
   note?: string;
+  fr: boolean;
 }) {
   const size = asset ? formatSize(asset.size) : null;
   return (
@@ -352,16 +358,33 @@ function DownloadCard({
       {size ? <p className="mt-1 font-mono text-[0.72rem] text-white/38">{size}</p> : null}
       <div className="mt-6">
         {asset ? (
-          // A plain link with `download`: the browser saves the file from our own origin.
-          // No new tab, no release host, no page to land on.
-          <a
-            href={asset.url}
-            download={asset.name}
-            className="btn btn-primary w-full justify-center"
-          >
-            <DownloadIcon size={15} />
-            {cta}
-          </a>
+          // The install switch (Uiverse, adapted): click plays the download —
+          // pulse, fill, then the green "Installed" pill that settles into the
+          // documentation link. The plain <a download> stays on the CLI and
+          // binary rows below, for people who want the file without the story.
+          <InstallSwitch
+            installLabel={cta}
+            installedLabel={fr ? "Installée" : "Installed"}
+            installedHref="/docs"
+            className="tech-pill-host w-full"
+            errorHint={
+              fr
+                ? "Le téléchargement n'a pas pu démarrer. Réessaie dans une minute, ou prends l'installateur du CLI ci-dessous."
+                : "The download could not start. Try again in a minute, or take the CLI installer below."
+            }
+            onInstall={async () => {
+              // The browser saves the file from our own origin — no new tab,
+              // no release host, no page to land on. The three-second fill is
+              // the truth: the file is genuinely this size and this slow.
+              const target = document.createElement("a");
+              target.href = asset.url;
+              target.download = asset.name;
+              document.body.appendChild(target);
+              target.click();
+              target.remove();
+              await new Promise((resolve) => setTimeout(resolve, 3_400));
+            }}
+          />
         ) : (
           <span className="btn w-full justify-center opacity-50" aria-busy={loading || undefined}>
             <DownloadIcon size={15} />

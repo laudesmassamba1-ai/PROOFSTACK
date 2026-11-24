@@ -30,7 +30,7 @@ function Panel({
     <div className="mx-auto w-full max-w-md px-6 py-16">
       {/* The marketing layout paints light text on a dark canvas; this card is a light
           surface, so it must set its own foreground or every heading turns invisible. */}
-      <div className="rounded-2xl border border-border bg-surface-1 p-6 text-foreground shadow-sm">
+      <div className="support-card rounded-2xl border border-border bg-surface-1 p-6 text-foreground shadow-sm">
         <h1 className="text-lg font-semibold tracking-tight text-foreground">{title}</h1>
         <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{lede}</p>
         <div className="mt-5">{children}</div>

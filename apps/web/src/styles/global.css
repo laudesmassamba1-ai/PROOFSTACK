@@ -17,9 +17,14 @@
 :root {
   /* Brand identity (reference A: black + luminous dotted wave) */
   --brand-black: #050708;
+  /* le rouge de la DA : accent unique de la marque */
+  --vermillon: #e4381f;
+  --vermillon-dark: #f04b31;
+  --galerie-paper: #f2ebdc;
+  --galerie-ink: #16130f;
   --brand-deep: #0a1014;
   --brand-emerald: #73d68b;
-  --brand-mint: #78e3cb;
+  --brand-mint: var(--vermillon, #e4381f);
   --brand-cyan: #70c9db;
 
   /* Product illustration family (reference B) */
@@ -5763,7 +5768,7 @@ p {
 }
 
 [data-theme="dark"] .tok-var {
-  color: #6d28d9;
+  color: var(--vermillon-dark, #f04b31);
 }
 
 /* In dark theme the plate is paper: comments and punctuation take dark inks.
@@ -8340,2324 +8345,7 @@ p {
   color: rgba(10, 10, 11, 0.52);
 }
 
-.brand-shell[data-da="light"]
-  :is(
-    [class*="text-white/40"],
-    [class*="text-white/42"],
-    [class*="text-white/44"],
-    [class*="text-white/45"],
-    [class*="text-white/46"],
-    [class*="text-white/48"]
-  ):not([data-dark] *) {
-  color: rgba(10, 10, 11, 0.52);
-}
-
-.brand-shell[data-da="light"]
-  :is(
-    [class*="text-white/52"],
-    [class*="text-white/54"],
-    [class*="text-white/56"],
-    [class*="text-white/58"],
-    [class*="text-white/60"]
-  ):not([data-dark] *) {
-  color: rgba(10, 10, 11, 0.62);
-}
-
-.brand-shell[data-da="light"]
-  :is(
-    [class*="text-white/62"],
-    [class*="text-white/68"],
-    [class*="text-white/70"],
-    [class*="text-white/72"],
-    [class*="text-white/74"]
-  ):not([data-dark] *) {
-  color: rgba(10, 10, 11, 0.74);
-}
-
-.brand-shell[data-da="light"]
-  :is([class*="text-white/76"], [class*="text-white/78"], [class*="text-white/82"]):not(
-    [data-dark] *
-  ) {
-  color: rgba(10, 10, 11, 0.84);
-}
-
-.brand-shell[data-da="light"]
-  :is([class*="text-white/86"], [class*="text-white/88"]):not([data-dark] *) {
-  color: rgba(10, 10, 11, 0.94);
-}
-
-/* surfaces */
-.brand-shell[data-da="light"] .brand-panel:not([data-dark] *) {
-  background: #fff;
-  border: 1px solid rgba(10, 10, 11, 0.08);
-  box-shadow: 0 1px 2px rgba(10, 10, 11, 0.04);
-}
-
-.brand-shell[data-da="light"] .hairline:not([data-dark] *) {
-  border-top: 1px solid rgba(10, 10, 11, 0.08);
-}
-
-.brand-shell[data-da="light"] .section-deeper {
-  border-top: 1px solid rgba(10, 10, 11, 0.06);
-  border-bottom: 1px solid rgba(10, 10, 11, 0.06);
-  background: linear-gradient(180deg, #f1f1ee, #f4f4f1);
-}
-
-.brand-shell[data-da="light"] .eyebrow {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-weight: 400;
-  font-size: 1.06rem;
-  letter-spacing: 0.01em;
-  text-transform: none;
-  color: var(--lh-accent);
-}
-
-.brand-shell[data-da="light"] .btn-ghost {
-  border-color: rgba(10, 10, 11, 0.16);
-  color: var(--ink);
-  background: #fff;
-}
-
-.brand-shell[data-da="light"] .btn-ghost:hover {
-  border-color: rgba(10, 10, 11, 0.38);
-}
-
-.brand-shell[data-da="light"] .btn-primary {
-  box-shadow: 0 8px 22px -12px rgba(15, 128, 110, 0.5);
-}
-
-/* the fixed nav reads light over the light shell */
-.brand-shell[data-da="light"] header.fixed {
-  background: rgba(255, 255, 255, 0.86) !important;
-  border-color: rgba(10, 10, 11, 0.08) !important;
-  backdrop-filter: blur(14px);
-}
-
-.brand-shell[data-da="light"] .nav-flyout {
-  border: 1px solid rgba(10, 10, 11, 0.1);
-  background: rgba(255, 255, 255, 0.97);
-  box-shadow: 0 30px 60px -30px rgba(10, 10, 11, 0.35);
-}
-
-.brand-shell[data-da="light"] .nav-flyout-label {
-  color: rgba(10, 10, 11, 0.5);
-}
-
-.brand-shell[data-da="light"] .nav-flyout-item {
-  color: var(--ink);
-}
-
-.brand-shell[data-da="light"] .nav-flyout-item:hover {
-  background: rgba(10, 10, 11, 0.04);
-}
-
-.brand-shell[data-da="light"] .module-card:not([data-dark] *) {
-  background: #fff;
-  border: 1px solid rgba(10, 10, 11, 0.08);
-}
-
-/* white-tinted borders and fills flip to ink tints outside the dark zones */
-.brand-shell[data-da="light"]
-  :is(
-    [class*="border-white/6"],
-    [class*="border-white/8"],
-    [class*="border-white/10"],
-    [class*="border-white/12"]
-  ):not([data-dark] *) {
-  border-color: rgba(10, 10, 11, 0.1);
-}
-
-.brand-shell[data-da="light"] :is([class*="border-white/15"]):not([data-dark] *) {
-  border-color: rgba(10, 10, 11, 0.16);
-}
-
-.brand-shell[data-da="light"]
-  :is([class*="bg-white/4"], [class*="bg-white/8"], [class*="bg-white/10"]):not([data-dark] *) {
-  background-color: rgba(10, 10, 11, 0.05);
-}
-
-/* mint accents darken to keep AA contrast on the light surface */
-.brand-shell[data-da="light"]
-  :is([class*="border-brand-mint/"], [class*="bg-brand-mint/"], [class*="text-brand-mint"]):not(
-    [data-dark] *
-  ) {
-  border-color: rgba(12, 122, 107, 0.32);
-}
-
-.brand-shell[data-da="light"] .text-brand-mint:not([data-dark] *),
-.brand-shell[data-da="light"] [class*="text-brand-mint/"]:not([data-dark] *) {
-  color: #0c7a6b;
-}
-
-.brand-shell[data-da="light"] [class*="bg-brand-mint/"]:not([data-dark] *) {
-  background-color: rgba(12, 122, 107, 0.09);
-}
-
-/* Dark instrument zones keep their black identity inside the light page: they
-   re-establish light ink by inheritance (their text has no explicit colour of
-   its own) and carry their own dark surface, since the light shell no longer
-   supplies the black behind them. */
-.brand-shell[data-da="light"] [data-dark] {
-  color: #f3f6f5;
-}
-
-.brand-shell[data-da="light"] .hero-section {
-  background: var(--brand-black);
-}
-
-.brand-shell[data-da="light"] .module-wall {
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 18px;
-  background: var(--brand-black);
-}
-
-.brand-shell[data-da="light"] .ai-sample {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 18px;
-  background: #070a0c;
-  box-shadow: 0 24px 50px -30px rgba(10, 10, 11, 0.5);
-}
-
-.brand-shell[data-da="light"] .terminal-preview {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 24px 50px -30px rgba(10, 10, 11, 0.5);
-}
-
-.brand-shell[data-da="light"] .engine-frame {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background:
-    radial-gradient(60% 80% at 20% 0%, rgba(49, 95, 200, 0.16), transparent 70%),
-    linear-gradient(180deg, #0b0f12, #070a0c);
-  box-shadow: 0 24px 50px -30px rgba(10, 10, 11, 0.5);
-}
-
-/* the stat strip sits on the light shell: its whites become ink */
-.brand-shell[data-da="light"] .stat-strip {
-  border-top: 1px solid rgba(10, 10, 11, 0.08);
-  border-bottom: 1px solid rgba(10, 10, 11, 0.08);
-}
-
-.brand-shell[data-da="light"] .stat-strip-item:nth-child(even) {
-  border-left: 1px solid rgba(10, 10, 11, 0.08);
-}
-
-.brand-shell[data-da="light"] .stat-strip-value {
-  color: var(--ink);
-}
-
-.brand-shell[data-da="light"] .stat-strip-label {
-  color: rgba(10, 10, 11, 0.52);
-}
-
-.brand-shell[data-da="light"] .stat-strip-note {
-  color: rgba(10, 10, 11, 0.36);
-}
-
-.brand-shell[data-da="light"] header.fixed .wordmark,
-.brand-shell[data-da="light"] header.fixed a:not([data-dark] *):not(.btn-primary),
-.brand-shell[data-da="light"] header.fixed button:not([data-dark] *):not(.btn-primary) {
-  color: var(--ink);
-}
-
-/* In the light DA the hero is light too: the wave stays, redrawn in deep teal
-   (palette prop), the scrim fades white, the copy reads in ink. */
-.brand-shell[data-da="light"] .hero-section {
-  background:
-    radial-gradient(90% 70% at 88% 30%, rgba(15, 128, 110, 0.08), transparent 62%), #f7f7f5;
-}
-
-.brand-shell[data-da="light"] .hero-scrim {
-  background: linear-gradient(
-    100deg,
-    rgba(247, 247, 245, 0.97) 0%,
-    rgba(247, 247, 245, 0.9) 30%,
-    rgba(247, 247, 245, 0.42) 58%,
-    rgba(247, 247, 245, 0.02) 82%
-  );
-}
-
-@media (max-width: 1023px) {
-  .brand-shell[data-da="light"] .hero-scrim {
-    background: linear-gradient(
-      180deg,
-      rgba(247, 247, 245, 0.96) 0%,
-      rgba(247, 247, 245, 0.86) 42%,
-      rgba(247, 247, 245, 0.4) 68%,
-      rgba(247, 247, 245, 0.8) 100%
-    );
-  }
-
-  .brand-shell[data-da="light"] .particle-canvas {
-    opacity: 0.85;
-  }
-}
-
-.brand-shell[data-da="light"] .hero-title {
-  color: var(--ink);
-}
-
-.brand-shell[data-da="light"] .hero-title-accent {
-  color: #0c7a6b;
-}
-
-/* the paper edition's footer: cream, hairline, ink */
-.brand-shell[data-da="light"] footer {
-  background: var(--lh-paper-deep) !important;
-  border-top: 1px solid var(--lh-rule) !important;
-  border-color: var(--lh-rule);
-}
-
-.brand-shell[data-da="light"] footer [class*="bg-white/"] {
-  background-color: transparent;
-}
-
-.brand-shell[data-da="light"] .lh-doc-pre {
-  margin: 0;
-  padding: 18px 16px;
-  font-family: var(--font-mono);
-  font-size: 0.74rem;
-  line-height: 1.7;
-  color: rgba(23, 22, 26, 0.8);
-  white-space: pre-wrap;
-  overflow-x: auto;
-}
-
-.brand-shell[data-da="light"] .lh-ledger {
-  margin-top: 18px;
-  display: grid;
-  gap: 0;
-}
-
-.brand-shell[data-da="light"] .lh-ledger-line {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  padding: 11px 0;
-  border-bottom: 1px solid var(--lh-rule);
-  font-size: 0.88rem;
-  line-height: 1.55;
-  color: rgba(23, 22, 26, 0.78);
-}
-
-.brand-shell[data-da="light"] .lh-ledger-line svg {
-  flex: 0 0 auto;
-  margin-top: 3px;
-}
-
-/* the featured plan speaks indigo in the paper edition */
-.brand-shell[data-da="light"] .pk-plan-featured {
-  animation: none;
-  border-color: rgba(79, 70, 229, 0.4);
-  box-shadow: 0 24px 54px -30px rgba(79, 70, 229, 0.45);
-}
-
-.brand-shell[data-da="light"] .pk-plan:hover {
-  box-shadow: 0 18px 40px -18px rgba(79, 70, 229, 0.28);
-}
-
-.brand-shell[data-da="light"] .lh-marquee-status {
-  letter-spacing: 0.26em;
-}
-
-.brand-shell[data-da="light"] .lh-marquee-pass {
-  color: #15803d;
-}
-.brand-shell[data-da="light"] .lh-marquee-warn {
-  color: #b45309;
-}
-.brand-shell[data-da="light"] .lh-marquee-fail {
-  color: #b91c1c;
-}
-.brand-shell[data-da="light"] .lh-marquee-pending,
-.brand-shell[data-da="light"] .lh-marquee-skipped {
-  color: rgba(23, 22, 26, 0.6);
-}
-
-.brand-shell[data-da="light"] .lh-marquee-status i {
-  color: rgba(23, 22, 26, 0.4);
-}
-
-/* the closing argument */
-.brand-shell[data-da="light"] .lh-final {
-  display: grid;
-  justify-items: center;
-  gap: 16px;
-  padding: clamp(3rem, 6vw, 5rem) 0;
-  text-align: center;
-}
-
-.brand-shell[data-da="light"] .lh-final .lh-cta-row {
-  margin-top: 8px;
-}
-
-.brand-shell[data-da="light"] .lh-final-foot {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  color: rgba(23, 22, 26, 0.55);
-}
-
-/* the divider carries its story: the evidence passing from the run to the
-   report. The headline names the exercise: this is what CLEAN grades. */
-.da-headline {
-  position: absolute;
-  bottom: 46px;
-  left: 50%;
-  z-index: 6;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  white-space: nowrap;
-}
-
-.da-headline-title {
-  padding: 10px 22px;
-  border: 1px solid rgba(10, 10, 11, 0.14);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.94);
-  color: #17161a;
-  font-family: var(--font-display, serif);
-  font-size: 1.15rem;
-  line-height: 1.2;
-  box-shadow: 0 8px 24px -12px rgba(10, 10, 11, 0.4);
-}
-
-.da-headline-title em {
-  font-style: italic;
-  color: #4f46e5;
-}
-
-/* one scrollbar on screen: the panes hide theirs, the evidence line is the
-   shared control */
-[data-da-pane] {
-  scrollbar-width: none;
-}
-
-[data-da-pane]::-webkit-scrollbar,
-[data-da-pane] body::-webkit-scrollbar {
-  display: none;
-  width: 0;
-}
-
-/* form fields on the light shell (auth pages inherit the light DA) */
-.brand-shell[data-da="light"] .field {
-  background: #fff;
-  border-color: rgba(10, 10, 11, 0.14);
-  color: var(--ink);
-}
-
-/* the auth page speaks ink on paper: its atoms are hard-coded white for the
-   black instrument, so the light shell re-voices them explicitly */
-.brand-shell[data-da="light"] .auth-page {
-  color: var(--lh-ink);
-}
-
-.brand-shell[data-da="light"] .label {
-  color: rgba(23, 22, 26, 0.6);
-}
-
-.brand-shell[data-da="light"] .auth-page a,
-.brand-shell[data-da="light"] .auth-page .text-white\/56,
-.brand-shell[data-da="light"] .auth-page .text-white\/46 {
-  color: rgba(23, 22, 26, 0.66);
-}
-
-.brand-shell[data-da="light"] .auth-page .text-white {
-  color: var(--lh-ink);
-}
-
-/* the mobile menu joins the paper edition: it keeps its dark panel markup
-   (bg-[#050708]) whose white links the flip turns to ink — ink on black */
-.brand-shell[data-da="light"] #mobile-nav {
-  background: #fff;
-  border-color: rgba(10, 10, 11, 0.08);
-}
-
-.brand-shell[data-da="light"] #mobile-nav .nav-flyout-name {
-  color: var(--lh-ink);
-}
-
-.brand-shell[data-da="light"] #mobile-nav .nav-flyout-tag {
-  color: rgba(23, 22, 26, 0.55);
-}
-
-/* the phone's DA switch: one button, no split screen */
-.da-toggle {
-  position: fixed;
-  bottom: 18px;
-  left: 18px;
-  z-index: 80;
-  padding: 9px 15px;
-  border: 1px solid rgba(10, 10, 11, 0.18);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.94);
-  color: #17161a;
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  font-weight: 560;
-  cursor: pointer;
-  box-shadow: 0 4px 14px -6px rgba(10, 10, 11, 0.3);
-}
-
-.da-toggle:hover {
-  border-color: rgba(10, 10, 11, 0.45);
-}
-
-@media (min-width: 768px) {
-  .da-toggle {
-    display: none;
-  }
-}
-
-/* underlined links that inherit the dark context read ink on paper */
-.brand-shell[data-da="light"] a.underline:not([data-dark] *) {
-  color: rgba(23, 22, 26, 0.72);
-}
-
-/* the amber "known limits" note was tuned for black: darken it on paper */
-.brand-shell[data-da="light"] .text-\[\#e9b45a\] {
-  color: #8a5a12;
-}
-
-/* every zone that declares itself a dark instrument gets its black surface in
-   the light DA — without this, zones on shell-dressed pages (docs, changelog,
-   security, download) kept white text over the paper background: invisible */
-.brand-shell[data-da="light"] [data-dark] {
-  background-color: #050708;
-  color: #f3f6f5;
-}
-
-.da-reopen {
-  position: fixed;
-  bottom: 18px;
-  left: 18px;
-  z-index: 80;
-  padding: 8px 14px;
-  border: 1px solid rgba(10, 10, 11, 0.16);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
-  color: #0a0a0b;
-  font-size: 0.74rem;
-  font-weight: 560;
-  cursor: pointer;
-  box-shadow: 0 4px 14px -6px rgba(10, 10, 11, 0.25);
-}
-
-.da-reopen:hover {
-  border-color: rgba(10, 10, 11, 0.4);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .da-reopen {
-    transition: none;
-  }
-}
-
-/* ==========================================================================
-   LIGHT DA — THE PAPER EDITION
-   A second identity, not a re-skin. Instrument Serif speaks (sentence case,
-   italic indigo accents), Instrument Sans carries the text, JetBrains Mono
-   keeps the data. Warm cream paper, hairline ink rules, indigo accent. The
-   landing composition is HomeLight: editorial index, document audit, numbered
-   path — against the dark identity's instrument wall and terminals.
-   ========================================================================== */
-
-/* the theme's --ink is the dark identity's paper-white; the light shell re-inks
-   it so every rule that reaches for var(--ink) writes dark on paper */
-.brand-shell[data-da="light"] {
-  --ink: #17161a;
-  --rule: rgba(23, 22, 26, 0.12);
-  --border: rgba(23, 22, 26, 0.12);
-}
-
-.brand-shell[data-da="light"] {
-  --font-display: "Instrument Serif", "Geist Variable", ui-serif, Georgia, serif;
-  --font-sans: "Instrument Sans", "Geist Variable", ui-sans-serif, system-ui, sans-serif;
-  --lh-accent: #4f46e5;
-  --lh-accent-strong: #4338ca;
-  --lh-paper: #f7f6f2;
-  --lh-paper-deep: #f1efe8;
-  --lh-ink: #17161a;
-  --lh-rule: rgba(23, 22, 26, 0.1);
-  background: var(--lh-paper);
-  color: var(--lh-ink);
-}
-
-/* the serif must breathe: the dark identity's tracking values are wrong for it.
-   The whole light shell speaks the paper edition — every page, not just the
-   landing — with Instrument Serif display and Instrument Sans text. */
-.brand-shell[data-da="light"] {
-  font-family: var(--font-sans);
-  font-size: 16px;
-  line-height: 1.55;
-}
-
-/* system display type joins the identity: serif, sentence case */
-.brand-shell[data-da="light"] .app-display,
-.brand-shell[data-da="light"] .app-page-title,
-.brand-shell[data-da="light"] .hero-title,
-.brand-shell[data-da="light"] .app-section-title {
-  font-family: var(--font-display);
-  font-weight: 400;
-  text-transform: none;
-  letter-spacing: -0.01em;
-}
-
-.brand-shell[data-da="light"] .hero-title,
-.brand-shell[data-da="light"] .app-page-title {
-  color: var(--lh-ink);
-}
-
-.brand-shell[data-da="light"] .app-card h2 {
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: 1.35rem;
-}
-
-/* the CTA speaks indigo in the paper edition */
-.brand-shell[data-da="light"] .btn-primary {
-  background: linear-gradient(180deg, #5b52ee, #4f46e5);
-  color: #fff;
-  box-shadow: 0 10px 24px -14px rgba(79, 70, 229, 0.65);
-}
-
-.brand-shell[data-da="light"] .btn-primary:hover {
-  background: linear-gradient(180deg, #655df0, #4338ca);
-}
-
-.brand-shell[data-da="light"] .hero-title-accent {
-  color: var(--lh-accent);
-  font-style: italic;
-}
-
-/* ---- shared atoms ---- */
-
-.brand-shell[data-da="light"] .lh-eyebrow {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-weight: 400;
-  font-size: 1.12rem;
-  letter-spacing: 0.01em;
-  text-transform: none;
-  color: var(--lh-accent);
-}
-
-.brand-shell[data-da="light"] .lh-title-md {
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: clamp(1.9rem, 3.4vw, 2.9rem);
-  line-height: 1.08;
-  letter-spacing: -0.01em;
-  max-width: 24ch;
-  text-wrap: balance;
-}
-
-.brand-shell[data-da="light"] .lh-lede {
-  max-width: 56ch;
-  font-size: 1.02rem;
-  line-height: 1.65;
-  color: rgba(23, 22, 26, 0.68);
-}
-
-.brand-shell[data-da="light"] .lh-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  border-radius: 999px;
-  padding: 12px 22px;
-  font-size: 0.92rem;
-  font-weight: 540;
-  transition:
-    background 0.25s var(--ease-anticipate, ease),
-    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.25s ease;
-}
-
-.brand-shell[data-da="light"] .lh-btn-solid {
-  background: var(--lh-accent);
-  color: #fff;
-  box-shadow: 0 10px 24px -14px rgba(79, 70, 229, 0.65);
-}
-
-.brand-shell[data-da="light"] .lh-btn-solid:hover {
-  background: var(--lh-accent-strong);
-  transform: translateY(-2px);
-}
-
-.brand-shell[data-da="light"] .lh-btn-solid:active {
-  transform: translateY(0);
-}
-
-.brand-shell[data-da="light"] .lh-underline-link {
-  display: inline-flex;
-  align-items: center;
-  padding-bottom: 3px;
-  background-image: linear-gradient(currentColor, currentColor);
-  background-repeat: no-repeat;
-  background-size: 100% 1px;
-  background-position: 0 100%;
-  color: var(--lh-ink);
-  font-size: 0.92rem;
-  font-weight: 540;
-  transition: background-size 0.35s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.brand-shell[data-da="light"] .lh-underline-link:hover {
-  background-size: 38% 1px;
-}
-
-.brand-shell[data-da="light"] .lh-cta-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 18px;
-}
-
-.brand-shell[data-da="light"] .lh-cta-center {
-  justify-content: center;
-}
-
-/* ---- character rise: the light identity's headline motion ---- */
-
-.brand-shell[data-da="light"] .m-char {
-  display: inline-block;
-  overflow: clip;
-  vertical-align: top;
-}
-
-.brand-shell[data-da="light"] .m-char-inner {
-  display: inline-block;
-  transform: translateY(110%) rotate(4deg);
-  transition:
-    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1),
-    transition-delay var(--c-delay, 0ms);
-  transition-delay: var(--c-delay, 0ms);
-  will-change: transform;
-}
-
-.brand-shell[data-da="light"] [data-motion].is-in .m-char-inner,
-.brand-shell[data-da="light"] [data-reveal].is-in .m-char-inner,
-.brand-shell[data-da="light"] .lh-hero-grid.is-in .m-char-inner {
-  transform: translateY(0) rotate(0);
-}
-
-/* ---- hero ---- */
-
-.brand-shell[data-da="light"] .lh-hero {
-  padding: clamp(3rem, 7vw, 6rem) 0 clamp(2.5rem, 5vw, 4rem);
-}
-
-.brand-shell[data-da="light"] .lh-hero-grid {
-  display: grid;
-  gap: clamp(2.5rem, 5vw, 4.5rem);
-  align-items: center;
-  max-width: 1240px;
-  margin: 0 auto;
-  padding: 0 clamp(1.25rem, 4vw, 2.5rem);
-}
-
-@media (min-width: 1024px) {
-  .brand-shell[data-da="light"] .lh-hero-grid {
-    grid-template-columns: 1.05fr 0.95fr;
-  }
-}
-
-.brand-shell[data-da="light"] .lh-hero-copy > * {
-  opacity: 0;
-  transform: translateY(18px);
-  transition:
-    opacity 0.7s ease,
-    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.brand-shell[data-da="light"] .lh-hero-grid.is-in .lh-hero-copy > * {
-  opacity: 1;
-  transform: none;
-}
-
-/* the copy children stagger, the headline chars run on their own delays */
-.brand-shell[data-da="light"] .lh-hero-grid.is-in .lh-hero-copy > :nth-child(1) {
-  transition-delay: 0.05s;
-}
-.brand-shell[data-da="light"] .lh-hero-grid.is-in .lh-hero-copy > :nth-child(3) {
-  transition-delay: 0.35s;
-}
-.brand-shell[data-da="light"] .lh-hero-grid.is-in .lh-hero-copy > :nth-child(4) {
-  transition-delay: 0.5s;
-}
-.brand-shell[data-da="light"] .lh-hero-grid.is-in .lh-hero-copy > :nth-child(5) {
-  transition-delay: 0.62s;
-}
-
-.brand-shell[data-da="light"] .lh-hero-title {
-  margin: 14px 0 22px;
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: clamp(3rem, 6.4vw, 5.4rem);
-  line-height: 1.02;
-  letter-spacing: -0.015em;
-  text-wrap: balance;
-}
-
-.brand-shell[data-da="light"] .lh-hero-accent {
-  font-style: italic;
-  color: var(--lh-accent);
-}
-
-.brand-shell[data-da="light"] .lh-hero-cli {
-  margin-top: 26px;
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  color: rgba(23, 22, 26, 0.55);
-}
-
-/* the proof card: a document, slightly lifted off the page */
-.brand-shell[data-da="light"] .lh-hero-proof {
-  border: 1px solid var(--lh-rule);
-  border-radius: 16px;
-  background: #fff;
-  box-shadow:
-    0 1px 2px rgba(23, 22, 26, 0.04),
-    0 24px 60px -30px rgba(23, 22, 26, 0.25);
-  transform: rotate(0.6deg);
-  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.brand-shell[data-da="light"] .lh-hero-proof:hover {
-  transform: rotate(0deg) translateY(-4px);
-}
-
-.brand-shell[data-da="light"] .lh-proof-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 18px;
-  border-bottom: 1px solid var(--lh-rule);
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  color: rgba(23, 22, 26, 0.55);
-}
-
-.brand-shell[data-da="light"] .lh-proof-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #22c55e;
-}
-
-.brand-shell[data-da="light"] .lh-proof-body {
-  display: grid;
-  gap: 14px;
-  padding: 22px 18px;
-}
-
-.brand-shell[data-da="light"] .lh-proof-line {
-  display: grid;
-  grid-template-columns: 64px 1fr auto;
-  gap: 14px;
-  align-items: center;
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-}
-
-.brand-shell[data-da="light"] .lh-proof-module {
-  letter-spacing: 0.1em;
-}
-
-.brand-shell[data-da="light"] .lh-proof-bar {
-  height: 6px;
-  border-radius: 999px;
-  background: rgba(23, 22, 26, 0.08);
-  overflow: hidden;
-}
-
-.brand-shell[data-da="light"] .lh-proof-bar i {
-  display: block;
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #22c55e, #86efac);
-  transform-origin: 0 50%;
-  transform: scaleX(0);
-  transition: transform 1s cubic-bezier(0.22, 1, 0.36, 1) 0.4s;
-}
-
-.brand-shell[data-da="light"] .lh-hero-grid.is-in .lh-proof-bar i {
-  transform: scaleX(1);
-}
-
-.brand-shell[data-da="light"] .lh-proof-count {
-  color: rgba(23, 22, 26, 0.6);
-}
-
-.brand-shell[data-da="light"] .lh-proof-total {
-  display: flex;
-  justify-content: space-between;
-  padding-top: 14px;
-  border-top: 1px solid var(--lh-rule);
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  color: rgba(23, 22, 26, 0.75);
-}
-
-.brand-shell[data-da="light"] .lh-proof-foot {
-  padding: 0 18px 14px;
-  font-size: 0.7rem;
-  color: rgba(23, 22, 26, 0.55);
-}
-
-/* ---- marquee ---- */
-
-.brand-shell[data-da="light"] .lh-marquee {
-  overflow: clip;
-  border-top: 1px solid var(--lh-rule);
-  border-bottom: 1px solid var(--lh-rule);
-  padding: 14px 0;
-  background: var(--lh-paper-deep);
-}
-
-.brand-shell[data-da="light"] .lh-marquee-track {
-  display: flex;
-  width: max-content;
-  animation: lh-marquee 36s linear infinite;
-}
-
-.brand-shell[data-da="light"] .lh-marquee:hover .lh-marquee-track {
-  animation-play-state: paused;
-}
-
-@keyframes lh-marquee {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
-}
-
-.brand-shell[data-da="light"] .lh-marquee-run {
-  display: flex;
-  align-items: center;
-}
-
-.brand-shell[data-da="light"] .lh-marquee-item {
-  padding: 0 18px;
-  font-family: var(--font-mono);
-  font-size: 0.74rem;
-  letter-spacing: 0.22em;
-  color: rgba(23, 22, 26, 0.72);
-  white-space: nowrap;
-}
-
-.brand-shell[data-da="light"] .lh-marquee-item i {
-  font-style: normal;
-  color: var(--lh-accent);
-  padding-left: 18px;
-}
-
-.brand-shell[data-da="light"] .lh-marquee-mono {
-  color: rgba(23, 22, 26, 0.56);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .brand-shell[data-da="light"] .lh-marquee-track {
-    animation: none;
-  }
-}
-
-/* ---- sections ---- */
-
-.brand-shell[data-da="light"] .lh-section {
-  max-width: 1240px;
-  margin: 0 auto;
-  padding: clamp(3.5rem, 7vw, 6rem) clamp(1.25rem, 4vw, 2.5rem);
-}
-
-.brand-shell[data-da="light"] .lh-section-head {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: clamp(1.8rem, 4vw, 3rem);
-}
-
-.brand-shell[data-da="light"] .lh-deeper {
-  max-width: none;
-  background: var(--lh-paper-deep);
-  border-top: 1px solid var(--lh-rule);
-  border-bottom: 1px solid var(--lh-rule);
-}
-
-.brand-shell[data-da="light"] .lh-deeper > * {
-  max-width: 1240px;
-  margin: 0 auto;
-  padding: 0 clamp(1.25rem, 4vw, 2.5rem);
-}
-
-/* ---- module index rows ---- */
-
-.brand-shell[data-da="light"] .lh-index {
-  border-top: 1px solid var(--lh-rule);
-}
-
-.brand-shell[data-da="light"] .lh-row {
-  display: grid;
-  grid-template-columns: 56px 1fr auto;
-  align-items: center;
-  column-gap: 18px;
-  padding: 22px 10px;
-  border-bottom: 1px solid var(--lh-rule);
-  color: inherit;
-  transition: background 0.3s ease;
-}
-
-@media (max-width: 720px) {
-  .brand-shell[data-da="light"] .lh-row {
-    grid-template-columns: 40px 1fr auto;
-  }
-}
-
-.brand-shell[data-da="light"] .lh-row:hover {
-  background: rgba(79, 70, 229, 0.045);
-}
-
-.brand-shell[data-da="light"] .lh-row-num {
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  color: rgba(23, 22, 26, 0.56);
-}
-
-.brand-shell[data-da="light"] .lh-row-name {
-  font-family: var(--font-display);
-  font-size: clamp(1.5rem, 2.6vw, 2.1rem);
-  line-height: 1.1;
-  letter-spacing: 0.01em;
-}
-
-.brand-shell[data-da="light"] .lh-row-main {
-  display: block;
-  min-width: 0;
-}
-
-.brand-shell[data-da="light"] .lh-row-tag {
-  font-size: 0.8rem;
-  font-weight: 560;
-  color: rgba(23, 22, 26, 0.55);
-}
-
-.brand-shell[data-da="light"] .lh-row-question {
-  display: block;
-  margin-top: 4px;
-  font-size: 0.9rem;
-  line-height: 1.5;
-  color: rgba(23, 22, 26, 0.68);
-  max-width: 52ch;
-}
-
-.brand-shell[data-da="light"] .lh-row-tokens {
-  display: block;
-  margin-top: 5px;
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-  letter-spacing: 0.06em;
-  color: rgba(23, 22, 26, 0.55);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.brand-shell[data-da="light"] .lh-row-arrow {
-  grid-area: arrow;
-  color: rgba(23, 22, 26, 0.55);
-  transition:
-    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
-    color 0.25s ease;
-}
-
-.brand-shell[data-da="light"] .lh-row:hover .lh-row-arrow {
-  transform: translate(4px, -4px);
-  color: var(--lh-accent);
-}
-
-/* ---- AI band: timeline + document ---- */
-
-.brand-shell[data-da="light"] .lh-ai-grid {
-  display: grid;
-  gap: clamp(2.5rem, 5vw, 4rem);
-  padding: clamp(3.5rem, 7vw, 6rem) 0;
-}
-
-@media (min-width: 1024px) {
-  .brand-shell[data-da="light"] .lh-ai-grid {
-    grid-template-columns: 0.9fr 1.1fr;
-    align-items: start;
-  }
-
-  .brand-shell[data-da="light"] .lh-ai-copy {
-    position: sticky;
-    top: 110px;
-  }
-}
-
-.brand-shell[data-da="light"] .lh-timeline {
-  display: grid;
-  gap: 0;
-  margin-bottom: 28px;
-}
-
-.brand-shell[data-da="light"] .lh-timeline-step {
-  position: relative;
-  display: grid;
-  grid-template-columns: 40px 1fr;
-  gap: 16px;
-  padding: 20px 0;
-}
-
-.brand-shell[data-da="light"] .lh-timeline-step:not(:last-child) {
-  border-bottom: 1px solid var(--lh-rule);
-}
-
-.brand-shell[data-da="light"] .lh-timeline-num {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  place-items: center;
-  border: 1px solid var(--lh-rule);
-  border-radius: 50%;
-  background: #fff;
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  color: var(--lh-accent);
-}
-
-.brand-shell[data-da="light"] .lh-step-title {
-  font-family: var(--font-display);
-  font-size: 1.25rem;
-  font-weight: 400;
-  line-height: 1.2;
-}
-
-.brand-shell[data-da="light"] .lh-step-body {
-  margin-top: 5px;
-  font-size: 0.9rem;
-  line-height: 1.6;
-  color: rgba(23, 22, 26, 0.62);
-}
-
-/* the recorded audit as a document */
-.brand-shell[data-da="light"] .lh-doc {
-  border: 1px solid var(--lh-rule);
-  border-radius: 14px;
-  background: #fff;
-  overflow: hidden;
-}
-
-.brand-shell[data-da="light"] .lh-doc-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--lh-rule);
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-  color: rgba(23, 22, 26, 0.5);
-}
-
-.brand-shell[data-da="light"] .lh-doc-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: rgba(34, 197, 94, 0.1);
-  color: #15803d;
-}
-
-.brand-shell[data-da="light"] .lh-doc-body {
-  padding: 18px 16px 20px;
-}
-
-.brand-shell[data-da="light"] .lh-doc-title {
-  font-family: var(--font-display);
-  font-size: 1.2rem;
-}
-
-.brand-shell[data-da="light"] .lh-doc-verdict {
-  margin-top: 8px;
-  font-size: 0.9rem;
-  line-height: 1.6;
-  color: rgba(23, 22, 26, 0.7);
-}
-
-.brand-shell[data-da="light"] .lh-doc-list {
-  margin-top: 14px;
-  display: grid;
-  gap: 10px;
-}
-
-.brand-shell[data-da="light"] .lh-doc-list li {
-  position: relative;
-  padding-left: 16px;
-  font-size: 0.85rem;
-  line-height: 1.55;
-  color: rgba(23, 22, 26, 0.66);
-}
-
-.brand-shell[data-da="light"] .lh-doc-list li::before {
-  content: "";
-  position: absolute;
-  top: 0.55em;
-  left: 0;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--lh-accent);
-}
-
-.brand-shell[data-da="light"] .lh-doc-fix {
-  display: flex;
-  gap: 8px;
-  margin-top: 16px;
-  padding: 11px 13px;
-  border: 1px solid rgba(34, 197, 94, 0.25);
-  border-radius: 10px;
-  background: rgba(34, 197, 94, 0.06);
-  color: #166534;
-  font-size: 0.83rem;
-  line-height: 1.5;
-}
-
-.brand-shell[data-da="light"] .lh-doc-fix svg {
-  flex: 0 0 auto;
-  margin-top: 3px;
-}
-
-/* ---- stats ---- */
-
-.brand-shell[data-da="light"] .lh-stats {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  max-width: 1240px;
-  margin: 0 auto;
-  border-top: 1px solid var(--lh-rule);
-  border-bottom: 1px solid var(--lh-rule);
-}
-
-@media (min-width: 900px) {
-  .brand-shell[data-da="light"] .lh-stats {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-
-.brand-shell[data-da="light"] .lh-stat {
-  padding: 30px clamp(1.25rem, 3vw, 2.5rem);
-}
-
-.brand-shell[data-da="light"] .lh-stat:not(:first-child) {
-  border-left: 1px solid var(--lh-rule);
-}
-
-@media (max-width: 899px) {
-  .brand-shell[data-da="light"] .lh-stat:nth-child(3) {
-    border-left: none;
-  }
-
-  .brand-shell[data-da="light"] .lh-stat:nth-child(n + 3) {
-    border-top: 1px solid var(--lh-rule);
-  }
-}
-
-.brand-shell[data-da="light"] .lh-stat-value {
-  font-family: var(--font-display);
-  font-size: clamp(2.6rem, 4.6vw, 3.6rem);
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-
-.brand-shell[data-da="light"] .lh-stat-label {
-  margin-top: 10px;
-  font-size: 0.86rem;
-  font-weight: 540;
-}
-
-.brand-shell[data-da="light"] .lh-stat-note {
-  margin-top: 4px;
-  font-family: var(--font-mono);
-  font-size: 0.64rem;
-  letter-spacing: 0.06em;
-  color: rgba(23, 22, 26, 0.56);
-}
-
-/* ---- workflow path ---- */
-
-.brand-shell[data-da="light"] .lh-path {
-  display: grid;
-  gap: 22px;
-  counter-reset: step;
-}
-
-@media (min-width: 900px) {
-  .brand-shell[data-da="light"] .lh-path {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 26px;
-  }
-}
-
-.brand-shell[data-da="light"] .lh-path-step {
-  position: relative;
-  padding: 24px 22px;
-  border: 1px solid var(--lh-rule);
-  border-radius: 14px;
-  background: #fff;
-  transition:
-    transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.4s ease;
-}
-
-.brand-shell[data-da="light"] .lh-path-step:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 20px 44px -24px rgba(23, 22, 26, 0.25);
-}
-
-.brand-shell[data-da="light"] .lh-path-num {
-  display: inline-grid;
-  width: 34px;
-  height: 34px;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--lh-accent);
-  color: #fff;
-  font-family: var(--font-mono);
-  font-size: 0.74rem;
-}
-
-/* ---- scroll progress ---- */
-
-.lh-progress {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 60;
-  height: 2px;
-  background: var(--lh-accent);
-  transform-origin: 0 50%;
-  transform: scaleX(0);
-}
-
-/* ------------------------------------------------------------ download page
-   The version selector and the "this is your system" mark. Kept to two rules: the page
-   is a list of files, and every extra ornament on a download page is a place where the
-   real button gets missed. */
-
-.brand-select {
-  appearance: none;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 8px;
-  padding: 5px 26px 5px 9px;
-  background-color: transparent;
-  background-image:
-    linear-gradient(45deg, transparent 50%, rgba(255, 255, 255, 0.5) 50%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.5) 50%, transparent 50%);
-  background-position:
-    calc(100% - 13px) 50%,
-    calc(100% - 9px) 50%;
-  background-size:
-    4px 4px,
-    4px 4px;
-  background-repeat: no-repeat;
-  color: rgba(255, 255, 255, 0.82);
-  font-family: var(--font-mono);
-  font-size: 0.86rem;
-  cursor: pointer;
-}
-
-.brand-select option {
-  color: #0a0a0b;
-  background: #f3f0e8;
-}
-
-.brand-panel.is-detected {
-  border-color: color-mix(in srgb, var(--mint, #5cf2c4) 42%, transparent);
-}
-
-/* ==========================================================================
-   BRAND MOTION — the CSS half of lib/motion.ts.
-
-   The engine writes --tilt-*, --magnet-*, --parallax-y and adds `.is-in`.
-   Until this block existed none of those variables were read by a single CSS
-   rule: the spring integrator ran at 60fps for nothing, and the 37 word masks
-   in the hero rendered as ordinary inline text. Everything below is scoped to
-   the dark brand shell so the light edition and the workspace keep their own
-   motion vocabulary. Only transform/opacity/clip-path animate — no layout reads
-   and no paint-heavy properties in a frame.
-   ========================================================================== */
-
-.brand-shell:not([data-da="light"]) {
-  --motion-enter: 780ms;
-}
-
-/* ---- masked word reveal (SplitWords) ---- */
-.brand-shell:not([data-da="light"]) .m-word {
-  display: inline-block;
-  overflow: clip;
-  vertical-align: top;
-  /* Descenders must survive the mask: the box is padded and pulled back. */
-  padding-bottom: 0.12em;
-  margin-bottom: -0.12em;
-}
-
-.brand-shell:not([data-da="light"]) .m-word-inner {
-  display: inline-block;
-  transform: translate3d(0, 112%, 0);
-  opacity: 0;
-  will-change: transform;
-}
-
-.brand-shell:not([data-da="light"]) [data-motion].is-in .m-word-inner {
-  transform: translate3d(0, 0, 0);
-  opacity: 1;
-  transition:
-    transform var(--motion-enter) var(--ease-anticipate),
-    opacity 420ms var(--ease-standard);
-  transition-delay: var(--w-delay, 0ms);
-}
-
-/* ---- spring tilt + specular glare (data-tilt) ---- */
-.brand-shell:not([data-da="light"]) [data-tilt] {
-  transform: perspective(900px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
-  transform-style: preserve-3d;
-  transition: box-shadow 220ms var(--ease-standard);
-}
-
-.brand-shell:not([data-da="light"]) [data-tilt]:hover {
-  box-shadow:
-    0 26px 60px -36px rgba(0, 0, 0, 0.9),
-    0 0 0 1px rgba(120, 227, 203, 0.18);
-}
-
-/* A pseudo-element keeps the glare composited: no extra DOM, no layout. */
-.brand-shell:not([data-da="light"]) [data-tilt]::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  pointer-events: none;
-  border-radius: inherit;
-  opacity: calc(var(--tilt-glow, 0) * 0.55);
-  background: radial-gradient(
-    38% 46% at var(--glare-x, 50%) var(--glare-y, 50%),
-    rgba(255, 255, 255, 0.16),
-    transparent 78%
-  );
-}
-
-/* ---- magnetic controls (data-magnet) ---- */
-.brand-shell:not([data-da="light"]) [data-magnet] {
-  transform: translate3d(var(--magnet-x, 0px), var(--magnet-y, 0px), 0);
-}
-
-/* ---- scroll drift (data-parallax) ---- */
-.brand-shell:not([data-da="light"]) [data-parallax] {
-  transform: translate3d(0, var(--parallax-y, 0px), 0);
-}
-
-/* ---- clip-path wipe for large panels (data-motion="mask") ---- */
-.brand-shell:not([data-da="light"]) [data-motion="mask"] {
-  clip-path: inset(0 0 100% 0);
-  opacity: 0;
-}
-
-.brand-shell:not([data-da="light"]) [data-motion="mask"].is-in {
-  clip-path: inset(0 0 0 0);
-  opacity: 1;
-  transition:
-    clip-path 900ms var(--ease-emphasized),
-    opacity 320ms var(--ease-standard);
-}
-
-/* ---- entrance choreography for the hero's supporting copy ---- */
-.brand-shell:not([data-da="light"]) .hero-section .eyebrow,
-.brand-shell:not([data-da="light"]) .hero-section .rise {
-  animation-timing-function: var(--ease-anticipate);
-}
-
-.brand-shell:not([data-da="light"]) .hero-module-link {
-  animation-timing-function: var(--ease-anticipate);
-}
-
-/* The module wall is the proof, not decoration: stagger each cell as it enters.
-   The wall itself carries [data-reveal], so its children inherit the reveal
-   timing without a second observer. */
-.brand-shell:not([data-da="light"]) [data-reveal].is-in .module-panel {
-  animation: panel-settle 620ms var(--ease-anticipate) both;
-  animation-delay: calc(var(--i, 0) * 70ms + 120ms);
-}
-
-@keyframes panel-settle {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 18px, 0);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-  }
-}
-
-/* ---- reduced motion: every entrance resolves to its final state ---- */
-@media (prefers-reduced-motion: reduce) {
-  .brand-shell:not([data-da="light"]) .m-word-inner,
-  .brand-shell:not([data-da="light"]) [data-motion="mask"],
-  .brand-shell:not([data-da="light"]) [data-reveal].is-in .module-panel {
-    transform: none;
-    opacity: 1;
-    clip-path: none;
-    animation: none;
-  }
-
-  .brand-shell:not([data-da="light"]) [data-tilt],
-  .brand-shell:not([data-da="light"]) [data-magnet],
-  .brand-shell:not([data-da="light"]) [data-parallax] {
-    transform: none;
-  }
-
-  .brand-shell:not([data-da="light"]) [data-tilt]::after {
-    display: none;
-  }
-}
-
-/* ---- Notification bell --------------------------------------------------- */
-
-.app-notification-bell {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-
-.app-notification-badge {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  background: var(--accent, #63d6a2);
-  color: #06210f;
-  font: 700 9px / 1 var(--font-mono, ui-monospace, monospace);
-  letter-spacing: -0.02em;
-}
-
-/* ============================================================================
-   Readability fixes from the automated DOM audit (16 routes × 5 viewports)
-   ============================================================================ */
-
-/*
- * 10px microtext failed the 4.5:1 contrast target once rendered and was hard to read
- * on a phone. 11px is the smallest size that stays legible, and the darker ink keeps
- * the ratio above 4.5:1 on the paper surface.
- */
-.app-eyebrow {
-  font-size: 11px;
-  color: var(--ink);
-}
-
-/* Badges follow the same rule: no 9px labels in a professional interface. */
-.app-badge {
-  font-size: 11px;
-}
-
-/* A label or a short caption must wrap, not be clipped by a fixed-width parent. */
-.app-label,
-.app-cell-state,
-.app-object-state,
-.app-object-question,
-.app-module-state {
-  overflow-wrap: anywhere;
-  word-break: normal;
-  white-space: normal;
-}
-
-/*
- * Tables scroll horizontally inside their own wrapper. The audit's "offscreen"
- * findings were cells inside that scroll area, which is correct behaviour — but the
- * wrapper must never let the whole document scroll sideways.
- */
-.overflow-x-auto {
-  max-width: 100%;
-  contain: inline-size;
-}
-
-/* The account avatar is a letter, not a 12px speck. */
-.app-account-avatar,
-.app-avatar,
-[data-testid="account-avatar"] {
-  font-size: 13px;
-  min-width: 28px;
-  min-height: 28px;
-}
-
-/* The accent green on paper measured 3.73:1 — below AA for an 11px badge. A darker
-   shade keeps the same hue and clears 4.5:1. */
-.app-badge-accent {
-  color: color-mix(in srgb, var(--accent) 62%, var(--ink));
-}
-
-/* ---- Free analysis paywall ------------------------------------------------ */
-
-.scan-paywall {
-  margin-bottom: 1.25rem;
-  padding: 1.25rem;
-  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
-  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
-}
-
-.scan-paywall-title {
-  margin-top: 0.4rem;
-  font-family: var(--font-display);
-  font-size: 1.35rem;
-  line-height: 1.1;
-  letter-spacing: -0.03em;
-}
-
-.scan-paywall-body {
-  margin-top: 0.5rem;
-  max-width: 68ch;
-  font-size: 0.85rem;
-  line-height: 1.6;
-  color: var(--text-secondary);
-}
-
-.scan-paywall-locked {
-  margin: 0.75rem 0 1rem;
-  font-size: 0.78rem;
-}
-
-.scan-paywall-locked summary {
-  cursor: pointer;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.scan-paywall-locked ul {
-  margin-top: 0.5rem;
-  max-height: 12rem;
-  overflow-y: auto;
-  display: grid;
-  gap: 0.25rem;
-  color: var(--text-secondary);
-}
-
-.scan-paywall-locked code {
-  margin-right: 0.4rem;
-  font-size: 0.7rem;
-}
-
-/* ============================================================================
-   Module objects — tangible instruments instead of icon-in-a-square
-   ============================================================================ */
-
-.module-panel-art {
-  display: inline-flex;
-  width: 72px;
-  height: 58px;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  margin: -0.35rem 0 0.15rem -0.4rem;
-  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45));
-  transition:
-    transform 420ms cubic-bezier(0.16, 1, 0.3, 1),
-    filter 420ms var(--ease-standard);
-}
-
-.module-art {
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-}
-
-/* Each object gets one accent glow that lights on hover — the material responds,
-   the layout does not move. */
-.module-art-world {
-  filter: drop-shadow(0 0 8px rgba(120, 227, 203, 0.25));
-}
-.module-art-flow {
-  filter: drop-shadow(0 0 8px rgba(92, 242, 196, 0.22));
-}
-.module-art-exit {
-  filter: drop-shadow(0 0 8px rgba(255, 176, 32, 0.22));
-}
-.module-art-fail {
-  filter: drop-shadow(0 0 8px rgba(240, 120, 132, 0.22));
-}
-.module-art-clean {
-  filter: drop-shadow(0 0 8px rgba(115, 214, 139, 0.22));
-}
-
-.module-panel:hover .module-panel-art {
-  transform: translateY(-3px) scale(1.06) rotate(-1.5deg);
-  filter: drop-shadow(0 12px 22px rgba(0, 0, 0, 0.55))
-    drop-shadow(0 0 14px color-mix(in srgb, var(--module-accent) 45%, transparent));
-}
-
-/* The orbit and the engine rotate slowly, but only once motion is allowed. */
-@media (prefers-reduced-motion: no-preference) {
-  .module-art-world > ellipse:first-of-type {
-    transform-box: fill-box;
-    transform-origin: center;
-    animation: orbit-drift 14s ease-in-out infinite alternate;
-  }
-  .module-art-engine > g:first-of-type {
-    transform-box: fill-box;
-    transform-origin: center;
-    animation: orbit-drift 20s ease-in-out infinite alternate-reverse;
-  }
-  .module-art-fail path[stroke="url(#fa-arc)"] {
-    animation: scanner-breathe 3.2s ease-in-out infinite;
-  }
-}
-
-@keyframes orbit-drift {
-  from {
-    transform: rotate(-16deg);
-  }
-  to {
-    transform: rotate(-6deg);
-  }
-}
-
-@keyframes scanner-breathe {
-  0%,
-  100% {
-    opacity: 0.72;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
-.module-panel-art-engine {
-  width: 84px;
-  height: 68px;
-  margin-top: -0.6rem;
-}
-
-/* ======================================================================
-   Recuperation du 24/11 : les regles suivantes viennent de la refonte en
-   cours (galerie peinte, heros ASCII, apercu CLI, fiches moteur), extraites
-   completes et equilibrees depuis la copie de travail, puis verifiees.
-   ====================================================================== */
-
-.brand-shell::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 70;
-  pointer-events: none;
-  opacity: 0.1;
-  mix-blend-mode: screen;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
-}
-
-.peint-hero {
-  position: relative;
-  background: var(--galerie-paper);
-  color: var(--galerie-ink);
-  padding: clamp(3rem, 8vh, 5rem) 0 clamp(2.5rem, 6vh, 4.5rem);
-}
-
-.peint-hero-inner {
-  margin-inline: auto;
-  max-width: 1440px;
-  padding-inline: clamp(1.25rem, 4vw, 4rem);
-  display: grid;
-  gap: clamp(2rem, 5vh, 3.5rem);
-  align-items: center;
-}
-
-@media (min-width: 1024px) {
-  .peint-hero-inner {
-    grid-template-columns: 0.82fr 1.18fr;
-  }
-}
-
-.peint-scene-wrap {
-  position: relative;
-  min-width: 0;
-  animation: peint-entree 1.1s var(--ease-standard) both;
-}
-
-.peint-scene {
-  display: block;
-  width: 100%;
-  height: auto;
-  overflow: visible;
-}
-
-/* chaque forme filtrée vit dans un groupe animé */
-
-.peint-scene g {
-  transform-box: fill-box;
-  transform-origin: center;
-}
-
-/* --- ACTE 1: les pigments s'assemblent en P --- */
-
-.peint-p-fut {
-  animation: peint-cyc-fut 16s linear infinite;
-}
-
-@keyframes peint-cyc-fut {
-  0% {
-    opacity: 0;
-    transform: translate(-540px, 150px) rotate(-28deg);
-  }
-
-  2% {
-    opacity: 1;
-  }
-
-  9% {
-    opacity: 1;
-    transform: translate(0, 0) rotate(0deg);
-  }
-
-  17% {
-    opacity: 1;
-    transform: translate(0, 0);
-  }
-
-  20% {
-    opacity: 0;
-    transform: translate(0, -36px);
-  }
-
-  100% {
-    opacity: 0;
-  }
-}
-
-.peint-p-panse {
-  animation: peint-cyc-panse 16s linear infinite;
-}
-
-@keyframes peint-cyc-panse {
-  0% {
-    opacity: 0;
-    transform: translate(430px, 320px) rotate(42deg) scale(0.5);
-  }
-
-  3% {
-    opacity: 1;
-  }
-
-  9% {
-    opacity: 1;
-    transform: translate(0, 0) rotate(0deg) scale(1);
-  }
-
-  17% {
-    opacity: 1;
-    transform: translate(0, 0);
-  }
-
-  20% {
-    opacity: 0;
-    transform: scale(1.06);
-  }
-
-  100% {
-    opacity: 0;
-  }
-}
-
-.peint-p-lune {
-  animation: peint-cyc-lune 16s linear infinite;
-}
-
-@keyframes peint-cyc-lune {
-  0% {
-    opacity: 0;
-    transform: translate(-640px, -300px) rotate(-60deg);
-  }
-
-  4% {
-    opacity: 1;
-  }
-
-  11% {
-    opacity: 1;
-    transform: translate(0, 0) rotate(0deg);
-  }
-
-  19% {
-    opacity: 1;
-    transform: translate(0, 0);
-  }
-
-  23% {
-    opacity: 0;
-    transform: translate(30px, -24px);
-  }
-
-  100% {
-    opacity: 0;
-  }
-}
-
-/* --- ACTE 2: la Terre qui tourne --- */
-
-.peint-terre-g {
-  opacity: 0;
-  animation: peint-cyc-terre 16s linear infinite;
-}
-
-@keyframes peint-cyc-terre {
-  0%,
-  19% {
-    opacity: 0;
-    transform: scale(0.92);
-  }
-
-  23% {
-    opacity: 1;
-    transform: scale(1);
-  }
-
-  55% {
-    opacity: 1;
-    transform: scale(1);
-  }
-
-  58%,
-  100% {
-    opacity: 0;
-    transform: scale(0.97);
-  }
-}
-
-/* le ruban des continents défile: la planète tourne */
-
-.peint-ruban {
-  animation: peint-ruban 13s linear infinite;
-  transform-box: view-box;
-  transform-origin: 0 0;
-}
-
-@keyframes peint-ruban {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-600px);
-  }
-}
-
-/* --- ACTE 3: la scène devient chaque module --- */
-
-.peint-mod {
-  opacity: 0;
-}
-
-.peint-mod-flow {
-  animation: peint-cyc-flow 16s linear infinite;
-}
-
-@keyframes peint-cyc-flow {
-  0%,
-  60% {
-    opacity: 0;
-    transform: translateY(26px);
-  }
-
-  62% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  68% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  70%,
-  100% {
-    opacity: 0;
-    transform: translateY(-18px);
-  }
-}
-
-.peint-mod-exit {
-  animation: peint-cyc-exit 16s linear infinite;
-}
-
-@keyframes peint-cyc-exit {
-  0%,
-  71% {
-    opacity: 0;
-    transform: translateY(26px);
-  }
-
-  73% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  79% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  81%,
-  100% {
-    opacity: 0;
-    transform: translateY(-18px);
-  }
-}
-
-.peint-mod-fail {
-  animation: peint-cyc-fail 16s linear infinite;
-}
-
-@keyframes peint-cyc-fail {
-  0%,
-  83% {
-    opacity: 0;
-    transform: translateY(26px);
-  }
-
-  85% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  89% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  91%,
-  100% {
-    opacity: 0;
-    transform: translateY(-18px);
-  }
-}
-
-.peint-mod-clean {
-  animation: peint-cyc-clean 16s linear infinite;
-}
-
-@keyframes peint-cyc-clean {
-  0%,
-  93% {
-    opacity: 0;
-    transform: translateY(26px);
-  }
-
-  95% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* --- le discours posé à gauche --- */
-
-.peint-copy {
-  position: relative;
-  z-index: 2;
-  opacity: 0;
-  animation: peint-apparait 0.9s var(--ease-standard) 0.9s forwards;
-}
-
-.peint-surtitre {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--vermillon);
-}
-
-.peint-lede {
-  margin-top: 1.1rem;
-  font-size: 1.13rem;
-  line-height: 1.6;
-  max-width: 54ch;
-  color: rgba(22, 19, 15, 0.82);
-}
-
-.peint-cli {
-  margin-top: 1.2rem;
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  color: rgba(22, 19, 15, 0.52);
-}
-
-.peint-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.6rem;
-  margin-top: 1.7rem;
-  padding-bottom: 0.35rem;
-  border-bottom: 3px solid var(--vermillon);
-  color: var(--galerie-ink);
-  font-weight: 600;
-  font-size: 1.02rem;
-  transition: color 0.3s var(--ease-standard);
-}
-
-.peint-cta:hover {
-  color: var(--vermillon);
-}
-
-.peint-cta svg {
-  transition: transform 0.3s var(--ease-standard);
-}
-
-.peint-cta:hover svg {
-  transform: translateX(4px);
-}
-
-@keyframes peint-apparait {
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes peint-entree {
-  from {
-    opacity: 0;
-    transform: scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-/* étiquettes des modules: microtexte mono, encre */
-
-.peint-etiquette text {
-  font-family: var(--font-mono);
-  fill: var(--galerie-ink);
-  font-weight: 600;
-}
-
-/* Mobile: la scène passe au-dessus, la copie en dessous, recomposée. */
-@media (max-width: 1023px) {
-  .peint-hero-inner {
-    grid-template-columns: 1fr;
-  }
-
-  .peint-scene-wrap {
-    order: -1;
-    margin-top: 1rem;
-  }
-
-  .peint-copy {
-    text-align: left;
-  }
-}
-
-/* Tout statique si le mouvement est réduit: la Terre reste posée. */
-@media (prefers-reduced-motion: reduce) {
-  .peint-scene-wrap,
-  .peint-copy {
-    animation: none;
-    opacity: 1;
-  }
-
-  .peint-p-fut,
-  .peint-p-panse,
-  .peint-p-lune {
-    animation: none;
-    opacity: 0;
-  }
-
-  .peint-terre-g {
-    animation: none;
-    opacity: 1;
-    transform: none;
-  }
-
-  .peint-ruban {
-    animation: none;
-  }
-
-  .peint-mod {
-    animation: none;
-    opacity: 0;
-  }
-
-  .peint-mod-flow {
-    opacity: 1;
-  }
-}
-
-/* ------------------------------------------------------------
-   Reference artifacts (ref_visuelles, 2026-11).
-   Pure CSS, no assets: a halftone dot field for the editorial cream
-
-}
-
-/* Editorial metadata row: mono microtext above a warm hairline (ref REPORT). */
-
-.meta-row {
-  display: flex;
-  align-items: baseline;
-  gap: 0.75rem;
-  border-top: 1px solid rgba(110, 43, 52, 0.18);
-  padding-top: 0.6rem;
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(110, 43, 52, 0.72);
-}
-
-/* Microtext label, ref 2: small cool-grey sans caps, quiet but present. */
-
-.engine-frame,
-.terminal-preview,
-.ai-sample {
-  --fiche-bg: #0d0e10;
-  --fiche-line: rgba(255, 255, 255, 0.09);
-  --fiche-line-soft: rgba(255, 255, 255, 0.06);
-  --fiche-band: rgba(255, 255, 255, 0.03);
-  --fiche-hi: rgba(255, 255, 255, 0.88);
-  --fiche-mid: rgba(255, 255, 255, 0.56);
-  --fiche-lo: rgba(255, 255, 255, 0.4);
-  --fiche-chip-line: rgba(255, 255, 255, 0.13);
-}
-
-.ef-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  border: 1px solid var(--fiche-line);
-  background: var(--fiche-band);
-  border-radius: 12px;
-  padding: 0.75rem 1rem;
-}
-
-.ef-row-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  border: 1px solid var(--fiche-chip-line);
-  border-radius: 8px;
-  color: var(--fiche-hi);
-}
-
-.ef-row-title {
-  font-size: 0.82rem;
-  font-weight: 500;
-  color: var(--fiche-hi);
-}
-.ef-row-sub {
-  font-family: var(--font-mono);
-  font-size: 0.67rem;
-  color: var(--fiche-mid);
-}
-.ef-row-tag {
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  text-transform: uppercase;
-  letter-spacing: 0.18em;
-  color: var(--fiche-lo);
-}
-
-.ef-core {
-  border: 1px solid var(--fiche-line);
-  background: var(--fiche-band);
-  border-radius: 12px;
-  padding: 1rem;
-}
-
-.ef-core p {
-  color: var(--fiche-hi);
-}
-.ef-core .ef-row-sub {
-  color: var(--fiche-mid);
-}
-
-.ef-status {
-  border: 1px solid var(--fiche-chip-line);
-  background: transparent;
-  color: var(--fiche-mid);
-  border-radius: 4px;
-  padding: 0.25rem 0.375rem;
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-}
-
-.ef-link {
-  border-left: 2px dashed var(--fiche-chip-line);
-}
-
-.ef-connect {
-  margin-left: 1.5rem;
-  height: 1.25rem;
-  border-left: 1px dashed var(--fiche-line);
-}
-
-.module-card .module-note {
-  font-family: var(--font-mono);
-  font-size: 0.63rem;
-  color: var(--fiche-mid);
-}
-
-.ai-sample-bar svg {
-  color: var(--fiche-mid);
-}
-
-[class*="text-white/42"],
-[class*="text-white/44"],
-[class*="text-white/45"],
-[class*="text-white/46"],
-[class*="text-white/54"],
-[class*="text-white/56"],
-[class*="text-white/58"],
-[class*="text-white/68"],
-[class*="text-white/70"],
-[class*="text-white/72"],
-[class*="text-white/78"],
-[class*="border-white/8"],
-[class*="border-white/10"],
-[class*="bg-brand-mint/"],
-/* Dark instrument zones keep their black identity inside the light page: they
-   re-establish light ink by inheritance (their text has no explicit colour of
-   its own) and carry their own dark surface,
-since the light shell no longer
-   supplies the black behind them. */
-
-  /* les fiches instrument suivent la DA via leurs variables — pas d'override ici */
-
-  /* Carte Assistance : un instrument noir sur la coque sombre,
-une feuille
-   blanche sur le papier. Les tokens workspace sont re-résolus localement
-   pour que le formulaire,
-les champs et le CTA basculent avec elle. */
-
-  .brand-shell[data-da="dark"]
-  .support-card
-  :is(input, textarea):focus {
+.brand-shell[data-da="dark"] .support-card :is(input, textarea):focus {
   border-color: var(--vermillon, #e4381f);
 }
 
@@ -11225,4 +8913,241 @@ hairline,
        pointer only; the band keeps its place without any idle animation. */
     height: clamp(110px, 14vw, 170px);
   }
+}
+
+/* From Uiverse.io by vinodjangid07 - https://uiverse.io/vinodjangid07/fresh-tiger-82
+   MIT License, Copyright (c) vinodjangid07 (Vinod Jangid)
+   Adapté : bouton de notification de l'en-tête de l'espace de travail.
+   Classes renommées en .notif-* (les noms génériques d'origine pouvaient
+   entrer en collision), le badge de messages non lus est intégré au flux,
+   la flèche reste l'animation signature du survol. */
+.notif-button {
+  width: 200px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 0 15px;
+  background-color: rgb(66, 66, 66);
+  border-radius: 10px;
+  color: white;
+  border: none;
+  position: relative;
+  cursor: pointer;
+  transition-duration: 0.2s;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.notif-bell {
+  width: 13px;
+  flex-shrink: 0;
+}
+
+.notif-bell path {
+  fill: rgb(0, 206, 62);
+}
+
+.notif-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: rgb(0, 206, 62);
+  color: #05231b;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.notif-arrow {
+  position: absolute;
+  right: 0;
+  width: 30px;
+  height: 100%;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notif-button:hover {
+  background-color: rgb(77, 77, 77);
+  transition-duration: 0.2s;
+}
+
+.notif-button:hover .notif-arrow {
+  animation: notif-slide-right 0.6s ease-out both;
+}
+
+@keyframes notif-slide-right {
+  0% {
+    transform: translateX(-10px);
+    opacity: 0;
+  }
+
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.notif-button:active {
+  transform: translate(1px, 1px);
+  transition-duration: 0.2s;
+}
+
+.notif-button:focus-visible {
+  outline: 2px solid rgb(0, 206, 62);
+  outline-offset: 2px;
+}
+
+/* From Uiverse.io by 00Kubi - https://uiverse.io/00Kubi/kind-mouse-43
+   MIT License, Copyright (c) vinodjangid07 (Vinod Jangid), 00Kubi (Kubi)
+   Adapté : pop-up de consentement cookies de l'app. Classes renommées en
+   .cookie-* (#cookieSvg → classe, cookieHeading/Description en kebab-case),
+   position fixe en bas à droite avec une entrée/sortie douce, et le bouton
+   d'acceptation passe du violet Uiverse au vermillon de la DA. */
+.cookie-card {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 90;
+  width: 300px;
+  min-height: 220px;
+  background-color: rgb(255, 255, 255);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 30px;
+  gap: 13px;
+  overflow: hidden;
+  box-shadow: 2px 2px 20px rgba(0, 0, 0, 0.25);
+  animation: cookie-in 0.35s ease-out both;
+}
+
+.cookie-card.is-leaving {
+  animation: cookie-out 0.24s ease-in both;
+}
+
+@keyframes cookie-in {
+  0% {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes cookie-out {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+}
+
+.cookie-svg {
+  width: 50px;
+}
+
+.cookie-svg g path {
+  fill: rgb(97, 81, 81);
+}
+
+.cookie-heading {
+  margin: 0;
+  font-size: 1.2em;
+  font-weight: 800;
+  color: rgb(26, 26, 26);
+}
+
+.cookie-description {
+  margin: 0;
+  text-align: center;
+  font-size: 0.7em;
+  font-weight: 600;
+  color: rgb(99, 99, 99);
+}
+
+.cookie-description a {
+  color: rgb(59, 130, 246);
+}
+
+.cookie-description a:hover {
+  text-decoration-line: underline;
+}
+
+.cookie-actions {
+  display: flex;
+  gap: 20px;
+  flex-direction: row;
+}
+
+.cookie-accept {
+  width: 80px;
+  height: 30px;
+  background-color: var(--vermillon, #e4381f);
+  border: none;
+  color: rgb(241, 241, 241);
+  cursor: pointer;
+  font-weight: 600;
+  border-radius: 20px;
+  box-shadow:
+    0 4px 6px -1px rgba(228, 56, 31, 0.45),
+    0 2px 4px -1px rgba(228, 56, 31, 0.45);
+  transition: all 0.6s ease;
+}
+
+.cookie-accept:hover {
+  background-color: var(--vermillon-dark, #f04b31);
+  box-shadow:
+    0 10px 15px -3px rgba(228, 56, 31, 0.45),
+    0 4px 6px -2px rgba(228, 56, 31, 0.45);
+  transition-duration: 0.2s;
+}
+
+.cookie-decline {
+  width: 80px;
+  height: 30px;
+  background-color: #dadada;
+  color: rgb(46, 46, 46);
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  border-radius: 20px;
+  box-shadow:
+    0 4px 6px -1px #bebdbd,
+    0 2px 4px -1px #bebdbd;
+  transition: all 0.6s ease;
+}
+
+.cookie-decline:hover {
+  background-color: #ebebeb;
+  box-shadow:
+    0 10px 15px -3px #bebdbd,
+    0 4px 6px -2px #bebdbd;
+  transition-duration: 0.2s;
+}
+
+.cookie-accept:focus-visible,
+.cookie-decline:focus-visible {
+  outline: 2px solid var(--vermillon, #e4381f);
+  outline-offset: 2px;
 }

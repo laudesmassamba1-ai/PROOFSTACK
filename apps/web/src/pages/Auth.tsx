@@ -3,6 +3,7 @@ import { CircleAlert, CircleCheck, LoaderCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { z } from "zod";
+import { ModernLoginSignup } from "../components/ui/modern-login-signup.js";
 import { useI18n } from "../i18n/index.js";
 import { API_BASE, type Probe, postJson, probeApi } from "../lib/api.js";
 import { errorText } from "../lib/errorText.js";
@@ -103,13 +104,22 @@ export function Auth({ mode }: { mode: Mode }) {
   };
 
   return (
-    <div className="auth-page mx-auto flex min-h-[calc(100vh-6rem)] max-w-[520px] flex-col justify-center px-5 py-10">
-      <h1 className="text-[1.6rem] tracking-tight">
-        {mode === "in" ? t("auth.signin.title") : t("auth.signup.title")}
-      </h1>
-
+    <ModernLoginSignup
+      title={mode === "in" ? t("auth.signin.title") : t("auth.signup.title")}
+      footer={
+        <div className="mt-5 w-full text-center text-[0.8rem] text-white/46">
+          {mode === "in" ? t("auth.noAccount") : t("auth.haveAccount")}{" "}
+          <Link
+            className="font-medium text-white underline-offset-2 hover:underline"
+            to={mode === "in" ? "/signup" : "/signin"}
+          >
+            {mode === "in" ? t("nav.signup") : t("nav.signin")}
+          </Link>
+        </div>
+      }
+    >
       {plan ? (
-        <p className="mt-3 rounded-lg border border-brand-mint/30 bg-brand-mint/8 px-3 py-2 text-[0.82rem] text-white/74">
+        <p className="mt-4 w-full rounded-lg border border-white/12 bg-white/[0.04] px-3 py-2 text-[0.82rem] leading-normal text-white/74">
           {t("mkt.auth.selected")
             .replace("{plan}", plan.name)
             .replace("{period}", params.get("period") ? ` · ${params.get("period")}` : "")
@@ -117,13 +127,13 @@ export function Auth({ mode }: { mode: Mode }) {
         </p>
       ) : null}
 
-      <form onSubmit={submit} className="brand-panel mt-6 space-y-4 p-6" noValidate>
+      <form onSubmit={submit} className="mt-6 w-full max-w-[360px] space-y-4" noValidate>
         {mode === "up" ? (
           <>
             <Field label={t("auth.name")} htmlFor="auth-name" error={errors.name}>
               <input
                 id="auth-name"
-                className="field"
+                className="field-dark"
                 name="name"
                 autoComplete="name"
                 value={values.name}
@@ -133,7 +143,7 @@ export function Auth({ mode }: { mode: Mode }) {
             <Field label={t("auth.company")} htmlFor="auth-workspace" error={errors.workspace}>
               <input
                 id="auth-workspace"
-                className="field"
+                className="field-dark"
                 name="workspace"
                 autoComplete="organization"
                 value={values.workspace}
@@ -146,7 +156,7 @@ export function Auth({ mode }: { mode: Mode }) {
         <Field label={t("auth.email")} htmlFor="auth-email" error={errors.email}>
           <input
             id="auth-email"
-            className="field"
+            className="field-dark"
             type="email"
             name="email"
             autoComplete="email"
@@ -159,7 +169,7 @@ export function Auth({ mode }: { mode: Mode }) {
         <Field label={t("auth.password")} htmlFor="auth-password" error={errors.password}>
           <input
             id="auth-password"
-            className="field"
+            className="field-dark"
             type="password"
             name="password"
             autoComplete={mode === "in" ? "current-password" : "new-password"}
@@ -182,26 +192,18 @@ export function Auth({ mode }: { mode: Mode }) {
 
         <button
           type="submit"
-          className="btn btn-primary w-full justify-center"
+          className="w-full rounded-md bg-[#ededed] py-2.5 text-[0.9rem] font-medium text-black transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
           disabled={state === "sending"}
         >
-          {state === "sending" ? <LoaderCircle size={16} className="animate-spin" /> : null}
+          {state === "sending" ? (
+            <LoaderCircle size={16} className="mr-2 inline animate-spin" />
+          ) : null}
           {mode === "in" ? t("auth.submit.in") : t("auth.submit.up")}
         </button>
-
-        <p className="text-[0.8rem] text-white/46">
-          {mode === "in" ? t("auth.noAccount") : t("auth.haveAccount")}{" "}
-          <Link
-            className="text-brand-mint underline-offset-2 hover:underline"
-            to={mode === "in" ? "/signup" : "/signin"}
-          >
-            {mode === "in" ? t("nav.signup") : t("nav.signin")}
-          </Link>
-        </p>
       </form>
 
       <div
-        className="mt-4 flex items-start gap-2.5 rounded-lg border px-4 py-3 text-[0.8rem] leading-relaxed"
+        className="mt-4 flex w-full max-w-[360px] items-start gap-2.5 rounded-lg border px-4 py-3 text-left text-[0.8rem] leading-relaxed"
         role="status"
         aria-live="polite"
         style={{
@@ -217,28 +219,18 @@ export function Auth({ mode }: { mode: Mode }) {
               : probe.status === "checking"
                 ? "rgba(255,255,255,0.03)"
                 : "rgba(233,180,90,0.07)",
-          // the paper edition needs ink-safe tints — pale mint/white on cream
-          // paper was unreadable
-          color:
-            document.querySelector(".brand-shell")?.getAttribute("data-da") === "light"
-              ? probe.status === "reachable"
-                ? "#1e5c40"
-                : "rgba(23,22,26,0.66)"
-              : probe.status === "reachable"
-                ? "#bfeed4"
-                : "rgba(242,246,250,0.7)",
         }}
       >
         {probe.status === "checking" ? (
           <LoaderCircle size={15} className="mt-0.5 shrink-0 animate-spin" />
         ) : null}
         {probe.status === "reachable" ? (
-          <CircleCheck size={15} className="mt-0.5 shrink-0" />
+          <CircleCheck size={15} className="mt-0.5 shrink-0 text-[#73d68b]" />
         ) : null}
         {probe.status === "unreachable" ? (
           <CircleAlert size={15} className="mt-0.5 shrink-0 text-[#e9b45a]" />
         ) : null}
-        <span>
+        <span className="text-white/70">
           {probe.status === "checking"
             ? t("auth.checking")
             : probe.status === "reachable"
@@ -255,7 +247,7 @@ export function Auth({ mode }: { mode: Mode }) {
           {message ? <strong className="mt-1 block text-white/86">{message}</strong> : null}
         </span>
       </div>
-    </div>
+    </ModernLoginSignup>
   );
 }
 
@@ -272,8 +264,8 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div>
-      <label className="label" htmlFor={htmlFor}>
+    <div className="text-left">
+      <label className="mb-1.5 block text-[0.78rem] font-medium text-white/55" htmlFor={htmlFor}>
         {label}
       </label>
       {children}
