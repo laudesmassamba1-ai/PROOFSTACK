@@ -1,0 +1,295 @@
+/* Install switch — from Uiverse.io by nazar-gavrylyk
+ * https://uiverse.io/nazar-gavrylyk/evil-dragon-24
+ * MIT License, Copyright (c) nazar-gavrylyk (Nazar)
+ *
+ * Renamed with an `insw-` prefix so the generic originals (.label, .title,
+ * .circle) cannot collide with anything on this site. Colours come from the
+ * app's own tokens: the source's periwinkle becomes --primary, its green
+ * success becomes --success, its text white becomes the surface the pill
+ * sits on. Sizes are kept from the source (160px pill, 45px circle).
+ */
+
+.insw-label {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 160px;
+  padding: 5px;
+  background: transparent;
+  border: 2px solid var(--primary);
+  border-radius: 50px;
+  cursor: pointer;
+  transition: all 0.4s ease;
+  color: var(--ink);
+}
+
+.insw-label::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 8px;
+  height: 8px;
+  margin: auto;
+  background: var(--surface, #fff);
+  border-radius: 100%;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.4s ease;
+}
+
+.insw-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.insw-title {
+  position: absolute;
+  right: 18px;
+  bottom: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  text-align: center;
+  transition: all 0.4s ease;
+}
+
+.insw-title-installed {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.insw-circle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 45px;
+  width: 45px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 0 0 rgb(255, 255, 255);
+  overflow: hidden;
+  transition: all 0.4s ease;
+}
+
+.insw-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 30px;
+  color: var(--on-primary);
+  transform: translate(-50%, -50%);
+  transition: all 0.4s ease;
+}
+
+.insw-square {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 15px;
+  aspect-ratio: 1;
+  border-radius: 2px;
+  background: var(--surface, #fff);
+  opacity: 0;
+  visibility: hidden;
+  transform: translate(-50%, -50%);
+  transition: all 0.4s ease;
+}
+
+.insw-circle::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 0;
+  background: var(--primary-strong, color-mix(in srgb, var(--primary) 72%, #000));
+  transition: all 0.4s ease;
+}
+
+/* checked: the story runs — pulse, fill, then the pill narrows and turns green */
+.insw-label.is-checked {
+  width: 57px;
+}
+
+.insw-label.is-checked::before {
+  animation: insw-rotate 3s ease-in-out 0.4s forwards;
+}
+
+.insw-label.is-checked .insw-circle {
+  rotate: 180deg;
+  animation:
+    insw-pulse 1s forwards,
+    insw-circle-delete 0.2s ease 3.5s forwards;
+}
+
+.insw-label.is-checked .insw-circle::before {
+  animation: insw-installing 3s ease-in-out forwards;
+}
+
+.insw-label.is-checked .insw-icon {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.insw-label.is-checked .insw-square {
+  opacity: 1;
+  visibility: visible;
+}
+
+.insw-label.is-checked .insw-title {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.insw-label.is-checked .insw-title-installed {
+  animation: insw-show-installed-message 0.4s ease 3.5s forwards;
+}
+
+/* done: the settled state. The class does what the animation's last frame
+   would freeze, so a reduced-motion visitor (or one who arrives after the
+   fact) sees the same truth without waiting. */
+.insw-label.is-done {
+  width: 150px;
+  border-color: var(--success);
+}
+
+.insw-label.is-done .insw-circle {
+  opacity: 0;
+  visibility: hidden;
+  animation: none;
+}
+
+.insw-label.is-done .insw-title-installed {
+  opacity: 1;
+  visibility: visible;
+  right: 56px;
+  animation: none;
+}
+
+.insw-label.is-error {
+  border-color: var(--danger, #b3261e);
+}
+
+.insw-label.is-error .insw-circle {
+  animation: none;
+}
+
+.insw-label.insw-done-link {
+  display: inline-flex;
+  gap: 8px;
+  width: 150px;
+  padding: 10px 16px;
+  text-decoration: none;
+}
+
+.insw-label.insw-done-link .insw-icon {
+  position: static;
+  width: 18px;
+  color: var(--success);
+  transform: none;
+}
+
+.insw-title-static {
+  position: static;
+  opacity: 1;
+  visibility: visible;
+}
+
+.insw-error {
+  margin-top: 6px;
+  font-size: 0.72rem;
+  color: var(--danger, #b3261e);
+}
+
+@keyframes insw-pulse {
+  0% {
+    scale: 0.95;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 70%, transparent);
+  }
+  70% {
+    scale: 1;
+    box-shadow: 0 0 0 16px transparent;
+  }
+  100% {
+    scale: 0.95;
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@keyframes insw-installing {
+  from {
+    height: 0;
+  }
+  to {
+    height: 100%;
+  }
+}
+
+@keyframes insw-rotate {
+  0% {
+    transform: rotate(-90deg) translate(27px) rotate(0);
+    opacity: 1;
+    visibility: visible;
+  }
+  99% {
+    transform: rotate(270deg) translate(27px) rotate(270deg);
+    opacity: 1;
+    visibility: visible;
+  }
+  100% {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+@keyframes insw-show-installed-message {
+  100% {
+    opacity: 1;
+    visibility: visible;
+    right: 56px;
+  }
+}
+
+@keyframes insw-circle-delete {
+  100% {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+/* Reduced motion: the story is told, not animated. One click jumps the pill
+   to its settled state; the circle fill still shows briefly that the click
+   was received, but nothing spins, pulses or waits three seconds. */
+@media (prefers-reduced-motion: reduce) {
+  .insw-label,
+  .insw-label .insw-circle,
+  .insw-label .insw-icon,
+  .insw-label .insw-square {
+    transition: none;
+    animation: none;
+    rotate: 0deg;
+  }
+
+  .insw-label.is-checked {
+    width: 150px;
+    border-color: var(--success);
+  }
+
+  .insw-label.is-checked .insw-circle {
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  .insw-label.is-checked .insw-title {
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  .insw-label.is-checked .insw-title-installed {
+    opacity: 1;
+    visibility: visible;
+    right: 56px;
+  }
+}

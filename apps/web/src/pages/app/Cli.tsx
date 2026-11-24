@@ -1,6 +1,7 @@
 import { ArrowRight, Bot, Check, Copy, ExternalLink, KeyRound, Terminal } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
+import { InstallSwitch } from "../../components/app/InstallSwitch.js";
 import { Card, Empty, ErrorState, Loading, StatusBadge } from "../../components/app/ui.js";
 import { CliPreview } from "../../components/marketing/CliPreview.js";
 import { useI18n } from "../../i18n/index.js";
@@ -164,6 +165,35 @@ export function Cli() {
             ))}
           </ul>
         </Card>
+      </div>
+
+      {/* The install itself is a switch, not a command to type: the pill plays the
+          download, and the honest way to stay a command afterwards is the copy
+          button that is already beside it. The download starts from this origin. */}
+      <div className="mt-4 flex flex-wrap items-center gap-4">
+        <InstallSwitch
+          installLabel={t("ws.cli.install")}
+          installedLabel={t("ws.cli.installed")}
+          installedHref="/download"
+          onInstall={async () => {
+            const release = await apiFetch<{
+              release: { assets: { name: string; url: string }[] };
+            }>("/api/v1/releases/latest", { timeoutMs: 12_000 });
+            // The CLI installer for this machine, from our own API. Choosing by
+            // platform here would need the same detection the download page
+            // already owns — the pill leads there, where the choice is made.
+            const installer = release.release.assets.find((asset) =>
+              /installer-(linux|darwin)/.test(asset.name)
+            );
+            const target = document.createElement("a");
+            target.href = installer ? installer.url : "/download";
+            target.download = installer ? installer.name : "";
+            document.body.appendChild(target);
+            target.click();
+            target.remove();
+          }}
+        />
+        <p className="text-[0.74rem] leading-relaxed text-muted">{t("ws.cli.install.body")}</p>
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
