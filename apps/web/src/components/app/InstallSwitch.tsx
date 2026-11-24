@@ -62,7 +62,7 @@ export function InstallSwitch({
     return (
       <a
         href={installedHref}
-        className="insw-label insw-done-link"
+        className={`insw-label insw-done-link${className ? ` ${className}` : ""}`}
         data-testid="install-switch-done"
       >
         <svg
