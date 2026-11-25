@@ -5,8 +5,11 @@ uses the Ink & Object direction; this file records what is true and what remains
 
 ## Implemented and checked
 
-- One engine, three fixture modules (WORLD, FLOW, EXIT) and two HTTP audit modules
-  (FAIL, CLEAN) that share the run, finding, report, insight and webhook pipeline.
+- Three fixture-driven engine modules (WORLD, FLOW, EXIT) plus two HTTP page-audit
+  modules (FAIL, CLEAN). WORLD/FLOW/EXIT engine runs use the shared run/report pipeline.
+  FAIL/CLEAN page scans produce measured findings, but the module-copilot live scan path
+  currently returns `runId: null` / `reportId: null` and does not create a shared engine
+  run. Do not claim that those live scans appear in run history.
 - CLI commands: init, doctor, validate, test, world/flow/exit, modules, report,
   audit (fail|clean), sync, login/logout (session or device flow), ai, mcp, tools.
   Core modules and the module board run locally; they never open the website.
@@ -57,51 +60,73 @@ uses the Ink & Object direction; this file records what is true and what remains
 
 ## Known gaps
 
-The full, evidence-based list lives in `docs/AUDIT_2026-11.md`. The short version:
+The following are current limitations, not historical claims. Keep them aligned with
+`docs/PROOFCORE_CAPABILITY_MATRIX.md` and the actual code.
 
-- Password recovery, email verification, session listing/revocation and account
-  deletion are implemented and tested. Email verification is **not required at sign-in**,
-  and the sign-up route still reveals a taken address (409). Transactional email has
-  EmailJS and Resend adapters, but no production credentials were supplied, so real
-  delivery remains unverified.
-- No OAuth (Google, GitHub) and no two-factor authentication.
-- No legal pages (terms, privacy, cookies).
-- Four sold entitlements have no implementation (GitHub integration, client sharing,
-  advanced reports, priority support). The pricing table now labels them "coming".
-- FAIL/CLEAN audit results are not yet uploaded as runs, so the two module pages stay
-  empty until `proofcore audit --sync` exists.
-- CLEAN still reads server HTML and does not execute JavaScript. On a client-rendered
-  shell it now skips DOM-dependent checks and reports the module `not_measured` instead
-  of presenting the shell as the interface; metadata checks remain measured.
-- CI exists (`.github/workflows/ci.yml`). WORLD and the payment adapters have tests.
-- No retention job, no backup/restore procedure, no full-text search. Pagination exists
-  (`limit`/`offset` plus migration 0010 indexes).
-- No MFA/OAuth, no report sharing, no PDF/CSV report export, no distributed limiter for
-  sign-up or AI calls.
-- EmailJS/Resend delivery is implemented but unverified without credentials; email
-  verification and password reset flows are still absent.
-- The CLI is distributable as a self-contained global tarball (`pnpm cli:install`), but
-  `@proofcore/cli` is not published on the npm registry yet.
-- SasPay live path is untested without credentials; sandbox payments are tested.
-- FLOW browser journeys now run through the local Chromium over CDP (`proofcore test`);
-  server-side audits skip them because the Worker has no browser. WORLD remains
-  HTTP/fixture based.
-- The Windows desktop installer is built by the release workflow and checked for its
-  packaged files, not launched on a Windows runner in this environment. It is unsigned,
-  so Windows SmartScreen may warn until a code-signing certificate is configured. macOS
-  packaging is configured but not part of the requested Windows/Linux matrix.
-- Desktop auto-update reads electron-builder's `latest*.yml` assets. It needs a published
-  GitHub release with those assets; it is not exercised by the local package build.
-  AppImage and NSIS update in place; a `.deb` reports the manual state and links to the
-  release page, because the system package manager owns that install.
-- The security review items for shared registration limits behind a proxy, the
-  per-isolate in-memory rate limiter, account-enumeration timing, PBKDF2 cost, single
-  `WEB_ORIGIN` support and chunked webhook size limits remain open. They are backend
-  work, not visual claims.
-- `.env.example` now exists and is un-ignored. Real values remain local or in the host
-  secret store.
-- Screenshots are committed for design review; they are not a substitute for visual
-  regression tests.
+### Accounts and identity
+- Password recovery, email-verification requests/confirmation, session listing/revocation
+  and account deletion are implemented and covered by API tests.
+- Email verification is not enforced at sign-in. Sign-up reveals an already-used address
+  with HTTP 409; assess and mitigate account enumeration.
+- OAuth (Google/GitHub) and MFA/TOTP are absent.
+- EmailJS and Resend adapters exist, but no production credentials were supplied.
+  Real transactional delivery is **NON VÉRIFIÉ**.
+
+### Product and reports
+- Four entitlements remain unimplemented and are labelled "coming": GitHub integration,
+  client sharing, advanced reports and priority support.
+- The legal routes/templates and their publication readiness must be treated separately:
+  required legal entity, jurisdiction and privacy-contact details still need owner/legal
+  completion. Do not describe placeholder content as final legal documents.
+- JSON, JUnit, HTML and text reports are supported by the engine/CLI. PDF/CSV report
+  export and client report sharing are absent.
+- Pagination exists (`limit`/`offset` and migration indexes); full-text search is absent.
+
+### Module execution and persistence
+- WORLD remains HTTP/fixture based.
+- FLOW browser journeys execute locally through Chromium/CDP in the CLI. The Cloudflare
+  Worker has no browser, so browser-only journeys are skipped/not runnable there.
+- EXIT file and command export sources require the local CLI runtime. The Worker does not
+  run those sources.
+- FAIL/CLEAN page scans can return live HTTP findings. In the AI module-copilot path they
+  are not converted into stored shared engine runs (`runId` and `reportId` are null).
+  The CLI also has no verified `audit --sync` path. The module pages therefore cannot
+  claim complete common run history for these audits.
+- CLEAN measures server HTML in the current audit path. On client-rendered pages it skips
+  DOM-dependent checks and reports `not_measured`; metadata checks may still be measured.
+- A simple Start scan is a page-level scan unless an explicit crawl/site scope is selected.
+  Never describe a one-page scan as a full-site audit.
+
+### Infrastructure and security
+- No retention job and no tested backup/restore procedure.
+- No distributed limiter yet for registration and AI calls; per-isolate in-memory limits
+  are not global across Workers.
+- Account-enumeration timing, PBKDF2 cost review, multi-origin `WEB_ORIGIN` support and
+  chunked webhook size enforcement remain review items.
+- DNS rebinding and embedded-browser redirect protections require further validation.
+- Do not infer production security from local unit tests alone.
+
+### Distribution and external services
+- The CLI can be packaged as a self-contained local tarball with `pnpm cli:package`
+  / installed with `pnpm cli:install`. The workspace package `@proofcore/cli` is
+  private. Registry publication/version parity must be verified independently before
+  recommending `npm install -g proofcore`.
+- SasPay sandbox is tested. The live path is **NON VÉRIFIÉ** without production
+  credentials, webhook secret and any required provider-side allowlisting.
+- Windows NSIS packaging is configured, but launching the installer on a Windows runner
+  and code signing remain unverified. SmartScreen may warn while the installer is unsigned.
+- Desktop auto-update requires a published release with the expected electron-builder
+  metadata/assets. Local package creation alone does not verify update delivery.
+
+### Evidence discipline
+- The last documented local verification reports 811 Vitest tests, 36 E2E tests with
+  2 skipped, lint/typecheck/build success and 42 route/viewport layout checks. These are
+  recorded results, not proof that every later commit or the production deployment
+  passed again.
+- The committed workspace screenshots predate the latest PROOFCORE wordmark correction
+  and must be regenerated before being treated as current visual references.
+- Real e-mail, SasPay live payment, external-provider AI and production deployment remain
+  **NON VÉRIFIÉ** until executed with the required credentials.
 
 ## Environment and API
 
