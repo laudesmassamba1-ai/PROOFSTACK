@@ -141,6 +141,7 @@ proofcore audit clean
 `--cwd /path/to/your/app` is also supported, but the path must already exist.
 
 Runtime boundaries matter:
+
 - WORLD/FLOW/EXIT engine runs use the local CLI runtime.
 - FLOW browser journeys require local Chromium.
 - FAIL/CLEAN HTTP audits can be run against the configured project host, but the
