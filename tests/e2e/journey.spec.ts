@@ -215,6 +215,57 @@ test.describe("dashboard", () => {
     ).toBeVisible();
   });
 
+  test("FAIL and CLEAN show a saved page audit separately from engine runs", async ({ page }) => {
+    test.setTimeout(90_000);
+    await signUp(page, uniqueEmail("page-audit-history"));
+
+    const sessionResponse = await page.request.get(`${API_ORIGIN}/api/auth/session`);
+    expect(sessionResponse.ok()).toBe(true);
+    const session = (await sessionResponse.json()) as {
+      workspaces: { id: string; name: string }[];
+    };
+    const workspaceId = session.workspaces[0]?.id;
+    expect(workspaceId).toBeTruthy();
+
+    const projectResponse = await page.request.post(`${API_ORIGIN}/api/v1/projects`, {
+      data: {
+        workspaceId,
+        name: "Page audit evidence",
+        baseUrl: "https://example.com",
+        environment: "staging",
+      },
+    });
+    expect(projectResponse.status()).toBe(201);
+    const projectBody = (await projectResponse.json()) as {
+      project: { id: string };
+    };
+
+    // This is a real page scan. The API stores a PageAudit, not an EngineRun.
+    const auditResponse = await page.request.post(`${API_ORIGIN}/api/v1/audits`, {
+      data: {
+        workspaceId,
+        projectId: projectBody.project.id,
+        url: "https://example.com",
+      },
+    });
+    expect(auditResponse.status()).toBe(201);
+    const auditBody = (await auditResponse.json()) as {
+      audit: { id: string; url: string };
+    };
+    expect(auditBody.audit.id).toMatch(/^aud_/);
+
+    for (const module of ["fail", "clean"]) {
+      await page.goto(`/app/modules/${module}`);
+      await expect(page.getByRole("heading", { name: /page audits/i })).toBeVisible();
+      await expect(page.getByText(/separately from engine runs/i)).toBeVisible();
+      await expect(page.getByText(/example\.com/i).first()).toBeVisible();
+      await expect(page.getByRole("link", { name: "Open" }).first()).toBeVisible();
+    }
+
+    await page.goto("/app/modules");
+    await expect(page.getByText(/latest global scan \(fail \+ clean\)/i).first()).toBeVisible();
+  });
+
   test("billing shows the provider cannot auto-charge", async ({ page }) => {
     await signUp(page, uniqueEmail("billing"));
     await page.goto("/app/billing");

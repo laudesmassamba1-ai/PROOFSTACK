@@ -1,4 +1,4 @@
-import { auditSite, ProofCoreError, scanPage, shortId, stableStringify } from "@proofcore/core";
+import { auditSite, controlFor, ProofCoreError, scanPage, shortId, stableStringify } from "@proofcore/core";
 import { type Context, Hono } from "hono";
 import { z } from "zod";
 import { decryptApiKey, encryptApiKey, hasEncryptionSecret, keyFingerprint } from "../ai-crypto.js";
@@ -521,7 +521,7 @@ const TOOLS: { name: string; description: string; parameters: Record<string, unk
   {
     name: "module_status",
     description:
-      "All five modules for one project: enabled, configured, blockers, whether this runtime can launch them, the last stored run, and the exact run command. Call this before claiming a module is ready or missing.",
+      "All five modules for one project: enabled, configured, blockers, runtime capability, and the exact local/server run command. Shows the latest EngineRun where applicable and the latest PageAudit for FAIL/CLEAN; these are separate histories. Use get_report with auditId to retrieve the complete page-audit payload. Call this before claiming a module is ready or missing.",
     parameters: {
       type: "object",
       properties: {
@@ -536,7 +536,7 @@ const TOOLS: { name: string; description: string; parameters: Record<string, unk
   {
     name: "module_config",
     description:
-      "The active, schema-valid configuration of one module (WORLD, FLOW, EXIT, FAIL, CLEAN), plus the vocabulary that module accepts and any issue or blocker. Read this before proposing a change.",
+      "The active configuration and accepted vocabulary for one module. WORLD, FLOW and EXIT have persisted project settings validated by their real schemas. FAIL and CLEAN are URL-driven HTTP audits and currently have no persisted module settings. Read this before proposing a change.",
     parameters: {
       type: "object",
       properties: {
@@ -571,7 +571,7 @@ const TOOLS: { name: string; description: string; parameters: Record<string, unk
   {
     name: "module_run",
     description:
-      "Launch one module on the real engine. FAIL/CLEAN scan the project's own URL over HTTP; WORLD and FLOW run against the configured target and store a metered run in history. EXIT and browser-only FLOW journeys report not_runnable_here with the local command instead of pretending. Set confirm:true only when the user asked to run tests.",
+      "Launch one module using the runtime capabilities below. WORLD and configured HTTP-backed FLOW execute the real engine and persist a metered run in shared history. FAIL/CLEAN perform a live HTTP page scan, consume the AI-audit quota, and save a PageAudit in the project's scan history; they return auditId while runId/reportId remain null because they are not EngineRuns. Use get_report with auditId to retrieve the saved page audit. EXIT is local-only and returns NOT_RUNNABLE_HERE with the exact CLI instruction. Browser-only FLOW journeys are also local Chromium work and are not executed by the Worker. Never describe a live scan as a stored run. Set confirm:true only after the user explicitly asked to execute the check.",
     parameters: {
       type: "object",
       properties: {
@@ -579,7 +579,8 @@ const TOOLS: { name: string; description: string; parameters: Record<string, unk
         module: { type: "string", enum: ["world", "flow", "exit", "fail", "clean"] },
         url: {
           type: "string",
-          description: "FAIL/CLEAN only; defaults to the project base URL, same host.",
+          description:
+            "FAIL/CLEAN only; defaults to the project base URL. Must use the exact same origin (scheme, host and port).",
         },
         onlyCases: {
           type: "array",
@@ -625,11 +626,27 @@ const TOOLS: { name: string; description: string; parameters: Record<string, unk
   {
     name: "get_report",
     description:
-      "The full stored report payload for one run id (requires a prior recent_runs call).",
+      "Retrieve stored evidence. Pass runId for a shared EngineRun report, or auditId for a FAIL/CLEAN PageAudit in page-scan history. These are different record types; use exactly one identifier.",
     parameters: {
       type: "object",
-      properties: { runId: { type: "string" } },
-      required: ["runId"],
+      properties: {
+        runId: { type: "string" },
+        auditId: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "get_control",
+    description:
+      "Retrieve the authoritative PROOFCORE control card for one finding id. Use after reading a run or PageAudit to get the exact objective, consequence, smallest correction, external verification steps, stack-specific code examples, complexity and risk. Do not invent these fields when a control is available.",
+    parameters: {
+      type: "object",
+      properties: {
+        module: { type: "string", enum: ["world", "flow", "exit", "fail", "clean"] },
+        controlId: { type: "string", description: "Exact finding/control id from the report, without a module prefix." },
+      },
+      required: ["module", "controlId"],
       additionalProperties: false,
     },
   },
@@ -837,8 +854,17 @@ function systemPrompt(
     "  the exact settings as a proposal and wait.",
     "- Run a module only when the user asked to run it, with `module_run` and confirm:true.",
     "  A run spends the workspace's monthly test-run quota and hits the customer's app.",
-    "- After a run, call `analyze_run` (or read the run id it returned) before explaining.",
-    "  Report failed and errored cases, then skipped cases with their exact reason. A",
+    "- After WORLD/FLOW returns an `EngineRun` `runId`, call `analyze_run` with that id",
+    "  before explaining. For FAIL/CLEAN, `module_run` returns a `PageAudit` `auditId`:",
+    "  call `get_report` with that id instead; do not call `analyze_run` on a PageAudit.",
+    "  A PageAudit may be a limited preview: if its module summary or fields are omitted,",
+    "  state that limitation instead of inferring a score or a missing check.",
+    "- For every FAIL/CLEAN finding you recommend changing, call `get_control` with its",
+    "  exact module and finding id. Use the registry's objective, consequence, smallest",
+    "  fix, verification steps and stack examples. Separate site-wide scan totals from",
+    "  the requested module's own counts; never attribute combined FAIL+CLEAN totals to",
+    "  one module.",
+    "- Report failed and errored cases, then skipped cases with their exact reason. A",
     "  skipped case is not a pass.",
     "- EXIT and browser-only FLOW journeys are not runnable in the API runtime. Say so and",
     "  give the local command; never imply they ran.",
@@ -1328,6 +1354,7 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
         const outcome = await executeTool(
           services,
           workspace.id,
+          user.id,
           call.name,
           call.arguments,
           tuning.maxFetchChars,
@@ -1708,6 +1735,7 @@ function copilotModule(value: unknown): CopilotModule | null {
 async function executeTool(
   services: Services,
   workspaceId: string,
+  actorUserId: string,
   name: string,
   rawArguments: string,
   maxFetchChars: number,
@@ -1877,6 +1905,7 @@ async function executeTool(
           : undefined;
         try {
           const result = await runModule(services, workspaceId, projectId, module, {
+            actorUserId,
             ...(typeof args.url === "string" ? { url: args.url } : {}),
             ...(onlyCases ? { onlyCases } : {}),
           });
@@ -1953,14 +1982,83 @@ async function executeTool(
           summary: `${findings.length} finding(s)`,
         };
       }
+      case "get_control": {
+        const module = copilotModule(args.module);
+        const controlId = typeof args.controlId === "string" ? args.controlId.trim() : "";
+        if (!module || !controlId) {
+          return {
+            content: stableStringify({ error: "module and controlId are required" }),
+            summary: "invalid control request",
+          };
+        }
+        const control = controlFor(module, controlId);
+        if (!control) {
+          return {
+            content: stableStringify({
+              error: "no control with this exact id in the requested module",
+              module,
+              controlId,
+            }),
+            summary: "control not found",
+          };
+        }
+        return {
+          content: stableStringify(
+            {
+              id: control.id,
+              module: control.module,
+              copy: { fr: control.fr, en: control.en },
+              complexity: control.complexity,
+              risk: control.risk,
+              method: control.method,
+              result: control.result,
+              fixes: control.fixes,
+              ...(control.aliasOf ? { aliasOf: control.aliasOf } : {}),
+            },
+            2
+          ),
+          summary: `${module.toUpperCase()} / ${control.id} · ${control.complexity} effort · ${control.risk} risk`,
+        };
+      }
       case "get_report": {
         const runId = typeof args.runId === "string" ? args.runId : "";
-        if (!runId)
-          throw new ProofCoreError({
-            message: "runId required",
-            category: "CONFIGURATION",
-            code: "run_id_required",
-          });
+        const auditId = typeof args.auditId === "string" ? args.auditId : "";
+        if (Boolean(runId) === Boolean(auditId)) {
+          return {
+            content: stableStringify({ error: "pass exactly one of runId or auditId" }),
+            summary: "missing or ambiguous identifier",
+          };
+        }
+        if (auditId) {
+          const row = await services.store.getPageAudit(workspaceId, auditId);
+          if (!row) {
+            return {
+              content: stableStringify({ error: "no page audit found in this workspace" }),
+              summary: "not found",
+            };
+          }
+          return {
+            content: stableStringify(
+              {
+                id: String(row.id),
+                projectId: row.project_id ? String(row.project_id) : null,
+                createdAt: String(row.created_at),
+                url: String(row.url),
+                finalUrl: String(row.final_url),
+                httpStatus: Number(row.status),
+                durationMs: Number(row.duration_ms),
+                worstVerdict: String(row.worst_verdict),
+                failed: Number(row.failed),
+                warnings: Number(row.warnings),
+                ownership: String(row.ownership ?? "unverified"),
+                redacted: Boolean(Number(row.redacted ?? 1)),
+                result: JSON.parse(String(row.payload)) as unknown,
+              },
+              2
+            ),
+            summary: `page audit · ${String(row.worst_verdict)} · ${Number(row.failed)} fail`,
+          };
+        }
         const report = await services.store.getReportByRunId(workspaceId, runId);
         if (!report) {
           return {

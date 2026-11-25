@@ -27,7 +27,7 @@ const ENV = {
 interface Harness {
   services: Services;
   request: (path: string, init?: RequestInit & { cookie?: string }) => Promise<Response>;
-  signUp: (email: string) => Promise<{ cookie: string; workspaceId: string }>;
+  signUp: (email: string) => Promise<{ cookie: string; workspaceId: string; userId: string }>;
 }
 
 async function bootstrap(): Promise<Harness> {
@@ -53,8 +53,11 @@ async function bootstrap(): Promise<Harness> {
     });
     expect(response.status).toBe(201);
     const cookie = (response.headers.get("set-cookie") ?? "").split(";")[0];
-    const body = (await response.json()) as { workspace: { id: string } };
-    return { cookie, workspaceId: body.workspace.id };
+    const body = (await response.json()) as {
+      user: { id: string };
+      workspace: { id: string };
+    };
+    return { cookie, workspaceId: body.workspace.id, userId: body.user.id };
   };
   return { services: built.services, request, signUp };
 }
@@ -325,11 +328,41 @@ describe("module copilot service", () => {
     expect(body.config.modules.flow.journeys).toEqual([]);
   });
 
+  it("refuses FAIL scans on a different protocol or port, even for the same hostname", async () => {
+    const server = await fixture();
+    try {
+      const { request, signUp, services } = harness;
+      const { workspaceId, cookie, userId } = await signUp("modules-origin-guard@example.com");
+      const created = await request("/api/v1/projects", {
+        method: "POST",
+        cookie,
+        body: JSON.stringify({
+          workspaceId,
+          name: "Origin guard project",
+          baseUrl: server.base,
+          environment: "local",
+        }),
+      });
+      const project = ((await created.json()) as { project: { id: string } }).project;
+      const wrongOrigin = new URL(server.base);
+      wrongOrigin.port = wrongOrigin.port === "1" ? "2" : "1";
+
+      await expect(
+        runModule(services, workspaceId, project.id, "fail", {
+          actorUserId: userId,
+          url: wrongOrigin.toString(),
+        })
+      ).rejects.toThrow("exact origin");
+    } finally {
+      server.close();
+    }
+  });
+
   it("scans FAIL on a real page and returns observed controls", async () => {
     const server = await fixture();
     try {
       const { request, signUp, services } = harness;
-      const { workspaceId, cookie } = await signUp("modules-fail@example.com");
+      const { workspaceId, cookie, userId } = await signUp("modules-fail@example.com");
       const created = await request("/api/v1/projects", {
         method: "POST",
         cookie,
@@ -342,9 +375,25 @@ describe("module copilot service", () => {
       });
       const project = ((await created.json()) as { project: { id: string } }).project;
 
-      const run = await runModule(services, workspaceId, project.id, "fail");
+      const run = await runModule(services, workspaceId, project.id, "fail", {
+        actorUserId: userId,
+      });
       expect(run.status).toBe("COMPLETED");
       expect(run.runId).toBeNull();
+      expect(run.reportId).toBeNull();
+      expect(run.auditId).toMatch(/^aud_[a-f0-9]{20}$/);
+      const stored = await services.store.getPageAudit(workspaceId, run.auditId as string);
+      expect(stored).not.toBeNull();
+      expect(stored?.created_by).toBe(userId);
+      expect(stored?.project_id).toBe(project.id);
+      expect(stored?.ownership).toBe("unverified");
+      const history = await services.store.listPageAudits(workspaceId, {
+        limit: 10,
+        offset: 0,
+        projectId: project.id,
+      });
+      expect(history.total).toBe(1);
+      expect(history.rows[0]?.id).toBe(run.auditId);
       const totals = run.totals as { total?: number; passed?: number } | null;
       expect(totals?.total ?? 0).toBeGreaterThan(0);
       expect(run.cases.some((item) => item.status === "FAIL" || item.status === "WARN")).toBe(true);

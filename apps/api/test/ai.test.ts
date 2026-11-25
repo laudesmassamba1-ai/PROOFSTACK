@@ -705,6 +705,79 @@ describe("ai memory and sub-agents", () => {
     });
   }
 
+  it("retrieves the official bilingual remediation card for a finding", async () => {
+    const { request } = harness;
+    const { cookie, workspaceId } = await ready("ai-control-card@example.com");
+    let observedToolResult = "";
+
+    upstreamState.respond = (attempt, body) => {
+      if (attempt === 1) {
+        return {
+          status: 200,
+          body: {
+            choices: [
+              {
+                message: {
+                  role: "assistant",
+                  content: null,
+                  tool_calls: [
+                    {
+                      id: "call_hsts",
+                      type: "function",
+                      function: {
+                        name: "get_control",
+                        arguments: JSON.stringify({ module: "fail", controlId: "hsts" }),
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        };
+      }
+
+      const parsed = body as { messages: { role: string; content: string }[] };
+      observedToolResult =
+        parsed.messages.find((message) => message.role === "tool")?.content ?? "";
+      return {
+        status: 200,
+        body: {
+          choices: [
+            {
+              message: {
+                role: "assistant",
+                content: "HSTS binds the browser to HTTPS. Apply the header and verify it with curl.",
+              },
+            },
+          ],
+        },
+      };
+    };
+
+    const response = await request("/api/v1/ai/chat", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({
+        workspaceId,
+        message: "How do I fix the HSTS finding?",
+        effort: "balanced",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      message: string;
+      trace: { tool: string; summary: string }[];
+    };
+    expect(body.trace.map((item) => item.tool)).toEqual(["get_control"]);
+    expect(body.trace[0]?.summary).toContain("HSTS");
+    expect(observedToolResult).toContain('"title": "HSTS"');
+    expect(observedToolResult).toContain("Strict-Transport-Security");
+    expect(observedToolResult).toContain("curl -sI https://your-site");
+    expect(observedToolResult).toContain('"complexity": "low"');
+    expect(body.message).toContain("HSTS");
+  });
+
   it("advertises at least two sub-agents per level, and more as effort rises", async () => {
     const { request } = harness;
     const { cookie } = await harness.signUp("ai-effort@example.com");

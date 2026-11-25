@@ -23,6 +23,21 @@ interface Overview {
   recentRuns: unknown[];
 }
 
+interface PageAuditSummary {
+  id: string;
+  url: string;
+  finalUrl: string;
+  status: number;
+  durationMs: number;
+  worstVerdict: "pass" | "warnings" | "fail" | string;
+  failed: number;
+  warnings: number;
+  ownership: string;
+  redacted: boolean;
+  projectId: string | null;
+  createdAt: string;
+}
+
 const MODULES = [
   {
     id: "world",
@@ -48,14 +63,14 @@ const MODULES = [
   {
     id: "fail",
     label: "FAIL",
-    command: "proofcore fail <url>",
+    command: "proofcore audit fail <url>",
     fr: "Audit de sécurité passif sur une URL.",
     en: "Passive security audit against a URL.",
   },
   {
     id: "clean",
     label: "CLEAN",
-    command: "proofcore clean <url>",
+    command: "proofcore audit clean <url>",
     fr: "Qualité d’interface : structure, contraste, accessibilité.",
     en: "Interface quality: structure, contrast, accessibility.",
   },
@@ -67,13 +82,21 @@ export function ModulesIndexPage() {
   const fr = locale === "fr";
   const { theme } = useTheme();
   const [data, setData] = useState<Overview | null>(null);
+  const [pageAudits, setPageAudits] = useState<PageAuditSummary[]>([]);
   const [error, setError] = useState<ApiError | Error | null>(null);
 
   const load = useCallback(async () => {
     if (!session.workspaceId) return;
     setError(null);
     try {
-      setData(await apiFetch<Overview>(`/api/v1/overview?workspaceId=${session.workspaceId}`));
+      const [overview, audits] = await Promise.all([
+        apiFetch<Overview>(`/api/v1/overview?workspaceId=${session.workspaceId}`),
+        apiFetch<{ items: PageAuditSummary[] }>(
+          `/api/v1/audits?workspaceId=${session.workspaceId}&limit=50`
+        ),
+      ]);
+      setData(overview);
+      setPageAudits(audits.items);
     } catch (caught) {
       setError(caught as ApiError);
     }
@@ -134,7 +157,10 @@ export function ModulesIndexPage() {
       <div className="app-object-grid">
         {MODULES.map((module, index) => {
           const record = data.modules.find((item) => item.module === module.id);
-          const covered = Boolean(record?.lastRunAt);
+          const isPageAudit = module.id === "fail" || module.id === "clean";
+          const latestAudit = isPageAudit ? (pageAudits[0] ?? null) : null;
+          const covered = Boolean(record?.lastRunAt || latestAudit);
+          const badgeStatus = record?.lastRunAt ? record.status : latestAudit ? "COMPLETED" : "";
           return (
             <Link
               key={module.id}
@@ -144,7 +170,7 @@ export function ModulesIndexPage() {
               <div className="app-object-card-head">
                 <span className="app-object-index">0{index + 1}</span>
                 {covered ? (
-                  <StatusBadge status={record?.status ?? ""} />
+                  <StatusBadge status={badgeStatus} />
                 ) : (
                   <span className="app-badge">{fr ? "non testé" : "not tested"}</span>
                 )}
@@ -157,7 +183,15 @@ export function ModulesIndexPage() {
               </div>
               <div className="app-object-card-foot">
                 <h2 className="app-object-name">{module.label}</h2>
-                <p className="app-object-state">{fr ? module.fr : module.en}</p>
+                <p className="app-object-state">
+                  {latestAudit && !record?.lastRunAt
+                    ? fr
+                      ? `Dernier scan global (FAIL + CLEAN) · ${latestAudit.failed} échec(s) · ${latestAudit.warnings} avertissement(s)`
+                      : `Latest global scan (FAIL + CLEAN) · ${latestAudit.failed} failure(s) · ${latestAudit.warnings} warning(s)`
+                    : fr
+                      ? module.fr
+                      : module.en}
+                </p>
                 <code className="modules-index-command">{module.command}</code>
                 <span className="app-object-open">
                   {fr ? "Voir le module" : "Open module"} <ArrowRight size={13} />
