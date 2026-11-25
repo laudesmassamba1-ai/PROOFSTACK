@@ -1328,6 +1328,7 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
         const outcome = await executeTool(
           services,
           workspace.id,
+          user.id,
           call.name,
           call.arguments,
           tuning.maxFetchChars,
@@ -1708,6 +1709,7 @@ function copilotModule(value: unknown): CopilotModule | null {
 async function executeTool(
   services: Services,
   workspaceId: string,
+  actorUserId: string,
   name: string,
   rawArguments: string,
   maxFetchChars: number,
@@ -1877,6 +1879,7 @@ async function executeTool(
           : undefined;
         try {
           const result = await runModule(services, workspaceId, projectId, module, {
+            actorUserId,
             ...(typeof args.url === "string" ? { url: args.url } : {}),
             ...(onlyCases ? { onlyCases } : {}),
           });
