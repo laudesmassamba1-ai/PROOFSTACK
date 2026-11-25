@@ -160,9 +160,8 @@ export function ModulesIndexPage() {
           const isPageAudit = module.id === "fail" || module.id === "clean";
           const latestAudit = isPageAudit ? (pageAudits[0] ?? null) : null;
           const covered = Boolean(record?.lastRunAt || latestAudit);
-          const badgeStatus =
-            record?.lastRunAt
-              ? record.status
+          const badgeStatus = record?.lastRunAt
+            ? record.status
               : latestAudit?.worstVerdict === "fail"
                 ? "FAILED"
                 : latestAudit?.worstVerdict === "warnings"
