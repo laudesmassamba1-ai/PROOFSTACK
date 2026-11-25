@@ -1,6 +1,8 @@
 import {
   BadgeCheck,
   BookOpen,
+  Boxes,
+  Brain,
   CreditCard,
   FolderPlus,
   Globe2,
@@ -10,7 +12,6 @@ import {
   Route as RouteIcon,
   ScanLine,
   Settings,
-  Settings2,
   ShieldAlert,
   Terminal,
 } from "lucide-react";
@@ -23,10 +24,10 @@ import Dock from "./Dock.js";
  * QuickDock — React Bits Dock (MIT), la navigation de bureau.
  *
  * Les tuiles grossissent avec une vraie physique à ressort quand le pointeur
- * les approche ; deux tuiles portent un sous-menu qui se déplie au survol
- * (Modules, Espace) — le clic bascule le menu fermé, un clic dans le menu
- * navigue. La barre latérale n'existe plus sur bureau : le dock est la
- * navigation ; sur mobile il laisse place à la feuille hamburger.
+ * les approche ; Modules et Espaces portent un sous-menu qui se déplie au
+ * survol — le clic bascule le menu fermé, un clic dans le menu navigue.
+ * Toutes les sections de l'application sont joignables depuis ici, quel que
+ * soit le mode (simple ou expert).
  */
 export function QuickDock() {
   const navigate = useNavigate();
@@ -55,14 +56,34 @@ export function QuickDock() {
     {
       icon: <LayoutGrid size={20} />,
       label: fr ? "Modules" : "Modules",
-      onClick: () => navigate("/app/modules"),
+      onClick: go("/app/modules"),
       menu: [
+        {
+          icon: <LayoutGrid size={15} />,
+          label: fr ? "Vue d'ensemble" : "Overview",
+          onClick: go("/app/modules"),
+        },
         { icon: <Globe2 size={15} />, label: "WORLD", onClick: go("/app/modules/world") },
         { icon: <RouteIcon size={15} />, label: "FLOW", onClick: go("/app/modules/flow") },
         { icon: <PackageOpen size={15} />, label: "EXIT", onClick: go("/app/modules/exit") },
         { icon: <ShieldAlert size={15} />, label: "FAIL", onClick: go("/app/modules/fail") },
         { icon: <BadgeCheck size={15} />, label: "CLEAN", onClick: go("/app/modules/clean") },
+        {
+          icon: <ScanLine size={15} />,
+          label: fr ? "Scanner une adresse" : "Scan an address",
+          onClick: go("/app/scan"),
+        },
+        {
+          icon: <Boxes size={15} />,
+          label: fr ? "Interaction navigateur" : "Browser interaction",
+          onClick: go("/app/interact"),
+        },
       ],
+    },
+    {
+      icon: <Brain size={20} />,
+      label: "IA",
+      onClick: go("/app/ai"),
     },
     {
       icon: <Terminal size={20} />,
@@ -75,10 +96,15 @@ export function QuickDock() {
       onClick: go("/app/guide"),
     },
     {
-      icon: <Settings2 size={20} />,
-      label: fr ? "Espace" : "Workspace",
-      onClick: go("/app/settings"),
+      icon: <Boxes size={20} />,
+      label: fr ? "Espaces" : "Workspaces",
+      onClick: go("/app/workspace"),
       menu: [
+        {
+          icon: <Boxes size={15} />,
+          label: fr ? "Espaces de travail" : "Workspaces",
+          onClick: go("/app/workspace"),
+        },
         {
           icon: <CreditCard size={15} />,
           label: fr ? "Facturation" : "Billing",
@@ -103,6 +129,7 @@ export function QuickDock() {
       magnification={64}
       panelHeight={56}
       distance={140}
+      gap={8}
       showIndicators={false}
       className="quick-dock"
     />
