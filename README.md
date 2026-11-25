@@ -20,8 +20,8 @@ execution and persistence paths are not yet identical.
 The local CLI can run supported Chromium journeys for FLOW. The Cloudflare Worker does
 not host Chromium, so browser-only journeys remain local. WORLD remains HTTP/fixture
 based. EXIT requires a local runtime for file and command export sources. FAIL/CLEAN
-module-copilot scans currently return live findings but do not create a shared stored
-engine run; do not treat those responses as run-history entries.
+module-copilot scans now save a `PageAudit` in page-scan history. They do not create an
+`EngineRun` or engine `RunReport`; keep the two history types distinct.
 
 ## Status
 
