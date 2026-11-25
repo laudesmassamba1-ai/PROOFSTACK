@@ -89,10 +89,11 @@ The following are current limitations, not historical claims. Keep them aligned 
   Worker has no browser, so browser-only journeys are skipped/not runnable there.
 - EXIT file and command export sources require the local CLI runtime. The Worker does not
   run those sources.
-- FAIL/CLEAN page scans can return live HTTP findings. In the AI module-copilot path they
-  are not converted into stored shared engine runs (`runId` and `reportId` are null).
-  The CLI also has no verified `audit --sync` path. The module pages therefore cannot
-  claim complete common run history for these audits.
+- FAIL/CLEAN page scans from the AI module-copilot path are persisted as `PageAudit`
+  records, and module readiness exposes the latest page audit. They are not converted into
+  shared engine runs (`runId` and `reportId` remain null by design). The CLI still has no
+  verified `audit --sync` path, so FAIL/CLEAN do not yet share the same EngineRun/RunReport
+  history or trend pipeline as WORLD/FLOW/EXIT.
 - CLEAN measures server HTML in the current audit path. On client-rendered pages it skips
   DOM-dependent checks and reports `not_measured`; metadata checks may still be measured.
 - A simple Start scan is a page-level scan unless an explicit crawl/site scope is selected.
