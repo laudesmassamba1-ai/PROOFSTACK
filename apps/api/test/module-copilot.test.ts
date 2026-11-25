@@ -328,6 +328,36 @@ describe("module copilot service", () => {
     expect(body.config.modules.flow.journeys).toEqual([]);
   });
 
+  it("refuses FAIL scans on a different protocol or port, even for the same hostname", async () => {
+    const server = await fixture();
+    try {
+      const { request, signUp, services } = harness;
+      const { workspaceId, cookie, userId } = await signUp("modules-origin-guard@example.com");
+      const created = await request("/api/v1/projects", {
+        method: "POST",
+        cookie,
+        body: JSON.stringify({
+          workspaceId,
+          name: "Origin guard project",
+          baseUrl: server.base,
+          environment: "local",
+        }),
+      });
+      const project = ((await created.json()) as { project: { id: string } }).project;
+      const wrongOrigin = new URL(server.base);
+      wrongOrigin.port = wrongOrigin.port === "1" ? "2" : "1";
+
+      await expect(
+        runModule(services, workspaceId, project.id, "fail", {
+          actorUserId: userId,
+          url: wrongOrigin.toString(),
+        })
+      ).rejects.toThrow("exact origin");
+    } finally {
+      server.close();
+    }
+  });
+
   it("scans FAIL on a real page and returns observed controls", async () => {
     const server = await fixture();
     try {
