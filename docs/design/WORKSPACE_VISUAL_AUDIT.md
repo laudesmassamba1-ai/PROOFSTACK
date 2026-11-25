@@ -15,7 +15,7 @@ small ink characters.
 
 First captured screens:
 
-- `dashboard.png` — paper frame, top navigation, state headline, three module objects; final capture reads “P ROOFSTACK” as one wordmark.
+- `dashboard.png` — paper frame, top navigation, state headline and module objects. This committed capture is historical and still shows the obsolete PROOFSTACK lockup; regenerate it after the current PROOFCORE wordmark fix.
 - `dashboard-mobile.png` — same content at 390×844.
 - `module-world.png` — WORLD workbench with orbit object and evidence table.
 - `command-palette.png` — `Ctrl/Cmd+K` palette.
@@ -30,7 +30,7 @@ Findings from pass 1 and fixes:
 | Command palette opened at the top-left        | Native dialog reset the UA margin; added `position: fixed; inset: 0; margin: auto` and a max-height.                                   |
 | Status words stayed English in a French shell | `StatusBadge` now reads the centralized workspace dictionary; `FAILED` → `Échec`, `PARTIAL` → `Partiel`.                               |
 | Relative dates stayed English                 | `format.ts` follows the selected locale via `Intl.RelativeTimeFormat`; “9 min ago” → “il y a 9 minutes”.                               |
-| Lockup read “PPROOFCORE”                      | The text beside the P mark is now “ROOFSTACK”; `Wordmark` and the animated hero follow the same rule. The logo itself was not changed. |
+| Wordmark duplicated its initial P                  | The geometric mark supplies the first P; `Wordmark` and the animated hero now render `ROOFCORE` beside it, yielding the complete PROOFCORE lockup. A render test covers both variants. The committed screenshots still need regeneration. |
 | The old KPI row and line chart remained       | Removed from Overview. Module totals are read from the latest run; no trend is inferred.                                               |
 
 ## After — pass 2 and 3
@@ -54,7 +54,7 @@ cross the viewport. `FAILURES=0`.
 
 ## The six anti-generic tests
 
-1. **Swap** — the state headline, WORLD/FLOW/EXIT objects and project facts are specific
+1. **Swap** — the state headline, module objects and project facts are specific
    to a verification product. A generic SaaS name would not fit the copy.
 2. **Squint** — Overview has one focal point: the state headline; module objects are
    the second read.
@@ -85,7 +85,7 @@ cross the viewport. `FAILURES=0`.
   Every customer workspace screen — shell, Overview, Projects, WORLD/FLOW/EXIT, CLI,
   Billing and Settings — follows the FR/EN switch, including nested actions, tables,
   empty states and confirmations.
-- The screenshots are representative, not an automated visual-regression suite.
+- The screenshots are representative, not an automated visual-regression suite. The committed lockup screenshots predate the latest wordmark correction and must be recaptured before being treated as current references.
 - Browser testing was performed against the local API with a real session and sandbox
   checkout. No production SasPay transaction was executed.
 - The audit did not test every hover, focus and screen-reader announcement; it verifies
