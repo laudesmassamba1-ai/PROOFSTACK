@@ -72,10 +72,12 @@ Voir `PROOFCORE_ARCHITECTURE_MAP.md`. Résumé :
   `module_run`, `analyze_run`. L'IA lit l'état et le vocabulaire des cinq modules.
   `module_configure` ne sauvegarde que WORLD/FLOW/EXIT, avec les schémas réels.
   `module_run` persiste les runs WORLD et les cas FLOW compatibles avec le runtime
-  serveur. FAIL/CLEAN exécutent ici un scan HTTP en direct mais retournent
-  `runId: null` et `reportId: null` : ce chemin ne crée pas de run partagé et ne doit
-  pas être présenté comme une entrée d'historique. EXIT et les journeys FLOW Chromium
-  restent locaux lorsque leurs prérequis nécessitent le poste du développeur.
+  serveur. FAIL/CLEAN exécutent un scan HTTP, consomment le quota `monthly_ai_audits`
+  et enregistrent un `PageAudit` dans l'historique des scans. Ils retournent `auditId`,
+  tandis que `runId: null` et `reportId: null` restent corrects : ce ne sont pas des
+  `EngineRun` / `RunReport`. `module_status` expose le dernier audit et `get_report`
+  peut le relire avec `auditId`. EXIT et les journeys FLOW Chromium restent locaux
+  lorsque leurs prérequis nécessitent le poste du développeur.
 - Une seule autre écriture : `remember` (fait de mémoire borné).
 - Clés chiffrées AES-256-GCM ; fingerprint seul renvoyé.
 - Contenus importés encadrés par un nonce ; 6 tests d'évasion.
@@ -301,7 +303,7 @@ Le produit est **démontrable et testé**, pas encore **exploitable en productio
 
 ## 24. Addendum de revue — 25 novembre 2026
 
-Cette revue a corrigé la description des capacités du copilot après inspection du code actuel. La phrase précédente « lance WORLD/FLOW/FAIL/CLEAN et analyse le run stocké » était trop large : seuls les runs WORLD et les exécutions FLOW compatibles avec le runtime serveur sont enregistrés par `runModule`. FAIL/CLEAN renvoient les résultats HTTP en direct sans créer de run partagé ; EXIT et les journeys Chromium sont locaux lorsque leurs prérequis l'exigent. La matrice de capacité doit être lue avec cette limite, et non comme une promesse d'exécution identique des cinq modules.
+Cette revue a corrigé puis étendu la description des capacités du copilot. Seuls les runs WORLD et les exécutions FLOW compatibles avec le runtime serveur créent des `EngineRun` / `RunReport`. FAIL/CLEAN enregistrent désormais un `PageAudit` après leur scan HTTP ; ils ne créent toujours pas d'EngineRun et renvoient `auditId` plutôt que `runId`. EXIT et les journeys Chromium restent locaux lorsque leurs prérequis l'exigent. Ces deux historiques restent volontairement distincts.
 
 Cette branche ajoute aussi :
 
