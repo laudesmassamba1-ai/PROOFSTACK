@@ -652,7 +652,7 @@ export function Stack({
   const openRef = useRef({ enabled: false, open: expanded, toggle: toggleOpen });
   openRef.current = { enabled: expandable, open: expanded, toggle: toggleOpen };
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: toggle is re-read via openRef
+  // biome-ignore lint/correctness/useExhaustiveDependencies: toggle reads the openRef mirror
   useEffect(() => {
     if (!expanded) return undefined;
     // The fold listens on the document: focus usually rests on a dealt card's
@@ -663,16 +663,15 @@ export function Stack({
         return;
       toggleOpen();
     };
-    const escape = (event: KeyboardEvent) => {
+    const onEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") toggleOpen();
     };
     document.addEventListener("pointerdown", close);
-    document.addEventListener("keydown", escape);
+    document.addEventListener("keydown", onEscape);
     return () => {
       document.removeEventListener("pointerdown", close);
-      document.removeEventListener("keydown", escape);
+      document.removeEventListener("keydown", onEscape);
     };
-    // biome-ignore lint/correctness/useExhaustiveDependencies: toggle is re-read via openRef
   }, [expanded]);
 
   const onMove = (event: PointerEvent) => {
