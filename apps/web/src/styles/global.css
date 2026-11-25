@@ -1917,85 +1917,6 @@ p {
   color: var(--ink-soft);
 }
 
-.app-desktop-nav {
-  display: flex;
-  align-items: center;
-  gap: 1px;
-  min-width: 0;
-}
-
-.app-toplink {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border: 0;
-  border-radius: 999px;
-  padding: 7px 10px;
-  background: transparent;
-  color: var(--ink-soft);
-  font-size: 10px;
-  font-weight: 560;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  transition:
-    background 140ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    color 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.app-toplink:hover,
-.app-toplink:focus-visible {
-  color: var(--ink);
-  background: var(--surface-alt);
-}
-
-.app-toplink[aria-current="page"],
-.app-toplink.is-active {
-  background: var(--ink);
-  color: var(--surface);
-}
-
-.app-engines {
-  position: relative;
-}
-
-.app-engines-trigger {
-  cursor: pointer;
-}
-
-.app-nav-popover {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  z-index: 45;
-  display: grid;
-  min-width: 170px;
-  gap: 2px;
-  padding: 6px;
-  border: 1px solid var(--rule);
-  border-radius: 14px;
-  background: var(--surface);
-  box-shadow: 0 18px 40px -24px rgba(10, 10, 11, 0.55);
-}
-
-.app-nav-popover-link {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border-radius: 9px;
-  padding: 8px 10px;
-  color: var(--ink-soft);
-  font-size: 11px;
-  font-weight: 560;
-  letter-spacing: 0.06em;
-}
-
-.app-nav-popover-link:hover,
-.app-nav-popover-link[aria-current="page"] {
-  background: var(--ink);
-  color: var(--surface);
-}
-
 .app-top-actions {
   display: flex;
   align-items: center;
@@ -2266,10 +2187,6 @@ p {
 .app-shell-pill:hover,
 .app-shell-pill:focus-visible {
   border-color: var(--ink);
-}
-
-.app-project-pill .app-shell-pill {
-  max-width: 128px;
 }
 
 .app-command-trigger {
@@ -3845,10 +3762,6 @@ p {
 /* ---------- responsive ---------- */
 
 @media (max-width: 1180px) {
-  .app-desktop-nav {
-    display: none;
-  }
-
   .app-command-trigger span,
   .app-command-trigger kbd {
     display: none;
@@ -3963,7 +3876,6 @@ p {
   }
 
   .app-beta,
-  .app-project-pill,
   .app-topbar .app-shell-select-wrap,
   .app-topbar .app-mode-toggle {
     display: none;
@@ -7529,7 +7441,6 @@ p {
 }
 
 @media (max-width: 1040px) {
-  .app-project-pill,
   .app-btn-3d {
     display: none;
   }

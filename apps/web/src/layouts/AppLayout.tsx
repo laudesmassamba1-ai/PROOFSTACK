@@ -10,6 +10,7 @@ import {
   FolderKanban,
   Globe2,
   LayoutDashboard,
+  LayoutGrid,
   LogOut,
   Menu,
   PackageOpen,
@@ -21,7 +22,6 @@ import {
   ShieldCheck,
   Terminal,
   X,
-  LayoutGrid,
 } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router";
@@ -67,7 +67,6 @@ export function AppLayout() {
   const [selected, setSelected] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
-  const [enginesOpen, setEnginesOpen] = useState(false);
   const paletteRef = useRef<HTMLDialogElement>(null);
   const paletteInputRef = useRef<HTMLInputElement>(null);
   const mobileRef = useRef<HTMLDivElement>(null);
@@ -105,7 +104,6 @@ export function AppLayout() {
   useEffect(() => {
     setMobileOpen(false);
     setAccountOpen(false);
-    setEnginesOpen(false);
     setPaletteOpen(false);
   }, [location.pathname]);
 
@@ -450,7 +448,6 @@ export function AppLayout() {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? "")
     .join("");
-  const enginesActive = location.pathname.startsWith("/app/modules");
 
   return (
     <div className="app-shell">
@@ -466,84 +463,6 @@ export function AppLayout() {
             <span className="wordmark app-brand-word">PROOFCORE</span>
             <span className="app-beta">{t("ws.shell.beta")}</span>
           </NavLink>
-
-          <nav className="app-desktop-nav" aria-label={t("ws.nav.menu")}>
-            <NavLink to="/app" end className="app-toplink">
-              {t("ws.nav.overview")}
-            </NavLink>
-            <NavLink to="/app/projects" className="app-toplink">
-              {t("ws.nav.projects")}
-            </NavLink>
-            <NavLink to="/app/start" className="app-toplink">
-              {locale === "fr" ? "Analyser" : "Scan"}
-            </NavLink>
-            <NavLink to="/app/guide" className="app-toplink">
-              {locale === "fr" ? "Guide" : "Guide"}
-            </NavLink>
-            {/* Simple mode hides the expert surfaces from the menu; every route stays
-                reachable, and Studio restores the full navigation without a page reload. */}
-            {uiMode === "studio" ? (
-              <>
-                <NavLink
-                  to="/app/workspace"
-                  className={({ isActive }) => `app-toplink ${isActive ? "is-active" : ""}`}
-                >
-                  {t("ws.nav.workspace")}
-                </NavLink>
-                <div className="app-engines">
-                  <button
-                    type="button"
-                    className={`app-toplink app-engines-trigger ${enginesActive ? "is-active" : ""}`}
-                    aria-expanded={enginesOpen}
-                    aria-haspopup="true"
-                    onClick={() => setEnginesOpen((value) => !value)}
-                  >
-                    {t("ws.nav.engines")} <ChevronDown size={13} />
-                  </button>
-                  {enginesOpen ? (
-                    <div className="app-nav-popover" role="menu">
-                      {[
-                        ["WORLD", "/app/modules/world", <Globe2 key="world" size={14} />],
-                        ["FLOW", "/app/modules/flow", <RouteIcon key="flow" size={14} />],
-                        ["EXIT", "/app/modules/exit", <PackageOpen key="exit" size={14} />],
-                        ["FAIL", "/app/modules/fail", <ShieldAlert key="fail" size={14} />],
-                        ["CLEAN", "/app/modules/clean", <BadgeCheck key="clean" size={14} />],
-                      ].map(([label, to, icon]) => (
-                        <NavLink
-                          key={String(label)}
-                          to={String(to)}
-                          className="app-nav-popover-link"
-                          role="menuitem"
-                        >
-                          {icon} {label}
-                        </NavLink>
-                      ))}
-                      <NavLink
-                        to="/app/modules"
-                        end
-                        className="app-nav-popover-link"
-                        role="menuitem"
-                      >
-                        {locale === "fr" ? "Vue d’ensemble" : "Overview"}
-                      </NavLink>
-                      <NavLink to="/app/scan" className="app-nav-popover-link" role="menuitem">
-                        {locale === "fr" ? "Scanner une adresse" : "Scan an address"}
-                      </NavLink>
-                      <NavLink to="/app/interact" className="app-nav-popover-link" role="menuitem">
-                        {locale === "fr" ? "Interaction navigateur" : "Browser interaction"}
-                      </NavLink>
-                    </div>
-                  ) : null}
-                </div>
-                <NavLink to="/app/cli" className="app-toplink">
-                  {t("ws.nav.cli")}
-                </NavLink>
-                <NavLink to="/app/ai" className="app-toplink">
-                  {t("ws.nav.ai")}
-                </NavLink>
-              </>
-            ) : null}
-          </nav>
 
           <div className="app-top-actions">
             <label className="sr-only" htmlFor="workspace-switcher">
@@ -564,33 +483,6 @@ export function AppLayout() {
               </select>
               <ChevronDown size={13} aria-hidden />
             </div>
-
-            {projects.length > 0 ? (
-              <>
-                <label className="sr-only" htmlFor="project-switcher">
-                  {t("ws.shell.project")}
-                </label>
-                <div className="app-shell-select-wrap app-project-pill">
-                  <select
-                    id="project-switcher"
-                    className="app-shell-pill app-shell-select"
-                    value={currentProjectId}
-                    onChange={(event) => {
-                      const id = event.target.value;
-                      navigate(id ? `/app/projects/${id}` : "/app/projects");
-                    }}
-                  >
-                    <option value="">{t("ws.shell.allProjects")}</option>
-                    {projects.map((project) => (
-                      <option key={project.id} value={project.id}>
-                        {project.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown size={13} aria-hidden />
-                </div>
-              </>
-            ) : null}
 
             <NavLink
               to="/app/notifications"
