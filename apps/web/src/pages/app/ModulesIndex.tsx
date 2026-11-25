@@ -162,13 +162,13 @@ export function ModulesIndexPage() {
           const covered = Boolean(record?.lastRunAt || latestAudit);
           const badgeStatus = record?.lastRunAt
             ? record.status
-              : latestAudit?.worstVerdict === "fail"
-                ? "FAILED"
-                : latestAudit?.worstVerdict === "warnings"
-                  ? "PARTIAL"
-                  : latestAudit
-                    ? "COMPLETED"
-                    : "";
+            : latestAudit?.worstVerdict === "fail"
+              ? "FAILED"
+              : latestAudit?.worstVerdict === "warnings"
+                ? "PARTIAL"
+                : latestAudit
+                  ? "COMPLETED"
+                  : "";
           return (
             <Link
               key={module.id}
