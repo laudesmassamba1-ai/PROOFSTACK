@@ -16,9 +16,11 @@ Vocabulaire :
 
 - Le parcours Start/Scan utilise `POST /api/v1/audits` et enregistre un `PageAudit` dans
   l'historique des scans. Ce n'est pas le même objet qu'un `EngineRun`.
-- Les outils IA `module_run` pour FAIL/CLEAN appellent actuellement le scanner HTTP et
-  renvoient les constats dans la conversation. Ce chemin ne crée pas de `PageAudit`, de
-  `EngineRun` ni de rapport commun : `runId` et `reportId` restent nuls.
+- Les outils IA `module_run` pour FAIL/CLEAN appellent le scanner HTTP et enregistrent
+  un `PageAudit` dans l'historique des scans. Ce chemin ne crée pas d'`EngineRun` ni de
+  `RunReport` : `auditId` identifie l'audit de page, tandis que `runId` et `reportId`
+  restent nuls par conception. `module_status` expose le dernier audit et `get_report`
+  peut relire son contenu via `auditId`.
 - WORLD et les scénarios FLOW compatibles avec le moteur serveur créent un run persistant
   et soumis au quota de runs. Les journeys Chromium restent locaux à la CLI.
 - EXIT reste local dans le Worker lorsque sa source nécessite un fichier ou une commande.
@@ -58,7 +60,7 @@ Vocabulaire :
 | Fencing des contenus non fiables            | `project-intelligence.ts`                           | `untrusted-file-content.test.ts` (6)             | oui         | API                               | non                 | VÉRIFIÉ                                        |
 | Mémoire IA auditable/supprimable            | `routes/ai.ts`, `workspace_memory`                  | `ai.test.ts`                                     | oui         | API + UI                          | non                 | VÉRIFIÉ (hors prod)                            |
 | Moteur commun + WORLD/FLOW/EXIT             | `packages/engine`, `modules/*`                      | `engine`, `world`, `flow`, `exit`                | oui         | CLI + API                         | non                 | VÉRIFIÉ (hors prod)                            |
-| FAIL / CLEAN (HTTP)                         | `packages/core/page-scan.ts`, `routes/audits.ts`     | `page-audits.test.ts`, `page-scan.test.ts`       | oui         | `/app/scan` + API                 | non                 | PARTIEL — page audits persistés via scan ; module-copilot live scan sans run commun ; pas de CLI `audit --sync` |
+| FAIL / CLEAN (HTTP)                         | `packages/core/page-scan.ts`, `routes/audits.ts`     | `page-audits.test.ts`, `page-scan.test.ts`       | oui         | `/app/scan` + API                 | non                 | PARTIEL — PageAudit persisté via scan Web et module_run IA ; distinct des EngineRuns ; pas de CLI `audit --sync` |
 | Rapports JSON/JUnit/HTML/texte              | `adapters/reporting`                                | `statuses.test.ts`, CLI                          | oui         | web + CLI                         | non                 | VÉRIFIÉ                                        |
 | Export PDF/CSV de rapport                   | aucun                                               | aucun                                            | —           | —                                 | —                   | ABSENT                                         |
 | Partage de rapport / lien public            | aucun                                               | aucun                                            | —           | —                                 | —                   | ABSENT                                         |
