@@ -65,6 +65,7 @@ The following are current limitations, not historical claims. Keep them aligned 
 `docs/PROOFCORE_CAPABILITY_MATRIX.md` and the actual code.
 
 ### Accounts and identity
+
 - Password recovery, email-verification requests/confirmation, session listing/revocation
   and account deletion are implemented and covered by API tests.
 - Email verification is not enforced at sign-in. Sign-up reveals an already-used address
@@ -74,6 +75,7 @@ The following are current limitations, not historical claims. Keep them aligned 
   Real transactional delivery is **NON VÉRIFIÉ**.
 
 ### Product and reports
+
 - Four entitlements remain unimplemented and are labelled "coming": GitHub integration,
   client sharing, advanced reports and priority support.
 - The legal routes/templates and their publication readiness must be treated separately:
@@ -84,6 +86,7 @@ The following are current limitations, not historical claims. Keep them aligned 
 - Pagination exists (`limit`/`offset` and migration indexes); full-text search is absent.
 
 ### Module execution and persistence
+
 - WORLD remains HTTP/fixture based.
 - FLOW browser journeys execute locally through Chromium/CDP in the CLI. The Cloudflare
   Worker has no browser, so browser-only journeys are skipped/not runnable there.
@@ -100,6 +103,7 @@ The following are current limitations, not historical claims. Keep them aligned 
   Never describe a one-page scan as a full-site audit.
 
 ### Infrastructure and security
+
 - No retention job and no tested backup/restore procedure.
 - No distributed limiter yet for registration and AI calls; per-isolate in-memory limits
   are not global across Workers.
@@ -109,6 +113,7 @@ The following are current limitations, not historical claims. Keep them aligned 
 - Do not infer production security from local unit tests alone.
 
 ### Distribution and external services
+
 - The CLI can be packaged as a self-contained local tarball with `pnpm cli:package`
   / installed with `pnpm cli:install`. The workspace package `@proofcore/cli` is
   private. Registry publication/version parity must be verified independently before
@@ -121,6 +126,7 @@ The following are current limitations, not historical claims. Keep them aligned 
   metadata/assets. Local package creation alone does not verify update delivery.
 
 ### Evidence discipline
+
 - The last documented local verification reports 811 Vitest tests, 36 E2E tests with
   2 skipped, lint/typecheck/build success and 42 route/viewport layout checks. These are
   recorded results, not proof that every later commit or the production deployment
