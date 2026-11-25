@@ -94,6 +94,54 @@ interface Finding {
   detectedAt: string;
 }
 
+interface PageAuditSummary {
+  id: string;
+  url: string;
+  finalUrl: string;
+  status: number;
+  durationMs: number;
+  worstVerdict: string;
+  failed: number;
+  warnings: number;
+  ownership: string;
+  redacted: boolean;
+  projectId: string | null;
+  createdAt: string;
+}
+
+interface PageAuditFinding {
+  id: string;
+  module: string;
+  status: string;
+  observed: string;
+  why: string;
+}
+
+interface PageAuditModuleSummary {
+  module: string;
+  passed: number;
+  failed: number;
+  warnings: number;
+  skipped: number;
+  score: number;
+  verdict: string;
+}
+
+interface PageAuditDetail {
+  result: {
+    findings?: PageAuditFinding[];
+    modules?: PageAuditModuleSummary[];
+  };
+}
+
+function auditBadgeStatus(verdict: string): string {
+  if (verdict === "fail") return "FAILED";
+  if (verdict === "warnings") return "PARTIAL";
+  if (verdict === "pass") return "COMPLETED";
+  return "NOT_MEASURED";
+}
+
+
 const ZERO = { passed: 0, failed: 0, warnings: 0, errors: 0, skipped: 0, total: 0 };
 
 export function ModulePage() {
@@ -114,20 +162,44 @@ export function ModulePage() {
   const { theme } = useTheme();
   const [runs, setRuns] = useState<ModuleRun[] | null>(null);
   const [findings, setFindings] = useState<Finding[]>([]);
+  const [pageAudits, setPageAudits] = useState<PageAuditSummary[]>([]);
+  const [pageAuditDetail, setPageAuditDetail] = useState<PageAuditDetail | null>(null);
   const [error, setError] = useState<ApiError | Error | null>(null);
 
   const load = useCallback(async () => {
     if (!workspaceId || !module) return;
     setError(null);
     try {
-      const [runBody, findingBody] = await Promise.all([
+      const isPageAuditModule = module === "fail" || module === "clean";
+      const [runBody, findingBody, auditBody] = await Promise.all([
         apiFetch<{ items: ModuleRun[] }>(`/api/v1/runs?workspaceId=${workspaceId}&limit=50`),
         apiFetch<{ items: Finding[] }>(
           `/api/v1/findings?workspaceId=${workspaceId}&module=${module}`
         ),
+        isPageAuditModule
+          ? apiFetch<{ items: PageAuditSummary[] }>(
+              `/api/v1/audits?workspaceId=${workspaceId}&limit=50`
+            )
+          : Promise.resolve({ items: [] as PageAuditSummary[] }),
       ]);
       setRuns(runBody.items.filter((run) => run.totals[module] !== undefined));
       setFindings(findingBody.items);
+      setPageAudits(auditBody.items);
+
+      const latestAudit = auditBody.items[0];
+      if (isPageAuditModule && latestAudit) {
+        try {
+          const detail = await apiFetch<PageAuditDetail>(
+            `/api/v1/audits/${latestAudit.id}?workspaceId=${workspaceId}`
+          );
+          setPageAuditDetail(detail);
+        } catch {
+          // The summary remains useful even when the detail payload is unavailable.
+          setPageAuditDetail(null);
+        }
+      } else {
+        setPageAuditDetail(null);
+      }
     } catch (caught) {
       setError(caught as ApiError);
     }
@@ -171,7 +243,16 @@ export function ModulePage() {
 
   const latest = runs[0];
   const latestTotals = latest?.totals[module] ?? ZERO;
+  const isPageAuditModule = module === "fail" || module === "clean";
+  const latestPageAudit = isPageAuditModule ? (pageAudits[0] ?? null) : null;
+  const pageModuleSummary =
+    pageAuditDetail?.result.modules?.find((item) => item.module === module) ?? null;
+  const pageModuleFindings =
+    pageAuditDetail?.result.findings?.filter((item) => item.module === module) ?? [];
+  const visiblePageFindings = pageModuleFindings.filter((item) => item.status !== "PASS");
   const hasRun = Boolean(latest);
+  const hasPageAudit = Boolean(latestPageAudit);
+  const projectForCodeAudit = latest?.projectId ?? latestPageAudit?.projectId ?? null;
 
   return (
     <div className={`app-page app-module-page module-${module}`}>
@@ -189,7 +270,11 @@ export function ModulePage() {
                   status: latest.status.toLowerCase(),
                   time: relativeTime(latest.startedAt),
                 })
-              : t("ws.module.state.empty", { module: meta.name })}
+              : hasPageAudit && latestPageAudit
+                ? fr
+                  ? `Dernier scan de page · ${relativeTime(latestPageAudit.createdAt)}`
+                  : `Latest page scan · ${relativeTime(latestPageAudit.createdAt)}`
+                : t("ws.module.state.empty", { module: meta.name })}
           </p>
         </div>
         <div className="app-module-object-stage">
@@ -199,26 +284,59 @@ export function ModulePage() {
           />
         </div>
         <div className="app-module-figures">
-          <div>
-            <span className="app-module-figure">{latestTotals.passed}</span>
-            <span className="app-eyebrow">{t("ws.module.passed")}</span>
-          </div>
-          <div>
-            <span className={`app-module-figure ${latestTotals.failed > 0 ? "is-danger" : ""}`}>
-              {latestTotals.failed}
-            </span>
-            <span className="app-eyebrow">{t("ws.module.failed")}</span>
-          </div>
-          <div>
-            <span className="app-module-figure">{latestTotals.skipped}</span>
-            <span className="app-eyebrow">{t("ws.module.skipped")}</span>
-          </div>
-          <div>
-            <span className="app-module-figure app-module-figure-small">
-              {latestTotals.warnings}
-            </span>
-            <span className="app-eyebrow">{t("ws.module.warnings")}</span>
-          </div>
+          {isPageAuditModule ? (
+            <>
+              <div>
+                <span className="app-module-figure">
+                  {pageModuleSummary?.score ?? "—"}
+                </span>
+                <span className="app-eyebrow">{fr ? "Score / 100" : "Score / 100"}</span>
+              </div>
+              <div>
+                <span
+                  className={`app-module-figure ${(pageModuleSummary?.failed ?? 0) > 0 ? "is-danger" : ""}`}
+                >
+                  {pageModuleSummary?.failed ?? "—"}
+                </span>
+                <span className="app-eyebrow">{t("ws.module.failed")}</span>
+              </div>
+              <div>
+                <span className="app-module-figure">{pageModuleSummary?.skipped ?? "—"}</span>
+                <span className="app-eyebrow">{t("ws.module.skipped")}</span>
+              </div>
+              <div>
+                <span className="app-module-figure app-module-figure-small">
+                  {pageModuleSummary?.warnings ?? "—"}
+                </span>
+                <span className="app-eyebrow">{t("ws.module.warnings")}</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <span className="app-module-figure">{latestTotals.passed}</span>
+                <span className="app-eyebrow">{t("ws.module.passed")}</span>
+              </div>
+              <div>
+                <span
+                  className={`app-module-figure ${latestTotals.failed > 0 ? "is-danger" : ""}`}
+                >
+                  {latestTotals.failed}
+                </span>
+                <span className="app-eyebrow">{t("ws.module.failed")}</span>
+              </div>
+              <div>
+                <span className="app-module-figure">{latestTotals.skipped}</span>
+                <span className="app-eyebrow">{t("ws.module.skipped")}</span>
+              </div>
+              <div>
+                <span className="app-module-figure app-module-figure-small">
+                  {latestTotals.warnings}
+                </span>
+                <span className="app-eyebrow">{t("ws.module.warnings")}</span>
+              </div>
+            </>
+          )}
         </div>
       </section>
 
@@ -237,9 +355,23 @@ export function ModulePage() {
                   skipped: latestTotals.skipped,
                   warnings: latestTotals.warnings,
                 })
-              : t("ws.module.latestNone")}
+              : hasPageAudit && pageModuleSummary
+                ? fr
+                  ? `${pageModuleSummary.passed} réussi(s) · ${pageModuleSummary.failed} échec(s) · ${pageModuleSummary.warnings} avertissement(s)`
+                  : `${pageModuleSummary.passed} passed · ${pageModuleSummary.failed} failed · ${pageModuleSummary.warnings} warnings`
+                : hasPageAudit
+                  ? fr
+                    ? "Scan enregistré · détails partiels"
+                    : "Scan saved · partial details"
+                  : t("ws.module.latestNone")}
           </span>
-          {latest ? <StatusBadge status={latest.status} /> : null}
+          {latest ? (
+            <StatusBadge status={latest.status} />
+          ) : hasPageAudit ? (
+            <StatusBadge
+              status={auditBadgeStatus(pageModuleSummary?.verdict ?? latestPageAudit?.worstVerdict ?? "")}
+            />
+          ) : null}
         </div>
       </section>
 
@@ -258,7 +390,7 @@ export function ModulePage() {
           </p>
         </div>
         <Link
-          to={latest?.projectId ? `/app/projects/${latest.projectId}?tab=ai` : "/app/projects"}
+          to={projectForCodeAudit ? `/app/projects/${projectForCodeAudit}?tab=ai` : "/app/projects"}
           className="app-btn app-btn-primary app-btn-sm"
         >
           <Brain size={13} />
@@ -268,6 +400,76 @@ export function ModulePage() {
       </section>
 
       <div className="app-module-body-grid">
+        {isPageAuditModule ? (
+          <section className="app-workbench" aria-labelledby="module-page-audits-title">
+            <header className="app-workbench-head">
+              <div>
+                <p className="app-eyebrow">02 / {fr ? "HISTORIQUE DES SCANS" : "PAGE SCAN HISTORY"}</p>
+                <h2 id="module-page-audits-title" className="app-workbench-title">
+                  {fr ? "Audits de pages" : "Page audits"}
+                </h2>
+                <p>
+                  {fr
+                    ? "Les audits FAIL/CLEAN sont conservés dans l'historique des scans de pages, séparément des exécutions du moteur."
+                    : "FAIL/CLEAN audits are stored in page-scan history, separately from engine runs."}
+                </p>
+              </div>
+              <span className="app-count-mark">{pageAudits.length}</span>
+            </header>
+            {pageAudits.length === 0 ? (
+              <Empty
+                title={fr ? "Aucun scan de page pour le moment" : "No page scan yet"}
+                body={t(meta.body)}
+                tester="working"
+                action={
+                  <Link to="/app/scan" className="app-btn app-btn-primary">
+                    <ScanLine size={13} /> {fr ? "Scanner une adresse" : "Scan an address"}
+                  </Link>
+                }
+              />
+            ) : (
+              <div className="app-table-wrap">
+                <table className="app-table">
+                  <thead>
+                    <tr>
+                      <th>{fr ? "Adresse" : "Address"}</th>
+                      <th>{fr ? "Verdict du scan" : "Scan verdict"}</th>
+                      <th>{fr ? "Date" : "Date"}</th>
+                      <th>HTTP</th>
+                      <th>{fr ? "Constats globaux" : "All-check findings"}</th>
+                      <th>{fr ? "Rapport" : "Report"}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pageAudits.map((audit) => (
+                      <tr key={audit.id}>
+                        <td className="max-w-[240px] truncate font-medium">{audit.url}</td>
+                        <td>
+                          <StatusBadge status={auditBadgeStatus(audit.worstVerdict)} />
+                        </td>
+                        <td className="text-muted">{relativeTime(audit.createdAt)}</td>
+                        <td className="tabular-nums">{audit.status}</td>
+                        <td className="tabular-nums">
+                          {audit.failed} / {audit.warnings}
+                        </td>
+                        <td>
+                          <Link to={`/app/scan?audit=${encodeURIComponent(audit.id)}`} className="app-text-link">
+                            {fr ? "Ouvrir" : "Open"} <ArrowRight size={12} />
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="mt-2 text-xs text-muted">
+                  {fr
+                    ? "Les nombres de constats affichés ici couvrent l'ensemble du scan (FAIL + CLEAN). Les chiffres du module ci-dessus sont filtrés sur ce module."
+                    : "Finding counts here cover the whole scan (FAIL + CLEAN). The figures above are filtered to this module."}
+                </p>
+              </div>
+            )}
+          </section>
+        ) : (
         <section className="app-workbench" aria-labelledby="module-runs-title">
           <header className="app-workbench-head">
             <div>
@@ -331,6 +533,7 @@ export function ModulePage() {
             </div>
           )}
         </section>
+        )}
 
         <aside className="app-module-side">
           <section className="app-command-sheet">
@@ -356,9 +559,46 @@ export function ModulePage() {
                   {t("ws.module.findings")}
                 </h2>
               </div>
-              <span className="app-count-mark">{findings.length}</span>
+              <span className="app-count-mark">{isPageAuditModule ? visiblePageFindings.length : findings.length}</span>
             </header>
-            {findings.length === 0 ? (
+            {isPageAuditModule ? (
+              visiblePageFindings.length === 0 ? (
+                <Empty
+                  title={fr ? "Aucun constat pour ce module" : "No finding for this module"}
+                  body={
+                    hasPageAudit
+                      ? fr
+                        ? "Le dernier scan n'a pas relevé d'échec ou d'avertissement dans ce module."
+                        : "The latest scan found no failure or warning in this module."
+                      : t("ws.module.findings.empty")
+                  }
+                  tester={false}
+                />
+              ) : (
+                <ul className="app-failure-list">
+                  {visiblePageFindings.slice(0, 8).map((finding) => (
+                    <li key={finding.id}>
+                      <div className="app-finding-static">
+                        <span className="app-failure-glyph" aria-hidden>
+                          {finding.status === "FAIL" ? "×" : "!"}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="app-failure-title">{finding.why}</span>
+                          <span className="app-failure-meta">
+                            <span className="app-mono">{finding.id}</span> · {finding.observed}
+                          </span>
+                        </span>
+                        <span
+                          className={`app-badge ${finding.status === "FAIL" ? "app-badge-danger" : "app-badge-warning"}`}
+                        >
+                          {finding.status}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )
+            ) : findings.length === 0 ? (
               <Empty
                 title={t("ws.module.findings")}
                 body={t("ws.module.findings.empty")}
