@@ -11,6 +11,23 @@ Vocabulaire :
 - **ABSENT** : non implémenté, non présenté comme disponible.
 - **NON VÉRIFIÉ** : code présent, preuve externe impossible sans credentials.
 
+
+## 2. Limites précises des chemins d'exécution
+
+- Le parcours Start/Scan utilise `POST /api/v1/audits` et enregistre un `PageAudit` dans
+  l'historique des scans. Ce n'est pas le même objet qu'un `EngineRun`.
+- Les outils IA `module_run` pour FAIL/CLEAN appellent actuellement le scanner HTTP et
+  renvoient les constats dans la conversation. Ce chemin ne crée pas de `PageAudit`, de
+  `EngineRun` ni de rapport commun : `runId` et `reportId` restent nuls.
+- WORLD et les scénarios FLOW compatibles avec le moteur serveur créent un run persistant
+  et soumis au quota de runs. Les journeys Chromium restent locaux à la CLI.
+- EXIT reste local dans le Worker lorsque sa source nécessite un fichier ou une commande.
+  Même une source HTTP ne doit pas être déclarée exécutée côté Worker tant que le code ne
+  fournit pas un chemin d'exécution et une preuve correspondants.
+- Un assistant peut expliquer le résultat d'un outil dans la conversation sans que ce
+  résultat soit automatiquement une entrée d'historique. La présence d'un message IA ne
+  prouve donc pas la persistance de l'analyse.
+
 ## 1. Tableau de preuve
 
 | Fonction                                    | Code présent                                        | Test exécuté                                     | Test réussi | Parcours vérifié                  | Production vérifiée | Statut                                         |
@@ -36,12 +53,12 @@ Vocabulaire :
 | Limitation IA distribuée                    | limiteur mémoire + quota                            | `ai.test.ts`                                     | oui (quota) | API                               | non                 | PARTIEL — le limiteur par isolate ne l'est pas |
 | Chiffrement des clés IA                     | `ai-crypto.ts`                                      | `ai.test.ts`                                     | oui         | clé jamais renvoyée               | non                 | VÉRIFIÉ (hors prod)                            |
 | Assistant IA contextuel (19 outils)         | `routes/ai.ts`, `module-copilot.ts`                 | `ai.test.ts`, `module-copilot.test.ts`           | oui         | web `/app/ai`                     | non                 | PARTIEL — fournisseur réel non vérifié         |
-| IA ↔ 5 modules (état, config, run, analyse) | `module-copilot.ts`                                 | `module-copilot.test.ts` (5 tests)               | oui         | web `/app/ai` + API               | non                 | VÉRIFIÉ (hors prod)                            |
+| Copilot : état/config/run des 5 modules | `module-copilot.ts`, `routes/ai.ts`                 | `module-copilot.test.ts`                         | oui         | web `/app/ai` + API               | non                 | PARTIEL — WORLD/FLOW runs persistés ; FAIL/CLEAN live sans run ; EXIT local-only |
 | FLOW navigateur réel (journey)              | `packages/cli/src/journey-runner.ts`                | `journey-browser.test.ts` (Chromium)             | oui         | CLI locale                        | non                 | VÉRIFIÉ (machine de test)                      |
 | Fencing des contenus non fiables            | `project-intelligence.ts`                           | `untrusted-file-content.test.ts` (6)             | oui         | API                               | non                 | VÉRIFIÉ                                        |
 | Mémoire IA auditable/supprimable            | `routes/ai.ts`, `workspace_memory`                  | `ai.test.ts`                                     | oui         | API + UI                          | non                 | VÉRIFIÉ (hors prod)                            |
 | Moteur commun + WORLD/FLOW/EXIT             | `packages/engine`, `modules/*`                      | `engine`, `world`, `flow`, `exit`                | oui         | CLI + API                         | non                 | VÉRIFIÉ (hors prod)                            |
-| FAIL / CLEAN (HTTP)                         | `packages/core/page-scan.ts`                        | `page-audits.test.ts`, `page-scan.test.ts`       | oui         | `/app/scan` + API                 | non                 | PARTIEL — pas d'upload CLI `--sync`            |
+| FAIL / CLEAN (HTTP)                         | `packages/core/page-scan.ts`, `routes/audits.ts`     | `page-audits.test.ts`, `page-scan.test.ts`       | oui         | `/app/scan` + API                 | non                 | PARTIEL — page audits persistés via scan ; module-copilot live scan sans run commun ; pas de CLI `audit --sync` |
 | Rapports JSON/JUnit/HTML/texte              | `adapters/reporting`                                | `statuses.test.ts`, CLI                          | oui         | web + CLI                         | non                 | VÉRIFIÉ                                        |
 | Export PDF/CSV de rapport                   | aucun                                               | aucun                                            | —           | —                                 | —                   | ABSENT                                         |
 | Partage de rapport / lien public            | aucun                                               | aucun                                            | —           | —                                 | —                   | ABSENT                                         |
