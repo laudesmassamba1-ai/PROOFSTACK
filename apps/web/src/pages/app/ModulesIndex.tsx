@@ -160,11 +160,7 @@ export function ModulesIndexPage() {
           const isPageAudit = module.id === "fail" || module.id === "clean";
           const latestAudit = isPageAudit ? (pageAudits[0] ?? null) : null;
           const covered = Boolean(record?.lastRunAt || latestAudit);
-          const badgeStatus = record?.lastRunAt
-            ? record.status
-            : latestAudit
-              ? "COMPLETED"
-              : "";
+          const badgeStatus = record?.lastRunAt ? record.status : latestAudit ? "COMPLETED" : "";
           return (
             <Link
               key={module.id}
