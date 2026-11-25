@@ -579,7 +579,8 @@ const TOOLS: { name: string; description: string; parameters: Record<string, unk
         module: { type: "string", enum: ["world", "flow", "exit", "fail", "clean"] },
         url: {
           type: "string",
-          description: "FAIL/CLEAN only; defaults to the project base URL. Must use the exact same origin (scheme, host and port). Must use the exact same origin (scheme, host and port).",
+          description:
+            "FAIL/CLEAN only; defaults to the project base URL. Must use the exact same origin (scheme, host and port).",
         },
         onlyCases: {
           type: "array",
@@ -1976,21 +1977,24 @@ async function executeTool(
             };
           }
           return {
-            content: stableStringify({
-              id: String(row.id),
-              projectId: row.project_id ? String(row.project_id) : null,
-              createdAt: String(row.created_at),
-              url: String(row.url),
-              finalUrl: String(row.final_url),
-              httpStatus: Number(row.status),
-              durationMs: Number(row.duration_ms),
-              worstVerdict: String(row.worst_verdict),
-              failed: Number(row.failed),
-              warnings: Number(row.warnings),
-              ownership: String(row.ownership ?? "unverified"),
-              redacted: Boolean(Number(row.redacted ?? 1)),
-              result: JSON.parse(String(row.payload)) as unknown,
-            }, 2),
+            content: stableStringify(
+              {
+                id: String(row.id),
+                projectId: row.project_id ? String(row.project_id) : null,
+                createdAt: String(row.created_at),
+                url: String(row.url),
+                finalUrl: String(row.final_url),
+                httpStatus: Number(row.status),
+                durationMs: Number(row.duration_ms),
+                worstVerdict: String(row.worst_verdict),
+                failed: Number(row.failed),
+                warnings: Number(row.warnings),
+                ownership: String(row.ownership ?? "unverified"),
+                redacted: Boolean(Number(row.redacted ?? 1)),
+                result: JSON.parse(String(row.payload)) as unknown,
+              },
+              2
+            ),
             summary: `page audit · ${String(row.worst_verdict)} · ${Number(row.failed)} fail`,
           };
         }
