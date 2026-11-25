@@ -141,7 +141,6 @@ function auditBadgeStatus(verdict: string): string {
   return "NOT_MEASURED";
 }
 
-
 const ZERO = { passed: 0, failed: 0, warnings: 0, errors: 0, skipped: 0, total: 0 };
 
 export function ModulePage() {
@@ -287,9 +286,7 @@ export function ModulePage() {
           {isPageAuditModule ? (
             <>
               <div>
-                <span className="app-module-figure">
-                  {pageModuleSummary?.score ?? "—"}
-                </span>
+                <span className="app-module-figure">{pageModuleSummary?.score ?? "—"}</span>
                 <span className="app-eyebrow">{fr ? "Score / 100" : "Score / 100"}</span>
               </div>
               <div>
@@ -318,9 +315,7 @@ export function ModulePage() {
                 <span className="app-eyebrow">{t("ws.module.passed")}</span>
               </div>
               <div>
-                <span
-                  className={`app-module-figure ${latestTotals.failed > 0 ? "is-danger" : ""}`}
-                >
+                <span className={`app-module-figure ${latestTotals.failed > 0 ? "is-danger" : ""}`}>
                   {latestTotals.failed}
                 </span>
                 <span className="app-eyebrow">{t("ws.module.failed")}</span>
@@ -369,7 +364,9 @@ export function ModulePage() {
             <StatusBadge status={latest.status} />
           ) : hasPageAudit ? (
             <StatusBadge
-              status={auditBadgeStatus(pageModuleSummary?.verdict ?? latestPageAudit?.worstVerdict ?? "")}
+              status={auditBadgeStatus(
+                pageModuleSummary?.verdict ?? latestPageAudit?.worstVerdict ?? ""
+              )}
             />
           ) : null}
         </div>
@@ -404,7 +401,9 @@ export function ModulePage() {
           <section className="app-workbench" aria-labelledby="module-page-audits-title">
             <header className="app-workbench-head">
               <div>
-                <p className="app-eyebrow">02 / {fr ? "HISTORIQUE DES SCANS" : "PAGE SCAN HISTORY"}</p>
+                <p className="app-eyebrow">
+                  02 / {fr ? "HISTORIQUE DES SCANS" : "PAGE SCAN HISTORY"}
+                </p>
                 <h2 id="module-page-audits-title" className="app-workbench-title">
                   {fr ? "Audits de pages" : "Page audits"}
                 </h2>
@@ -453,7 +452,10 @@ export function ModulePage() {
                           {audit.failed} / {audit.warnings}
                         </td>
                         <td>
-                          <Link to={`/app/scan?audit=${encodeURIComponent(audit.id)}`} className="app-text-link">
+                          <Link
+                              to={`/app/scan?audit=${encodeURIComponent(audit.id)}`}
+                              className="app-text-link"
+                            >
                             {fr ? "Ouvrir" : "Open"} <ArrowRight size={12} />
                           </Link>
                         </td>
@@ -470,69 +472,69 @@ export function ModulePage() {
             )}
           </section>
         ) : (
-        <section className="app-workbench" aria-labelledby="module-runs-title">
-          <header className="app-workbench-head">
-            <div>
-              <p className="app-eyebrow">02 / {t("ws.module.runs")}</p>
-              <h2 id="module-runs-title" className="app-workbench-title">
-                {t("ws.module.runs")}
-              </h2>
-              <p>{t("ws.module.runs.body")}</p>
-            </div>
-            <span className="app-count-mark">{runs.length}</span>
-          </header>
-          {runs.length === 0 ? (
-            <Empty
-              title={`${meta.name} has not run yet`}
-              body={t(meta.body)}
-              tester="working"
-              action={
-                // Two ways in, and the one that needs no install comes first: a module that
-                // cannot be started from the browser reads as documentation, not as a tool.
-                <div className="flex flex-wrap gap-2">
-                  <Link to="/app/scan" className="app-btn app-btn-primary">
-                    <ScanLine size={13} /> {t("ws.module.runNow")}
-                  </Link>
-                  <Link to="/app/projects" className="app-btn">
-                    {t("ws.module.configure")} <ArrowRight size={13} />
-                  </Link>
-                </div>
-              }
-            />
-          ) : (
-            <div className="app-table-wrap">
-              <table className="app-table">
-                <thead>
-                  <tr>
-                    <th>{t("ws.module.project")}</th>
-                    <th>{t("ws.module.status")}</th>
-                    <th>{t("ws.module.started")}</th>
-                    <th>{t("ws.module.duration")}</th>
-                    <th>{t("ws.module.passFail")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {runs.map((run) => {
-                    const totals = run.totals[module] ?? ZERO;
-                    return (
-                      <tr key={run.id}>
-                        <td className="font-medium">{run.projectName}</td>
-                        <td>
-                          <StatusBadge status={run.status} />
-                        </td>
-                        <td className="text-muted">{relativeTime(run.startedAt)}</td>
-                        <td className="text-muted">{duration(run.durationMs)}</td>
-                        <td className="tabular-nums">
-                          {totals.passed} / {totals.failed}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+          <section className="app-workbench" aria-labelledby="module-runs-title">
+            <header className="app-workbench-head">
+              <div>
+                <p className="app-eyebrow">02 / {t("ws.module.runs")}</p>
+                <h2 id="module-runs-title" className="app-workbench-title">
+                  {t("ws.module.runs")}
+                </h2>
+                <p>{t("ws.module.runs.body")}</p>
+              </div>
+              <span className="app-count-mark">{runs.length}</span>
+            </header>
+            {runs.length === 0 ? (
+              <Empty
+                title={`${meta.name} has not run yet`}
+                body={t(meta.body)}
+                tester="working"
+                action={
+                  // Two ways in, and the one that needs no install comes first: a module that
+                  // cannot be started from the browser reads as documentation, not as a tool.
+                  <div className="flex flex-wrap gap-2">
+                    <Link to="/app/scan" className="app-btn app-btn-primary">
+                      <ScanLine size={13} /> {t("ws.module.runNow")}
+                    </Link>
+                    <Link to="/app/projects" className="app-btn">
+                      {t("ws.module.configure")} <ArrowRight size={13} />
+                    </Link>
+                  </div>
+                }
+              />
+            ) : (
+              <div className="app-table-wrap">
+                <table className="app-table">
+                  <thead>
+                    <tr>
+                      <th>{t("ws.module.project")}</th>
+                      <th>{t("ws.module.status")}</th>
+                      <th>{t("ws.module.started")}</th>
+                      <th>{t("ws.module.duration")}</th>
+                      <th>{t("ws.module.passFail")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {runs.map((run) => {
+                      const totals = run.totals[module] ?? ZERO;
+                      return (
+                        <tr key={run.id}>
+                          <td className="font-medium">{run.projectName}</td>
+                          <td>
+                            <StatusBadge status={run.status} />
+                          </td>
+                          <td className="text-muted">{relativeTime(run.startedAt)}</td>
+                          <td className="text-muted">{duration(run.durationMs)}</td>
+                          <td className="tabular-nums">
+                            {totals.passed} / {totals.failed}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
         )}
 
         <aside className="app-module-side">
