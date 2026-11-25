@@ -521,7 +521,7 @@ const TOOLS: { name: string; description: string; parameters: Record<string, unk
   {
     name: "module_status",
     description:
-      "All five modules for one project: enabled, configured, blockers, whether this runtime can launch them, the last stored run, and the exact run command. Call this before claiming a module is ready or missing.",
+      "All five modules for one project: enabled, configured, blockers, runtime capability, and the exact local/server run command. A last stored run is shown only where that module writes to the shared run history; live FAIL/CLEAN page scans currently return findings without a run record. Call this before claiming a module is ready or missing.",
     parameters: {
       type: "object",
       properties: {
@@ -536,7 +536,7 @@ const TOOLS: { name: string; description: string; parameters: Record<string, unk
   {
     name: "module_config",
     description:
-      "The active, schema-valid configuration of one module (WORLD, FLOW, EXIT, FAIL, CLEAN), plus the vocabulary that module accepts and any issue or blocker. Read this before proposing a change.",
+      "The active configuration and accepted vocabulary for one module. WORLD, FLOW and EXIT have persisted project settings validated by their real schemas. FAIL and CLEAN are URL-driven HTTP audits and currently have no persisted module settings. Read this before proposing a change.",
     parameters: {
       type: "object",
       properties: {
@@ -571,7 +571,7 @@ const TOOLS: { name: string; description: string; parameters: Record<string, unk
   {
     name: "module_run",
     description:
-      "Launch one module on the real engine. FAIL/CLEAN scan the project's own URL over HTTP; WORLD and FLOW run against the configured target and store a metered run in history. EXIT and browser-only FLOW journeys report not_runnable_here with the local command instead of pretending. Set confirm:true only when the user asked to run tests.",
+      "Launch one module using the runtime capabilities below. WORLD and configured HTTP-backed FLOW execute the real engine and persist a metered run in shared history. FAIL/CLEAN currently perform a live HTTP page scan and return findings directly; they return runId=null/reportId=null and do NOT create a stored run or history entry. EXIT is local-only and returns NOT_RUNNABLE_HERE with the exact CLI instruction. Browser-only FLOW journeys are also local Chromium work and are not executed by the Worker. Never describe a live scan as a stored run. Set confirm:true only after the user explicitly asked to execute the check.",
     parameters: {
       type: "object",
       properties: {
