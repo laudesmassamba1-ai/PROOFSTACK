@@ -625,11 +625,13 @@ const TOOLS: { name: string; description: string; parameters: Record<string, unk
   {
     name: "get_report",
     description:
-      "The full stored report payload for one run id (requires a prior recent_runs call).",
+      "Retrieve stored evidence. Pass runId for a shared EngineRun report, or auditId for a FAIL/CLEAN PageAudit in page-scan history. These are different record types; use exactly one identifier.",
     parameters: {
       type: "object",
-      properties: { runId: { type: "string" } },
-      required: ["runId"],
+      properties: {
+        runId: { type: "string" },
+        auditId: { type: "string" },
+      },
       additionalProperties: false,
     },
   },
@@ -1958,12 +1960,40 @@ async function executeTool(
       }
       case "get_report": {
         const runId = typeof args.runId === "string" ? args.runId : "";
-        if (!runId)
-          throw new ProofCoreError({
-            message: "runId required",
-            category: "CONFIGURATION",
-            code: "run_id_required",
-          });
+        const auditId = typeof args.auditId === "string" ? args.auditId : "";
+        if (Boolean(runId) === Boolean(auditId)) {
+          return {
+            content: stableStringify({ error: "pass exactly one of runId or auditId" }),
+            summary: "missing or ambiguous identifier",
+          };
+        }
+        if (auditId) {
+          const row = await services.store.getPageAudit(workspaceId, auditId);
+          if (!row) {
+            return {
+              content: stableStringify({ error: "no page audit found in this workspace" }),
+              summary: "not found",
+            };
+          }
+          return {
+            content: stableStringify({
+              id: String(row.id),
+              projectId: row.project_id ? String(row.project_id) : null,
+              createdAt: String(row.created_at),
+              url: String(row.url),
+              finalUrl: String(row.final_url),
+              httpStatus: Number(row.status),
+              durationMs: Number(row.duration_ms),
+              worstVerdict: String(row.worst_verdict),
+              failed: Number(row.failed),
+              warnings: Number(row.warnings),
+              ownership: String(row.ownership ?? "unverified"),
+              redacted: Boolean(Number(row.redacted ?? 1)),
+              result: JSON.parse(String(row.payload)) as unknown,
+            }, 2),
+            summary: `page audit · ${String(row.worst_verdict)} · ${Number(row.failed)} fail`,
+          };
+        }
         const report = await services.store.getReportByRunId(workspaceId, runId);
         if (!report) {
           return {
