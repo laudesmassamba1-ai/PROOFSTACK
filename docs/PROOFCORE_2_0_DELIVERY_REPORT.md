@@ -255,6 +255,7 @@ encore être exécutés par la CI de la branche avant fusion.
 8. Consigner version, date, opérateur, résultats.
 
 ## 22. Tableau de preuve final
+
 | Fonction                             | État                        | Limite / preuve                                                                               |
 | ------------------------------------ | --------------------------- | --------------------------------------------------------------------------------------------- |
 | Inscription, connexion et sessions   | VÉRIFIÉ (hors production)   | Parcours desktop et mobile consignés                                                          |
@@ -292,7 +293,6 @@ exploitation commerciale : sauvegarde/restauration, rétention, MFA/vérificatio
 obligatoire, partage/export, et la preuve réelle des fournisseurs externes.
 
 Le produit est **démontrable et testé**, pas encore **exploitable en production**.
-
 
 ## 24. Addendum de revue — 25 novembre 2026
 
