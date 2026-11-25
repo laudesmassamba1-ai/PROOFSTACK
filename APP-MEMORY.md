@@ -385,3 +385,11 @@ pnpm cloud:deploy --dry-run
 - **La config Biome d'un autre fil bloquait tout lint** (clé `include` au lieu de `includes` dans un override) — corrigé d'un mot.
 - Vérifié : local (clic → pilule → drag physique → navigation `prj_…`, zéro erreur) et production sur Vercel + Pages (inscription jetable + projet créé via API, ouverture, physique active, navigation, zéro erreur). 769 tests verts, tsc/biome propres.
 - Le tree commit de l'autre agent (`a8a6780`) a embarqué ce travail + son intelligence projet ; suivi `2bdf63e` (imports).
+
+## 2026-11-25 (les KPI et les cinq questions deviennent des piles — Stack, React Bits)
+
+- **CardStack** (React Bits « Stack », `motion` v14) adapté en TS nommé dans `apps/web/src/components/app/CardStack.tsx` + `.css` : classes préfixées `card-stack-` (le `.stack` du source est trop générique), `ariaLabel` en prop (le source code l'anglais en dur), timers `ReturnType<typeof setTimeout>`, garde `noUncheckedIndexedAccess`. Biome a exigé des suppressions documentées (tabIndex sur div d'une pile, clé positionnelle — l'index EST l'identité de la carte) et a fait corriger deux `forEach` qui retournaient une valeur.
+- **Vue d'ensemble** : les quatre faits du workspace sont un deck (layout `deck`, spread 0.35 — les quatre restent visibles en recul, tirer/cliquer fait tourner) ; les cinq questions (WORLD. FLOW. EXIT. FAIL. CLEAN.) sont un éventail de cinq cartes (`fan`, visible 5) — un geste envoie la carte du dessus derrière, un clic simple ouvre toujours le module : le lien survit au drag.
+- La grille `.app-object-grid` reste utilisée par `ModulesIndex` — pas de nettoyage CSS.
+- Leçon de suppression biome : le commentaire `// biome-ignore` doit être la ligne **immédiatement** au-dessus de la ligne où l'ancre le diagnostic (attribut JSX pour `tabIndex`/`key`, ligne d'élément pour `noStaticElementInteractions`). Un ignore au-dessus de l'élément ne couvre pas les diagnostics ancrés sur un attribut.
+- Vérifié : local (deck KPI cyclé au drag, éventail WORLD → FLOW au flick, clic → `/app/modules/flow`, reduced-motion : placement direct et navigation au clic, mobile 390 px sans scroll) et production sur les deux hôtes (2 piles, éventail cyclé, zéro erreur console). 769 tests verts, tsc/biome propres. `b049a6e`.
