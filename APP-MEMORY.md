@@ -376,3 +376,12 @@ pnpm cloud:deploy --dry-run
 - **Composant élargi** : `className` en pass-through (l'hôte sombre thème via `--insw-ink`/`--insw-surface` au lieu d'un fork) et `errorHint` (le message d'échec vient de la page, dans sa langue). **Défaut corrigé en vérifiant le DOM, pas l'œil** : l'état final était rendu avec `insw-ink` presque noir sur fond noir — l'état `is-done` rendait le lien SANS la classe de l'hôte ; les classes passent maintenant sur les deux branches du rendu.
 - Vérifié en local et en production sur les deux hôtes : 3 switches, le premier téléchargé (`proofcore-0.6.3-setup-win-x64.exe` part réellement), état final lisible, zéro erreur console. 769 tests verts.
 - Leçon : la couleur « pâle » que l'œil jugeait être un bug d'opacité était un bug de classe — `getComputedStyle` sur l'élément rendu a tranché en une lecture (`border: rgb(10,10,11)` sur fond sombre = mauvaise branche du rendu).
+
+## 2026-11-25 (le dossier de projets flotte sur la vue d'ensemble — FolderFloat, React Bits)
+
+- **FolderFloat** (React Bits, matter-js) adapté en TS nommé dans `apps/web/src/components/app/FolderFloat.tsx` + `.css` : sur `/app` (vue d'ensemble), dans la colonne du tampon, sous les faits. Ouverture **au clic** (pas au survol — la vue d'ensemble est une surface de lecture) ; chaque projet du workspace sort en pilule, physique zéro-gravité après la pose (drift 0.4), clic sur une pilule → page du projet. Couleurs passées par props en tokens app (`--ink`, `--paper`, `--surface`) — pas de fork du CSS. Reduced-motion : pilules sans monde physique.
+- **Leçons de lint** : Biome refuse le motif eslint-disable du source — positions lues via `posRef` (callbacks stables), clé React sans index (`value::label`), `noStaticElementInteractions` assumé par biome-ignore (les enfants portent la sémantique). `noUncheckedIndexedAccess` a exigé des gardes sur `sizes[i]`/`pos[i]`.
+- **`overflow-x: clip` sur `.app-overview`** : le nuage de pilules (±188 px) ne doit jamais créer de scroll horizontal sur mobile (390 px vérifié = 390).
+- **La config Biome d'un autre fil bloquait tout lint** (clé `include` au lieu de `includes` dans un override) — corrigé d'un mot.
+- Vérifié : local (clic → pilule → drag physique → navigation `prj_…`, zéro erreur) et production sur Vercel + Pages (inscription jetable + projet créé via API, ouverture, physique active, navigation, zéro erreur). 769 tests verts, tsc/biome propres.
+- Le tree commit de l'autre agent (`a8a6780`) a embarqué ce travail + son intelligence projet ; suivi `2bdf63e` (imports).
