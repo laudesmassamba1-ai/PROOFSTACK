@@ -88,7 +88,7 @@ export function Wordmark({
           color: variant === "onLight" ? "#142033" : "#F2F6FA",
         }}
       >
-        {/* The mark supplies the first P; printing it again reads “PPROOFCORE”. */}
+        {/* With the mark, the adjacent text is ROOFCORE; without it, render the full name. */}
         {showMark ? "ROOFCORE" : "PROOFCORE"}
       </span>
     </span>
