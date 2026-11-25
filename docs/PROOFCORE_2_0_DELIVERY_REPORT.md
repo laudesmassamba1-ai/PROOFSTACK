@@ -256,39 +256,33 @@ encore être exécutés par la CI de la branche avant fusion.
 
 ## 22. Tableau de preuve final
 
-| Fonction                                                      | Code présent | Test exécuté | Test réussi       | Parcours vérifié                                           | Production vérifiée  |         |
-| -----------------------------------                           | ------------ | ------------ | ----------------- | -------------------------                                  | -------------------- |         |
-| Inscription/connexion/session                                 | oui          | oui          | oui               | desktop + mobile                                           | non                  |         |
-| Reset mot de passe                                            | oui          | oui          | oui               | API                                                        | non (e-mail externe) |         |
-| Vérification e-mail                                           | oui          | oui          | oui               | API                                                        | non                  |         |
-| MFA / OAuth                                                   | non          | —            | —                 | —                                                          | non                  |         |
-| Isolation multi-comptes                                       | oui          | oui          | oui               | 22 lectures + 8 écritures                                  | non                  |         |
-| Rôles et invitations                                          | oui          | oui          | oui               | API                                                        | non                  |         |
-| IA contextuelle                                               | oui          | oui          | oui               | fournisseur simulé                                         | non                  |         |
-| Copilot : état/config des 5 modules ; exécution selon runtime | oui          | oui          | partiel           | WORLD/FLOW API ; FAIL/CLEAN live sans run ; EXIT local     | non                  | PARTIEL |
-| FLOW navigateur réel                                          | oui          | oui          | oui               | Chromium local                                             | non                  |         |
-| Fencing contenus non fiables                                  | oui          | oui          | oui               | API                                                        | non                  |         |
-| WORLD/FLOW/EXIT                                               | oui          | oui          | oui               | API + CLI/tests                                            | non                  |         |
-| FAIL/CLEAN                                                    | oui          | oui          | oui               | PageAudit via scan Web ; module_run IA live sans EngineRun | non                  | PARTIEL |
-| Rapports JSON/JUnit/HTML/texte                                | oui          | oui          | oui               | web + CLI                                                  | non                  |         |
-| PDF/CSV                                                       | non          | —            | —                 | —                                                          | non                  |         |
-| Partage client                                                | non          | —            | —                 | —                                                          | non                  |         |
-| Pagination                                                    | oui          | oui          | oui               | API + UI                                                   | non                  |         |
-| Recherche plein-texte                                         | non          | —            | —                 | —                                                          | non                  |         |
-| Paiement sandbox                                              | oui          | oui          | oui               | E2E checkout                                               | non                  |         |
-| Paiement live                                                 | oui          | partiel      | unitaire          | —                                                          | non                  |         |
-| Webhooks entrants                                             | oui          | oui          | oui               | API                                                        | non                  |         |
-| Webhooks sortants + anti-SSRF                                 | oui          | oui          | oui               | receiver local                                             | non                  |         |
-| Quotas/consommation                                           | oui          | oui          | oui               | API + UI                                                   | non                  |         |
-| E-mails transactionnels                                       | oui          | oui          | oui (journal)     | outbox                                                     | non                  |         |
-| Notifications                                                 | oui          | oui          | oui               | UI                                                         | non                  |         |
-| Support                                                       | oui          | oui          | oui               | API + console                                              | non                  |         |
-| Design Ink & Object                                           | oui          | partiel      | oui               | captures E2E                                               | non                  |         |
-| Responsive                                                    | oui          | oui          | oui (2 viewports) | desktop + mobile                                           | non                  |         |
-| Accessibilité AA                                              | partiel      | non          | —                 | clavier partiel                                            | non                  |         |
-| Observabilité                                                 | partiel      | non          | —                 | —                                                          | non                  |         |
-| Sauvegarde/restauration                                       | non          | —            | —                 | —                                                          | non                  |         |
-| Rétention                                                     | partiel      | non          | —                 | —                                                          | non                  |         |
+| Fonction | État | Limite / preuve |
+| --- | --- | --- |
+| Inscription, connexion et sessions | VÉRIFIÉ (hors production) | Parcours desktop et mobile consignés |
+| Réinitialisation du mot de passe | PARTIEL | API testée ; livraison réelle des e-mails non vérifiée |
+| Vérification d'e-mail | PARTIEL | Flux API présent ; non exigée à la connexion et fournisseur réel non vérifié |
+| MFA et OAuth | ABSENT | Aucun fournisseur ni parcours |
+| Isolation multi-comptes | VÉRIFIÉ (hors production) | 22 lectures et 8 écritures contrôlées |
+| Rôles et invitations | VÉRIFIÉ (hors production) | API et notifications testées |
+| IA contextuelle | PARTIEL | Tests avec fournisseur simulé ; fournisseur réel non vérifié |
+| Copilot des cinq modules | PARTIEL | WORLD/FLOW produisent des EngineRun ; FAIL/CLEAN enregistrent un PageAudit ; EXIT reste local |
+| FLOW navigateur | VÉRIFIÉ sur machine de test | Chromium local via CLI ; non exécuté dans le Worker |
+| WORLD/FLOW/EXIT | VÉRIFIÉ hors production | Moteur partagé et parcours CLI/API testés, avec limites de runtime |
+| FAIL/CLEAN | PARTIEL | PageAudit persisté ; historique distinct des EngineRun ; aucun `audit --sync` CLI |
+| Rapports JSON/JUnit/HTML/texte | VÉRIFIÉ | Web et CLI |
+| Export PDF/CSV et partage client | ABSENT | Aucune implémentation |
+| Pagination | VÉRIFIÉ hors production | API et interface |
+| Recherche plein-texte | ABSENT | Aucun index ni endpoint |
+| Paiement sandbox | VÉRIFIÉ en sandbox | Parcours checkout et confirmation E2E |
+| Paiement live SasPay | NON VÉRIFIÉ | Credentials et transaction réelle manquants |
+| Webhooks entrants et sortants | VÉRIFIÉ hors production | Signature, anti-rejeu et receiver local testés |
+| Quotas et consommation | VÉRIFIÉ hors production | API et interface testées |
+| E-mails transactionnels | NON VÉRIFIÉ | Fournisseur de production non configuré |
+| Notifications et support | VÉRIFIÉ hors production | Interface, API et console admin testées |
+| Design et responsive | PARTIEL | Captures E2E et 2 viewports ; campagne visuelle complète à rejouer |
+| Accessibilité | PARTIEL | Contrôle clavier limité ; audit WCAG/axe absent |
+| Observabilité | PARTIEL | Request ID et logs JSON ; pas de tracing ni tests dédiés |
+| Sauvegarde/restauration et rétention | ABSENT | Aucun processus opérationnel testé |
 
 ## 23. Verdict
 
