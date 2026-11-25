@@ -5,12 +5,12 @@
 PROOFCORE is a software quality and reliability platform with **five module
 families** grouped by the kind of evidence they produce:
 
-| Module | What it checks |
-| --- | --- |
-| **WORLD** | International compatibility: identity, addresses, phones, currencies, dates and sorting profiles. |
-| **FLOW** | Transaction and workflow behavior: checkout, orders, webhooks, refunds and supported browser journeys. |
-| **EXIT** | Data portability: export formats, schema, relationships, truncation and round trips. |
-| **FAIL** | HTTP security posture: headers, cookies, TLS-related signals and information disclosure. |
+| Module    | What it checks                                                                                          |
+| --------- | ------------------------------------------------------------------------------------------------------- |
+| **WORLD** | International compatibility: identity, addresses, phones, currencies, dates and sorting profiles.       |
+| **FLOW**  | Transaction and workflow behavior: checkout, orders, webhooks, refunds and supported browser journeys.  |
+| **EXIT**  | Data portability: export formats, schema, relationships, truncation and round trips.                    |
+| **FAIL**  | HTTP security posture: headers, cookies, TLS-related signals and information disclosure.                |
 | **CLEAN** | Page quality signals: metadata, document structure, image alternatives, form labels and resource hints. |
 
 These are not five interchangeable engines. WORLD, FLOW and EXIT use the shared
