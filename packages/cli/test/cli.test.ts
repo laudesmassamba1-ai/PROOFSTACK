@@ -53,6 +53,15 @@ describe("CLI", () => {
     expect(result.stdout).toContain("exit codes");
   });
 
+  it.each(["--help", "-h", "help"])("audit %s prints its help and exits 0", async (argument) => {
+    const dir = await project();
+    const result = await cli(["audit", argument], dir);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("proofcore audit fail");
+    expect(result.stdout).toContain("proofcore audit clean");
+    expect(result.stdout).toContain("Exit codes");
+  });
+
   it("prints a version", async () => {
     const dir = await project();
     const result = await cli(["--version"], dir);
