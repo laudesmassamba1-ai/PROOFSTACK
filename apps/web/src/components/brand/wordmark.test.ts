@@ -6,19 +6,19 @@ import { HeroLockup, Wordmark } from "./Logo.js";
 describe("PROOFCORE wordmark", () => {
   it("uses the geometric P as the first letter when the mark is visible", () => {
     const html = renderToStaticMarkup(createElement(Wordmark, { showMark: true }));
-    expect(html).toContain(">ROOFCORE</span>");
+    expect(html.replace(/<[^>]*>/g, "")).toBe("ROOFCORE");
     expect(html).not.toContain("PPROOFCORE");
     expect(html).not.toContain("PROOFSTACK");
   });
 
   it("renders the complete name when the mark is hidden", () => {
     const html = renderToStaticMarkup(createElement(Wordmark, { showMark: false }));
-    expect(html).toContain(">PROOFCORE</span>");
+    expect(html.replace(/<[^>]*>/g, "")).toBe("PROOFCORE");
   });
 
   it("uses the matching ROOFCORE letter sequence in the animated hero", () => {
     const html = renderToStaticMarkup(createElement(HeroLockup));
-    expect(html).toContain(">ROOFCORE</span>");
+    expect(html.replace(/<[^>]*>/g, "")).toBe("ROOFCORE");
     expect(html).not.toContain("ROOFSTACK");
     expect(html).not.toContain("PPROOFCORE");
   });
