@@ -24,14 +24,14 @@ First captured screens:
 
 Findings from pass 1 and fixes:
 
-| Finding                                       | Decision                                                                                                                               |
-| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Headline wrapped “À” alone at 390px           | Reduced mobile display scale and removed the narrow max-width; now breaks as “2 ÉCHEC(S)” / “À EXAMINER.”                              |
-| Command palette opened at the top-left        | Native dialog reset the UA margin; added `position: fixed; inset: 0; margin: auto` and a max-height.                                   |
-| Status words stayed English in a French shell | `StatusBadge` now reads the centralized workspace dictionary; `FAILED` → `Échec`, `PARTIAL` → `Partiel`.                               |
-| Relative dates stayed English                 | `format.ts` follows the selected locale via `Intl.RelativeTimeFormat`; “9 min ago” → “il y a 9 minutes”.                               |
-| Wordmark duplicated its initial P                  | The geometric mark supplies the first P; `Wordmark` and the animated hero now render `ROOFCORE` beside it, yielding the complete PROOFCORE lockup. A render test covers both variants. The committed screenshots still need regeneration. |
-| The old KPI row and line chart remained       | Removed from Overview. Module totals are read from the latest run; no trend is inferred.                                               |
+| Finding                                       | Decision                                                                                                                                                                                                                                  |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Headline wrapped “À” alone at 390px           | Reduced mobile display scale and removed the narrow max-width; now breaks as “2 ÉCHEC(S)” / “À EXAMINER.”                                                                                                                                 |
+| Command palette opened at the top-left        | Native dialog reset the UA margin; added `position: fixed; inset: 0; margin: auto` and a max-height.                                                                                                                                      |
+| Status words stayed English in a French shell | `StatusBadge` now reads the centralized workspace dictionary; `FAILED` → `Échec`, `PARTIAL` → `Partiel`.                                                                                                                                  |
+| Relative dates stayed English                 | `format.ts` follows the selected locale via `Intl.RelativeTimeFormat`; “9 min ago” → “il y a 9 minutes”.                                                                                                                                  |
+| Wordmark duplicated its initial P             | The geometric mark supplies the first P; `Wordmark` and the animated hero now render `ROOFCORE` beside it, yielding the complete PROOFCORE lockup. A render test covers both variants. The committed screenshots still need regeneration. |
+| The old KPI row and line chart remained       | Removed from Overview. Module totals are read from the latest run; no trend is inferred.                                                                                                                                                  |
 
 ## After — pass 2 and 3
 
