@@ -2,21 +2,26 @@
 
 **Make software work everywhere.**
 
-PROOFCORE is an integrated software quality and reliability suite with three
-modules that share one execution engine, one report format, one CLI and one
-dashboard:
+PROOFCORE is a software quality and reliability platform with **five module
+families** grouped by the kind of evidence they produce:
 
-| Module    | Question it answers                                                        |
-| --------- | -------------------------------------------------------------------------- |
-| **WORLD** | Can users from different countries use the software correctly?             |
-| **FLOW**  | Can users complete the critical operations (checkout, payments, webhooks)? |
-| **EXIT**  | Can users retrieve their data without losing or corrupting it?             |
+| Module | What it checks |
+| --- | --- |
+| **WORLD** | International compatibility: identity, addresses, phones, currencies, dates and sorting profiles. |
+| **FLOW** | Transaction and workflow behavior: checkout, orders, webhooks, refunds and supported browser journeys. |
+| **EXIT** | Data portability: export formats, schema, relationships, truncation and round trips. |
+| **FAIL** | HTTP security posture: headers, cookies, TLS-related signals and information disclosure. |
+| **CLEAN** | Page quality signals: metadata, document structure, image alternatives, form labels and resource hints. |
 
-The product is a monorepo: checks execute on the developer's machine or in CI against
-an HTTP target and synthetic fixtures, while the SaaS layer stores accounts, projects,
-reports, usage and billing. The assistant drives a real Chromium over the DevTools
-Protocol and runs a real terminal; customer browser journeys inside WORLD and FLOW
-are not implemented yet — see the status file.
+These are not five interchangeable engines. WORLD, FLOW and EXIT use the shared
+fixture-driven execution engine. FAIL and CLEAN are HTTP page audits. Their current
+execution and persistence paths are not yet identical.
+
+The local CLI can run supported Chromium journeys for FLOW. The Cloudflare Worker does
+not host Chromium, so browser-only journeys remain local. WORLD remains HTTP/fixture
+based. EXIT requires a local runtime for file and command export sources. FAIL/CLEAN
+module-copilot scans currently return live findings but do not create a shared stored
+engine run; do not treat those responses as run-history entries.
 
 ## Status
 
@@ -44,12 +49,14 @@ navigation, state-driven display type and one data-bound object per module. Desi
 records and real captures live under [`docs/design`](docs/design), including
 [`WORKSPACE_VISUAL_AUDIT.md`](docs/design/WORKSPACE_VISUAL_AUDIT.md).
 
-Not yet true: email verification and password recovery are absent; transactional email
-has EmailJS and Resend adapters but no production credentials were supplied, so delivery
-is unverified. SasPay's live path is untested without credentials, and prices still
-require a deploy to change. See
-[`docs/DEVELOPMENT_STATUS.md`](docs/DEVELOPMENT_STATUS.md) for the full, unvarnished
-list.
+Important limits: password recovery and email-verification API flows exist and are
+covered by tests, but email verification is not enforced at sign-in and real delivery
+is **not verified** until EmailJS or Resend production credentials are configured.
+SasPay's live path is also unverified without production credentials. Some paid
+entitlements remain marked "coming"; do not treat them as delivered. See
+[`docs/DEVELOPMENT_STATUS.md`](docs/DEVELOPMENT_STATUS.md) and
+[`docs/PROOFCORE_CAPABILITY_MATRIX.md`](docs/PROOFCORE_CAPABILITY_MATRIX.md) for
+the evidence-backed capability and limitation lists.
 
 ## Deploy
 
@@ -91,36 +98,31 @@ pnpm proofcore -- report text
 pnpm proofcore -- sync
 ```
 
-## Install the CLI globally
+## Install the CLI
 
-The CLI is published on npm as the unscoped package `proofcore` — a self-contained
-bundle with **no runtime npm dependencies**:
+The repository can build a self-contained CLI tarball locally. The workspace package
+`@proofcore/cli` is private; do not assume that the npm registry package named
+`proofcore` is the same version or contains the same commands as this checkout.
 
-```bash
-npm install -g proofcore
-proofcore --version
-```
-
-To build the tarball locally instead (same bytes, no registry needed):
+Build and install the artifact produced by this repository:
 
 ```bash
 pnpm cli:package
 npm install -g ./artifacts/proofcore-<version>.tgz
 proofcore --version
+proofcore --help
 ```
 
-To publish a new version (reads the npm token from `NPM_TOKEN` or a hidden prompt,
-accepts `-- --otp=123456` for 2FA-enforced accounts):
-
-```bash
-pnpm cli:publish
-```
-
-Or build, install and check the global binary in one command:
+Or use the repository helper:
 
 ```bash
 pnpm cli:install
 ```
+
+Before using a registry installation, verify the published package metadata and version
+against the release you intend to install. Registry publication and ownership are
+separate from the private workspace package. Do not publish a new version without
+explicit release approval.
 
 Then open a terminal in the application you want to test and run it there:
 
@@ -128,23 +130,22 @@ Then open a terminal in the application you want to test and run it there:
 cd /path/to/your/app   # replace with a real, existing directory
 proofcore init
 proofcore doctor
-proofcore modules          # local wiring, with the command for each module
-proofcore flow             # run FLOW locally (also world / exit)
+proofcore modules
+proofcore flow
 proofcore test --module world,flow,exit
+proofcore audit fail
+proofcore audit clean
 ```
 
 `init` writes the config in the current directory; it does not create the directory.
 `--cwd /path/to/your/app` is also supported, but the path must already exist.
 
-The package is not yet on the npm registry. Once npm authentication and ownership of
-the `@proofcore` scope are configured, the generated release is publishable:
-
-```bash
-npm publish ./packages/cli/release --access public
-```
-
-`pnpm proofcore` remains the in-repo command. `pnpm cli` from an unrelated application
-still resolves nothing; use the generated global binary instead.
+Runtime boundaries matter:
+- WORLD/FLOW/EXIT engine runs use the local CLI runtime.
+- FLOW browser journeys require local Chromium.
+- FAIL/CLEAN HTTP audits can be run against the configured project host, but the
+  module-copilot live scan currently does not create a shared engine run.
+- EXIT file/command export sources are local-only.
 
 ## Install the desktop app
 
