@@ -5,7 +5,7 @@ import { decryptApiKey, hasEncryptionSecret } from "../ai-crypto.js";
 import { HttpError } from "../http/errors.js";
 import { readBody, requireUser, requireWorkspace } from "../http/guards.js";
 import type { AppEnv, Services } from "../http/services.js";
-import type { ProjectAuditFinding } from "../project-knowledge.js";
+import type { ProjectAuditFileResult, ProjectAuditFinding } from "../project-knowledge.js";
 
 /**
  * Project intelligence: uploaded source files and AI code audits.
@@ -40,13 +40,13 @@ const auditSchema = z
     scope: z.string().max(500).optional(),
     path: z.string().max(500).optional(),
     instructions: z.string().max(1000).optional(),
+    locale: z.enum(["fr", "en"]).optional(),
   })
   .strict();
 
 const MAX_FILES = 250;
 const MAX_TOTAL_CHARS = 1_500_000;
-const MAX_BATCH_CHARS = 45_000;
-const MAX_BATCHES = 12;
+const MAX_FILE_CHARS = 45_000;
 const MAX_RESPONSE_TOKENS = 2400;
 
 const LANGUAGE_BY_EXTENSION: Record<string, string> = {
@@ -157,39 +157,6 @@ function parseJsonAnswer(text: string): {
 interface AuditChunk {
   path: string;
   content: string;
-}
-
-interface BatchPlan {
-  batches: AuditChunk[][];
-  /** Files that were actually placed in a batch sent to the provider. */
-  included: number;
-  /** Files left out by the batch cap. Reported, never silently presented as read. */
-  omitted: number;
-}
-
-function batchesOf(files: AuditChunk[]): BatchPlan {
-  const batches: AuditChunk[][] = [];
-  let current: AuditChunk[] = [];
-  let chars = 0;
-  let included = 0;
-  for (const file of files) {
-    if (batches.length >= MAX_BATCHES) break;
-    const content =
-      file.content.length > MAX_BATCH_CHARS
-        ? `${file.content.slice(0, MAX_BATCH_CHARS)}\n\n[file truncated by PROOFCORE]`
-        : file.content;
-    if (current.length > 0 && chars + content.length > MAX_BATCH_CHARS) {
-      batches.push(current);
-      current = [];
-      chars = 0;
-      if (batches.length >= MAX_BATCHES) break;
-    }
-    current.push({ path: file.path, content });
-    chars += content.length;
-    included += 1;
-  }
-  if (current.length > 0 && batches.length < MAX_BATCHES) batches.push(current);
-  return { batches, included, omitted: files.length - included };
 }
 
 async function callModel(input: {
@@ -508,13 +475,11 @@ export function projectIntelligenceRoutes(services: Services): Hono<AppEnv> {
       throw new HttpError(404, "scope_empty", `No file matches “${scope}”.`);
     }
 
-    const plan = batchesOf(selected);
-    const batches = plan.batches;
-    if (batches.length === 0) throw new HttpError(400, "empty_scope", "No readable file.");
-    const coverageNote =
-      plan.omitted > 0
-        ? ` ${plan.omitted} fichier(s) non lu(s) : limite de ${MAX_BATCHES} lots. Les constats ne portent que sur les ${plan.included} fichier(s) analysés.`
-        : "";
+    const files = selected.map((file) => ({
+      path: file.path,
+      content: file.content,
+      oversized: file.content.length > MAX_FILE_CHARS,
+    }));
     const auditId = `aia_${crypto.randomUUID().replaceAll("-", "").slice(0, 20)}`;
     const gate = await services.meter.authorize({
       workspaceId: workspace.id,
@@ -538,32 +503,96 @@ export function projectIntelligenceRoutes(services: Services): Hono<AppEnv> {
           ? `dossier ${scope}`
           : "projet complet";
     const instructions = body.instructions?.trim();
-    const results = [];
+    const outputLanguage = body.locale === "fr" ? "French" : "English";
+    const system = `${AUDIT_SYSTEM} Write every summary, finding title, evidence and fix in ${outputLanguage}.`;
+    const fileResults: ProjectAuditFileResult[] = [];
     let analyzedFiles = 0;
+    let fatal: HttpError | null = null;
     try {
-      for (const batch of batches) {
-        const answer = await callModel({
-          kind: profile.providerKind,
-          baseUrl: profile.providerBaseUrl,
-          model: profile.providerModel,
-          apiKey,
-          system: AUDIT_SYSTEM,
-          user: [
-            `Scope: ${label}.`,
-            instructions ? `Additional instruction from the user: ${instructions}` : "",
-            "Read every supplied file. Report only defects evidenced below.",
-            "",
-            fileBlock(batch),
-          ]
-            .filter(Boolean)
-            .join("\n"),
-        });
-        results.push(parseJsonAnswer(answer));
-        analyzedFiles += batch.length;
+      // One provider call per file. A large project costs more calls, but no file is
+      // silently dropped behind a batch cap, and every returned score is attributable.
+      for (const file of files) {
+        if (file.oversized) {
+          // Never send a truncated file and present the result as if the whole file
+          // was read. Oversize is a real maintainability defect and a negative score.
+          const detail = `Fichier de ${file.content.length.toLocaleString(
+            "fr-FR"
+          )} caractères ; limite ${MAX_FILE_CHARS.toLocaleString("fr-FR")}.`;
+          fileResults.push({
+            path: file.path,
+            score: 0,
+            summary: null,
+            status: "failed",
+            findings: [
+              {
+                severity: "high",
+                file: file.path,
+                line: null,
+                title: "Fichier trop long pour être audité en entier",
+                evidence: detail,
+                fix: "Découper ce fichier en plusieurs modules cohérents, chacun sous la limite, puis relancer l'audit. Ne pas masquer la taille par une troncature.",
+              },
+            ],
+            error: `${detail} Découper le fichier en plusieurs fichiers avant de relancer l'audit.`,
+            oversized: true,
+          });
+          continue;
+        }
+        try {
+          const answer = await callModel({
+            kind: profile.providerKind,
+            baseUrl: profile.providerBaseUrl,
+            model: profile.providerModel,
+            apiKey,
+            system,
+            user: [
+              `Scope: ${label}.`,
+              instructions ? `Additional instruction from the user: ${instructions}` : "",
+              `Read only the supplied file: ${file.path}. Report only defects evidenced below.`,
+              "",
+              fileBlock([{ path: file.path, content: file.content }]),
+            ]
+              .filter(Boolean)
+              .join("\n"),
+          });
+          const result = parseJsonAnswer(answer);
+          fileResults.push({
+            path: file.path,
+            score: result.score,
+            summary: result.summary,
+            status: "done",
+            findings: result.findings,
+            error: null,
+            oversized: false,
+          });
+          analyzedFiles += 1;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "AI audit failed";
+          fileResults.push({
+            path: file.path,
+            score: null,
+            summary: null,
+            status: "failed",
+            findings: [],
+            error: message.slice(0, 1000),
+            oversized: false,
+          });
+          if (error instanceof HttpError) {
+            fatal = error;
+            break;
+          }
+        }
       }
 
-      const findings = results
-        .flatMap((result) => result.findings)
+      if (fatal) throw fatal;
+      const oversizedFiles = fileResults.filter((file) => file.oversized);
+      if (analyzedFiles === 0 && oversizedFiles.length === 0) {
+        const reason = fileResults.find((file) => file.error)?.error ?? "AI audit failed";
+        throw new HttpError(502, "ai_audit_failed", reason);
+      }
+
+      const findings = fileResults
+        .flatMap((file) => file.findings)
         .filter(
           (finding, index, list) =>
             list.findIndex(
@@ -571,17 +600,28 @@ export function projectIntelligenceRoutes(services: Services): Hono<AppEnv> {
             ) === index
         )
         .slice(0, 100);
-      const scores = results
-        .map((result) => result.score)
+      const scores = fileResults
+        .map((file) => file.score)
         .filter((score): score is number => score !== null);
+      // The final score is the arithmetic mean of the files that returned a score.
+      // No score is invented for a file the provider could not judge.
       const score =
         scores.length > 0
           ? Math.round(scores.reduce((sum, value) => sum + value, 0) / scores.length)
           : null;
-      const summary =
-        results.length === 1
-          ? `${results[0]?.summary ?? "Audit terminé."}${coverageNote}`
-          : `Audit de ${analyzedFiles} fichier(s) en ${results.length} passe(s). ${findings.length} constat(s) consolidé(s).${coverageNote}`;
+      const oversizedNote =
+        oversizedFiles.length > 0
+          ? ` ${oversizedFiles.length} fichier(s) dépassent ${MAX_FILE_CHARS.toLocaleString(
+              "fr-FR"
+            )} caractères : ils n'ont pas été envoyés au modèle, comptent 0 dans le score final et doivent être découpés en plusieurs fichiers.`
+          : "";
+      const baseSummary =
+        fileResults.length === 1 && fileResults[0]?.summary
+          ? fileResults[0].summary
+          : analyzedFiles > 0
+            ? `Audit fichier par fichier de ${analyzedFiles} fichier(s). ${findings.length} constat(s) consolidé(s). Score final = moyenne de ${scores.length} score(s) de fichier.`
+            : "Aucun fichier n'a pu être envoyé au modèle.";
+      const summary = `${baseSummary}${oversizedNote}`;
       const audit = await knowledge.createAudit({
         workspaceId: workspace.id,
         projectId: c.req.param("projectId"),
@@ -595,6 +635,7 @@ export function projectIntelligenceRoutes(services: Services): Hono<AppEnv> {
         provider: profile.providerId,
         filesAnalyzed: analyzedFiles,
         findings,
+        files: fileResults,
       });
       await services.meter.meter({
         workspaceId: workspace.id,
@@ -616,7 +657,8 @@ export function projectIntelligenceRoutes(services: Services): Hono<AppEnv> {
           model: profile.providerModel,
           provider: profile.providerId,
           filesAnalyzed: analyzedFiles,
-          error: `${message}${coverageNote}`.slice(0, 1000),
+          files: fileResults,
+          error: message.slice(0, 1000),
         })
         .catch(() => undefined);
       if (error instanceof HttpError) throw error;

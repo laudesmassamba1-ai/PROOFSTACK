@@ -74,7 +74,7 @@
   },
   "overrides": [
     {
-      "include": [
+      "includes": [
         "apps/web/src/components/app/Dock.tsx"
       ],
       "linter": {

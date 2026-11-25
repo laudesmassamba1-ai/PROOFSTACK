@@ -102,7 +102,7 @@ async function main() {
     $shell = New-Object -ComObject WScript.Shell
     $links = @(
       @{ Name = 'PROOFCORE'; Target = '${quote(launcher)}'; Args = ''; Desc = 'PROOFCORE - the hub' },
-      @{ Name = 'PROOFCORE interface'; Target = '$env:ComSpec'; Args = '/c start "" "${quote(target)}" app'; Desc = 'PROOFCORE - the application' }
+      @{ Name = 'PROOFCORE interface'; Target = [Environment]::ExpandEnvironmentVariables('%ComSpec%'); Args = '/c start "" "${quote(target)}" app'; Desc = 'PROOFCORE - the application' }
     )
     foreach ($folder in @([Environment]::GetFolderPath('Programs'), [Environment]::GetFolderPath('Desktop'))) {
       foreach ($link in $links) {

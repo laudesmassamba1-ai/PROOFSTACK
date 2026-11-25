@@ -9991,3 +9991,15 @@ hairline,
     display: none;
   }
 }
+
+/* --- Projects folder on the overview stamp (FolderFloat, React Bits) --- */
+.app-stamp-folder {
+  margin-top: 18px;
+}
+
+/* The pill cloud may be wider than the stamp: it floats over the page, but it
+   must never drag the page into a horizontal scroll on a phone. `clip` does not
+   create a scroll container, so the vertical layout is untouched. */
+.app-overview {
+  overflow-x: clip;
+}

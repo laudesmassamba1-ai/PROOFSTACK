@@ -446,7 +446,7 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
   "ws.overview.anomaly.body": "Sur les {count} derniers téléversements.",
   "ws.overview.modules": "Les cinq questions",
   "ws.overview.next": "Prochaine action",
-  "ws.overview.onboard.title": "Trois étapes vers votre premier run vérifié",
+  "ws.overview.onboard.title": "Trois étapes vers votre première exécution vérifiée",
   "ws.overview.onboard.step1":
     "Créez un projet : son URL de base et ses modules définissent ce qui est vérifié.",
   "ws.overview.onboard.step2":
@@ -491,7 +491,7 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
   "ws.overview.module.failed": "{count} échec(s)",
   "ws.overview.module.skipped": "{count} ignoré(s)",
   "ws.overview.latest": "En un coup d'œil",
-  "ws.overview.facts.aria": "Faits réels du workspace",
+  "ws.overview.facts.aria": "Faits réels de l'espace de travail",
   "ws.overview.noWorkspace.title": "Aucun espace de travail",
   "ws.overview.noWorkspace.body": "Créez un espace de travail pour commencer.",
   "ws.overview.noWorkspace.action": "Créer un espace de travail",
@@ -580,7 +580,7 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
   "ws.projects.loading": "Chargement des projets…",
   "ws.projects.empty.title": "Aucun projet",
   "ws.projects.empty.body":
-    "Créez un projet pour obtenir une configuration et un token projet pour la CLI.",
+    "Créez un projet pour obtenir une configuration et un jeton de projet pour la CLI.",
   "ws.projects.name": "Nom",
   "ws.projects.baseUrl": "URL de base",
   "ws.projects.baseUrl.hint":
@@ -605,7 +605,7 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
   "ws.cli.eyebrow": "Configuration développeur",
   "ws.cli.title": "Connecter la CLI.",
   "ws.cli.description":
-    "Le navigateur peut copier des commandes et créer un token projet ; il ne peut pas exécuter de commande shell locale.",
+    "Le navigateur peut copier des commandes et créer un jeton de projet ; il ne peut pas exécuter de commande shell locale.",
   "ws.cli.docs": "Documentation CLI",
   "ws.cli.docs.agent": "Ouvrir l’agent local",
   "ws.cli.connection": "État de la connexion",
@@ -616,10 +616,10 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
   "ws.cli.create": "Créer un projet",
   "ws.cli.lastUpload": "Dernier téléversement depuis {project}",
   "ws.cli.noRun": "Aucune exécution reçue",
-  "ws.cli.token": "Token projet",
+  "ws.cli.token": "Jeton de projet",
   "ws.cli.token.body":
-    "Ouvrez un projet et créez un token limité à runs:write et reports:read. Il n'est affiché qu'une fois ; stockez-le dans les secrets CI.",
-  "ws.cli.token.open": "Ouvrir le token projet",
+    "Ouvrez un projet et créez un jeton limité aux portées runs:write et reports:read. Il n'est affiché qu'une fois ; stockez-le dans les secrets CI.",
+  "ws.cli.token.open": "Ouvrir le jeton de projet",
   "ws.cli.what": "Ce qu'est la CLI",
   "ws.cli.what.body": "Le modèle d'exécution, dit simplement.",
   "ws.cli.static":
@@ -635,9 +635,9 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
   "ws.cli.step.prove.body":
     "Depuis le même dossier d'application, lancez les contrôles, lisez le constat, reproduisez-le. Le téléversement du résultat est une étape explicite et séparée.",
   "ws.cli.lastUpload.body":
-    "{time} · le statut est celui du run téléversé, pas un résultat de test local.",
+    "{time} · le statut est celui de l'exécution téléversée, pas un résultat de test local.",
   "ws.cli.noRun.body":
-    "Les projets existent, mais la CLI n'a téléversé aucune exécution. Créez un token limité, lancez les contrôles, puis synchronisez.",
+    "Les projets existent, mais la CLI n'a téléversé aucune exécution. Créez un jeton limité, lancez les contrôles, puis synchronisez.",
   "ws.cli.what.1": "Tourne sur votre machine ou en CI, jamais dans le navigateur ni dans l'API.",
   "ws.cli.what.2": "Un moteur, un schéma de rapport, cinq modules.",
   "ws.cli.what.3":
@@ -650,7 +650,7 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
   "ws.cli.trouble.command.body":
     'Lancez `pnpm cli:install` depuis le checkout, puis ajoutez le dossier bin global de npm au PATH : `export PATH="$(npm config get prefix)/bin:$PATH"`.',
   "ws.cli.trouble.sync.title": "401 à la synchronisation ?",
-  "ws.cli.trouble.sync.body": "Le token est limité à un projet et doit être fourni via",
+  "ws.cli.trouble.sync.body": "Le jeton est limité à un projet et doit être fourni via",
   "ws.cli.trouble.api.title": "API injoignable ?",
   "ws.cli.trouble.api.body": "Définissez",
   "ws.cli.trouble.api.body2": "pour le tableau de bord et",

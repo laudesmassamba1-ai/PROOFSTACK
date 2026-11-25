@@ -1214,6 +1214,8 @@ describe("project code and AI code audits", () => {
       model: "test-model",
       provider: "custom",
       filesAnalyzed: 1,
+      findings: audit.findings ?? [],
+      files: [],
       error: null,
       createdAt: NOW,
     }));
@@ -1256,6 +1258,7 @@ describe("project code and AI code audits", () => {
           provider: input.provider ?? null,
           filesAnalyzed: input.filesAnalyzed,
           findings: input.findings ?? [],
+          files: input.files ?? [],
           error: input.error ?? null,
           createdAt: NOW,
         };
@@ -1474,6 +1477,14 @@ describe("project code and AI code audits", () => {
       line: 3,
       title: "SQL injection through string concatenation",
     });
+    expect(store.created[0]?.files).toEqual([
+      expect.objectContaining({
+        path: "src/index.ts",
+        score: 64,
+        status: "done",
+        oversized: false,
+      }),
+    ]);
 
     const requestBody = upstreamState.requests[0]?.body ?? "";
     expect(requestBody).toContain("FILE: src/index.ts");
@@ -1516,14 +1527,18 @@ describe("project code and AI code audits", () => {
     expect(store.created[0]?.error).toContain("HTTP 500");
   });
 
-  it("reports the files the batch cap left unread instead of claiming the whole source", async () => {
+  it("analyzes every file one by one, stores each score and averages the final score", async () => {
     const { request, signUp } = harness;
-    const { cookie, workspaceId } = await signUp("ai-code-batches@example.com");
+    const { cookie, workspaceId } = await signUp("ai-code-files@example.com");
     const projectId = await createProject(request, cookie, workspaceId, "Large source");
     const files = Array.from({ length: 13 }, (_, index) => ({
       path: `src/file-${index}.ts`,
-      content: `export const value${index} = "${index}";\n`.padEnd(46_000, " "),
+      content: `export const value${index} = "${index}";\n`,
     }));
+    files.push({
+      path: "src/too-large.ts",
+      content: `export const huge = "${"x".repeat(46_000)}";\n`,
+    });
     const store = installKnowledge({
       workspaceId,
       projectId,
@@ -1531,14 +1546,18 @@ describe("project code and AI code audits", () => {
       files,
     });
     await connectProvider(request, cookie);
-    upstreamState.respond = () => ({
+    upstreamState.respond = (attempt) => ({
       status: 200,
       body: {
         choices: [
           {
             message: {
               role: "assistant",
-              content: JSON.stringify({ score: 80, summary: "Nothing critical.", findings: [] }),
+              content: JSON.stringify({
+                score: attempt % 2 === 0 ? 70 : 80,
+                summary: `File ${attempt}.`,
+                findings: [],
+              }),
             },
           },
         ],
@@ -1551,9 +1570,20 @@ describe("project code and AI code audits", () => {
       body: JSON.stringify({ workspaceId, sourceId: "src_large" }),
     });
     expect(response.status).toBe(201);
-    expect(store.created[0]?.filesAnalyzed).toBe(12);
-    expect(store.created[0]?.summary).toContain("1 fichier(s) non lu(s)");
-    expect(store.created[0]?.summary).toContain("12 fichier(s) analysés");
-    expect(upstreamState.requests).toHaveLength(12);
+    expect(store.created[0]?.filesAnalyzed).toBe(13);
+    expect(store.created[0]?.files).toHaveLength(14);
+    // 13 analyzed files alternate 80/70, and the oversized file counts as 0.
+    expect(store.created[0]?.score).toBe(70);
+    expect(store.created[0]?.summary).toContain("Audit fichier par fichier de 13 fichier(s)");
+    expect(store.created[0]?.summary).toContain("1 fichier(s) dépassent");
+    expect(store.created[0]?.summary).toContain("doivent être découpés");
+    expect(store.created[0]?.summary).not.toContain("non lu");
+    expect(upstreamState.requests).toHaveLength(13);
+    expect(store.created[0]?.files?.find((file) => file.path === "src/too-large.ts")).toMatchObject(
+      { score: 0, status: "failed", oversized: true }
+    );
+    expect(store.created[0]?.findings?.some((finding) => /trop long/i.test(finding.title))).toBe(
+      true
+    );
   });
 });

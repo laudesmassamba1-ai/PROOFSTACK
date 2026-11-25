@@ -177,6 +177,19 @@ interface CorrectionsResponse {
   comparison: ScanComparison | null;
 }
 
+const SCAN_STATUS_LABELS: Record<ScanStatus, { fr: string; en: string }> = {
+  PASS: { fr: "Réussi", en: "Pass" },
+  WARN: { fr: "Avert.", en: "Warn" },
+  FAIL: { fr: "Échec", en: "Fail" },
+  SKIPPED: { fr: "Ignoré", en: "Skipped" },
+};
+
+const SKIP_REASONS_FR: Record<string, string> = {
+  "disallowed by robots.txt": "interdit par robots.txt",
+  "excluded by pattern": "exclu par un motif",
+  "page limit reached": "limite de pages atteinte",
+};
+
 const CORRECTION_LABELS: Record<CorrectionState, { fr: string; en: string }> = {
   todo: { fr: "À traiter", en: "To fix" },
   in_progress: { fr: "En cours", en: "In progress" },
@@ -1142,7 +1155,7 @@ export function ScanPage(): React.ReactElement {
             <p className="scan-notice">
               <AlertTriangle size={13} aria-hidden />
               {fr
-                ? `Le site a refusé les identifiants : le scan n'a vu que les pages publiques.${scan.login.reason ? ` (${scan.login.reason})` : ""}`
+                ? `Le site a refusé les identifiants : le scan n'a vu que les pages publiques.${scan.login.reason ? " (connexion impossible)" : ""}`
                 : `The site refused the credentials, so the scan only saw public pages.${scan.login.reason ? ` (${scan.login.reason})` : ""}`}
             </p>
           ) : null}
@@ -1336,7 +1349,8 @@ export function ScanPage(): React.ReactElement {
                   <ul>
                     {scan.site.skipped.slice(0, 20).map((item) => (
                       <li key={item.url}>
-                        <code>{item.url}</code> — {item.reason}
+                        <code>{item.url}</code> —{" "}
+                        {fr ? (SKIP_REASONS_FR[item.reason] ?? item.reason) : item.reason}
                       </li>
                     ))}
                   </ul>
@@ -1511,7 +1525,8 @@ export function ScanPage(): React.ReactElement {
                         className={`scan-finding-status ${STATUS_STYLE[item.status as ScanStatus] ?? ""}`}
                       >
                         {statusIcon(item.status as ScanStatus)}
-                        {item.status}
+                        {SCAN_STATUS_LABELS[item.status as ScanStatus]?.[fr ? "fr" : "en"] ??
+                          item.status}
                       </span>
                       <div className="min-w-0 flex-1">
                         <p className="app-mono text-xs">
@@ -1619,7 +1634,7 @@ export function ScanPage(): React.ReactElement {
                       <li key={item.id} className={STATUS_STYLE[item.status]}>
                         <span className="scan-finding-status">
                           {statusIcon(item.status)}
-                          {item.status}
+                          {SCAN_STATUS_LABELS[item.status]?.[fr ? "fr" : "en"] ?? item.status}
                         </span>
                         <div className="scan-finding-body">
                           <p className="scan-finding-id">
@@ -1627,7 +1642,9 @@ export function ScanPage(): React.ReactElement {
                             {copy ? <span className="scan-finding-title">{copy.title}</span> : null}
                           </p>
                           <p className="scan-finding-observed">{item.observed}</p>
-                          <p className="scan-finding-why">{item.why}</p>
+                          <p className="scan-finding-why">
+                            {fr && copy ? copy.objective : item.why}
+                          </p>
                           {copy && fixable ? (
                             <details className="scan-finding-explain">
                               <summary>

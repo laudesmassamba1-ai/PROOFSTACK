@@ -10,6 +10,10 @@ name: release
 
 on:
   push:
+    # Tags only. Without `branches: []`, GitHub also matches branch names against the
+    # tag pattern on some events, which made every master push start a release job that
+    # was rejected in 0s. An empty branch list makes the intent explicit.
+    branches: []
     tags: ["v*"]
   workflow_dispatch:
 

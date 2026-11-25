@@ -15,6 +15,7 @@ import { Empty, ErrorState, Loading, StatusBadge } from "../../components/app/ui
 import { useI18n } from "../../i18n/index.js";
 import { PageHeader } from "../../layouts/AppLayout.js";
 import { API_BASE, type ApiError, apiFetch } from "../../lib/api.js";
+import { environmentLabel } from "../../lib/appLabels.js";
 import { duration, formatDate, relativeTime } from "../../lib/format.js";
 import { useSession } from "../../lib/session.js";
 
@@ -171,7 +172,10 @@ export function ProjectDetail() {
         <ArrowLeft size={13} /> {fr ? "Projets" : "Projects"}
       </Link>
       <PageHeader
-        eyebrow={`PROJECT / ${project.environment.toUpperCase()}`}
+        eyebrow={`${fr ? "PROJET" : "PROJECT"} / ${environmentLabel(
+          project.environment,
+          fr
+        ).toUpperCase()}`}
         title={project.name}
         description={`${project.baseUrl}${project.stack ? ` · ${project.stack}` : ""}`}
         actions={
@@ -252,7 +256,7 @@ export function ProjectDetail() {
       <div
         className="project-tabs mb-4 flex flex-wrap gap-2"
         role="tablist"
-        aria-label="Project views"
+        aria-label={fr ? "Vues du projet" : "Project views"}
       >
         {(
           [
@@ -282,7 +286,7 @@ export function ProjectDetail() {
           <section className="app-workbench">
             <header className="app-workbench-head">
               <div>
-                <p className="app-eyebrow">01 / RUNS</p>
+                <p className="app-eyebrow">01 / {fr ? "EXÉCUTIONS" : "RUNS"}</p>
                 <h2 className="app-workbench-title">
                   {fr ? "Vérifications déterministes" : "Deterministic checks"}
                 </h2>
@@ -371,7 +375,8 @@ export function ProjectDetail() {
                     <StatusBadge status={scan.worstVerdict === "fail" ? "failed" : "passed"} />
                     <span className="min-w-0 flex-1 truncate app-mono">{scan.url}</span>
                     <span className="text-muted">
-                      {scan.failed} fail · {scan.warnings} warn
+                      {scan.failed} {fr ? "échec(s)" : "fail"} · {scan.warnings}{" "}
+                      {fr ? "avertissement(s)" : "warn"}
                     </span>
                     <span className="shrink-0 text-muted">{relativeTime(scan.createdAt)}</span>
                   </Link>

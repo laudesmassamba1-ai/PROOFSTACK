@@ -49,6 +49,17 @@ export interface ProjectAuditFinding {
   fix: string;
 }
 
+export interface ProjectAuditFileResult {
+  path: string;
+  score: number | null;
+  summary: string | null;
+  status: "done" | "failed";
+  findings: ProjectAuditFinding[];
+  error: string | null;
+  /** True when the file exceeded the per-file limit and was not sent to the model. */
+  oversized: boolean;
+}
+
 export interface ProjectAiAuditRecord {
   id: string;
   workspaceId: string;
@@ -63,6 +74,8 @@ export interface ProjectAiAuditRecord {
   provider: string | null;
   filesAnalyzed: number;
   findings: ProjectAuditFinding[];
+  /** One row per file actually sent to the provider, including its own score. */
+  files: ProjectAuditFileResult[];
   error: string | null;
   createdAt: string;
 }
@@ -115,6 +128,7 @@ export interface ProjectKnowledge {
     provider?: string | null;
     filesAnalyzed: number;
     findings?: ProjectAuditFinding[];
+    files?: ProjectAuditFileResult[];
     error?: string | null;
   }): Promise<ProjectAiAuditRecord>;
   listAudits(
@@ -154,6 +168,18 @@ function sourceFrom(row: Row): ProjectSourceRecord {
   };
 }
 
+function fileFrom(row: Row): ProjectAuditFileResult {
+  return {
+    path: str(row, "path"),
+    score: row.score === null || row.score === undefined ? null : Number(row.score),
+    summary: nullable(row, "summary"),
+    status: str(row, "status") === "failed" ? "failed" : "done",
+    findings: Array.isArray(row.findings) ? (row.findings as ProjectAuditFinding[]) : [],
+    error: nullable(row, "error"),
+    oversized: row.oversized === true,
+  };
+}
+
 function auditFrom(row: Row): ProjectAiAuditRecord {
   const findings = Array.isArray(row.findings) ? row.findings : [];
   return {
@@ -171,6 +197,7 @@ function auditFrom(row: Row): ProjectAiAuditRecord {
     provider: nullable(row, "provider"),
     filesAnalyzed: number(row, "files_analyzed"),
     findings: findings as ProjectAuditFinding[],
+    files: [],
     error: nullable(row, "error"),
     createdAt: str(row, "created_at"),
   };
@@ -303,7 +330,39 @@ export function createProjectKnowledge(databaseUrl: string | undefined): Project
         returning *`;
       const row = rows[0];
       if (!row) throw new Error("Neon did not return the created audit");
-      return auditFrom(row);
+      const files = input.files ?? [];
+      if (files.length > 0) {
+        const tuples: string[] = [];
+        const params: unknown[] = [];
+        files.forEach((file, index) => {
+          const base = index * 11;
+          tuples.push(
+            `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, ` +
+              `$${base + 6}, $${base + 7}, $${base + 8}, $${base + 9}, $${base + 10}, $${base + 11})`
+          );
+          params.push(
+            `fia_${uuid().replaceAll("-", "").slice(0, 20)}`,
+            id,
+            input.workspaceId,
+            input.projectId,
+            file.path,
+            file.score,
+            file.summary,
+            file.status,
+            JSON.stringify(file.findings),
+            file.error,
+            file.oversized
+          );
+        });
+        await sql.query(
+          `insert into pc_ai_audit_files
+             (id, audit_id, workspace_id, project_id, path, score, summary, status,
+              findings, error, oversized)
+           values ${tuples.join(", ")}`,
+          params
+        );
+      }
+      return { ...auditFrom(row), files };
     },
 
     async listAudits(workspaceId, projectId, limit = 20) {
@@ -312,7 +371,20 @@ export function createProjectKnowledge(databaseUrl: string | undefined): Project
         where workspace_id = ${workspaceId} and project_id = ${projectId}
         order by created_at desc
         limit ${Math.min(100, Math.max(1, limit))}`;
-      return rows.map((row) => auditFrom(row));
+      const audits = rows.map((row) => auditFrom(row));
+      if (audits.length === 0) return audits;
+      const fileRows = await sql`
+        select * from pc_ai_audit_files
+        where workspace_id = ${workspaceId} and project_id = ${projectId}
+        order by created_at, path`;
+      const filesByAudit = new Map<string, ProjectAuditFileResult[]>();
+      for (const row of fileRows) {
+        const auditId = str(row, "audit_id");
+        const list = filesByAudit.get(auditId) ?? [];
+        list.push(fileFrom(row));
+        filesByAudit.set(auditId, list);
+      }
+      return audits.map((audit) => ({ ...audit, files: filesByAudit.get(audit.id) ?? [] }));
     },
 
     async metrics(workspaceId, projectId) {

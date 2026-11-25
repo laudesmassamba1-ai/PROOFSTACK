@@ -5,6 +5,7 @@ import { Empty, ErrorState, Field, Loading, StatusBadge } from "../../components
 import { useI18n } from "../../i18n/index.js";
 import { PageHeader } from "../../layouts/AppLayout.js";
 import { type ApiError, apiFetch } from "../../lib/api.js";
+import { environmentLabel } from "../../lib/appLabels.js";
 import { relativeTime } from "../../lib/format.js";
 import { useSession } from "../../lib/session.js";
 
@@ -23,7 +24,8 @@ const MODULES = ["world", "flow", "exit"] as const;
 
 export function Projects() {
   const { workspaceId } = useSession();
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
+  const fr = locale === "fr";
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [error, setError] = useState<ApiError | Error | null>(null);
   const [creating, setCreating] = useState(false);
@@ -154,10 +156,11 @@ export function Projects() {
                 value={form.environment}
                 onChange={(event) => setForm({ ...form, environment: event.target.value })}
               >
-                <option value="local">local</option>
-                <option value="staging">staging</option>
-                <option value="ci">ci</option>
-                <option value="production">production</option>
+                {(["local", "staging", "ci", "production"] as const).map((environment) => (
+                  <option key={environment} value={environment}>
+                    {environmentLabel(environment, fr)}
+                  </option>
+                ))}
               </select>
             </Field>
             <fieldset className="sm:col-span-2 md:col-span-2">
@@ -186,11 +189,23 @@ export function Projects() {
                 <ErrorState error={formError} />
                 {"code" in formError && formError.code === "project_limit_reached" ? (
                   <p className="mt-2 text-xs text-muted">
-                    <Link to="/app/billing" className="app-text-link">
-                      Compare plans
-                    </Link>{" "}
-                    to raise this limit. Existing projects are never deleted when a limit is
-                    reached.
+                    {fr ? (
+                      <>
+                        <Link to="/app/billing" className="app-text-link">
+                          Comparer les offres
+                        </Link>{" "}
+                        pour augmenter cette limite. Aucun projet existant n'est supprimé lorsqu'une
+                        limite est atteinte.
+                      </>
+                    ) : (
+                      <>
+                        <Link to="/app/billing" className="app-text-link">
+                          Compare plans
+                        </Link>{" "}
+                        to raise this limit. Existing projects are never deleted when a limit is
+                        reached.
+                      </>
+                    )}
                   </p>
                 ) : null}
               </div>
@@ -246,7 +261,7 @@ export function Projects() {
                   <p className="app-project-target">{project.baseUrl}</p>
                 </div>
                 <div className="app-project-meta">
-                  <span>{project.environment}</span>
+                  <span>{environmentLabel(project.environment, fr)}</span>
                   {project.enabledModules.map((module) => (
                     <span key={module}>{module.toUpperCase()}</span>
                   ))}

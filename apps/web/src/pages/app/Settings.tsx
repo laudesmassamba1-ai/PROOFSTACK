@@ -5,6 +5,7 @@ import { Cannot, Card, Empty, ErrorState, Loading } from "../../components/app/u
 import { useI18n } from "../../i18n/index.js";
 import { PageHeader } from "../../layouts/AppLayout.js";
 import { type ApiError, apiFetch } from "../../lib/api.js";
+import { planLabel } from "../../lib/appLabels.js";
 import { formatDay, relativeTime } from "../../lib/format.js";
 import { useSession } from "../../lib/session.js";
 import { useTheme } from "../../lib/theme.js";
@@ -438,11 +439,14 @@ export function Settings() {
           <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
             <div>
               <p className="text-sm font-medium">
-                {billing ? billing.planName : fr ? "Lecture du plan…" : "Reading plan…"}
+                {billing
+                  ? planLabel(billing.planKey, billing.planName, fr)
+                  : fr
+                    ? "Lecture du plan…"
+                    : "Reading plan…"}
               </p>
               <p className="mt-1 text-xs text-muted">
                 {subscriptionLabel}
-                {billing?.state && billing.state !== "NONE" ? ` · ${billing.state}` : ""}
                 {billing?.currentPeriodEnd
                   ? fr
                     ? ` · jusqu’au ${formatDay(billing.currentPeriodEnd)}`

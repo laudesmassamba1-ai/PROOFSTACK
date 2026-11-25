@@ -1,14 +1,16 @@
 import { ArrowRight, FolderPlus, Terminal } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { ModulePassRates, RunsTrend, SeverityBreakdown } from "../../components/app/Insights.js";
 import { KpiRow } from "../../components/app/KpiCards.js";
 import { Empty, ErrorState, Loading, StatusBadge } from "../../components/app/ui.js";
 import { ModuleGlyph } from "../../components/brand/GlyphArt.js";
 import { EnhancedCard } from "../../components/common/EnhancedCard.js";
+import { FolderFloat } from "../../components/app/FolderFloat.js";
 import { useI18n } from "../../i18n/index.js";
 import { type ApiError, apiFetch } from "../../lib/api.js";
+import { planLabel, severityLabel, usageLabel } from "../../lib/appLabels.js";
 import { duration, formatDate, relativeTime } from "../../lib/format.js";
 import { useSession } from "../../lib/session.js";
 import { useTheme } from "../../lib/theme.js";
@@ -113,6 +115,7 @@ export function Overview() {
   const { locale, t } = useI18n();
   const fr = locale === "fr";
   const { theme } = useTheme();
+  const navigate = useNavigate();
   const [data, setData] = useState<Overview | null>(null);
   const [insights, setInsights] = useState<Insights | null>(null);
   const [error, setError] = useState<ApiError | Error | null>(null);
@@ -234,6 +237,48 @@ export function Overview() {
                 ? `${latest.projectName} · ${relativeTime(latest.startedAt)}`
                 : t("ws.overview.never")}
             </p>
+            {hasProjects ? (
+              /* The projects as a physical folder: open it and every project of
+                 the workspace floats out as a pill; picking one lands on its
+                 page. Click, not hover — the overview is a reading surface, the
+                 cloud must not open while the eye passes over it. The physics
+                 runs after the pills settle, and a reduced-motion user gets the
+                 pills straight away, no world. */
+              <div className="app-stamp-folder">
+                <FolderFloat
+                  items={data.projects.map((project) => ({
+                    label: project.name,
+                    value: project.id,
+                  }))}
+                  label={t("ws.overview.projects")}
+                  sublabel={
+                    data.projects.length === 1
+                      ? fr
+                        ? "1 projet"
+                        : "1 project"
+                      : fr
+                        ? `${data.projects.length} projets`
+                        : `${data.projects.length} projects`
+                  }
+                  trigger="click"
+                  closeOnSelect
+                  physics
+                  drift={0.4}
+                  onSelect={(projectId) => navigate(`/app/projects/${projectId}`)}
+                  folderColor="var(--ink)"
+                  frontColor="var(--ink)"
+                  paperColor="var(--paper)"
+                  itemColor="var(--surface)"
+                  itemTextColor="var(--ink)"
+                  labelColor="var(--paper)"
+                  width={200}
+                  height={132}
+                  radius={12}
+                  spread={typeof window !== "undefined" && window.innerWidth < 700 ? 120 : 180}
+                  lift={24}
+                />
+              </div>
+            ) : null}
           </aside>
         </section>
       </EnhancedCard>
@@ -714,7 +759,7 @@ export function Overview() {
                         </span>
                       </span>
                       <span className="app-badge app-badge-danger">
-                        {finding.severity.toLowerCase()}
+                        {severityLabel(finding.severity, fr)}
                       </span>
                     </Link>
                   </li>
@@ -728,7 +773,7 @@ export function Overview() {
               <div>
                 <p className="app-eyebrow">06 / {t("ws.overview.usage")}</p>
                 <h2 id="usage-title" className="app-workbench-title">
-                  {data.subscription.planName}
+                  {planLabel(data.subscription.planKey, data.subscription.planName, fr)}
                 </h2>
               </div>
               <span className="app-badge">
@@ -737,7 +782,11 @@ export function Overview() {
             </header>
             <div className="app-usage-body">
               <div className="app-usage-row">
-                <span>{runsCounter?.label ?? t("ws.overview.runs.count")}</span>
+                <span>
+                  {runsCounter
+                    ? usageLabel(runsCounter.key, runsCounter.label, fr)
+                    : t("ws.overview.runs.count")}
+                </span>
                 <strong>{quota === -1 ? `${used}` : `${used} / ${quota}`}</strong>
               </div>
               <div className="app-meter" aria-hidden>

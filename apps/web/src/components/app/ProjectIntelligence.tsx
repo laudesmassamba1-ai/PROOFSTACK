@@ -41,6 +41,16 @@ interface Finding {
   fix: string;
 }
 
+interface AuditFileScore {
+  path: string;
+  score: number | null;
+  summary: string | null;
+  status: "done" | "failed";
+  findings: Finding[];
+  error: string | null;
+  oversized: boolean;
+}
+
 interface AiAudit {
   id: string;
   scope: string;
@@ -52,6 +62,7 @@ interface AiAudit {
   provider: string | null;
   filesAnalyzed: number;
   findings: Finding[];
+  files: AuditFileScore[];
   error: string | null;
   createdAt: string;
 }
@@ -311,6 +322,7 @@ export function ProjectAiPanel({ projectId }: { projectId: string }) {
           ...(mode === "file" ? { path: selectedFile } : {}),
           ...(mode === "folder" ? { scope } : {}),
           ...(instructions.trim() ? { instructions: instructions.trim() } : {}),
+          locale: document.documentElement.lang === "fr" ? "fr" : "en",
         },
       });
       setSelected(body.audit);
@@ -624,7 +636,14 @@ function AuditResult({ audit }: { audit: AiAudit }) {
         </div>
         <div className="min-w-0 flex-1">
           <p className="app-eyebrow">
-            {audit.mode.toUpperCase()} · {audit.scope}
+            {
+              {
+                file: "FICHIER",
+                folder: "DOSSIER",
+                project: "PROJET",
+              }[audit.mode]
+            }{" "}
+            · {audit.scope}
           </p>
           <p className="mt-1 text-sm leading-relaxed">{audit.summary}</p>
           <p className="mt-2 text-[11px] text-muted">
@@ -633,6 +652,33 @@ function AuditResult({ audit }: { audit: AiAudit }) {
           </p>
         </div>
       </div>
+      {audit.files.length > 0 ? (
+        <details className="border-b border-black/10 px-5 py-3">
+          <summary className="cursor-pointer text-xs font-medium">
+            Détail par fichier ({audit.files.length})
+          </summary>
+          <ul className="mt-2 divide-y divide-black/5">
+            {audit.files.map((file) => (
+              <li key={file.path} className="flex items-center gap-3 py-2 text-xs">
+                <span className="w-9 shrink-0 text-right font-semibold tabular-nums">
+                  {file.score ?? "—"}
+                </span>
+                <span className="min-w-0 flex-1 truncate app-mono">{file.path}</span>
+                {file.oversized ? (
+                  <span className="shrink-0 text-[10px] uppercase tracking-wide text-warning">
+                    trop long
+                  </span>
+                ) : null}
+                {file.status === "failed" ? (
+                  <span className="shrink-0 text-[10px] uppercase tracking-wide text-danger">
+                    non analysé
+                  </span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
       {audit.findings.length === 0 ? (
         <p className="px-5 py-5 text-sm text-muted">
           Aucun défaut justifié par les fichiers fournis. Ce n'est pas une preuve que le projet est

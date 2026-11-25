@@ -1,7 +1,7 @@
 import { Bell, CheckCheck, Inbox } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
-import { Empty, ErrorState, Loading, StatusBadge } from "../../components/app/ui.js";
+import { Empty, ErrorState, Loading } from "../../components/app/ui.js";
 import { useI18n } from "../../i18n/index.js";
 import { PageHeader } from "../../layouts/AppLayout.js";
 import { type ApiError, apiFetch } from "../../lib/api.js";
@@ -36,6 +36,49 @@ interface InboxPayload {
 }
 
 type Filter = "all" | "unread";
+
+/** Known event kinds rendered in French without exposing the API's English prose. */
+const NOTIFICATION_COPY_FR: Record<string, { title: string; body: string }> = {
+  "run.completed": { title: "Exécution terminée", body: "Une exécution a été téléversée." },
+  "run.failed": {
+    title: "Exécution interrompue",
+    body: "Une exécution s'est terminée sans être complète.",
+  },
+  "payment.credited": {
+    title: "Paiement vérifié",
+    body: "Un paiement a été vérifié et crédité. L'accès payant est actif.",
+  },
+  "payment.failed": {
+    title: "Paiement refusé",
+    body: "Un paiement n'a pas été crédité. Aucun accès payant n'a été accordé.",
+  },
+  "api_key.created": { title: "Clé API créée", body: "Une clé API a été créée." },
+  "api_key.revoked": { title: "Clé API révoquée", body: "Une clé API a été révoquée." },
+  "invitation.sent": {
+    title: "Invitation envoyée",
+    body: "Une invitation à cet espace a été envoyée. L'accès commence après acceptation.",
+  },
+  "invitation.accepted": {
+    title: "Invitation acceptée",
+    body: "Une invitation a été acceptée.",
+  },
+  "invitation.declined": {
+    title: "Invitation refusée",
+    body: "Une invitation a été refusée.",
+  },
+  "invitation.revoked": {
+    title: "Invitation révoquée",
+    body: "Une invitation a été révoquée.",
+  },
+  "member.removed": {
+    title: "Membre retiré",
+    body: "Un membre a été retiré de l'espace.",
+  },
+  "member.role_changed": {
+    title: "Rôle modifié",
+    body: "Le rôle d'un membre a changé.",
+  },
+};
 
 export function NotificationsPage() {
   const { locale } = useI18n();
@@ -180,10 +223,17 @@ export function NotificationsPage() {
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-medium">{item.title}</p>
-                    <StatusBadge status={item.kind} />
+                    <p className="text-sm font-medium">
+                      {locale === "fr"
+                        ? (NOTIFICATION_COPY_FR[item.kind]?.title ?? item.title)
+                        : item.title}
+                    </p>
                   </div>
-                  <p className="mt-1 text-xs leading-relaxed text-muted">{item.body}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">
+                    {locale === "fr"
+                      ? (NOTIFICATION_COPY_FR[item.kind]?.body ?? item.body)
+                      : item.body}
+                  </p>
                   <p className="mt-1 text-[0.68rem] text-muted" title={formatDate(item.createdAt)}>
                     {relativeTime(item.createdAt)}
                   </p>

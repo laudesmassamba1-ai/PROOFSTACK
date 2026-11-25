@@ -60,3 +60,28 @@ create table if not exists pc_ai_audits (
 
 create index if not exists pc_ai_audits_project_idx
   on pc_ai_audits (workspace_id, project_id, created_at desc);
+
+-- One row per file sent to the model. `score` is the file's own 0-100 score;
+-- `pc_ai_audits.score` is the arithmetic mean of these non-null scores. Keeping both
+-- makes the final score reproducible and lets the UI show which file lowered it.
+create table if not exists pc_ai_audit_files (
+  id text primary key,
+  audit_id text not null references pc_ai_audits(id) on delete cascade,
+  workspace_id text not null,
+  project_id text not null,
+  path text not null,
+  score integer,
+  summary text,
+  status text not null check (status in ('done', 'failed')),
+  findings jsonb not null default '[]'::jsonb,
+  error text,
+  oversized boolean not null default false,
+  created_at timestamptz not null default now(),
+  unique (audit_id, path)
+);
+
+create index if not exists pc_ai_audit_files_audit_idx
+  on pc_ai_audit_files (audit_id, path);
+
+create index if not exists pc_ai_audit_files_project_idx
+  on pc_ai_audit_files (workspace_id, project_id, created_at desc);

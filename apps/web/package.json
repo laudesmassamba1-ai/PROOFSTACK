@@ -23,6 +23,7 @@
     "@xterm/addon-fit": "0.10.0",
     "@xterm/xterm": "5.5.0",
     "lucide-react": "1.73.0",
+    "matter-js": "^0.20.0",
     "pdfjs-dist": "^6.5.438",
     "react": "19.3.1",
     "react-dom": "19.3.1",
@@ -32,6 +33,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.3.5",
+    "@types/matter-js": "^0.20.2",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@types/three": "^0.187.0",

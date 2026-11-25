@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { severityLabel } from "../../lib/appLabels.js";
 
 /**
  * Small dependency-free SVG charts for the workspace insights.
@@ -34,7 +35,7 @@ export function RunsTrend({
       viewBox={`0 0 ${width} ${height}`}
       className="w-full"
       role="img"
-      aria-label="Checks per day"
+      aria-label={locale === "fr" ? "Vérifications par jour" : "Checks per day"}
     >
       {[0.5, 1].map((fraction) => (
         <line
@@ -145,7 +146,7 @@ export function SeverityBreakdown({
       {normalized.map((entry) => (
         <div key={entry.severity} className="flex items-center gap-3">
           <span className="w-16 text-[11px] font-medium capitalize text-muted-foreground">
-            {entry.severity}
+            {severityLabel(entry.severity, locale === "fr")}
           </span>
           <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-surface-2">
             <div

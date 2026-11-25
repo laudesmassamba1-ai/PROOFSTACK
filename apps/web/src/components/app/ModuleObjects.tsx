@@ -1,4 +1,5 @@
 import { type CSSProperties, useEffect, useId, useRef, useState } from "react";
+import { useI18n } from "../../i18n/index.js";
 import { usePrefersReducedMotion } from "../../lib/theme.js";
 
 /**
@@ -42,6 +43,8 @@ function useUid() {
 }
 
 export function WorldObject({ passed, failed, total }: ObjectProps) {
+  const { locale } = useI18n();
+  const fr = locale === "fr";
   const uid = useUid();
   const { ref, running } = useObjectMotion<SVGSVGElement>();
   const shown = Math.min(Math.max(passed + failed, 0), 10);
@@ -67,8 +70,12 @@ export function WorldObject({ passed, failed, total }: ObjectProps) {
       role="img"
       aria-label={
         hasData
-          ? `WORLD orbit: ${passed} passed and ${failed} failed cases in the latest run`
-          : "WORLD orbit unlit: no run received"
+          ? fr
+            ? `Orbite WORLD : ${passed} cas réussi(s) et ${failed} échec(s) dans la dernière exécution`
+            : `WORLD orbit: ${passed} passed and ${failed} failed cases in the latest run`
+          : fr
+            ? "Orbite WORLD éteinte : aucune exécution reçue"
+            : "WORLD orbit unlit: no run received"
       }
     >
       <defs>
@@ -190,6 +197,8 @@ export function WorldObject({ passed, failed, total }: ObjectProps) {
 }
 
 export function FlowObject({ passed, failed, total }: ObjectProps) {
+  const { locale } = useI18n();
+  const fr = locale === "fr";
   const uid = useUid();
   const { ref, running } = useObjectMotion<SVGSVGElement>();
   const count = Math.min(Math.max(passed + failed, 0), 7);
@@ -217,8 +226,12 @@ export function FlowObject({ passed, failed, total }: ObjectProps) {
       role="img"
       aria-label={
         hasData
-          ? `FLOW chain: ${passed} passed and ${failed} failed cases in the latest run`
-          : "FLOW chain matte: no run received"
+          ? fr
+            ? `Chaîne FLOW : ${passed} cas réussi(s) et ${failed} échec(s) dans la dernière exécution`
+            : `FLOW chain: ${passed} passed and ${failed} failed cases in the latest run`
+          : fr
+            ? "Chaîne FLOW mate : aucune exécution reçue"
+            : "FLOW chain matte: no run received"
       }
     >
       <defs>
@@ -297,6 +310,8 @@ export function FlowObject({ passed, failed, total }: ObjectProps) {
 }
 
 export function ExitObject({ passed, failed, total }: ObjectProps) {
+  const { locale } = useI18n();
+  const fr = locale === "fr";
   const uid = useUid();
   const { ref, running } = useObjectMotion<SVGSVGElement>();
   const count = Math.min(Math.max(passed + failed, 0), 5);
@@ -316,8 +331,12 @@ export function ExitObject({ passed, failed, total }: ObjectProps) {
       role="img"
       aria-label={
         hasData
-          ? `EXIT stack: ${passed} passed and ${failed} failed cases in the latest run`
-          : "EXIT tray empty: no run received"
+          ? fr
+            ? `Pile EXIT : ${passed} cas réussi(s) et ${failed} échec(s) dans la dernière exécution`
+            : `EXIT stack: ${passed} passed and ${failed} failed cases in the latest run`
+          : fr
+            ? "Plateau EXIT vide : aucune exécution reçue"
+            : "EXIT tray empty: no run received"
       }
     >
       <defs>
@@ -441,8 +460,11 @@ function AuditObject({
   total: number;
   variant: "fail" | "clean";
 }) {
+  const { locale } = useI18n();
+  const fr = locale === "fr";
   const { ref, running } = useObjectMotion<SVGSVGElement>();
   const rate = total > 0 ? passed / total : 0;
+  const percent = Math.round(rate * 100);
   const angle = -90 + Math.min(1, Math.max(0, rate)) * 180;
   const color = variant === "fail" ? "#f43f5e" : "#10b981";
   const arcLen = Math.PI * 60 * Math.min(1, Math.max(0, rate));
@@ -454,8 +476,20 @@ function AuditObject({
       role="img"
       aria-label={
         variant === "fail"
-          ? "Jauge de sécurité FAIL, aucune mesure"
-          : "Jauge de qualité d'interface CLEAN, aucune mesure"
+          ? fr
+            ? total > 0
+              ? `Jauge de sécurité FAIL : ${percent} % de réussite`
+              : "Jauge de sécurité FAIL, aucune mesure"
+            : total > 0
+              ? `FAIL security gauge: ${percent}% pass rate`
+              : "FAIL security gauge, no measurement"
+          : fr
+            ? total > 0
+              ? `Jauge de qualité d'interface CLEAN : ${percent} % de réussite`
+              : "Jauge de qualité d'interface CLEAN, aucune mesure"
+            : total > 0
+              ? `CLEAN interface-quality gauge: ${percent}% pass rate`
+              : "CLEAN interface-quality gauge, no measurement"
       }
     >
       <path
