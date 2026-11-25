@@ -386,9 +386,13 @@ async function main(argv: string[]): Promise<number> {
       if (kind === "interact") {
         return commandAuditInteract(args.slice(1));
       }
-      if (kind !== "fail" && kind !== "clean") {
+      if (kind === "--help" || kind === "-h" || kind === "help") {
         printAuditHelp(flags);
         if (kind === "help") printAuditInteractHelp();
+        return 0;
+      }
+      if (kind !== "fail" && kind !== "clean") {
+        printAuditHelp(flags);
         return kind ? 2 : 0;
       }
       const target = args.slice(1).find((arg) => !arg.startsWith("-"));
