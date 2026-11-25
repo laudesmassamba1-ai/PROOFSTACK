@@ -651,12 +651,16 @@ export async function runModule(
   workspaceId: string,
   projectId: string,
   module: CopilotModule,
-  options: { url?: string; onlyCases?: string[]; actorUserId: string }
+  options: { url?: string; onlyCases?: string[]; actorUserId?: string } = {}
 ): Promise<ModuleRunSummary> {
+  const actorUserId = options.actorUserId;
   const project = await projectOrThrow(services, workspaceId, projectId);
   const config = buildProjectConfig(project, readStoredProjectConfig(project.moduleConfig));
 
   if (module === "fail" || module === "clean") {
+    if (!actorUserId) {
+      throw new HttpError(401, "not_authenticated", "Sign in before running a FAIL/CLEAN audit.");
+    }
     const url = options.url ?? project.baseUrl;
     let target: URL;
     try {
@@ -722,7 +726,7 @@ export async function runModule(
     await services.store.createPageAudit({
       id: auditId,
       workspaceId,
-      createdBy: options.actorUserId,
+      createdBy: actorUserId,
       projectId: project.id,
       url: scan.url,
       finalUrl: scan.finalUrl,
