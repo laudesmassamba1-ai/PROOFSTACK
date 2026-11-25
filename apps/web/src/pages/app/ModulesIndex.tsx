@@ -162,13 +162,9 @@ export function ModulesIndexPage() {
           const covered = Boolean(record?.lastRunAt || latestAudit);
           const badgeStatus = record?.lastRunAt
             ? record.status
-            : latestAudit?.worstVerdict === "fail"
-              ? "FAILED"
-              : latestAudit?.worstVerdict === "warnings"
-                ? "PARTIAL"
-                : latestAudit
-                  ? "COMPLETED"
-                  : "";
+            : latestAudit
+              ? "COMPLETED"
+              : "";
           return (
             <Link
               key={module.id}
@@ -194,8 +190,8 @@ export function ModulesIndexPage() {
                 <p className="app-object-state">
                   {latestAudit && !record?.lastRunAt
                     ? fr
-                      ? `Dernier audit de page · ${latestAudit.failed} échec(s) · ${latestAudit.warnings} avertissement(s)`
-                      : `Latest page audit · ${latestAudit.failed} failure(s) · ${latestAudit.warnings} warning(s)`
+                      ? `Dernier scan global (FAIL + CLEAN) · ${latestAudit.failed} échec(s) · ${latestAudit.warnings} avertissement(s)`
+                      : `Latest global scan (FAIL + CLEAN) · ${latestAudit.failed} failure(s) · ${latestAudit.warnings} warning(s)`
                     : fr
                       ? module.fr
                       : module.en}
