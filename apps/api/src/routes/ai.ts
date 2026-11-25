@@ -521,7 +521,7 @@ const TOOLS: { name: string; description: string; parameters: Record<string, unk
   {
     name: "module_status",
     description:
-      "All five modules for one project: enabled, configured, blockers, runtime capability, and the exact local/server run command. A last stored run is shown only where that module writes to the shared run history; live FAIL/CLEAN page scans currently return findings without a run record. Call this before claiming a module is ready or missing.",
+      "All five modules for one project: enabled, configured, blockers, runtime capability, and the exact local/server run command. Shows the latest EngineRun where applicable and the latest PageAudit for FAIL/CLEAN; these are separate histories. Call this before claiming a module is ready or missing.",
     parameters: {
       type: "object",
       properties: {
@@ -571,7 +571,7 @@ const TOOLS: { name: string; description: string; parameters: Record<string, unk
   {
     name: "module_run",
     description:
-      "Launch one module using the runtime capabilities below. WORLD and configured HTTP-backed FLOW execute the real engine and persist a metered run in shared history. FAIL/CLEAN currently perform a live HTTP page scan and return findings directly; they return runId=null/reportId=null and do NOT create a stored run or history entry. EXIT is local-only and returns NOT_RUNNABLE_HERE with the exact CLI instruction. Browser-only FLOW journeys are also local Chromium work and are not executed by the Worker. Never describe a live scan as a stored run. Set confirm:true only after the user explicitly asked to execute the check.",
+      "Launch one module using the runtime capabilities below. WORLD and configured HTTP-backed FLOW execute the real engine and persist a metered run in shared history. FAIL/CLEAN perform a live HTTP page scan, consume the AI-audit quota, and save a PageAudit in the project's scan history; they return auditId while runId/reportId remain null because they are not EngineRuns. Use get_page_audit to retrieve a prior saved page audit. EXIT is local-only and returns NOT_RUNNABLE_HERE with the exact CLI instruction. Browser-only FLOW journeys are also local Chromium work and are not executed by the Worker. Never describe a live scan as a stored run. Set confirm:true only after the user explicitly asked to execute the check.",
     parameters: {
       type: "object",
       properties: {
