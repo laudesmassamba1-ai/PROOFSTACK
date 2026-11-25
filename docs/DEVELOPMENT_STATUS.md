@@ -8,8 +8,9 @@ uses the Ink & Object direction; this file records what is true and what remains
 - Three fixture-driven engine modules (WORLD, FLOW, EXIT) plus two HTTP page-audit
   modules (FAIL, CLEAN). WORLD/FLOW/EXIT engine runs use the shared run/report pipeline.
   FAIL/CLEAN page scans produce measured findings, but the module-copilot live scan path
-  currently returns `runId: null` / `reportId: null` and does not create a shared engine
-  run. Do not claim that those live scans appear in run history.
+  records in page-scan history. The module-copilot response returns `auditId`, while
+  `runId: null` / `reportId: null` remain correct: page audits are not shared EngineRuns.
+  Keep the page-audit and engine-run histories distinct.
 - CLI commands: init, doctor, validate, test, world/flow/exit, modules, report,
   audit (fail|clean), sync, login/logout (session or device flow), ai, mcp, tools.
   Core modules and the module board run locally; they never open the website.
