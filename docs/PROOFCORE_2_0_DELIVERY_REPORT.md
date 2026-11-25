@@ -68,11 +68,14 @@ Voir `PROOFCORE_ARCHITECTURE_MAP.md`. Résumé :
 ## 5. Évolution de l'IA
 
 - Contexte strictement limité au workspace ; 19 outils.
-- Cinq outils de modules : `module_status`, `module_config`, `module_configure`,
-  `module_run`, `analyze_run`. L'IA voit l'état des 5 modules, valide une configuration
-  avec les schémas réels, la sauvegarde avec `confirm: true`, lance WORLD/FLOW/FAIL/CLEAN
-  et analyse le run stocké. EXIT et les journeys navigateur annoncent honnêtement leur
-  limite de runtime et la commande locale.
+- Cinq outils de module : `module_status`, `module_config`, `module_configure`,
+  `module_run`, `analyze_run`. L'IA lit l'état et le vocabulaire des cinq modules.
+  `module_configure` ne sauvegarde que WORLD/FLOW/EXIT, avec les schémas réels.
+  `module_run` persiste les runs WORLD et les cas FLOW compatibles avec le runtime
+  serveur. FAIL/CLEAN exécutent ici un scan HTTP en direct mais retournent
+  `runId: null` et `reportId: null` : ce chemin ne crée pas de run partagé et ne doit
+  pas être présenté comme une entrée d'historique. EXIT et les journeys FLOW Chromium
+  restent locaux lorsque leurs prérequis nécessitent le poste du développeur.
 - Une seule autre écriture : `remember` (fait de mémoire borné).
 - Clés chiffrées AES-256-GCM ; fingerprint seul renvoyé.
 - Contenus importés encadrés par un nonce ; 6 tests d'évasion.
@@ -196,18 +199,23 @@ présenté comme une permanence 24/7.
 
 ## 18. Tests
 
-| Suite             | Résultat                             |
-| ----------------- | ------------------------------------ |
-| `pnpm lint`       | 496 fichiers, 0 erreur               |
-| `pnpm typecheck`  | OK                                   |
-| `pnpm test`       | 811 tests, 69 fichiers, 0 échec      |
-| Preuve navigateur | Chromium réel, journey FLOW `PASSED` |
-| `pnpm verify`     | OK (lint + types + tests + build)    |
-| E2E desktop       | 17 passés, 2 sautés                  |
-| E2E mobile        | 19 passés                            |
+Les nombres ci-dessous sont les résultats consignés dans la passe locale de livraison
+à laquelle ce rapport se réfère. Ils ne prouvent pas automatiquement que chaque commit
+ultérieur, y compris la branche de suivi documentaire, passe encore la suite.
+
+| Suite             | Résultat consigné dans la passe d'origine |
+| ----------------- | ----------------------------------------- |
+| `pnpm lint`       | 496 fichiers, 0 erreur                    |
+| `pnpm typecheck`  | OK                                        |
+| `pnpm test`       | 811 tests, 69 fichiers, 0 échec           |
+| Preuve navigateur | Chromium réel, journey FLOW `PASSED`      |
+| `pnpm verify`     | OK (lint + types + tests + build)         |
+| E2E desktop       | 17 passés, 2 sautés                       |
+| E2E mobile        | 19 passés                                 |
 
 Les deux tests sautés sont les scénarios réservés au téléphone, exécutés dans le projet
-mobile.
+mobile. Les modifications documentaires et le test du wordmark ajoutés ensuite doivent
+encore être exécutés par la CI de la branche avant fusion.
 
 ## 19. Erreurs restantes
 
@@ -255,11 +263,11 @@ mobile.
 | Isolation multi-comptes             | oui          | oui          | oui               | 22 lectures + 8 écritures | non                  |
 | Rôles et invitations                | oui          | oui          | oui               | API                       | non                  |
 | IA contextuelle                     | oui          | oui          | oui               | fournisseur simulé        | non                  |
-| IA ↔ 5 modules (config/run/analyse) | oui          | oui          | oui               | API + moteur réel         | non                  |
+| Copilot : état/config des 5 modules ; exécution selon runtime | oui | oui | partiel | WORLD/FLOW API ; FAIL/CLEAN live sans run ; EXIT local | non | PARTIEL |
 | FLOW navigateur réel                | oui          | oui          | oui               | Chromium local            | non                  |
 | Fencing contenus non fiables        | oui          | oui          | oui               | API                       | non                  |
 | WORLD/FLOW/EXIT                     | oui          | oui          | oui               | API + CLI/tests           | non                  |
-| FAIL/CLEAN                          | oui          | oui          | oui               | web + API                 | non                  |
+| FAIL/CLEAN                          | oui          | oui          | oui               | PageAudit via scan Web ; module_run IA live sans EngineRun | non | PARTIEL |
 | Rapports JSON/JUnit/HTML/texte      | oui          | oui          | oui               | web + CLI                 | non                  |
 | PDF/CSV                             | non          | —            | —                 | —                         | non                  |
 | Partage client                      | non          | —            | —                 | —                         | non                  |
@@ -289,3 +297,17 @@ exploitation commerciale : sauvegarde/restauration, rétention, MFA/vérificatio
 obligatoire, partage/export, et la preuve réelle des fournisseurs externes.
 
 Le produit est **démontrable et testé**, pas encore **exploitable en production**.
+
+
+## 24. Addendum de revue — 25 novembre 2026
+
+Cette revue a corrigé la description des capacités du copilot après inspection du code actuel. La phrase précédente « lance WORLD/FLOW/FAIL/CLEAN et analyse le run stocké » était trop large : seuls les runs WORLD et les exécutions FLOW compatibles avec le runtime serveur sont enregistrés par `runModule`. FAIL/CLEAN renvoient les résultats HTTP en direct sans créer de run partagé ; EXIT et les journeys Chromium sont locaux lorsque leurs prérequis l'exigent. La matrice de capacité doit être lue avec cette limite, et non comme une promesse d'exécution identique des cinq modules.
+
+Cette branche ajoute aussi :
+
+- correction du wordmark : le P géométrique est rendu une seule fois, le texte adjacent devient `ROOFCORE`, et la version sans symbole reste `PROOFCORE` ;
+- un test de rendu du wordmark et du hero animé ;
+- des descriptions d'outils IA qui distinguent clairement exécution, scan live et persistance ;
+- une clarification du README, du statut de développement et de la matrice de capacités.
+
+**Validation de cette branche : NON EXÉCUTÉE localement par cette revue.** Les changements ont été poussés sur une branche séparée. La CI doit encore confirmer lint, typecheck, tests, build et E2E. Aucune publication npm ni aucun déploiement de production n'a été effectué.
