@@ -255,34 +255,33 @@ encore être exécutés par la CI de la branche avant fusion.
 8. Consigner version, date, opérateur, résultats.
 
 ## 22. Tableau de preuve final
-
-| Fonction | État | Limite / preuve |
-| --- | --- | --- |
-| Inscription, connexion et sessions | VÉRIFIÉ (hors production) | Parcours desktop et mobile consignés |
-| Réinitialisation du mot de passe | PARTIEL | API testée ; livraison réelle des e-mails non vérifiée |
-| Vérification d'e-mail | PARTIEL | Flux API présent ; non exigée à la connexion et fournisseur réel non vérifié |
-| MFA et OAuth | ABSENT | Aucun fournisseur ni parcours |
-| Isolation multi-comptes | VÉRIFIÉ (hors production) | 22 lectures et 8 écritures contrôlées |
-| Rôles et invitations | VÉRIFIÉ (hors production) | API et notifications testées |
-| IA contextuelle | PARTIEL | Tests avec fournisseur simulé ; fournisseur réel non vérifié |
-| Copilot des cinq modules | PARTIEL | WORLD/FLOW produisent des EngineRun ; FAIL/CLEAN enregistrent un PageAudit ; EXIT reste local |
-| FLOW navigateur | VÉRIFIÉ sur machine de test | Chromium local via CLI ; non exécuté dans le Worker |
-| WORLD/FLOW/EXIT | VÉRIFIÉ hors production | Moteur partagé et parcours CLI/API testés, avec limites de runtime |
-| FAIL/CLEAN | PARTIEL | PageAudit persisté ; historique distinct des EngineRun ; aucun `audit --sync` CLI |
-| Rapports JSON/JUnit/HTML/texte | VÉRIFIÉ | Web et CLI |
-| Export PDF/CSV et partage client | ABSENT | Aucune implémentation |
-| Pagination | VÉRIFIÉ hors production | API et interface |
-| Recherche plein-texte | ABSENT | Aucun index ni endpoint |
-| Paiement sandbox | VÉRIFIÉ en sandbox | Parcours checkout et confirmation E2E |
-| Paiement live SasPay | NON VÉRIFIÉ | Credentials et transaction réelle manquants |
-| Webhooks entrants et sortants | VÉRIFIÉ hors production | Signature, anti-rejeu et receiver local testés |
-| Quotas et consommation | VÉRIFIÉ hors production | API et interface testées |
-| E-mails transactionnels | NON VÉRIFIÉ | Fournisseur de production non configuré |
-| Notifications et support | VÉRIFIÉ hors production | Interface, API et console admin testées |
-| Design et responsive | PARTIEL | Captures E2E et 2 viewports ; campagne visuelle complète à rejouer |
-| Accessibilité | PARTIEL | Contrôle clavier limité ; audit WCAG/axe absent |
-| Observabilité | PARTIEL | Request ID et logs JSON ; pas de tracing ni tests dédiés |
-| Sauvegarde/restauration et rétention | ABSENT | Aucun processus opérationnel testé |
+| Fonction                             | État                        | Limite / preuve                                                                               |
+| ------------------------------------ | --------------------------- | --------------------------------------------------------------------------------------------- |
+| Inscription, connexion et sessions   | VÉRIFIÉ (hors production)   | Parcours desktop et mobile consignés                                                          |
+| Réinitialisation du mot de passe     | PARTIEL                     | API testée ; livraison réelle des e-mails non vérifiée                                        |
+| Vérification d'e-mail                | PARTIEL                     | Flux API présent ; non exigée à la connexion et fournisseur réel non vérifié                  |
+| MFA et OAuth                         | ABSENT                      | Aucun fournisseur ni parcours                                                                 |
+| Isolation multi-comptes              | VÉRIFIÉ (hors production)   | 22 lectures et 8 écritures contrôlées                                                         |
+| Rôles et invitations                 | VÉRIFIÉ (hors production)   | API et notifications testées                                                                  |
+| IA contextuelle                      | PARTIEL                     | Tests avec fournisseur simulé ; fournisseur réel non vérifié                                  |
+| Copilot des cinq modules             | PARTIEL                     | WORLD/FLOW produisent des EngineRun ; FAIL/CLEAN enregistrent un PageAudit ; EXIT reste local |
+| FLOW navigateur                      | VÉRIFIÉ sur machine de test | Chromium local via CLI ; non exécuté dans le Worker                                           |
+| WORLD/FLOW/EXIT                      | VÉRIFIÉ hors production     | Moteur partagé et parcours CLI/API testés, avec limites de runtime                            |
+| FAIL/CLEAN                           | PARTIEL                     | PageAudit persisté ; historique distinct des EngineRun ; aucun `audit --sync` CLI             |
+| Rapports JSON/JUnit/HTML/texte       | VÉRIFIÉ                     | Web et CLI                                                                                    |
+| Export PDF/CSV et partage client     | ABSENT                      | Aucune implémentation                                                                         |
+| Pagination                           | VÉRIFIÉ hors production     | API et interface                                                                              |
+| Recherche plein-texte                | ABSENT                      | Aucun index ni endpoint                                                                       |
+| Paiement sandbox                     | VÉRIFIÉ en sandbox          | Parcours checkout et confirmation E2E                                                         |
+| Paiement live SasPay                 | NON VÉRIFIÉ                 | Credentials et transaction réelle manquants                                                   |
+| Webhooks entrants et sortants        | VÉRIFIÉ hors production     | Signature, anti-rejeu et receiver local testés                                                |
+| Quotas et consommation               | VÉRIFIÉ hors production     | API et interface testées                                                                      |
+| E-mails transactionnels              | NON VÉRIFIÉ                 | Fournisseur de production non configuré                                                       |
+| Notifications et support             | VÉRIFIÉ hors production     | Interface, API et console admin testées                                                       |
+| Design et responsive                 | PARTIEL                     | Captures E2E et 2 viewports ; campagne visuelle complète à rejouer                            |
+| Accessibilité                        | PARTIEL                     | Contrôle clavier limité ; audit WCAG/axe absent                                               |
+| Observabilité                        | PARTIEL                     | Request ID et logs JSON ; pas de tracing ni tests dédiés                                      |
+| Sauvegarde/restauration et rétention | ABSENT                      | Aucun processus opérationnel testé                                                            |
 
 ## 23. Verdict
 
