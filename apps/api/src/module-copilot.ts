@@ -605,7 +605,10 @@ const REMEDIATIONS: Record<string, { fix: string; verify: string }> = {
 
 export interface ModuleRunSummary {
   module: CopilotModule;
+  /** Engine run id. Page scans use auditId and are not EngineRuns. */
   runId: string | null;
+  /** Page-audit history id for FAIL/CLEAN scans. */
+  auditId?: string | null;
   reportId: string | null;
   status: string;
   totals: unknown;
@@ -626,7 +629,7 @@ export async function runModule(
   workspaceId: string,
   projectId: string,
   module: CopilotModule,
-  options: { url?: string; onlyCases?: string[] } = {}
+  options: { url?: string; onlyCases?: string[]; actorUserId: string }
 ): Promise<ModuleRunSummary> {
   const project = await projectOrThrow(services, workspaceId, projectId);
   const config = buildProjectConfig(project, readStoredProjectConfig(project.moduleConfig));
@@ -640,20 +643,82 @@ export async function runModule(
       throw new HttpError(400, "bad_url", "An absolute http(s) URL is required.");
     }
     const own = new URL(project.baseUrl);
-    if (target.hostname !== own.hostname) {
-      throw new HttpError(403, "url_outside_project", "Scan only this project's host.");
+    if (
+      !["http:", "https:"].includes(target.protocol) ||
+      target.username.length > 0 ||
+      target.password.length > 0 ||
+      target.origin !== own.origin
+    ) {
+      throw new HttpError(
+        403,
+        "url_outside_project",
+        "Scan only the project's exact origin (protocol, host and port)."
+      );
     }
-    const scan = await services.scan(url, {
+    const scan = await services.scan(target.toString(), {
       allowPrivate: false,
       timeoutMs: 15_000,
       ownershipHint: "remote",
     });
     const summary = scan.modules.find((item) => item.module === module);
     const findings = scan.findings.filter((item) => item.module === module);
+    const auditId = `aud_${crypto.randomUUID().replaceAll("-", "").slice(0, 20)}`;
+    const failed = findings.filter((item) => item.status === "FAIL").length;
+    const warnings = findings.filter((item) => item.status === "WARN").length;
+    const worstVerdict = failed > 0 ? "fail" : warnings > 0 ? "warnings" : "pass";
+
+    const gate = await services.meter.authorize({
+      workspaceId,
+      check: { key: "monthly_ai_audits", requested: 1 },
+      subjectId: auditId,
+      quantity: 0,
+    });
+    if (!gate.allowed) {
+      throw new HttpError(
+        403,
+        "quota_exhausted",
+        "The monthly AI-audit quota is exhausted; this scan was not saved.",
+        { remaining: gate.decision.remaining }
+      );
+    }
+    const metered = await services.meter.meter({
+      workspaceId,
+      kind: "ai_audit",
+      subjectId: auditId,
+      quantity: 1,
+      at: services.clock(),
+    });
+    if (metered.reason === "quota_exhausted") {
+      throw new HttpError(
+        403,
+        "quota_exhausted",
+        "The monthly AI-audit quota was consumed by another request; this scan was not saved.",
+        { remaining: metered.decision.remaining }
+      );
+    }
+
+    await services.store.createPageAudit({
+      id: auditId,
+      workspaceId,
+      createdBy: options.actorUserId,
+      projectId: project.id,
+      url: scan.url,
+      finalUrl: scan.finalUrl,
+      status: scan.status,
+      durationMs: scan.durationMs,
+      worstVerdict,
+      failed,
+      warnings,
+      payload: JSON.stringify(scan),
+      ownership: scan.ownership,
+      redacted: scan.redacted,
+    });
+
     return {
       module,
       runId: null,
       reportId: null,
+      auditId,
       status: summary?.score === undefined ? "NOT_MEASURED" : "COMPLETED",
       totals: summary
         ? {
@@ -675,7 +740,7 @@ export async function runModule(
       skipped: findings
         .filter((finding) => finding.status === "SKIPPED")
         .map((finding) => ({ id: finding.id, reason: finding.observed })),
-      note: "A page scan is returned live; it is not stored as a test run. Use FAIL/CLEAN history for trends.",
+      note: `Audit saved as ${auditId} in page-audit history. It is not an EngineRun and has no engine reportId.`,
     };
   }
 
