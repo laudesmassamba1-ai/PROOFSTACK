@@ -12,6 +12,7 @@ Vocabulaire :
 - **NON VÉRIFIÉ** : code présent, preuve externe impossible sans credentials.
 
 ## 1. Tableau de preuve
+
 | Fonction                                | Code présent                                        | Test exécuté                                     | Test réussi | Parcours vérifié                  | Production vérifiée | Statut                                                                                                            |
 | --------------------------------------- | --------------------------------------------------- | ------------------------------------------------ | ----------- | --------------------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | Inscription e-mail/mot de passe         | `routes/auth.ts`                                    | `api.test.ts`, E2E signup                        | oui (805)   | desktop + mobile                  | non                 | VÉRIFIÉ (hors prod)                                                                                               |
