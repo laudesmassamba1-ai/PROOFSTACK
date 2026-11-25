@@ -74,9 +74,7 @@
   },
   "overrides": [
     {
-      "includes": [
-        "apps/web/src/components/app/Dock.tsx"
-      ],
+      "includes": ["apps/web/src/components/app/Dock.tsx"],
       "linter": {
         "rules": {
           "suspicious": {

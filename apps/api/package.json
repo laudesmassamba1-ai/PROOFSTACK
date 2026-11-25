@@ -22,6 +22,8 @@
     "@proofcore/contracts": "workspace:*",
     "@proofcore/core": "workspace:*",
     "@proofcore/engine": "workspace:*",
+    "@proofcore/module-flow": "workspace:*",
+    "@proofcore/module-world": "workspace:*",
     "hono": "4.13.19",
     "zod": "4.6.7"
   },

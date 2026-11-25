@@ -23,8 +23,8 @@ for (const route of routes) {
     if (m.type() === "error" && !m.text().includes("ERR_CONNECTION_REFUSED"))
       errors.push(m.text().slice(0, 160));
   });
-  page.on("pageerror", (e) => errors.push("PAGEERROR: " + e.message.slice(0, 160)));
-  await page.goto("http://127.0.0.1:5173" + route, { waitUntil: "domcontentloaded" });
+  page.on("pageerror", (e) => errors.push(`PAGEERROR: ${e.message.slice(0, 160)}`));
+  await page.goto(`http://127.0.0.1:5173${route}`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(900);
   const r = await page.evaluate(() => ({
     scrollW: document.documentElement.scrollWidth,

@@ -135,7 +135,8 @@ describe("worker scenario engine", () => {
 
   it("records real page errors from the event stream", async () => {
     const { page, state } = makePage();
-    const original = page.evaluate!;
+    const original = page.evaluate;
+    if (!original) throw new Error("the fake page must expose evaluate");
     page.evaluate = async (expression: string) => {
       // The handlers are registered at the start of runScenario; fire only now.
       state.handlers.get("pageerror")?.[0]?.("TypeError: boom");
@@ -152,7 +153,8 @@ describe("worker scenario engine", () => {
 
   it("records console errors as warnings", async () => {
     const { page, state } = makePage();
-    const original = page.evaluate!;
+    const original = page.evaluate;
+    if (!original) throw new Error("the fake page must expose evaluate");
     page.evaluate = async (expression: string) => {
       state.handlers.get("console")?.[0]?.({ type: () => "error", text: () => "failed to load" });
       return original(expression);

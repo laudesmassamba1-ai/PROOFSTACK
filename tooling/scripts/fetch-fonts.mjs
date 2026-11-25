@@ -98,7 +98,7 @@ const header = `/*
  */
 
 `;
-await writeFile(CSS_FILE, header + sheets.join("\n\n") + "\n");
+await writeFile(CSS_FILE, `${header}${sheets.join("\n\n")}\n`);
 
 const written = await readdir(OUT_DIR);
 console.log(`fonts: ${files} files, ${(bytes / 1024).toFixed(0)} kB`);

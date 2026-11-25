@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import * as THREE from "three";
 
 /**
@@ -117,7 +117,11 @@ function DotShaderBackground({ className = "" }: { className?: string }) {
 
     try {
       renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false });
-      renderer.setPixelRatio(window.devicePixelRatio);
+      // A decorative background must not compete with the form it sits behind. At a
+      // phone's 2.6x ratio this canvas is several million fragments per frame, which
+      // starves the main thread long enough for the six-second sign-up request to
+      // abort. 1.5x keeps the dots crisp and the request alive.
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     } catch {
       // WebGL indisponible : la page reste lisible, le fond tombe sur le noir uni.
       return;
@@ -167,13 +171,7 @@ function DotShaderBackground({ className = "" }: { className?: string }) {
     };
   }, []);
 
-  return (
-    <canvas
-      ref={canvasRef}
-      aria-hidden="true"
-      className={`absolute inset-0 h-full w-full ${className}`}
-    />
-  );
+  return <canvas ref={canvasRef} className={`absolute inset-0 h-full w-full ${className}`} />;
 }
 
 /**

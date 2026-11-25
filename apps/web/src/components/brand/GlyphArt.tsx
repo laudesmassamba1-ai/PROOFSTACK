@@ -66,7 +66,7 @@ function useGlyphLoop(
       io.disconnect();
       if (raf) cancelAnimationFrame(raf);
     };
-  }, []);
+  }, [canvasRef.current]);
 }
 
 const GLYPHS = "▓▒░#*+=·";
@@ -177,7 +177,7 @@ function paintGrid(
 const NAMES = ["WORLD", "FLOW", "EXIT", "FAIL", "CLEAN"] as const;
 const RESOLVE_AT = NAMES.map((_, i) => 0.9 + i * 0.55);
 
-function nameLayout(w: number, h: number): { font: number; total: number; gap: number } {
+function nameLayout(w: number, _h: number): { font: number; total: number; gap: number } {
   const font = Math.max(18, Math.min(52, Math.floor(w / 26)));
   const gap = font * 0.9;
   return { font, total: 0, gap };
@@ -223,7 +223,8 @@ export function NameStrip({ className = "" }: { className?: string }) {
     <div
       className={`relative overflow-hidden rounded-2xl border border-white/8 bg-[#050708] ${className}`}
     >
-      <canvas ref={ref} className="block h-28 w-full sm:h-36" aria-hidden="true" />
+      {/* Decorative and unnamed: assistive tech has no content to announce here. */}
+      <canvas ref={ref} className="block h-28 w-full sm:h-36" />
     </div>
   );
 }
@@ -333,5 +334,5 @@ export function ModuleGlyph({
     const data = rasterize(w, h, step, sigil(kind, t));
     paintGrid(ctx, w, h, data, Math.ceil(w), step, t, 0.06, tone);
   });
-  return <canvas ref={ref} className={`block h-full w-full ${className}`} aria-hidden="true" />;
+  return <canvas ref={ref} className={`block h-full w-full ${className}`} />;
 }

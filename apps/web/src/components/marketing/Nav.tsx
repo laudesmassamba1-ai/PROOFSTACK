@@ -2,7 +2,6 @@ import { ChevronDown, Languages, Menu, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router";
 import { useI18n } from "../../i18n/index.js";
-import { useDAMode } from "../../lib/da.js";
 import { Wordmark } from "../brand/Logo.js";
 
 /**
@@ -39,7 +38,6 @@ const MODULES = [
 ];
 
 export function Nav() {
-  const da = useDAMode();
   const { t, locale, setLocale } = useI18n();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);

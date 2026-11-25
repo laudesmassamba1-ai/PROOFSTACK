@@ -1,3 +1,33 @@
+## Règle de livraison — une fonctionnalité n'existe pas sans preuve
+
+> **Une fonctionnalité = une implémentation + une preuve + un parcours validé.**
+
+Cette règle prime sur toute impression de progression. Un composant, une route ou un
+schéma ne sont pas une fonctionnalité.
+
+- **Implémentation** : code serveur _et_ client, contrôle d'autorisation côté serveur,
+  validation des entrées, gestion des erreurs, textes FR/EN.
+- **Preuve** : un test automatisé qui échoue sans le correctif, exécuté et passé. La
+  commande, la date et le résultat sont consignés. Une capture ne remplace pas un test.
+- **Parcours validé** : le chemin réel de l'utilisateur (web, API ou CLI) sur un
+  environnement supporté. Un fournisseur externe sans credentials reste
+  **NON VÉRIFIÉ** — jamais « vérifié » par inférence.
+
+Statuts autorisés : **VÉRIFIÉ**, **PARTIEL**, **ABSENT**, **NON VÉRIFIÉ**. Ne jamais
+écrire VÉRIFIÉ sans l'artefact correspondant. Toute limite connue est nommée à côté du
+statut.
+
+Toute fonctionnalité livrée ajoute une ligne à ce tableau (dans le rapport de livraison
+ou le document de la phase) :
+
+| Fonction | Code présent | Test exécuté | Test réussi | Parcours vérifié | Production vérifiée |
+| -------- | ------------ | ------------ | ----------- | ---------------- | ------------------- |
+
+Interdits : masquer une régression, affaiblir une assertion, sauter un cas, modifier un
+fixture pour faire disparaître un échec, ou présenter « bientôt disponible » comme
+opérationnel. Une étape bloquée par un secret externe se déclare bloquée ; les travaux
+indépendants continuent.
+
 ## Intégration de l'API SasPay
 
 - Utilisez la documentation officielle : /llms.txt de la documentation SasPay.

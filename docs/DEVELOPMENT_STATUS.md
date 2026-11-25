@@ -44,23 +44,26 @@ uses the Ink & Object direction; this file records what is true and what remains
 ## Verification
 
 - `pnpm typecheck`: passes across the workspace.
-- `pnpm test`: 534 tests pass (42 files).
-- `pnpm test:e2e`: 30 tests pass (desktop + mobile), including the HttpOnly session
-  surviving a reload and no horizontal overflow on any dashboard page.
+- `pnpm test`: 811 tests pass (69 files), measured 25 November 2026.
+- `pnpm test:e2e`: 36 tests pass, 2 skipped (desktop Chrome + Pixel 7), including the
+  HttpOnly session surviving a reload, the mobile sign-up journey and no horizontal
+  overflow on any dashboard page.
 - `pnpm --filter @proofcore/web build`: passes; route-level chunks replace the previous
   single 554 kB bundle.
 - Visual QA: 42 route/viewport combinations from 1920×1080 to 375×812, zero horizontal
   overflow; screenshots generated with no console/page errors.
-- `pnpm lint`: clean across 362 files (10 warnings, no errors).
+- `pnpm lint`: clean across 493 files (0 errors, 0 warnings).
 - Packaged desktop smoke (Linux): the built app starts its packaged sidecar, serves `resources/web`, redirects to `/app`, shows the site title, reads the account AI model without asking for a second provider setup, and re-reads it before each turn so a profile connected later takes effect without a restart. A Playwright Electron run also opens the Engine panel, enters the integrated IA route, receives a streamed model answer, and verifies that a simulated 503 shows the offline screen with no raw status code and still opens the local agent.
 
 ## Known gaps
 
 The full, evidence-based list lives in `docs/AUDIT_2026-11.md`. The short version:
 
-- No password recovery and no email verification: a user who forgets a password cannot
-  recover the account. Transactional email has EmailJS and Resend adapters, but no
-  production credentials were supplied, so real delivery remains unverified.
+- Password recovery, email verification, session listing/revocation and account
+  deletion are implemented and tested. Email verification is **not required at sign-in**,
+  and the sign-up route still reveals a taken address (409). Transactional email has
+  EmailJS and Resend adapters, but no production credentials were supplied, so real
+  delivery remains unverified.
 - No OAuth (Google, GitHub) and no two-factor authentication.
 - No legal pages (terms, privacy, cookies).
 - Four sold entitlements have no implementation (GitHub integration, client sharing,
@@ -70,8 +73,11 @@ The full, evidence-based list lives in `docs/AUDIT_2026-11.md`. The short versio
 - CLEAN still reads server HTML and does not execute JavaScript. On a client-rendered
   shell it now skips DOM-dependent checks and reports the module `not_measured` instead
   of presenting the shell as the interface; metadata checks remain measured.
-- No CI. No tests for the WORLD module or the payment adapters.
-- No retention job, no backup procedure, no pagination, no search.
+- CI exists (`.github/workflows/ci.yml`). WORLD and the payment adapters have tests.
+- No retention job, no backup/restore procedure, no full-text search. Pagination exists
+  (`limit`/`offset` plus migration 0010 indexes).
+- No MFA/OAuth, no report sharing, no PDF/CSV report export, no distributed limiter for
+  sign-up or AI calls.
 - EmailJS/Resend delivery is implemented but unverified without credentials; email
   verification and password reset flows are still absent.
 - The CLI is distributable as a self-contained global tarball (`pnpm cli:install`), but

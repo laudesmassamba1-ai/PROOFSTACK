@@ -318,16 +318,17 @@ export async function runScenario(
               : `Page still contains "${step.expect.textNotContains}".`,
           });
         }
-        if (step.expect.headingContains) {
+        const headingContains = step.expect.headingContains;
+        if (headingContains) {
           const ok = after.headings.some((h) =>
-            h.toLowerCase().includes(step.expect!.headingContains!.toLowerCase())
+            h.toLowerCase().includes(headingContains.toLowerCase())
           );
           checks.push({
             id: "heading",
             ok,
             observed: ok
-              ? `A heading contains "${step.expect.headingContains}".`
-              : `No heading contains "${step.expect.headingContains}".`,
+              ? `A heading contains "${headingContains}".`
+              : `No heading contains "${headingContains}".`,
           });
         }
         for (const check of checks) {

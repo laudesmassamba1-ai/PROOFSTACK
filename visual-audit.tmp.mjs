@@ -39,25 +39,6 @@ const VIEWPORTS = [
   { name: "small-phone", width: 375, height: 812 },
 ];
 
-function luminance(rgb) {
-  const [r, g, b] = rgb.map((v) => {
-    const c = v / 255;
-    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-
-function parseRgb(value) {
-  const m = /rgba?\((\d+)[,\s]+(\d+)[,\s]+(\d+)/.exec(value ?? "");
-  return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
-}
-
-function contrast(fg, bg) {
-  const a = luminance(fg);
-  const b = luminance(bg);
-  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
-}
-
 const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: VIEWPORTS[0] });
 const page = await context.newPage();
@@ -93,7 +74,8 @@ for (const viewport of VIEWPORTS) {
         return 0.2126 * r + 0.7152 * g + 0.0722 * b;
       };
       const ratio = (a, b) => {
-        const x = lum(a), y = lum(b);
+        const x = lum(a),
+          y = lum(b);
         return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
       };
 
@@ -110,8 +92,17 @@ for (const viewport of VIEWPORTS) {
         const hasTextChild = [...el.children].some((c) => (c.textContent ?? "").trim());
         if (hasTextChild) continue;
 
-        if (el.scrollWidth > el.clientWidth + 3 && style.overflowX !== "auto" && style.overflowX !== "scroll") {
-          out.clipped.push({ text, tag: el.tagName, scroll: el.scrollWidth, client: el.clientWidth });
+        if (
+          el.scrollWidth > el.clientWidth + 3 &&
+          style.overflowX !== "auto" &&
+          style.overflowX !== "scroll"
+        ) {
+          out.clipped.push({
+            text,
+            tag: el.tagName,
+            scroll: el.scrollWidth,
+            client: el.clientWidth,
+          });
         }
         const size = parseFloat(style.fontSize);
         if (size < 10) out.tiny.push({ text, size });
@@ -121,13 +112,16 @@ for (const viewport of VIEWPORTS) {
         let node = el;
         while (node && !bg) {
           const candidate = parse(getComputedStyle(node).backgroundColor);
-          if (candidate && !/rgba\(0, 0, 0, 0\)/.test(getComputedStyle(node).backgroundColor)) bg = candidate;
+          if (candidate && !/rgba\(0, 0, 0, 0\)/.test(getComputedStyle(node).backgroundColor))
+            bg = candidate;
           node = node.parentElement;
         }
         if (fg && bg) {
           const r = ratio(fg, bg);
-          if (r < 3 && size >= 18) out.lowContrast.push({ text, ratio: Number(r.toFixed(2)), size });
-          if (r < 4.5 && size < 18) out.lowContrast.push({ text, ratio: Number(r.toFixed(2)), size });
+          if (r < 3 && size >= 18)
+            out.lowContrast.push({ text, ratio: Number(r.toFixed(2)), size });
+          if (r < 4.5 && size < 18)
+            out.lowContrast.push({ text, ratio: Number(r.toFixed(2)), size });
         }
         if (rect.right > window.innerWidth + 2 || rect.left < -2) {
           out.offscreen.push({ text, left: Math.round(rect.left), right: Math.round(rect.right) });
@@ -136,11 +130,16 @@ for (const viewport of VIEWPORTS) {
       return out;
     });
 
-    if (result.overflow > 2) defects.push({ viewport: viewport.name, route, type: "overflow", value: result.overflow });
-    for (const c of result.clipped.slice(0, 4)) defects.push({ viewport: viewport.name, route, type: "clipped", ...c });
-    for (const t of result.tiny.slice(0, 4)) defects.push({ viewport: viewport.name, route, type: "tiny", ...t });
-    for (const c of result.lowContrast.slice(0, 4)) defects.push({ viewport: viewport.name, route, type: "lowContrast", ...c });
-    for (const o of result.offscreen.slice(0, 4)) defects.push({ viewport: viewport.name, route, type: "offscreen", ...o });
+    if (result.overflow > 2)
+      defects.push({ viewport: viewport.name, route, type: "overflow", value: result.overflow });
+    for (const c of result.clipped.slice(0, 4))
+      defects.push({ viewport: viewport.name, route, type: "clipped", ...c });
+    for (const t of result.tiny.slice(0, 4))
+      defects.push({ viewport: viewport.name, route, type: "tiny", ...t });
+    for (const c of result.lowContrast.slice(0, 4))
+      defects.push({ viewport: viewport.name, route, type: "lowContrast", ...c });
+    for (const o of result.offscreen.slice(0, 4))
+      defects.push({ viewport: viewport.name, route, type: "offscreen", ...o });
   }
 }
 

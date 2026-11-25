@@ -76,28 +76,31 @@ function flowCase(scenario: FlowScenario, options: FlowCheckOptions): TestCaseDe
       // skipFor() guarantees the optional surfaces exist for the scenarios that
       // need them. If one is missing here, the skip table and the switch have
       // drifted: fail the harness loudly instead of silently passing.
-      const deliver = target.deliverWebhook;
+      // Bind once: these are class methods on the HTTP target. A detached method
+      // loses `this`, which turned every webhook/refund/readback case into a
+      // TypeError instead of a product verdict. Closures (test fakes) hid it.
+      const deliver = target.deliverWebhook?.bind(target);
       if (!deliver)
         throw new ProofCoreError({
           message: "flow harness drift: webhook receiver missing for a webhook scenario",
           category: "INTERNAL",
           code: "harness_drift",
         });
-      const checkout = target.checkout;
+      const checkout = target.checkout.bind(target);
       if (!checkout)
         throw new ProofCoreError({
           message: "flow harness drift: checkout missing for a checkout scenario",
           category: "INTERNAL",
           code: "harness_drift",
         });
-      const readback = target.readOrder;
+      const readback = target.readOrder?.bind(target);
       if (!readback)
         throw new ProofCoreError({
           message: "flow harness drift: order readback missing",
           category: "INTERNAL",
           code: "harness_drift",
         });
-      const refundFn = target.refund;
+      const refundFn = target.refund?.bind(target);
       if (!refundFn)
         throw new ProofCoreError({
           message: "flow harness drift: refund surface missing",

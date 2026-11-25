@@ -162,7 +162,7 @@ function Nuage({
         const dist = scatter * (0.35 + rand() * 0.65);
         return (
           <circle
-            key={`${i}-${Math.round(p.x)}-${Math.round(p.y)}`}
+            key={`${Math.round(p.x)}-${Math.round(p.y)}-${Math.round((p.r ?? 0) * 100)}`}
             className="peint-grain"
             cx={p.x + (rand() - 0.5) * 4}
             cy={p.y + (rand() - 0.5) * 4}
@@ -492,9 +492,7 @@ export function PeintScene() {
         </clipPath>
       </defs>
 
-      <g className="peint-poussiere" aria-hidden="true">
-        {poussiere}
-      </g>
+      <g className="peint-poussiere">{poussiere}</g>
 
       {/* ACTE 1 — les grains forment le P */}
       <Nuage pts={particulesP()} seed={3} className="peint-ph-P" scatter={340} />

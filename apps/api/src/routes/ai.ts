@@ -14,6 +14,15 @@ import { clientAddress, HttpError, RateLimiter } from "../http/errors.js";
 import { readBody, requireWorkspace } from "../http/guards.js";
 import { pageBody, readPage } from "../http/pagination.js";
 import type { AppEnv, Services } from "../http/services.js";
+import {
+  analyzeRun,
+  COPILOT_MODULES,
+  type CopilotModule,
+  configureModule,
+  moduleConfigView,
+  moduleStatus,
+  runModule,
+} from "../module-copilot.js";
 
 /**
  * In-app AI experience: a real assistant with memory and tools.
@@ -510,6 +519,91 @@ const TOOLS: { name: string; description: string; parameters: Record<string, unk
     parameters: { type: "object", properties: {}, additionalProperties: false },
   },
   {
+    name: "module_status",
+    description:
+      "All five modules for one project: enabled, configured, blockers, whether this runtime can launch them, the last stored run, and the exact run command. Call this before claiming a module is ready or missing.",
+    parameters: {
+      type: "object",
+      properties: {
+        projectId: {
+          type: "string",
+          description: "Project id from list_projects. Defaults to the first project.",
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "module_config",
+    description:
+      "The active, schema-valid configuration of one module (WORLD, FLOW, EXIT, FAIL, CLEAN), plus the vocabulary that module accepts and any issue or blocker. Read this before proposing a change.",
+    parameters: {
+      type: "object",
+      properties: {
+        projectId: { type: "string" },
+        module: { type: "string", enum: ["world", "flow", "exit", "fail", "clean"] },
+      },
+      required: ["projectId", "module"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "module_configure",
+    description:
+      "Validate and save a partial change to WORLD, FLOW or EXIT using the real PROOFCORE schema. The server merges it with the active config and refuses anything that would be unsafe or invalid. Set confirm:true only after the user explicitly asked to apply the change. FAIL and CLEAN have no stored settings.",
+    parameters: {
+      type: "object",
+      properties: {
+        projectId: { type: "string" },
+        module: { type: "string", enum: ["world", "flow", "exit"] },
+        settings: {
+          type: "object",
+          description:
+            "Partial module settings, e.g. FLOW { scenarios: [..], journeys: [{ id, name, steps: [{ id, action, target?, value? }] }] }; WORLD { profiles, categories, forms }; EXIT { formats, target, schema, maxRecords }.",
+          additionalProperties: true,
+        },
+        confirm: { type: "boolean", description: "Must be true: the user asked to save." },
+      },
+      required: ["projectId", "module", "settings", "confirm"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "module_run",
+    description:
+      "Launch one module on the real engine. FAIL/CLEAN scan the project's own URL over HTTP; WORLD and FLOW run against the configured target and store a metered run in history. EXIT and browser-only FLOW journeys report not_runnable_here with the local command instead of pretending. Set confirm:true only when the user asked to run tests.",
+    parameters: {
+      type: "object",
+      properties: {
+        projectId: { type: "string" },
+        module: { type: "string", enum: ["world", "flow", "exit", "fail", "clean"] },
+        url: {
+          type: "string",
+          description: "FAIL/CLEAN only; defaults to the project base URL, same host.",
+        },
+        onlyCases: {
+          type: "array",
+          items: { type: "string" },
+          description: "Optional case-id substrings to run a subset.",
+        },
+        confirm: { type: "boolean", description: "Must be true: the user asked to run." },
+      },
+      required: ["projectId", "module", "confirm"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "analyze_run",
+    description:
+      "Compact diagnosis of one stored run: per-module totals, every failed or errored case with its code, observed and expected value, the registry's documented fix and verification, plus the skipped cases. Use it after module_run or recent_runs, then propose concrete fixes in order of impact.",
+    parameters: {
+      type: "object",
+      properties: { runId: { type: "string" } },
+      required: ["runId"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "recent_runs",
     description:
       "The most recent test runs, newest first. Use before claiming anything about results.",
@@ -734,6 +828,23 @@ function systemPrompt(
     "- Read real evidence with the tools before answering; never guess what a run contains.",
     "- Cite case ids, URLs and exact values when you describe a defect.",
     "- A passing check is also information. Never claim a check ran that did not.",
+    "- Module work starts with `module_status`: it says what is enabled, configured,",
+    "  blocked, launchable here, and which run is the latest. Do not guess a module is",
+    "  ready from its name.",
+    "- Before proposing a module change, call `module_config` and use the vocabulary it",
+    "  returns. Then call `module_configure` with the smallest partial change. Only set",
+    "  confirm:true when the user explicitly asked to apply or save it; otherwise present",
+    "  the exact settings as a proposal and wait.",
+    "- Run a module only when the user asked to run it, with `module_run` and confirm:true.",
+    "  A run spends the workspace's monthly test-run quota and hits the customer's app.",
+    "- After a run, call `analyze_run` (or read the run id it returned) before explaining.",
+    "  Report failed and errored cases, then skipped cases with their exact reason. A",
+    "  skipped case is not a pass.",
+    "- EXIT and browser-only FLOW journeys are not runnable in the API runtime. Say so and",
+    "  give the local command; never imply they ran.",
+    "- Recommendations must be ordered by impact and tied to a case id or control. When the",
+    "  registry documents a fix and a verification, use them; do not invent a cause the",
+    "  evidence does not show.",
     "- For FAIL and CLEAN audits: lead with the score and the ordered issue list, each with",
     "  its location and the exact observed value.",
     "- For questions about uploaded project code, call `project_code` before answering. Read",
@@ -1589,6 +1700,11 @@ function stableId(): string {
   return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+function copilotModule(value: unknown): CopilotModule | null {
+  if (typeof value !== "string") return null;
+  return COPILOT_MODULES.includes(value as CopilotModule) ? (value as CopilotModule) : null;
+}
+
 async function executeTool(
   services: Services,
   workspaceId: string,
@@ -1682,6 +1798,120 @@ async function executeTool(
             2
           ),
           summary: `${projects.length} project(s)`,
+        };
+      }
+      case "module_status": {
+        const projectId = typeof args.projectId === "string" ? args.projectId : undefined;
+        const status = await moduleStatus(services, workspaceId, projectId);
+        return {
+          content: stableStringify(status, 2),
+          summary: status.project
+            ? `${status.modules.filter((m) => m.enabled).length}/5 enabled · ${status.project.name}`
+            : "no project",
+        };
+      }
+      case "module_config": {
+        const projectId = typeof args.projectId === "string" ? args.projectId : "";
+        const module = copilotModule(args.module);
+        if (!projectId || !module) {
+          return {
+            content: stableStringify({ error: "projectId and module are required" }),
+            summary: "invalid module request",
+          };
+        }
+        const view = await moduleConfigView(services, workspaceId, projectId, module);
+        return {
+          content: stableStringify(view, 2),
+          summary: `${view.label} · ${view.blocking.length} blocker(s)`,
+        };
+      }
+      case "module_configure": {
+        if (args.confirm !== true) {
+          return {
+            content: stableStringify({
+              error: "confirm must be true, and only when the user asked to apply the change",
+            }),
+            summary: "not confirmed",
+          };
+        }
+        const projectId = typeof args.projectId === "string" ? args.projectId : "";
+        const module = copilotModule(args.module);
+        if (!projectId || !module) {
+          return {
+            content: stableStringify({ error: "projectId and module are required" }),
+            summary: "invalid module request",
+          };
+        }
+        const settings = args.settings;
+        if (typeof settings !== "object" || settings === null || Array.isArray(settings)) {
+          return {
+            content: stableStringify({ error: "settings must be an object" }),
+            summary: "invalid settings",
+          };
+        }
+        const result = await configureModule(services, workspaceId, projectId, module, settings);
+        return {
+          content: stableStringify(result, 2),
+          summary: result.ok ? `${module.toUpperCase()} saved` : `${module.toUpperCase()} refused`,
+        };
+      }
+      case "module_run": {
+        if (args.confirm !== true) {
+          return {
+            content: stableStringify({
+              error: "confirm must be true, and only when the user asked to run tests",
+            }),
+            summary: "not confirmed",
+          };
+        }
+        const projectId = typeof args.projectId === "string" ? args.projectId : "";
+        const module = copilotModule(args.module);
+        if (!projectId || !module) {
+          return {
+            content: stableStringify({ error: "projectId and module are required" }),
+            summary: "invalid module request",
+          };
+        }
+        const onlyCases = Array.isArray(args.onlyCases)
+          ? args.onlyCases.filter((value): value is string => typeof value === "string")
+          : undefined;
+        try {
+          const result = await runModule(services, workspaceId, projectId, module, {
+            ...(typeof args.url === "string" ? { url: args.url } : {}),
+            ...(onlyCases ? { onlyCases } : {}),
+          });
+          return {
+            content: stableStringify(result, 2),
+            summary: `${module.toUpperCase()} ${result.status} · ${result.cases.length} case(s)`,
+          };
+        } catch (error) {
+          return {
+            content: stableStringify({
+              error: error instanceof Error ? error.message : "module run failed",
+              ran: false,
+            }),
+            summary: "not launched",
+          };
+        }
+      }
+      case "analyze_run": {
+        const runId = typeof args.runId === "string" ? args.runId : "";
+        if (!runId) {
+          return {
+            content: stableStringify({ error: "runId is required; call recent_runs first" }),
+            summary: "missing run",
+          };
+        }
+        const analysis = await analyzeRun(services, workspaceId, runId);
+        if (!analysis) {
+          return {
+            content: stableStringify({ error: "no stored report for this run id" }),
+            summary: "not found",
+          };
+        }
+        return {
+          content: stableStringify(analysis, 2),
+          summary: `${analysis.failures.length} failure(s), ${analysis.skipped.length} not measured`,
         };
       }
       case "recent_runs": {

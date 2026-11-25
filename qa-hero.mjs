@@ -7,7 +7,7 @@ await page.waitForTimeout(5000);
 await page.evaluate(() => document.querySelector(".da-comparer")?.remove());
 await page.waitForTimeout(900);
 const t = await page.evaluate(() =>
-  document.querySelector(".lh-hero-title")?.innerText.replace(/\n/g, "|")
+  document.querySelector(".lh-hero-title")?.textContent?.replace(/\n/g, "|")
 );
 console.log("title:", t);
 await page.screenshot({ path: "/tmp/light-hero2.png" });

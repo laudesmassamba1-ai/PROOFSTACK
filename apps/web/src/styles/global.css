@@ -10091,7 +10091,9 @@ hairline,
   color: inherit;
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.16s ease, background 0.16s ease;
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease;
 }
 
 .chat-tools-list button:hover,
@@ -10139,7 +10141,9 @@ hairline,
   color: var(--ink-soft);
   opacity: 0;
   translate: -4px 0;
-  transition: opacity 0.16s ease, translate 0.16s ease;
+  transition:
+    opacity 0.16s ease,
+    translate 0.16s ease;
 }
 
 .chat-tools-list button:hover .chat-tools-go {
@@ -10159,7 +10163,9 @@ hairline,
 
 /* le composer respire à la prise de focus */
 .chat-composer {
-  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+  transition:
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
 }
 
 .chat-composer:focus-within {

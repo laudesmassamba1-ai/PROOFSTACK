@@ -24,22 +24,25 @@ export function SplitChars({ text, from = 0 }: { text: string; from?: number }):
         return (
           // The key belongs on the outermost returned node: a bare fragment cannot
           // hold one, which made React warn on every render of this component.
-          <span key={`${wordIndex}\u0000${word}`} aria-hidden="true">
+          <span key={`${start}\u0000${word}`} aria-hidden="true">
             <span style={{ display: "inline-block", whiteSpace: "nowrap" }}>
-              {[...word].map((char, i) => (
-                <span
-                  key={`${char}-${i}`}
-                  className="m-char"
-                  style={
-                    {
-                      "--ci": String(i),
-                      "--c-delay": `${Math.round((start + i) * 26)}ms`,
-                    } as React.CSSProperties
-                  }
-                >
-                  <span className="m-char-inner">{char}</span>
-                </span>
-              ))}
+              {[...word].map((char, i) => {
+                const position = start + i;
+                return (
+                  <span
+                    key={`${char}-${position}`}
+                    className="m-char"
+                    style={
+                      {
+                        "--ci": String(i),
+                        "--c-delay": `${Math.round(position * 26)}ms`,
+                      } as React.CSSProperties
+                    }
+                  >
+                    <span className="m-char-inner">{char}</span>
+                  </span>
+                );
+              })}
             </span>
             {wordIndex < words.length - 1 ? " " : null}
           </span>

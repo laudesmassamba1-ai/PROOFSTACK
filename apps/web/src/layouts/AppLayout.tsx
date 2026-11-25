@@ -454,8 +454,6 @@ export function AppLayout() {
   }
 
   const workspace = session.workspaces.find((item) => item.id === session.workspaceId);
-  const projectMatch = location.pathname.match(/^\/app\/projects\/([^/]+)/);
-  const currentProjectId = projectMatch?.[1] ?? "";
   const initials = (session.user?.name ?? "?")
     .split(/\s+/)
     .filter(Boolean)

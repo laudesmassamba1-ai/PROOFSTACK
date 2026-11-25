@@ -1,18 +1,28 @@
 import {
+  ArrowUpRight,
   BadgeCheck,
   Brain,
   ChevronDown,
   Eraser,
+  FileCode2,
   FileText,
+  FolderGit2,
+  FolderKanban,
   Globe,
+  History,
+  LayoutDashboard,
   Loader2,
   Lock,
+  Maximize2,
+  Minimize2,
   Monitor,
   PanelLeft,
   Paperclip,
   Plug,
   Plus,
+  RadioTower,
   RefreshCw,
+  ScanSearch,
   Search,
   Send,
   ShieldAlert,
@@ -21,16 +31,6 @@ import {
   Users,
   Wrench,
   X,
-  Maximize2,
-  Minimize2,
-  LayoutDashboard,
-  FolderKanban,
-  History,
-  FileCode2,
-  ScanSearch,
-  RadioTower,
-  FolderGit2,
-  ArrowUpRight,
 } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -591,7 +591,11 @@ function Composer({
             type="button"
             className="chat-attach-btn"
             aria-label={fr ? "Outils de l'assistant" : "Assistant tools"}
-            title={fr ? "Les 14 outils : audits, navigateur, code, mémoire" : "The 14 tools: audits, browser, code, memory"}
+            title={
+              fr
+                ? "Les 14 outils : audits, navigateur, code, mémoire"
+                : "The 14 tools: audits, browser, code, memory"
+            }
             onClick={onTools}
           >
             <Wrench size={13} aria-hidden />
@@ -642,7 +646,6 @@ function Composer({
     </div>
   );
 }
-
 
 /* ---------- les outils de l'assistant (les 14 vrais outils du serveur) ---------- */
 
@@ -825,7 +828,12 @@ function ChatToolsPanel({
       <section className="chat-tools" role="dialog" aria-label={fr ? "Outils" : "Tools"}>
         <header className="chat-tools-head">
           <p className="app-eyebrow">{fr ? "OUTILS DE L'ASSISTANT" : "ASSISTANT TOOLS"}</p>
-          <button type="button" onClick={onClose} className="chat-icon-btn" aria-label={fr ? "Fermer" : "Close"}>
+          <button
+            type="button"
+            onClick={onClose}
+            className="chat-icon-btn"
+            aria-label={fr ? "Fermer" : "Close"}
+          >
             <X size={14} />
           </button>
         </header>
@@ -891,7 +899,6 @@ export function AiChatPage(): React.ReactElement {
   const [browserOpen, setBrowserOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [immersive, setImmersive] = useState(false);
-  const composerInputRef = useRef<HTMLInputElement>(null);
   const [browserUrl, setBrowserUrl] = useState<string | undefined>(undefined);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 

@@ -11,8 +11,8 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
-import { ModuleGlyph } from "../../components/brand/GlyphArt.js";
 import { Empty, ErrorState, Loading, StatusBadge } from "../../components/app/ui.js";
+import { ModuleGlyph } from "../../components/brand/GlyphArt.js";
 import { useI18n } from "../../i18n/index.js";
 import { type ApiError, apiFetch } from "../../lib/api.js";
 import { duration, relativeTime } from "../../lib/format.js";
