@@ -89,7 +89,7 @@ export function Wordmark({
         }}
       >
         {/* The mark supplies the first P; printing it again reads “PPROOFCORE”. */}
-        {showMark ? "PROOFCORE" : "PROOFCORE"}
+        {showMark ? "ROOFCORE" : "PROOFCORE"}
       </span>
     </span>
   );
@@ -99,7 +99,7 @@ export function Wordmark({
 const WORDMARK_LETTERS = (() => {
   const seen = new Map<string, number>();
   // The geometric P is rendered separately as the mark.
-  return "PROOFCORE".split("").map((char) => {
+  return "ROOFCORE".split("").map((char) => {
     const occurrence = (seen.get(char) ?? 0) + 1;
     seen.set(char, occurrence);
     return { char, key: `${char}-${occurrence}` };
