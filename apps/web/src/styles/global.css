@@ -9077,10 +9077,11 @@ hairline,
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 14px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.008)),
-    #0b0c0e;
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.008)), #0b0c0e;
   padding: 16px 18px 14px;
-  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.22s ease;
+  transition:
+    transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 0.22s ease;
 }
 
 /* le faisceau qui court le long du bord — Magic UI BorderBeam, réécrit en CSS
@@ -9104,7 +9105,12 @@ hairline,
   width: 64px;
   aspect-ratio: 1;
   offset-path: rect(0 auto auto 0 round 64px);
-  background: linear-gradient(to left, rgba(255, 255, 255, 0), var(--beam-to, var(--vermillon, #e4381f)), rgba(255, 255, 255, 0));
+  background: linear-gradient(
+    to left,
+    rgba(255, 255, 255, 0),
+    var(--beam-to, var(--vermillon, #e4381f)),
+    rgba(255, 255, 255, 0)
+  );
   animation: kpi-beam-run 7s linear infinite;
   animation-delay: var(--beam-delay, 0s);
   filter: blur(0.4px);
@@ -9159,7 +9165,11 @@ hairline,
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: radial-gradient(220px circle at var(--mx) var(--my), rgba(255, 255, 255, 0.07), transparent 65%);
+  background: radial-gradient(
+    220px circle at var(--mx) var(--my),
+    rgba(255, 255, 255, 0.07),
+    transparent 65%
+  );
   opacity: 0;
   transition: opacity 0.25s ease;
   pointer-events: none;
@@ -9234,12 +9244,22 @@ hairline,
   transition: width 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.kpi-neutral { color: rgba(255, 255, 255, 0.55); }
-.kpi-success { color: var(--brand-emerald, #73d68b); }
-.kpi-danger { color: var(--vermillon, #e4381f); }
-.kpi-cyan { color: var(--brand-cyan, #70c9db); }
+.kpi-neutral {
+  color: rgba(255, 255, 255, 0.55);
+}
+.kpi-success {
+  color: var(--brand-emerald, #73d68b);
+}
+.kpi-danger {
+  color: var(--vermillon, #e4381f);
+}
+.kpi-cyan {
+  color: var(--brand-cyan, #70c9db);
+}
 
-.kpi-danger .kpi-value { color: #fff; }
+.kpi-danger .kpi-value {
+  color: #fff;
+}
 
 /* ── ShinyText (React Bits, adapté CSS pur) : un balayage clair traverse le
    titre de situation, en boucle lente. Blanc sur blanc — jamais décoratif. */
@@ -9348,7 +9368,12 @@ hairline,
   top: 0;
   bottom: 0;
   width: 16%;
-  background: linear-gradient(180deg, rgba(228, 56, 31, 0.12), rgba(228, 56, 31, 0.04) 45%, transparent 80%);
+  background: linear-gradient(
+    180deg,
+    rgba(228, 56, 31, 0.12),
+    rgba(228, 56, 31, 0.04) 45%,
+    transparent 80%
+  );
   filter: blur(70px);
 }
 
@@ -9365,7 +9390,12 @@ hairline,
   top: 0;
   bottom: 0;
   width: 9%;
-  background: linear-gradient(180deg, rgba(228, 56, 31, 0.2), rgba(228, 56, 31, 0.05) 50%, transparent 85%);
+  background: linear-gradient(
+    180deg,
+    rgba(228, 56, 31, 0.2),
+    rgba(228, 56, 31, 0.05) 50%,
+    transparent 85%
+  );
   filter: blur(46px);
 }
 
@@ -9391,7 +9421,9 @@ hairline,
   background: #fff;
   color: #101014;
   box-shadow: 0 24px 48px -22px rgba(0, 0, 0, 0.55);
-  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.3s ease;
+  transition:
+    transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 0.3s ease;
 }
 
 .pk-sheet:hover {
@@ -9468,7 +9500,9 @@ hairline,
   text-align: center;
   text-decoration: none;
   cursor: pointer;
-  transition: transform 0.16s ease, background 0.2s ease;
+  transition:
+    transform 0.16s ease,
+    background 0.2s ease;
 }
 
 .pk-cta:active {
@@ -9631,11 +9665,13 @@ hairline,
 }
 
 @keyframes ascii-cursor {
-  0%, 55% {
+  0%,
+  55% {
     opacity: 1;
   }
 
-  56%, 100% {
+  56%,
+  100% {
     opacity: 0.15;
   }
 }
@@ -9697,7 +9733,9 @@ hairline,
    Les feuilles papier lèvent d'un souffle et leur bord s'échauffe vers le
    vermillon — la carte répond, même sans lien. */
 .app-card {
-  transition: border-color 0.2s ease, box-shadow 0.25s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.25s ease;
 }
 
 .app-card:hover {
@@ -9719,7 +9757,10 @@ hairline,
   text-decoration: none;
   animation: app-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: calc(var(--i, 0) * 80ms + 120ms);
-  transition: border-color 0.2s ease, transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.25s ease;
+  transition:
+    border-color 0.2s ease,
+    transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 0.25s ease;
 }
 
 .app-door:hover {
@@ -9806,7 +9847,8 @@ hairline,
 }
 
 @keyframes btn-sheen {
-  0%, 60% {
+  0%,
+  60% {
     translate: -120% 0;
   }
 
@@ -9847,20 +9889,15 @@ hairline,
    Un papier quadrillé à peine visible — la salle d'instrument, pas la feuille
    vierge. Suit le thème. */
 .app-shell {
-  background-image:
-    radial-gradient(
-      color-mix(in srgb, var(--ink) 5%, transparent) 1px,
-      transparent 1.1px
-    );
+  background-image: radial-gradient(
+    color-mix(in srgb, var(--ink) 5%, transparent) 1px,
+    transparent 1.1px
+  );
   background-size: 22px 22px;
 }
 
 [data-theme="dark"] .app-shell {
-  background-image:
-    radial-gradient(
-      rgba(243, 240, 232, 0.04) 1px,
-      transparent 1.1px
-    );
+  background-image: radial-gradient(rgba(243, 240, 232, 0.04) 1px, transparent 1.1px);
 }
 
 /* ── QuickDock : la barre d'accès rapide ──────────────────────────────────
@@ -9913,4 +9950,21 @@ hairline,
    create a scroll container, so the vertical layout is untouched. */
 .app-overview {
   overflow-x: clip;
+}
+
+/* --- Card stacks on the overview (Stack, React Bits) --- */
+
+/* The four facts as one deck: a card-sized column, not a four-across row. */
+.app-kpi-stack {
+  width: min(100%, 330px);
+  height: 152px;
+  margin-top: 14px;
+}
+
+/* The five questions as one fanned deck; the behind cards fan bottom-right,
+   so the block keeps a card's footprint plus the fan's reach. */
+.app-module-stack {
+  width: min(100%, 420px);
+  height: 430px;
+  margin-top: 6px;
 }

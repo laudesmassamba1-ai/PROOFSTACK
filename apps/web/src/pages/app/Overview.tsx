@@ -2,9 +2,10 @@ import { ArrowRight, FolderPlus, Terminal } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { Stack } from "../../components/app/CardStack.js";
 import { FolderFloat } from "../../components/app/FolderFloat.js";
 import { ModulePassRates, RunsTrend, SeverityBreakdown } from "../../components/app/Insights.js";
-import { KpiRow } from "../../components/app/KpiCards.js";
+import { KpiCard } from "../../components/app/KpiCards.js";
 import { Empty, ErrorState, Loading, StatusBadge } from "../../components/app/ui.js";
 import { ModuleGlyph } from "../../components/brand/GlyphArt.js";
 import { EnhancedCard } from "../../components/common/EnhancedCard.js";
@@ -283,54 +284,78 @@ export function Overview() {
         </section>
       </EnhancedCard>
 
-      <KpiRow
-        kpis={[
-          {
-            key: "projects",
-            label: fr ? "Projets" : "Projects",
-            value: data.projects.length,
-            tone: "neutral",
-            note: latest
-              ? `${latest.projectName} · ${relativeTime(latest.startedAt)}`
-              : fr
-                ? "Aucun projet suivi"
-                : "No tracked project",
-          },
-          {
-            key: "checks",
-            label: fr ? "Vérifications · 14 j" : "Checks · 14d",
-            value: insights ? insights.runsPerDay.reduce((total, day) => total + day.total, 0) : 0,
-            tone: "success",
-            spark: insights?.runsPerDay.map((day) => day.total),
-            note: fr ? "Sur les quatorze derniers jours" : "Over the last fourteen days",
-          },
-          {
-            key: "failures",
-            label: fr ? "Constats ouverts" : "Open findings",
-            value: failures,
-            tone: failures > 0 ? "danger" : "neutral",
-            note: firstFailure
-              ? `${firstFailure.module.toUpperCase()} · ${relativeTime(firstFailure.detectedAt)}`
-              : fr
-                ? "Aucun défaut ouvert"
-                : "No open defect",
-          },
-          {
-            key: "quota",
-            label: fr ? "Quota du plan" : "Plan quota",
-            value: percent,
-            suffix: "%",
-            tone: "cyan",
-            meter: percent,
-            note:
-              quota === -1
-                ? fr
-                  ? "Illimité ce mois-ci"
-                  : "Unlimited this month"
-                : `${used} / ${quota} · ${data.subscription.planName}`,
-          },
-        ]}
-      />
+      {/* The same four facts, but as a deck: the top card faces you, the three
+          behind recede upward, and dragging (or a click) cycles them. All four
+          stay visible — the deck spreads 0.35, so the numbers peek behind. */}
+      <div className="app-kpi-stack" data-reveal>
+        <Stack
+          ariaLabel={
+            fr
+              ? "Faits du workspace — tirez la carte du dessus"
+              : "Workspace facts — drag the top card"
+          }
+          layout="deck"
+          visible={4}
+          spread={0.35}
+          depth={0.55}
+          radius={14}
+          speed={1.1}
+          sendToBackOnClick
+          cards={[
+            <KpiCard
+              key="projects"
+              label={fr ? "Projets" : "Projects"}
+              value={data.projects.length}
+              tone="neutral"
+              note={
+                latest
+                  ? `${latest.projectName} · ${relativeTime(latest.startedAt)}`
+                  : fr
+                    ? "Aucun projet suivi"
+                    : "No tracked project"
+              }
+            />,
+            <KpiCard
+              key="checks"
+              label={fr ? "Vérifications · 14 j" : "Checks · 14d"}
+              value={
+                insights ? insights.runsPerDay.reduce((total, day) => total + day.total, 0) : 0
+              }
+              tone="success"
+              spark={insights?.runsPerDay.map((day) => day.total)}
+              note={fr ? "Sur les quatorze derniers jours" : "Over the last fourteen days"}
+            />,
+            <KpiCard
+              key="failures"
+              label={fr ? "Constats ouverts" : "Open findings"}
+              value={failures}
+              tone={failures > 0 ? "danger" : "neutral"}
+              note={
+                firstFailure
+                  ? `${firstFailure.module.toUpperCase()} · ${relativeTime(firstFailure.detectedAt)}`
+                  : fr
+                    ? "Aucun défaut ouvert"
+                    : "No open defect"
+              }
+            />,
+            <KpiCard
+              key="quota"
+              label={fr ? "Quota du plan" : "Plan quota"}
+              value={percent}
+              suffix="%"
+              tone="cyan"
+              meter={percent}
+              note={
+                quota === -1
+                  ? fr
+                    ? "Illimité ce mois-ci"
+                    : "Unlimited this month"
+                  : `${used} / ${quota} · ${data.subscription.planName}`
+              }
+            />,
+          ]}
+        />
+      </div>
 
       {/* The beginner's first screen: four real doors, not a wall of statistics. It only
           appears while the workspace has no project, so it never hides real work. */}
@@ -501,55 +526,71 @@ export function Overview() {
           </h2>
         </div>
 
-        <div className="app-object-grid">
-          {MODULE_IDS.map((module, index) => {
-            const latestModuleRun = data.recentRuns.find((run) => run.totals[module]);
-            const totals = latestModuleRun?.totals[module] ?? EMPTY_TOTALS;
-            const moduleRecord = data.modules.find((item) => item.module === module);
-            const covered = moduleRecord?.lastRunAt ?? latestModuleRun?.startedAt;
-            return (
-              <Link
-                key={module}
-                style={{ "--pk-delay": `${140 + index * 80}ms` } as React.CSSProperties}
-                to={`/app/modules/${module}`}
-                className={`app-object-card pk-enter module-${module} app-object-card-${index + 1}`}
-              >
-                <div className="app-object-card-head">
-                  <span className="app-object-index">0{index + 1}</span>
-                  {covered ? (
-                    <StatusBadge status={moduleRecord?.status ?? latestModuleRun?.status ?? ""} />
-                  ) : (
-                    <span className="app-badge">{t("ws.status.notTested")}</span>
-                  )}
-                </div>
-                <div className="app-object-stage">
-                  <ModuleGlyph
-                    kind={module as "world" | "flow" | "exit" | "fail" | "clean"}
-                    tone={theme === "dark" ? "dark" : "ink"}
-                  />
-                </div>
-                <div className="app-object-card-foot">
-                  <h3 className="app-object-name">{module.toUpperCase()}</h3>
-                  <p className="min-h-[2.7em] max-w-[30ch] text-[0.76rem] font-medium leading-[1.35] text-ink">
-                    {fr ? MODULE_QUESTIONS[module].fr : MODULE_QUESTIONS[module].en}
-                  </p>
-                  <p className="app-object-state">
-                    {covered
-                      ? t("ws.module.latestSummary", {
-                          passed: totals.passed,
-                          failed: totals.failed,
-                          skipped: totals.skipped,
-                          warnings: totals.warnings,
-                        })
-                      : t("ws.module.latestNone")}
-                  </p>
-                  <span className="app-object-open">
-                    {t("ws.overview.openModule")} <ArrowRight size={13} />
-                  </span>
-                </div>
-              </Link>
-            );
-          })}
+        {/* The five questions as one fanned deck: the top card faces you, the
+            four behind recede bottom-right, and a drag (or a flick) sends the
+            top one to the back — the next question comes forward. A plain click
+            still opens the module: the link survives, only the drag cycles. */}
+        <div className="app-module-stack" data-reveal>
+          <Stack
+            ariaLabel={
+              fr
+                ? "Les cinq questions — tirez la carte du dessus"
+                : "The five questions — drag the top card"
+            }
+            layout="fan"
+            visible={5}
+            spread={0.5}
+            depth={0.5}
+            radius={20}
+            threshold={90}
+            cards={MODULE_IDS.map((module, index) => {
+              const latestModuleRun = data.recentRuns.find((run) => run.totals[module]);
+              const totals = latestModuleRun?.totals[module] ?? EMPTY_TOTALS;
+              const moduleRecord = data.modules.find((item) => item.module === module);
+              const covered = moduleRecord?.lastRunAt ?? latestModuleRun?.startedAt;
+              return (
+                <Link
+                  key={module}
+                  to={`/app/modules/${module}`}
+                  className={`app-object-card module-${module} app-object-card-${index + 1}`}
+                >
+                  <div className="app-object-card-head">
+                    <span className="app-object-index">0{index + 1}</span>
+                    {covered ? (
+                      <StatusBadge status={moduleRecord?.status ?? latestModuleRun?.status ?? ""} />
+                    ) : (
+                      <span className="app-badge">{t("ws.status.notTested")}</span>
+                    )}
+                  </div>
+                  <div className="app-object-stage">
+                    <ModuleGlyph
+                      kind={module as "world" | "flow" | "exit" | "fail" | "clean"}
+                      tone={theme === "dark" ? "dark" : "ink"}
+                    />
+                  </div>
+                  <div className="app-object-card-foot">
+                    <h3 className="app-object-name">{module.toUpperCase()}</h3>
+                    <p className="min-h-[2.7em] max-w-[30ch] text-[0.76rem] font-medium leading-[1.35] text-ink">
+                      {fr ? MODULE_QUESTIONS[module].fr : MODULE_QUESTIONS[module].en}
+                    </p>
+                    <p className="app-object-state">
+                      {covered
+                        ? t("ws.module.latestSummary", {
+                            passed: totals.passed,
+                            failed: totals.failed,
+                            skipped: totals.skipped,
+                            warnings: totals.warnings,
+                          })
+                        : t("ws.module.latestNone")}
+                    </p>
+                    <span className="app-object-open">
+                      {t("ws.overview.openModule")} <ArrowRight size={13} />
+                    </span>
+                  </div>
+                </Link>
+              );
+            })}
+          />
         </div>
       </section>
 

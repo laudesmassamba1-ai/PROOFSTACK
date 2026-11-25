@@ -1,0 +1,57 @@
+/*
+ * Adapted from "Stack" by React Bits (https://reactbits.dev), MIT licence.
+ * Class names are prefixed `card-stack-` (the source `.stack` is too generic);
+ * colours and shadows stay inline as the source draws them.
+ */
+
+.card-stack {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  outline: none;
+}
+
+.card-stack-card {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.card-stack-face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  will-change: transform;
+}
+
+/* Mentioned after `.card-stack-face` so no descending-specificity warning fires. */
+.card-stack:focus-visible .card-stack-card[data-top] .card-stack-face {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+}
+
+.card-stack-content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.card-stack-content img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+.card-stack-shade {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  pointer-events: none;
+}
