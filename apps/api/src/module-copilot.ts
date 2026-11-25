@@ -225,7 +225,8 @@ export async function moduleStatus(
   const config = buildProjectConfig(project, readStoredProjectConfig(project.moduleConfig));
   const runs = await services.store.recentRuns(workspaceId, 20);
   const projectRuns = runs.filter((run) => run.projectId === project.id);
-  const latestAudit = (await services.store.latestPageAudits(workspaceId, project.id, 1))[0] ?? null;
+  const latestAudit =
+    (await services.store.latestPageAudits(workspaceId, project.id, 1))[0] ?? null;
   const pageAudit = latestAudit
     ? {
         id: String(latestAudit.id),
