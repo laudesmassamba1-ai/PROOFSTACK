@@ -92,7 +92,7 @@
   --primary: var(--ink);
   /* Text drawn on top of a primary-filled surface. */
   --on-primary: var(--paper-raised);
-  --accent: #0e8f75;
+  --accent: var(--vermillon, #e4381f);
   --success: #177a54;
   --warning: #8a5a00;
   --danger: #b62c36;
@@ -113,7 +113,7 @@
   --border: rgba(243, 240, 232, 0.14);
   --primary: var(--paper);
   --on-primary: #0a0a0b;
-  --accent: #63d6a2;
+  --accent: var(--vermillon, #e4381f);
   --success: #63d6a2;
   --warning: #e9b45a;
   --danger: #f07884;
@@ -3847,10 +3847,6 @@ p {
 @media (max-width: 1180px) {
   .app-desktop-nav {
     display: none;
-  }
-
-  .app-menu-trigger {
-    display: grid;
   }
 
   .app-command-trigger span,
@@ -9148,335 +9144,6 @@ hairline,
   outline-offset: 2px;
 }
 
-/* ── Barre latérale repliable (inspiration shadcn sidebar-07) ──────────────
-   Un rail d'icônes avec infobulles ↔ un panneau étendu avec libellés et
-   sous-modules ; la largeur est portée par --sbw, posée sur :root par le
-   composant, et le contenu se décale d'elle-même sur grand écran. */
-.app-sidebar {
-  position: fixed;
-  inset: 0 auto 0 0;
-  z-index: 40;
-  display: none;
-  flex-direction: column;
-  width: var(--sbw, 238px);
-  border-right: 1px solid var(--rule);
-  background: #0a0b0d;
-  transition: width 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
-  overflow: hidden;
-}
-
-/* en-tête : le nom de l'espace, posé comme un instrument */
-.sb-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 16px 14px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  overflow: hidden;
-  white-space: nowrap;
-}
-
-.sb-head-mark {
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: var(--vermillon, #e4381f);
-}
-
-.sb-head-name {
-  min-width: 0;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.92);
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.sb-head-role {
-  display: block;
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.36);
-}
-
-/* la barre active respire : elle se lève puis reste, avec une lueur faible */
-.sb-item.is-active::before {
-  transform-origin: top;
-  animation: sb-bar-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-
-@keyframes sb-bar-in {
-  0% {
-    transform: scaleY(0);
-  }
-
-  100% {
-    transform: scaleY(1);
-  }
-}
-
-.sb-item:hover .sb-icon {
-  transform: translateX(1px);
-}
-
-.sb-icon {
-  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-@media (min-width: 1024px) {
-  .app-sidebar {
-    display: flex;
-  }
-
-  .app-shell {
-    padding-left: var(--sbw, 238px);
-    transition: padding-left 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
-  }
-
-  /* la barre du haut reprend la navigation : elle se recentre sur les actions */
-  .app-desktop-nav {
-    display: none;
-  }
-}
-
-.app-sidebar-nav {
-  flex: 1;
-  padding: 18px 10px 8px;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-.sb-group + .sb-group {
-  margin-top: 20px;
-}
-
-.sb-group-label {
-  padding: 0 12px;
-  margin-bottom: 6px;
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.3);
-  white-space: nowrap;
-  transition: opacity 0.18s ease;
-}
-
-.app-sidebar.is-rail .sb-group-label {
-  opacity: 0;
-  height: 10px;
-  overflow: hidden;
-}
-
-.sb-list,
-.sb-sublist {
-  display: grid;
-  gap: 2px;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.sb-item {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 8px 12px;
-  border-radius: 9px;
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 0.82rem;
-  font-weight: 500;
-  text-decoration: none;
-  white-space: nowrap;
-  transition: background 0.16s ease, color 0.16s ease, padding-left 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.sb-item:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.9);
-  padding-left: 15px;
-}
-
-.sb-item.is-active {
-  background: rgba(255, 255, 255, 0.07);
-  color: #fff;
-}
-
-.sb-item.is-active::before {
-  content: "";
-  position: absolute;
-  inset: 6px auto 6px 0;
-  width: 3px;
-  border-radius: 2px;
-  background: var(--vermillon, #e4381f);
-}
-
-.sb-icon {
-  flex-shrink: 0;
-  color: inherit;
-  opacity: 0.85;
-}
-
-.sb-item.is-active .sb-icon {
-  color: var(--vermillon, #e4381f);
-  opacity: 1;
-}
-
-.sb-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: opacity 0.18s ease, transform 0.18s ease;
-}
-
-.sb-badge {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 17px;
-  height: 17px;
-  padding: 0 4px;
-  border-radius: 999px;
-  background: var(--vermillon, #e4381f);
-  color: #fff;
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  font-weight: 700;
-}
-
-.sb-caret {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border: none;
-  border-radius: 5px;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.4);
-  font-size: 1rem;
-  cursor: pointer;
-  transform: rotate(90deg);
-  transition: transform 0.2s ease, color 0.16s ease;
-}
-
-.sb-caret[aria-expanded="true"] {
-  transform: rotate(-90deg);
-}
-
-.sb-caret:hover {
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.sb-sublist {
-  margin: 2px 0 4px 18px;
-  padding-left: 10px;
-  border-left: 1px dashed rgba(255, 255, 255, 0.12);
-}
-
-.sb-item-sub {
-  padding: 5px 10px;
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.14em;
-}
-
-.sb-toggle {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  margin: 8px 10px 12px;
-  padding: 8px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 9px;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 0.78rem;
-  cursor: pointer;
-  transition: background 0.16s ease, color 0.16s ease;
-}
-
-.sb-toggle:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.9);
-}
-
-/* rail : icônes seules, libellés masqués, infobulle au survol */
-.app-sidebar.is-rail {
-  --rail-w: 60px;
-}
-
-.app-sidebar.is-rail .app-sidebar-nav,
-.app-sidebar.is-rail .sb-toggle {
-  padding-left: 0;
-  padding-right: 0;
-  margin-left: 0;
-  margin-right: 0;
-}
-
-.app-sidebar.is-rail .sb-item,
-.app-sidebar.is-rail .sb-toggle {
-  justify-content: center;
-  padding: 8px 0;
-}
-
-.app-sidebar.is-rail .sb-item:hover,
-.app-sidebar.is-rail .sb-toggle:hover {
-  padding-left: 0;
-}
-
-.app-sidebar.is-rail .sb-label,
-.app-sidebar.is-rail .sb-badge,
-.app-sidebar.is-rail .sb-sublist,
-.app-sidebar.is-rail .sb-caret,
-.app-sidebar.is-rail .sb-head-name {
-  display: none;
-}
-
-.app-sidebar.is-rail .sb-head {
-  justify-content: center;
-  padding-left: 0;
-  padding-right: 0;
-}
-
-.app-sidebar.is-rail .sb-item::after,
-.app-sidebar.is-rail .sb-toggle::after {
-  content: attr(data-tip);
-  position: absolute;
-  left: calc(100% + 10px);
-  top: 50%;
-  translate: 0 -50%;
-  padding: 5px 9px;
-  border-radius: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: #131417;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 0.72rem;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateX(-4px);
-  transition: opacity 0.16s ease, transform 0.16s ease;
-  z-index: 50;
-}
-
-.app-sidebar.is-rail .sb-item:hover::after,
-.app-sidebar.is-rail .sb-item:focus-visible::after,
-.app-sidebar.is-rail .sb-toggle:hover::after,
-.app-sidebar.is-rail .sb-toggle:focus-visible::after {
-  opacity: 1;
-  transform: translateX(0);
-}
-
 /* ── Cartes KPI contrastées + halo réactif (SpotlightCard / Number Ticker) ── */
 .kpi-grid {
   display: grid;
@@ -10297,6 +9964,22 @@ hairline,
 /* le contenu garde la place du dock : rien ne se cachera derrière lui */
 .app-shell {
   padding-bottom: 92px;
+}
+
+/* sous 1024px, la navigation revient à la feuille mobile (hamburger) :
+   pas de dock, pas de réservation d'espace */
+@media (max-width: 1023px) {
+  .app-shell .quick-dock.dock--bottom {
+    display: none;
+  }
+
+  .app-shell {
+    padding-bottom: 0;
+  }
+
+  .app-menu-trigger {
+    display: grid;
+  }
 }
 
 @media (max-width: 640px) {

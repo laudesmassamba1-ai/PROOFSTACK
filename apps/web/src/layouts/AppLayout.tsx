@@ -21,10 +21,10 @@ import {
   ShieldCheck,
   Terminal,
   X,
+  LayoutGrid,
 } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router";
-import { AppSidebar } from "../components/app/AppSidebar.js";
 import { CookieConsent } from "../components/app/CookieConsent.js";
 import { DesktopTools } from "../components/app/DesktopTools.js";
 import { InvitationBanner } from "../components/app/InvitationBanner.js";
@@ -277,6 +277,7 @@ export function AppLayout() {
       [t("ws.nav.projects"), "/app/projects", <FolderKanban key="projects" size={15} />],
       [locale === "fr" ? "Analyser" : "Scan", "/app/start", <Search key="start" size={15} />],
       [locale === "fr" ? "Guide" : "Guide", "/app/guide", <BookOpen key="guide" size={15} />],
+      ["MODULES", "/app/modules", <LayoutGrid key="modules" size={15} />],
       [t("ws.nav.workspace"), "/app/workspace", <Boxes key="workspace" size={15} />],
       ["WORLD", "/app/modules/world", <Globe2 key="world" size={15} />],
       ["FLOW", "/app/modules/flow", <RouteIcon key="flow" size={15} />],
@@ -298,7 +299,11 @@ export function AppLayout() {
       uiMode === "simple"
         ? list.filter(
             ([, to]) =>
-              to === "/app" || to === "/app/projects" || to === "/app/start" || to === "/app/guide"
+              to === "/app" ||
+              to === "/app/projects" ||
+              to === "/app/start" ||
+              to === "/app/modules" ||
+              to === "/app/guide"
           )
         : list;
     return visible.map(([label, to, icon]) => ({ label, to, icon, group: "routes" as const }));
@@ -449,13 +454,7 @@ export function AppLayout() {
 
   return (
     <div className="app-shell">
-      <AppSidebar
-        unreadCount={unreadCount}
-        advanced={uiMode === "studio"}
-        workspaceName={workspace?.name}
-        roleLabel={workspace ? workspace.role.toUpperCase() : undefined}
-      />
-      <QuickDock unreadCount={unreadCount} />
+      <QuickDock />
       <div className="app-frame">
         <header className="app-topbar">
           <NavLink

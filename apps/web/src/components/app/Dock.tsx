@@ -657,6 +657,7 @@ export default function Dock({
   const menuRef = useRef<MenuState | null>(null);
   const serialRef = useRef(0);
   const pressRef = useRef<Press | null>(null);
+  const hoverTimerRef = useRef(0);
   const pressingRef = useRef(false);
   const skipRef = useRef(-1);
   const [fit, setFit] = useState(1);
@@ -969,6 +970,7 @@ export default function Dock({
       alive = false;
       cancelAnimationFrame(raf);
       window.clearTimeout(hideTimer);
+      window.clearTimeout(hoverTimerRef.current);
       root.removeEventListener("pointermove", onMove);
       root.removeEventListener("pointerdown", onMove);
       root.removeEventListener("pointerleave", onLeave);
@@ -1173,6 +1175,19 @@ export default function Dock({
             aria-haspopup={item.menu?.length ? "menu" : undefined}
             aria-expanded={item.menu?.length ? openIndex === index : undefined}
             data-open={openIndex === index ? "" : undefined}
+            onPointerEnter={() => {
+              window.clearTimeout(hoverTimerRef.current);
+              const current = menuRef.current;
+              if (item.menu?.length) {
+                if (current && !current.closing && current.index === index) return;
+                hoverTimerRef.current = window.setTimeout(() => openMenu(index, "pointer"), 220);
+              } else if (current && !current.closing) {
+                closeMenu(false);
+              }
+            }}
+            onPointerLeave={() => {
+              window.clearTimeout(hoverTimerRef.current);
+            }}
             onPointerDown={(event) => {
               skipRef.current = -1;
               const current = menuRef.current;
