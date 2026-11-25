@@ -19,7 +19,18 @@ import {
   Terminal,
   Trash2,
   Users,
+  Wrench,
   X,
+  Maximize2,
+  Minimize2,
+  LayoutDashboard,
+  FolderKanban,
+  History,
+  FileCode2,
+  ScanSearch,
+  RadioTower,
+  FolderGit2,
+  ArrowUpRight,
 } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -495,6 +506,7 @@ function Composer({
   onDismissNotice,
   extracting,
   notice,
+  onTools,
 }: {
   draft: string;
   setDraft: (value: string) => void;
@@ -509,6 +521,7 @@ function Composer({
   onDismissNotice: () => void;
   extracting: boolean;
   notice: { title: string; detail: string } | null;
+  onTools: () => void;
 }): React.ReactElement {
   const inputRef = useRef<HTMLInputElement>(null);
   return (
@@ -577,6 +590,15 @@ function Composer({
           <button
             type="button"
             className="chat-attach-btn"
+            aria-label={fr ? "Outils de l'assistant" : "Assistant tools"}
+            title={fr ? "Les 14 outils : audits, navigateur, code, mémoire" : "The 14 tools: audits, browser, code, memory"}
+            onClick={onTools}
+          >
+            <Wrench size={13} aria-hidden />
+          </button>
+          <button
+            type="button"
+            className="chat-attach-btn"
             aria-label={
               fr
                 ? "Joindre un document (texte, .md, .csv, .json, code, PDF textuel)"
@@ -621,6 +643,216 @@ function Composer({
   );
 }
 
+
+/* ---------- les outils de l'assistant (les 14 vrais outils du serveur) ---------- */
+
+type ChatTool = {
+  name: string;
+  icon: React.ReactElement;
+  fr: string;
+  en: string;
+  starter: { fr: string; en: string };
+};
+
+/** Miroir des TOOLS de l'API (apps/api/src/routes/ai.ts) : le serveur exécute,
+ *  cette liste explique et pré-remplit. Ne jamais promettre un outil qui
+ *  n'existe pas côté serveur. */
+const CHAT_TOOLS: ChatTool[] = [
+  {
+    name: "workspace_overview",
+    icon: <LayoutDashboard />,
+    fr: "Instantané de l'espace : projets, exécutions, statuts, constats.",
+    en: "Workspace snapshot: projects, runs, statuses, findings.",
+    starter: {
+      fr: "Fais le point sur mon espace de travail : projets, dernières exécutions, constats ouverts.",
+      en: "Take stock of my workspace: projects, latest runs, open findings.",
+    },
+  },
+  {
+    name: "list_projects",
+    icon: <FolderKanban />,
+    fr: "Les projets avec URL de base, environnement et modules.",
+    en: "Projects with base URL, environment and modules.",
+    starter: {
+      fr: "Liste mes projets et leurs configurations.",
+      en: "List my projects and their configurations.",
+    },
+  },
+  {
+    name: "recent_runs",
+    icon: <History />,
+    fr: "Les dernières exécutions de tests et leurs résultats.",
+    en: "Latest test runs and their results.",
+    starter: {
+      fr: "Montre-moi les dernières exécutions de tests et leurs résultats.",
+      en: "Show me the latest test runs and their results.",
+    },
+  },
+  {
+    name: "recent_findings",
+    icon: <ShieldAlert />,
+    fr: "Les constats FAILED récents, avec les détails exacts.",
+    en: "Recent FAILED findings with exact details.",
+    starter: {
+      fr: "Quels sont les constats ouverts les plus récents ? Donne les détails exacts.",
+      en: "Which findings are open most recently? Give exact details.",
+    },
+  },
+  {
+    name: "get_report",
+    icon: <FileText />,
+    fr: "Le rapport d'une exécution : identité, vérifications, constats.",
+    en: "A run's report: identity, checks, findings.",
+    starter: {
+      fr: "Résume le dernier rapport d'exécution.",
+      en: "Summarize the latest run report.",
+    },
+  },
+  {
+    name: "project_code",
+    icon: <FileCode2 />,
+    fr: "Lire le code source importé du projet.",
+    en: "Read the project's imported source code.",
+    starter: {
+      fr: "Explore le code source importé de ce projet et décris son architecture.",
+      en: "Explore this project's imported source and describe its architecture.",
+    },
+  },
+  {
+    name: "fetch_web",
+    icon: <Globe />,
+    fr: "Récupérer une page web publique en texte.",
+    en: "Fetch a public web page as text.",
+    starter: {
+      fr: "Récupère le contenu de cette page : https://",
+      en: "Fetch the content of this page: https://",
+    },
+  },
+  {
+    name: "fail_scan",
+    icon: <ShieldAlert />,
+    fr: "Scan FAIL d'une page ou d'un endpoint (sécurité, en-têtes).",
+    en: "FAIL scan of a page or endpoint (security, headers).",
+    starter: {
+      fr: "Lance un scan FAIL sur cette page : https://",
+      en: "Run a FAIL scan on this page: https://",
+    },
+  },
+  {
+    name: "clean_audit",
+    icon: <BadgeCheck />,
+    fr: "Audit CLEAN d'une page : qualité d'interface, score /100.",
+    en: "CLEAN audit of a page: UI quality, score /100.",
+    starter: {
+      fr: "Lance un audit CLEAN sur cette page : https://",
+      en: "Run a CLEAN audit on this page: https://",
+    },
+  },
+  {
+    name: "site_audit",
+    icon: <ScanSearch />,
+    fr: "Crawl complet FAIL + CLEAN multi-pages, session incluse.",
+    en: "Full FAIL + CLEAN multi-page crawl, session included.",
+    starter: {
+      fr: "Lance un audit de site complet sur cette adresse : https://",
+      en: "Run a full site audit on this address: https://",
+    },
+  },
+  {
+    name: "read_repo",
+    icon: <FolderGit2 />,
+    fr: "Lire un dépôt GitHub connecté.",
+    en: "Read a connected GitHub repository.",
+    starter: {
+      fr: "Lit le dépôt GitHub connecté et résume sa structure.",
+      en: "Read the connected GitHub repo and summarize its structure.",
+    },
+  },
+  {
+    name: "browse_url",
+    icon: <Monitor />,
+    fr: "Voir la page dans le navigateur intégré (rendu réel).",
+    en: "See the page in the embedded browser (real render).",
+    starter: {
+      fr: "Ouvre cette page dans le navigateur intégré : https://",
+      en: "Open this page in the embedded browser: https://",
+    },
+  },
+  {
+    name: "probe_url",
+    icon: <RadioTower />,
+    fr: "Sonder un endpoint API : méthode, en-têtes, réponse.",
+    en: "Probe an API endpoint: method, headers, response.",
+    starter: {
+      fr: "Sonde cet endpoint API : https://",
+      en: "Probe this API endpoint: https://",
+    },
+  },
+  {
+    name: "remember",
+    icon: <Brain />,
+    fr: "Retenir durablement un fait sur le projet.",
+    en: "Durably remember a fact about the project.",
+    starter: {
+      fr: "Retiens ceci sur le projet : ",
+      en: "Remember this about the project: ",
+    },
+  },
+];
+
+/* ---------- panneau d'outils ---------- */
+
+function ChatToolsPanel({
+  open,
+  onClose,
+  onPick,
+  fr,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onPick: (tool: ChatTool) => void;
+  fr: boolean;
+}): React.ReactElement | null {
+  if (!open) return null;
+  return (
+    <>
+      <button
+        type="button"
+        className="chat-tools-backdrop"
+        aria-label={fr ? "Fermer les outils" : "Close tools"}
+        onClick={onClose}
+      />
+      <section className="chat-tools" role="dialog" aria-label={fr ? "Outils" : "Tools"}>
+        <header className="chat-tools-head">
+          <p className="app-eyebrow">{fr ? "OUTILS DE L'ASSISTANT" : "ASSISTANT TOOLS"}</p>
+          <button type="button" onClick={onClose} className="chat-icon-btn" aria-label={fr ? "Fermer" : "Close"}>
+            <X size={14} />
+          </button>
+        </header>
+        <p className="chat-tools-note">
+          {fr
+            ? "Le serveur exécute, l'assistant décide quand s'en servir — et chaque appel est tracé dans la conversation. Cliquez pour pré-remplir."
+            : "The server executes, the assistant decides when to use them — and every call is traced in the conversation. Click to pre-fill."}
+        </p>
+        <ul className="chat-tools-list">
+          {CHAT_TOOLS.map((tool, index) => (
+            <li key={tool.name} style={{ "--i": index } as React.CSSProperties}>
+              <button type="button" onClick={() => onPick(tool)}>
+                <span className="chat-tools-icon">{tool.icon}</span>
+                <span className="chat-tools-text">
+                  <code>{tool.name}</code>
+                  <span>{fr ? tool.fr : tool.en}</span>
+                </span>
+                <ArrowUpRight size={13} className="chat-tools-go" aria-hidden />
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </>
+  );
+}
+
 /* ---------- the page ---------- */
 
 export function AiChatPage(): React.ReactElement {
@@ -657,8 +889,18 @@ export function AiChatPage(): React.ReactElement {
   // The browser opens beside the chat, not inside the transcript: a page you can click is a
   // panel, not a message.
   const [browserOpen, setBrowserOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [immersive, setImmersive] = useState(false);
+  const composerInputRef = useRef<HTMLInputElement>(null);
   const [browserUrl, setBrowserUrl] = useState<string | undefined>(undefined);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("proofcore.chat.immersive", { detail: immersive }));
+    return () => {
+      window.dispatchEvent(new CustomEvent("proofcore.chat.immersive", { detail: false }));
+    };
+  }, [immersive]);
   const [profile, setProfile] = useState<ProfileState | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [baseUrlDraft, setBaseUrlDraft] = useState("https://api.openai.com/v1");
@@ -1494,6 +1736,40 @@ export function AiChatPage(): React.ReactElement {
           </button>
           <button
             type="button"
+            className={`chat-action-btn ${toolsOpen ? "is-on" : ""}`}
+            onClick={() => setToolsOpen((open) => !open)}
+            aria-pressed={toolsOpen}
+          >
+            <Wrench size={13} /> {fr ? "Outils" : "Tools"}
+          </button>
+          <button
+            type="button"
+            className="chat-icon-btn"
+            onClick={() => setImmersive((value) => !value)}
+            aria-pressed={immersive}
+            aria-label={
+              immersive
+                ? fr
+                  ? "Quitter le plein écran"
+                  : "Exit full screen"
+                : fr
+                  ? "Plein écran"
+                  : "Full screen"
+            }
+            title={
+              immersive
+                ? fr
+                  ? "Quitter le plein écran"
+                  : "Exit full screen"
+                : fr
+                  ? "Plein écran"
+                  : "Full screen"
+            }
+          >
+            {immersive ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+          </button>
+          <button
+            type="button"
             className="chat-action-btn chat-topbar-export"
             onClick={() =>
               printConversation(
@@ -1516,7 +1792,7 @@ export function AiChatPage(): React.ReactElement {
             {/* empty state: centered greeting + composer, like the reference */}
             {!hasMessages && (
               <div className="chat-greeting">
-                <Terminal size={44} className="chat-greeting-mark text-brand-mint" aria-hidden />
+                <Terminal size={44} className="chat-greeting-mark" aria-hidden />
                 <h1 className="chat-greeting-title">{greeting}</h1>
                 <p className="chat-greeting-support">
                   {fr
@@ -1538,6 +1814,7 @@ export function AiChatPage(): React.ReactElement {
                       setAttachments((items) => items.filter((_, i) => i !== index))
                     }
                     onDismissNotice={() => setAttachNotice(null)}
+                    onTools={() => setToolsOpen(true)}
                     extracting={extracting}
                     notice={attachNotice}
                   />
@@ -1648,6 +1925,7 @@ export function AiChatPage(): React.ReactElement {
                       setAttachments((items) => items.filter((_, i) => i !== index))
                     }
                     onDismissNotice={() => setAttachNotice(null)}
+                    onTools={() => setToolsOpen(true)}
                     extracting={extracting}
                     notice={attachNotice}
                   />
@@ -2052,6 +2330,19 @@ export function AiChatPage(): React.ReactElement {
           </div>
         </div>
       )}
+
+      <ChatToolsPanel
+        open={toolsOpen}
+        onClose={() => setToolsOpen(false)}
+        onPick={(tool) => {
+          setDraft(fr ? tool.starter.fr : tool.starter.en);
+          setToolsOpen(false);
+          window.setTimeout(() => {
+            document.querySelector<HTMLTextAreaElement>(".chat-composer-input")?.focus();
+          }, 60);
+        }}
+        fr={fr}
+      />
     </div>
   );
 }

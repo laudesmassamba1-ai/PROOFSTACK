@@ -66,6 +66,7 @@ export function AppLayout() {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [chatImmersive, setChatImmersive] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const paletteRef = useRef<HTMLDialogElement>(null);
   const paletteInputRef = useRef<HTMLInputElement>(null);
@@ -106,6 +107,16 @@ export function AppLayout() {
     setAccountOpen(false);
     setPaletteOpen(false);
   }, [location.pathname]);
+
+  /* Le chat IA peut demander le plein écran (bandeau d'outils, longue rédaction) :
+     la topbar et le pied s'effacent, le chat prend toute la hauteur. */
+  useEffect(() => {
+    const onImmersive = (event: Event) => {
+      setChatImmersive(Boolean((event as CustomEvent<boolean>).detail));
+    };
+    window.addEventListener("proofcore.chat.immersive", onImmersive);
+    return () => window.removeEventListener("proofcore.chat.immersive", onImmersive);
+  }, []);
 
   // Scroll-choreographed reveals, re-armed per route.
   // biome-ignore lint/correctness/useExhaustiveDependencies: pathname IS the dependency
@@ -390,7 +401,10 @@ export function AppLayout() {
               <WindowControls />
             </div>
           </header>
-          <main id="main" className="app-main">
+          <main
+            id="main"
+            className={`app-main${location.pathname.startsWith("/app/ai") ? " app-main-chat" : ""}`}
+          >
             <Outlet />
           </main>
         </div>
@@ -450,7 +464,7 @@ export function AppLayout() {
     .join("");
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${chatImmersive ? " app-chat-immersive" : ""}`}>
       <QuickDock />
       <div className="app-frame">
         <header className="app-topbar">
@@ -622,7 +636,11 @@ export function AppLayout() {
 
         <InvitationBanner />
 
-        <main id="main" className="app-main" key={location.pathname}>
+        <main
+          id="main"
+          className={`app-main${location.pathname.startsWith("/app/ai") ? " app-main-chat" : ""}`}
+          key={location.pathname}
+        >
           <Outlet />
         </main>
 

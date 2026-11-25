@@ -534,8 +534,8 @@ export function Overview() {
           <Stack
             ariaLabel={
               fr
-                ? "Les cinq questions — tirez la carte du dessus"
-                : "The five questions — drag the top card"
+                ? "Les cinq questions — cliquez la pile pour déplier"
+                : "The five questions — click the pile to deal it out"
             }
             layout="fan"
             visible={5}
@@ -543,6 +543,7 @@ export function Overview() {
             depth={0.5}
             radius={20}
             threshold={90}
+            expandable
             cards={MODULE_IDS.map((module, index) => {
               const latestModuleRun = data.recentRuns.find((run) => run.totals[module]);
               const totals = latestModuleRun?.totals[module] ?? EMPTY_TOTALS;

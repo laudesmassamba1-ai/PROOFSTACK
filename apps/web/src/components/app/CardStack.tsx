@@ -41,6 +41,10 @@ export interface StackProps {
   speed?: number;
   /** Clicking the top card also sends it to the back. */
   sendToBackOnClick?: boolean;
+  /** Clicking the pile spreads every card out, clickable; the top card or
+   * outside click folds them back. The pile becomes a hand, not a cycle. */
+  expandable?: boolean;
+  onOpenChange?: (open: boolean) => void;
   autoplay?: boolean;
   autoplayDelay?: number;
   pauseOnHover?: boolean;
@@ -201,6 +205,8 @@ export function Stack({
   threshold = 90,
   speed = 1,
   sendToBackOnClick = false,
+  expandable = false,
+  onOpenChange,
   autoplay = false,
   autoplayDelay = 3000,
   pauseOnHover = false,
@@ -218,6 +224,7 @@ export function Stack({
   );
   const [dragging, setDragging] = useState(false);
   const [hovered, setHovered] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const orderRef = useRef<number[]>(order);
   const valuesRef = useRef(new Map<number, CardValues>());
   const elementsRef = useRef(new Map<number, HTMLDivElement | null>());
@@ -234,6 +241,7 @@ export function Stack({
     threshold: number;
     speed: number;
     sendToBackOnClick: boolean;
+    expandable: boolean;
     count: number;
     reduceMotion: boolean;
   }>(null as never);
@@ -261,6 +269,7 @@ export function Stack({
     threshold: Math.max(threshold, 0),
     speed: clamp(speed, 0.2, 4),
     sendToBackOnClick,
+    expandable,
     count,
     reduceMotion: !!reduceMotion,
   };
@@ -513,6 +522,159 @@ export function Stack({
     animate(values.spin, clamp(offsetX / LEAN_REACH, -1, 1) * 6, follow);
   };
 
+  // ---- the spread: clicking an expandable pile deals every card out so each
+  // ---- is reachable, then the pile folds back on top card, outside click or
+  // ---- Escape. Desktop deals a row across the section; a narrow page deals
+  // ---- the cards downward, each showing its lower strip (where the name is).
+  // The dealt row shrinks every card so all five stay readable side by side;
+  // the fan's bottom-right transform origin shifts a scaled card, so the x/y
+  // targets compensate for it (0.9 is the fan origin factor).
+  const dealtRow = (
+    position: number,
+    count: number,
+    width: number,
+    height: number,
+    available: number
+  ): { x: number; y: number; rotate: number; scale: number } => {
+    const scale = clamp(available / (count * width), 0.4, 1);
+    const visual = width * scale;
+    const step = Math.min(visual * 0.96, (available - visual) / Math.max(count - 1, 1));
+    // The row grows rightward from the root's own left edge: the wrapper sits
+    // at the section's left, so nothing ever clips against the page margin.
+    const left = 0;
+    return {
+      x: left + position * step - 0.9 * width * (1 - scale),
+      y: (height - height * scale) / 2 - 0.9 * height * (1 - scale),
+      rotate: 0,
+      scale,
+    };
+  };
+
+  const applyOpen = (open: boolean) => {
+    const s = settingsRef.current;
+    if (s.reduceMotion) {
+      // No world to animate: jump the cards to their dealt places and back.
+      const n = Math.max(s.count, 1);
+      const rootNow = rootRef.current;
+      const hostNow = rootNow?.parentElement;
+      const availableNow = hostNow?.getBoundingClientRect().width ?? 1340;
+      orderRef.current.forEach((index, position) => {
+        const values = valuesFor(index);
+        if (open) {
+          const target = dealtRow(
+            position,
+            n,
+            rootNow?.getBoundingClientRect().width ?? 420,
+            rootNow?.getBoundingClientRect().height ?? 430,
+            availableNow
+          );
+          values.x.set(target.x);
+          values.y.set(target.y);
+          values.rotate.set(target.rotate);
+          values.scale.set(target.scale);
+          values.opacity.set(1);
+          values.shade.set(0);
+          values.z.set(position + 2);
+        } else {
+          const target = placement(s.layout, position, index, s.spread, s.depth);
+          values.x.set(target.x);
+          values.y.set(target.y);
+          values.rotate.set(target.rotate);
+          values.scale.set(target.scale);
+          values.opacity.set(position < s.visible ? 1 : 0);
+          values.z.set(s.count - position);
+        }
+      });
+      return;
+    }
+    const root = rootRef.current;
+    if (!root) return;
+    const bounds = root.getBoundingClientRect();
+    // The root is usually a card-sized wrapper; the dealt row may span the
+    // section around it, so walk up to the first ancestor that is clearly
+    // wider before measuring the room the hand has to deal into.
+    let host = root.parentElement;
+    while (
+      host &&
+      host !== document.body &&
+      host.getBoundingClientRect().width < bounds.width * 1.6
+    ) {
+      host = host.parentElement;
+    }
+    const available = host?.getBoundingClientRect().width ?? window.innerWidth;
+    const narrow = available < 980;
+    const step = narrow ? Math.min(150, bounds.height * 0.36) : 0;
+    orderRef.current.forEach((index, position) => {
+      const values = valuesFor(index);
+      if (open) {
+        const target = narrow
+          ? {
+              x: position % 2 ? 9 : -7,
+              y: position * step,
+              rotate: position % 2 ? 2 : -2,
+              scale: 1,
+            }
+          : dealtRow(position, s.count, bounds.width, bounds.height, available);
+        const spring = springFor(s, "settle", { delay: position * 0.045 });
+        animate(values.x, target.x, spring);
+        animate(values.y, target.y, spring);
+        animate(values.rotate, target.rotate, spring);
+        animate(values.scale, target.scale, spring);
+        animate(values.opacity, 1, { duration: 0.3, ease: "easeOut", delay: position * 0.045 });
+        animate(values.shade, 0, { duration: 0.3, ease: "easeOut" });
+        // Dealt left-to-right / top-to-bottom, each card above the previous:
+        // the left (or lower) strip of every card stays visible and clickable.
+        values.z.set(position + 2);
+        settleFace(values, s, position * 0.045);
+      } else {
+        placeCard(index, position, { kind: "settle", delay: position * 0.03 });
+      }
+    });
+  };
+
+  // The mirror must flip before the state commits: the click that follows the
+  // pointerup of the same gesture arrives after React has re-rendered, and it
+  // must not read the pre-toggle value. The suppressClick stamp kills that
+  // trailing click (a link would navigate, or the capture would re-fold).
+  const expandedRef = useRef(expanded);
+  expandedRef.current = expanded;
+  const suppressClickRef = useRef(0);
+  const toggleOpen = () => {
+    const open = !expandedRef.current;
+    expandedRef.current = open;
+    suppressClickRef.current = performance.now();
+    applyOpen(open);
+    onOpenChange?.(open);
+    setExpanded(open);
+  };
+
+  // The pointer handlers run outside React's render; they read this mirror.
+  const openRef = useRef({ enabled: false, open: expanded, toggle: toggleOpen });
+  openRef.current = { enabled: expandable, open: expanded, toggle: toggleOpen };
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: toggle is re-read via openRef
+  useEffect(() => {
+    if (!expanded) return undefined;
+    // The fold listens on the document: focus usually rests on a dealt card's
+    // link, not on the root, so neither Escape nor an outside click would be
+    // seen by the root's own handlers.
+    const close = (event: PointerEvent) => {
+      if (rootRef.current && event.target instanceof Node && rootRef.current.contains(event.target))
+        return;
+      toggleOpen();
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") toggleOpen();
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", escape);
+    };
+    // biome-ignore lint/correctness/useExhaustiveDependencies: toggle is re-read via openRef
+  }, [expanded]);
+
   const onMove = (event: PointerEvent) => {
     const drag = dragRef.current;
     if (!drag || event.pointerId !== drag.id) return;
@@ -572,6 +734,7 @@ export function Stack({
     const s = settingsRef.current;
     if (!drag.moved) {
       if (event.type === "pointerup" && s.sendToBackOnClick) sendToBack(null);
+      else if (event.type === "pointerup" && s.expandable) openRef.current.toggle();
       else settleFace(valuesFor(drag.card), s);
       return;
     }
@@ -594,7 +757,7 @@ export function Stack({
   };
 
   const onDown = (event: React.PointerEvent<HTMLDivElement>, index: number) => {
-    if (event.button !== 0 || dragRef.current) return;
+    if (event.button !== 0 || dragRef.current || openRef.current.open) return;
     if (orderRef.current[0] !== index || flyingRef.current.has(index)) return;
     const s = settingsRef.current;
     const values = valuesFor(index);
@@ -628,9 +791,15 @@ export function Stack({
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.target !== event.currentTarget) return;
+    if (event.key === "Escape" && openRef.current.open) {
+      event.preventDefault();
+      openRef.current.toggle();
+      return;
+    }
     if (["ArrowRight", "ArrowDown", "Enter", " "].includes(event.key)) {
       event.preventDefault();
-      sendToBack(null);
+      if (openRef.current.open) openRef.current.toggle();
+      else sendToBack(null);
     }
   };
 
@@ -725,7 +894,7 @@ export function Stack({
             }}
             className="card-stack-card"
             data-top={isTop ? "" : undefined}
-            aria-hidden={isTop ? undefined : true}
+            aria-hidden={isTop || expanded ? undefined : true}
             style={{
               x: values.x,
               y: values.y,
@@ -735,10 +904,35 @@ export function Stack({
               opacity: values.opacity,
               originX,
               originY,
-              cursor: isTop ? (dragging ? "grabbing" : "grab") : "default",
-              touchAction: isTop ? "pan-y" : "auto",
+              cursor: expanded ? "pointer" : isTop ? (dragging ? "grabbing" : "grab") : "default",
+              touchAction: isTop && !expanded ? "pan-y" : "auto",
             }}
             onPointerDown={(event) => onDown(event, index)}
+            /* The dealt pile: every card is a link of its own. Folded, a click on
+               a behind card deals the pile out instead of slipping through to
+               the link; open, the top card folds instead of navigating. */
+            onClickCapture={(event) => {
+              if (!openRef.current.enabled) return;
+              // The click trailing the toggling pointerup belongs to the same
+              // gesture: swallow it, or the link would navigate (open→fold)
+              // and the capture would fold what was just dealt (fold→open).
+              if (performance.now() - suppressClickRef.current < 200) {
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+              }
+              if (openRef.current.open) {
+                if (isTop) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  openRef.current.toggle();
+                }
+              } else if (!isTop) {
+                event.preventDefault();
+                event.stopPropagation();
+                openRef.current.toggle();
+              }
+            }}
           >
             <motion.div
               className="card-stack-face"

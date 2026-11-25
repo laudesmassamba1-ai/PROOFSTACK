@@ -4773,8 +4773,8 @@ p {
 }
 
 .chat-greeting-mark {
-  color: var(--mint);
-  filter: drop-shadow(0 2px 14px color-mix(in srgb, var(--mint) 45%, transparent));
+  color: var(--vermillon, #e4381f);
+  filter: drop-shadow(0 2px 14px color-mix(in srgb, var(--vermillon, #e4381f) 40%, transparent));
 }
 
 .chat-greeting-title {
@@ -9967,4 +9967,212 @@ hairline,
   width: min(100%, 420px);
   height: 430px;
   margin-top: 6px;
+}
+
+/* ── Chat IA plein écran ────────────────────────────────────────────────── */
+.app-main-chat {
+  max-width: none;
+  padding: 0;
+}
+
+.app-main-chat .chat-shell {
+  height: calc(100dvh - 57px);
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-top: 0;
+}
+
+/* mode immersif : la topbar et le pied s'effacent, le chat prend tout */
+.app-chat-immersive .app-topbar,
+.app-chat-immersive .app-footer {
+  display: none;
+}
+
+.app-chat-immersive .app-main-chat .chat-shell {
+  height: 100dvh;
+}
+
+.app-chat-immersive .app-frame {
+  min-height: 100dvh;
+}
+
+/* ── Panneau des outils ─────────────────────────────────────────────────── */
+.chat-shell {
+  position: relative;
+}
+
+.chat-tools-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  border: 0;
+  background: color-mix(in srgb, var(--ink) 22%, transparent);
+  cursor: pointer;
+  animation: chat-fade 0.2s ease both;
+}
+
+@keyframes chat-fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.chat-tools {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  bottom: 10px;
+  z-index: 31;
+  display: flex;
+  width: min(340px, 92%);
+  flex-direction: column;
+  border: 1px solid var(--rule);
+  border-radius: 18px;
+  background: var(--paper-raised);
+  box-shadow: 0 24px 60px -30px rgba(10, 10, 11, 0.5);
+  animation: chat-tools-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  overflow: hidden;
+}
+
+@keyframes chat-tools-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.chat-tools-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+}
+
+.chat-tools-note {
+  padding: 0 16px 10px;
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+
+.chat-tools-list {
+  display: grid;
+  gap: 3px;
+  padding: 4px 10px 14px;
+  overflow-y: auto;
+}
+
+.chat-tools-list li {
+  animation: app-rise 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 34ms);
+}
+
+.chat-tools-list button {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 30px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.16s ease, background 0.16s ease;
+}
+
+.chat-tools-list button:hover,
+.chat-tools-list button:focus-visible {
+  border-color: color-mix(in srgb, var(--vermillon, #e4381f) 40%, transparent);
+  background: color-mix(in srgb, var(--vermillon, #e4381f) 5%, transparent);
+}
+
+.chat-tools-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid var(--rule);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--ink-soft);
+}
+
+.chat-tools-list button:hover .chat-tools-icon {
+  color: var(--vermillon, #e4381f);
+  border-color: color-mix(in srgb, var(--vermillon, #e4381f) 40%, transparent);
+}
+
+.chat-tools-text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.chat-tools-text code {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.chat-tools-text span {
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.chat-tools-go {
+  color: var(--ink-soft);
+  opacity: 0;
+  translate: -4px 0;
+  transition: opacity 0.16s ease, translate 0.16s ease;
+}
+
+.chat-tools-list button:hover .chat-tools-go {
+  opacity: 1;
+  translate: 0 0;
+  color: var(--vermillon, #e4381f);
+}
+
+/* ── Animations du fil ──────────────────────────────────────────────────── */
+.chat-msg {
+  animation: app-rise 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.chat-trace-chip {
+  animation: app-rise 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* le composer respire à la prise de focus */
+.chat-composer {
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.chat-composer:focus-within {
+  border-color: color-mix(in srgb, var(--vermillon, #e4381f) 45%, transparent);
+  box-shadow: 0 14px 40px -24px rgba(228, 56, 31, 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-msg,
+  .chat-trace-chip,
+  .chat-tools,
+  .chat-tools-backdrop,
+  .chat-tools-list li {
+    animation: none;
+  }
 }
