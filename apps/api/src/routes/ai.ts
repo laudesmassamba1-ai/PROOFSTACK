@@ -1,4 +1,4 @@
-import { auditSite, ProofCoreError, scanPage, shortId, stableStringify } from "@proofcore/core";
+import { auditSite, controlFor, ProofCoreError, scanPage, shortId, stableStringify } from "@proofcore/core";
 import { type Context, Hono } from "hono";
 import { z } from "zod";
 import { decryptApiKey, encryptApiKey, hasEncryptionSecret, keyFingerprint } from "../ai-crypto.js";
@@ -637,6 +637,20 @@ const TOOLS: { name: string; description: string; parameters: Record<string, unk
     },
   },
   {
+    name: "get_control",
+    description:
+      "Retrieve the authoritative PROOFCORE control card for one finding id. Use after reading a run or PageAudit to get the exact objective, consequence, smallest correction, external verification steps, stack-specific code examples, complexity and risk. Do not invent these fields when a control is available.",
+    parameters: {
+      type: "object",
+      properties: {
+        module: { type: "string", enum: ["world", "flow", "exit", "fail", "clean"] },
+        controlId: { type: "string", description: "Exact finding/control id from the report, without a module prefix." },
+      },
+      required: ["module", "controlId"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "project_code",
     description:
       "Read the code a person uploaded to a project, and the AI code audits already run on it. Without sourceId it lists sources, file counts, scores and recent audit findings; with sourceId it lists files; with sourceId and path it returns that exact file. Uploaded code only, never the server's own disk.",
@@ -840,8 +854,17 @@ function systemPrompt(
     "  the exact settings as a proposal and wait.",
     "- Run a module only when the user asked to run it, with `module_run` and confirm:true.",
     "  A run spends the workspace's monthly test-run quota and hits the customer's app.",
-    "- After a run, call `analyze_run` (or read the run id it returned) before explaining.",
-    "  Report failed and errored cases, then skipped cases with their exact reason. A",
+    "- After WORLD/FLOW returns an `EngineRun` `runId`, call `analyze_run` with that id",
+    "  before explaining. For FAIL/CLEAN, `module_run` returns a `PageAudit` `auditId`:",
+    "  call `get_report` with that id instead; do not call `analyze_run` on a PageAudit.",
+    "  A PageAudit may be a limited preview: if its module summary or fields are omitted,",
+    "  state that limitation instead of inferring a score or a missing check.",
+    "- For every FAIL/CLEAN finding you recommend changing, call `get_control` with its",
+    "  exact module and finding id. Use the registry's objective, consequence, smallest",
+    "  fix, verification steps and stack examples. Separate site-wide scan totals from",
+    "  the requested module's own counts; never attribute combined FAIL+CLEAN totals to",
+    "  one module.",
+    "- Report failed and errored cases, then skipped cases with their exact reason. A",
     "  skipped case is not a pass.",
     "- EXIT and browser-only FLOW journeys are not runnable in the API runtime. Say so and",
     "  give the local command; never imply they ran.",
@@ -1957,6 +1980,44 @@ async function executeTool(
             2
           ),
           summary: `${findings.length} finding(s)`,
+        };
+      }
+      case "get_control": {
+        const module = copilotModule(args.module);
+        const controlId = typeof args.controlId === "string" ? args.controlId.trim() : "";
+        if (!module || !controlId) {
+          return {
+            content: stableStringify({ error: "module and controlId are required" }),
+            summary: "invalid control request",
+          };
+        }
+        const control = controlFor(module, controlId);
+        if (!control) {
+          return {
+            content: stableStringify({
+              error: "no control with this exact id in the requested module",
+              module,
+              controlId,
+            }),
+            summary: "control not found",
+          };
+        }
+        return {
+          content: stableStringify(
+            {
+              id: control.id,
+              module: control.module,
+              copy: { fr: control.fr, en: control.en },
+              complexity: control.complexity,
+              risk: control.risk,
+              method: control.method,
+              result: control.result,
+              fixes: control.fixes,
+              ...(control.aliasOf ? { aliasOf: control.aliasOf } : {}),
+            },
+            2
+          ),
+          summary: `${module.toUpperCase()} / ${control.id} · ${control.complexity} effort · ${control.risk} risk`,
         };
       }
       case "get_report": {
