@@ -78,6 +78,15 @@ export interface ModuleReadiness {
     startedAt: string;
     totals: unknown;
   } | null;
+  /** Latest stored page scan. FAIL/CLEAN audits live in page-audit history, not EngineRun history. */
+  lastAudit: {
+    id: string;
+    createdAt: string;
+    url: string;
+    status: string;
+    failed: number;
+    warnings: number;
+  } | null;
   runHere: string;
   runLocally: string;
 }
@@ -216,6 +225,17 @@ export async function moduleStatus(
   const config = buildProjectConfig(project, readStoredProjectConfig(project.moduleConfig));
   const runs = await services.store.recentRuns(workspaceId, 20);
   const projectRuns = runs.filter((run) => run.projectId === project.id);
+  const latestAudit = (await services.store.latestPageAudits(workspaceId, project.id, 1))[0] ?? null;
+  const pageAudit = latestAudit
+    ? {
+        id: String(latestAudit.id),
+        createdAt: String(latestAudit.created_at),
+        url: String(latestAudit.url),
+        status: String(latestAudit.worst_verdict),
+        failed: Number(latestAudit.failed),
+        warnings: Number(latestAudit.warnings),
+      }
+    : null;
 
   const modules = COPILOT_MODULES.map((module): ModuleReadiness => {
     const issues = issuesFor(config, module);
@@ -245,6 +265,7 @@ export async function moduleStatus(
             totals: lastRun.totals,
           }
         : null,
+      lastAudit: module === "fail" || module === "clean" ? pageAudit : null,
       runHere: runHint(module, project, config, true),
       runLocally: runHint(module, project, config, false),
     };
