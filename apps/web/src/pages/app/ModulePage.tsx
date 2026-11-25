@@ -455,7 +455,7 @@ export function ModulePage() {
                           <Link
                             to={`/app/scan?audit=${encodeURIComponent(audit.id)}`}
                             className="app-text-link"
-                            >
+                          >
                             {fr ? "Ouvrir" : "Open"} <ArrowRight size={12} />
                           </Link>
                         </td>
