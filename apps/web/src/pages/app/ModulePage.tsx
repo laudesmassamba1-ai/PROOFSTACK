@@ -453,8 +453,8 @@ export function ModulePage() {
                         </td>
                         <td>
                           <Link
-                              to={`/app/scan?audit=${encodeURIComponent(audit.id)}`}
-                              className="app-text-link"
+                            to={`/app/scan?audit=${encodeURIComponent(audit.id)}`}
+                            className="app-text-link"
                             >
                             {fr ? "Ouvrir" : "Open"} <ArrowRight size={12} />
                           </Link>
@@ -561,7 +561,9 @@ export function ModulePage() {
                   {t("ws.module.findings")}
                 </h2>
               </div>
-              <span className="app-count-mark">{isPageAuditModule ? visiblePageFindings.length : findings.length}</span>
+              <span className="app-count-mark">
+                {isPageAuditModule ? visiblePageFindings.length : findings.length}
+              </span>
             </header>
             {isPageAuditModule ? (
               visiblePageFindings.length === 0 ? (
