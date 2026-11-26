@@ -279,6 +279,20 @@ export interface WorkspaceWebhookRecord {
   lastError: string | null;
 }
 
+export interface OnboardingRecord {
+  workspaceId: string;
+  experience: "simple" | "studio";
+  projectType: string | null;
+  goal: string | null;
+  level: string | null;
+  target: string | null;
+  completed: boolean;
+  completedAt: string | null;
+  updatedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface WorkspaceRecord {
   id: string;
   name: string;
@@ -1404,6 +1418,73 @@ export class AppStore {
       .bind(userId)
       .all<Row>();
     return rows.map((row) => ({ ...mapWorkspace(row), role: str(row, "role") as Role }));
+  }
+
+  async getOnboarding(workspaceId: string): Promise<OnboardingRecord | null> {
+    const row = await this.db
+      .prepare("SELECT * FROM workspace_onboarding WHERE workspace_id = ?")
+      .bind(workspaceId)
+      .first<Row>();
+    return row ? mapOnboarding(row) : null;
+  }
+
+  /**
+   * Upsert: the first save creates the row, later ones only move the fields that were
+   * supplied. `completed` is derived by the caller from the merged state, never trusted
+   * from the request alone.
+   */
+  async saveOnboarding(input: {
+    workspaceId: string;
+    experience: "simple" | "studio";
+    projectType: string | null;
+    goal: string | null;
+    level: string | null;
+    target: string | null;
+    completed: boolean;
+    updatedBy: string;
+    now: Date;
+  }): Promise<OnboardingRecord> {
+    const at = iso(input.now);
+    await this.db
+      .prepare(
+        `INSERT INTO workspace_onboarding
+           (workspace_id, experience, project_type, goal, level, target, completed, completed_at, updated_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(workspace_id) DO UPDATE SET
+           experience = excluded.experience,
+           project_type = excluded.project_type,
+           goal = excluded.goal,
+           level = excluded.level,
+           target = excluded.target,
+           completed = excluded.completed,
+           completed_at = CASE
+             WHEN excluded.completed = 1 AND workspace_onboarding.completed = 0 THEN excluded.completed_at
+             WHEN excluded.completed = 0 THEN NULL
+             ELSE workspace_onboarding.completed_at
+           END,
+           updated_by = excluded.updated_by,
+           updated_at = excluded.updated_at`
+      )
+      .bind(
+        input.workspaceId,
+        input.experience,
+        input.projectType,
+        input.goal,
+        input.level,
+        input.target,
+        input.completed ? 1 : 0,
+        input.completed ? at : null,
+        input.updatedBy,
+        at,
+        at
+      )
+      .run();
+    const row = await this.db
+      .prepare("SELECT * FROM workspace_onboarding WHERE workspace_id = ?")
+      .bind(input.workspaceId)
+      .first<Row>();
+    if (!row) throw new Error("onboarding row disappeared after write");
+    return mapOnboarding(row);
   }
 
   async getWorkspace(workspaceId: string): Promise<WorkspaceRecord | null> {
@@ -3286,6 +3367,22 @@ function mapDeviceGrant(row: Row): DeviceGrantRecord {
     pollCount: typeof row.poll_count === "number" ? row.poll_count : 0,
     clientName: nullableStr(row, "client_name"),
     ip: nullableStr(row, "ip"),
+  };
+}
+
+function mapOnboarding(row: Row): OnboardingRecord {
+  return {
+    workspaceId: str(row, "workspace_id"),
+    experience: str(row, "experience") === "studio" ? "studio" : "simple",
+    projectType: nullableStr(row, "project_type"),
+    goal: nullableStr(row, "goal"),
+    level: nullableStr(row, "level"),
+    target: nullableStr(row, "target"),
+    completed: Number(row.completed) === 1,
+    completedAt: nullableStr(row, "completed_at"),
+    updatedBy: nullableStr(row, "updated_by"),
+    createdAt: str(row, "created_at"),
+    updatedAt: str(row, "updated_at"),
   };
 }
 
