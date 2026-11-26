@@ -1,147 +1,106 @@
-# PROOFCORE — audit approfondi
+# PROOFCORE — Audit profond (phase 0, cartographie)
 
-Date : 25 novembre 2026 · Dépôt : `apps/`, `packages/`, `tooling/`, `tests/` · Base : commit
-`9976fdd` plus les changements décrits au § 3.
+Base : commit `85e27a2` (branche `master`), dépôt de travail avec modifications non commitées
+(`apps/web/src/pages/app/{AiChat,Billing,ModulePage,Settings}.tsx`, `AppLayout.tsx`,
+`global.css`, `packages/cli/src/index.ts`, `packages/cli/test/cli.test.ts`) et trois fichiers
+de débogage non suivis à la racine (`mobile-*.tmp.mjs`, `visual-audit.tmp.mjs` est suivi).
 
-> Méthode : lecture du code livré, exécution réelle des contrôles, tests à deux comptes,
-> parcours navigateur sur base fraîche. Aucun statut n'est déduit d'un nom de fichier ou
-> d'une page marketing.
+Statuts utilisés dans ce document : **VÉRIFIÉ** (artefact observé), **PARTIEL**,
+**ABSENT**, **NON VÉRIFIÉ** (non exécuté ou non inspecté).
 
-## 1. Résultat mesuré
+## 1. Ce qui a été vérifié
 
-| Contrôle                    | Commande                       | Résultat                                     |
-| --------------------------- | ------------------------------ | -------------------------------------------- |
-| Lint                        | `pnpm lint`                    | 496 fichiers, 0 erreur, 0 avertissement      |
-| Types                       | `pnpm typecheck`               | OK sur tous les paquets + web + desktop      |
-| Tests unitaires/intégration | `pnpm test`                    | **811 tests, 69 fichiers, 0 échec** (~126 s) |
-| Chaîne complète             | `pnpm verify`                  | OK : lint + typecheck + tests + build web    |
-| E2E desktop (Chrome)        | `playwright --project=desktop` | **17 passés, 2 sautés**                      |
-| E2E mobile (Pixel 7)        | `playwright --project=mobile`  | **19 passés**                                |
+| Point | Statut | Preuve |
+| ----- | ------ | ------ |
+| Lint du dépôt suivi par Git | PARTIEL | `pnpm lint` échoue uniquement à cause de trois fichiers `*.tmp.mjs` non suivis à la racine (erreurs `useDomNodeTextContent`, format). Le code produit n'est pas en cause ; la CI repart d'un checkout et ne les voit pas. |
+| Fichiers cités par l'audit historique | PARTIEL | `apps/web/src/pages/app/Start.tsx` (389 l.), `ProjectConfig.tsx` (1067 l.), `apps/api/src/routes/audits.ts` (1172 l.), `apps/api/src/routes/ai.ts` (2685 l.), `packages/cli/src/audit.ts` (495 l.) existent. **`packages/engine/src/contracts/statuses.ts` est absent** : les statuts sont dans `packages/contracts/src/statuses.ts`. |
+| Statuts de test | VÉRIFIÉ | `packages/contracts/src/statuses.ts` : PENDING, RUNNING, PASSED, FAILED, WARNING, SKIPPED, ERROR, BLOCKED, NOT_APPLICABLE, NOT_CONFIGURED. Statuts de run : PENDING, RUNNING, COMPLETED, PARTIAL, FAILED, ERROR, CANCELLED, NOTHING_VERIFIED. |
+| Modules | VÉRIFIÉ | `packages/modules/` contient `world`, `flow`, `exit` uniquement. FAIL et CLEAN sont dans `packages/core/src/page-scan.ts` (`ScanModule = "fail" \| "clean" \| "flow" \| "world" \| "exit"`) et `packages/cli/src/audit.ts` (`kind: "fail"` / `"clean"`). |
+| Protection CSRF | ABSENT | Aucune occurrence de `csrf` dans `apps/api/src`. |
+| Rate limiting | PARTIEL | `RateLimiter` (`apps/api/src/http/errors.ts:133`) : compteur en `Map` mémoire, par processus/isolat. Non distribué. Utilisé par `auth.ts` (connexion 10 / 5 min, inscription configurable). |
+| Révocation de session | PARTIEL | Révocation présente dans `auth.ts`, `device.ts`, `account.ts`, `machine.ts`, `billing.ts`, `workspace.ts`, `store/app-store.ts`. Rotation : NON VÉRIFIÉ. |
+| Tests | VÉRIFIÉ | 69 fichiers `*.test.*` / `*.spec.*` hors `node_modules` et `dist`. |
+| Espace disque | VÉRIFIÉ | 5,2 Go libres sur 232 Go (98 % utilisé). Les builds et installations lourdes sont à risque. |
 
-Les E2E ont été lancés avec `CI=1`, une base SQLite en mémoire neuve et des ports
-dédiés (5186/8799). Les deux tests sautés sont les scénarios réservés au téléphone,
-volontairement `test.skip(!isMobile)`.
+## 2. Ce qui n'a pas été vérifié (à compléter)
 
-## 2. Ce que l'audit a réellement trouvé
+- **Exécution réelle des tests** : `pnpm test`, `pnpm typecheck`, `pnpm build`, E2E — NON VÉRIFIÉ dans cette session (disque presque plein ; lancer après libération d'espace).
+- **État réel de la CI** sur GitHub (exécution #105 citée) : NON VÉRIFIÉ, aucun accès aux journaux distants n'a été tenté.
+- **Pages rendues dans un navigateur** (phase 0.3) : NON VÉRIFIÉ.
+- **Cartographie complète des routes et des appels web → API** : tentée via sous-agent, interrompue par la limite d'étapes. À refaire par lots (voir `PROOFCORE_ARCHITECTURE_MAP.md`, section « à compléter »).
+- **Schéma de persistance d'analyse commune** : NON VÉRIFIÉ ; les tables D1 et le schéma Neon (`apps/api/neon/schema.sql`) doivent être lus avant toute migration.
 
-### 2.1 Faille SSRF dans les webhooks sortants — CORRIGÉ
+## 3. Incohérences documentaires relevées
 
-`apps/api/src/outbound.ts` validait l'URL d'un webhook avec une courte expression
-régulière. En production, `https://169.254.169.254/latest/meta-data` (métadonnées
-cloud), `https://100.64.0.1/`, `https://[fd00::1]/`, `https://[::ffff:127.0.0.1]/`,
-`https://relay.cluster.local/` et `https://hooks.example:6379/` passaient. La livraison
-suivait aussi les redirections, ce qui transformait un receiver public en rebond vers le
-réseau interne.
+- `package.json` racine : `"name": "proofcore"`, `"description"` décrit trois moteurs (WORLD, FLOW, EXIT) alors que le produit en documente cinq. Le README et le statut en parlent aussi différemment.
+- Version racine `0.1.0` ; version CLI `@proofcore/cli` `0.6.3`. Pas de règle de versionnement documentée (à vérifier dans `README.md` et `docs/`).
+- `APP-MEMORY.md` indique « Dernière mise à jour : 2026-11-21 » et des chantiers « en cours » qui peuvent être dépassés.
+- Le sous-agent a signalé des chemins de documentation contradictoires ; à réconcilier dans la phase 1.4.
 
-Correctif : garde complet sur les plages réservées (lien-local, CGNAT, TEST-NET,
-multicast, ULA, link-local IPv6, IPv4 mappée), refus des identifiants dans l'URL, refus
-des ports de service en production, `redirect: "manual"` et refus explicite des 3xx,
-revalidation de l'URL stockée au moment de la livraison.
+## 4. Décision de cette session
 
-Preuve : `apps/api/test/webhook-guard.test.ts` — 31 tests (table d'URL + refus
-d'enregistrement en production + refus de redirection + cible stockée devenue
-invalide). Le test de redirection vérifie `lastStatus = 302` et
-`lastError` contenant « redirect ».
+La phase 0 complète (cartographie de toutes les routes, pages et composants, tests navigateur)
+dépasse une seule session. Les trois autres documents (`CAPABILITY_MATRIX`, `ARCHITECTURE_MAP`,
+`RISK_REGISTER`) ne contiennent que ce qui est vérifié ci-dessus. Les lignes marquées NON VÉRIFIÉ
+ne doivent pas être lues comme des fonctions opérationnelles.
 
-### 2.2 Le parcours d'inscription mobile échouait — CORRIGÉ
+## 5. Vérification en direct — 26 novembre 2026 (phase 0.3 exécutée)
 
-`tests/e2e/journey.spec.ts` passait sur desktop et échouait sur Pixel 7 : la requête
-d'inscription était abandonnée après 6 s (« signal is aborted without reason »). Cause
-mesurée : le fond WebGL décoratif de la page d'authentification était rendu au
-`devicePixelRatio` du téléphone (×2,625), soit ~2,6 millions de fragments par frame ;
-le thread principal était saturé et le timer `AbortController` de 6 s se déclenchait
-avant que la réponse ne soit traitée.
+Session du 26 novembre, dépôt à `e5b5e63` (master), l'agent « chat IA mobile » travaillait
+en parallèle dans le même arbre. Cette section ne décrit que ce qui a été exécuté ce jour.
 
-Correctif : `apps/web/src/components/ui/modern-login-signup.tsx` plafonne le ratio de
-rendu à 1,5. Le formulaire n'entre plus en concurrence avec son décor.
+### 5.1 Suite de tests exécutée (comble la section 2.1 ci-dessus)
 
-Preuve : le test mobile « overview states the plan honestly… » échouait avant, passe
-après ; la suite mobile complète est à 19/19.
+- `pnpm test` : **69 fichiers, 818 tests, 0 échec** (Vitest, local).
+- `pnpm typecheck` : 0 erreur (`apps/web`, exécuté à chaque passe du jour).
+- `pnpm build` : succès (racine, deux fois ce jour).
 
-### 2.3 La carte de consentement bloquait le parcours débutant — CORRIGÉ (parcours)
+### 5.2 Pages rendues dans un navigateur (Playwright, 1440×900 ; app connectée avec
+un compte jetable réel ; API locale `:8787` en vie)
 
-Le test « a non-technical phone user follows the guide and analyses a site » cliquait
-« Voir le résultat » derrière la carte cookies, qui intercepte le pointeur. Un visiteur
-réel doit d'abord consentir. Les helpers E2E effectuent maintenant ce choix comme un
-utilisateur (attente de l'affichage, puis clic sur « Autoriser »/« Allow »). Aucune
-assertion n'a été affaiblie.
+| Route | H1 rendu | Anomalies |
+| ----- | -------- | --------- |
+| `/`, `/download`, `/pricing`, `/docs`, `/changelog`, `/security`, `/signin` | correctes | aucune ; 0 erreur console, 0 réponse ≥ 400 |
+| `/legal` | « Page introuvable » | les routes existantes sont `/legal/terms`, `/legal/privacy`, `/legal/cookies` — pas de raccourci `/legal` |
+| `/app`, `/app/projects`, `/app/modules`, `/app/modules/{world,flow,exit,fail,clean}` | correctes | aucune |
+| `/app/scan`, `/app/start`, `/app/billing`, `/app/settings`, `/app/workspace`, `/app/cli`, `/app/interact`, `/app/ai`, `/app/guide`, `/app/notifications` | correctes | aucune |
+| `/app/terminal` | Terminal | **404 sur `/api/terminal/start`** (le démarrage du terminal local n'est pas servi par cette instance API locale) |
+| `/app/admin` | Opérations | **503 sur `/api/v1/admin/overview`** (instance locale ; ADMIN_EMAILS vide par défaut) |
+| `/app/account`, `/app/local-agent` | « Page introuvable » | URL saisies à la main : les vraies routes sont `/app/settings` (Account.tsx est rendu ailleurs) et `/app/agent`. Aucun lien de navigation ne pointe vers ces 404 — URLs mortes, pas de parcours cassé |
 
-### 2.4 Lint rouge sur 21 diagnostics — CORRIGÉ
+### 5.3 CI observée via `gh` (comble la section 2.2 ci-dessus)
 
-Contrairement à ce qu'affirmait `DEVELOPMENT_STATUS.md`, `pnpm lint` échouait. Les
-corrections portent sur : variables/imports/paramètres inutilisés, concaténations à
-remplacer par des templates, assertions non nulles dans `scenario.ts`, clés de listes
-instables dans `SplitChars`/`PeintScene`, et `aria-hidden` sur des canvas/SVG décoratifs
-(remplacé par des éléments sans nom accessible). Aucun `biome-ignore` n'a été ajouté.
+| Run | Commit | Résultat |
+| --- | ------ | -------- |
+| 45600283899 (antérieure) | — | échec smoke CLI — cause corrigée (`asksHelp`), voir R5 du registre |
+| 45755203107 | `8f5e61c` | **failure** au smoke CLI : `--version` OK (0.6.3), `--help` sort 2, aucune trace d'erreur au log |
+| 45756582954 | `e5b5e63` | en cours au moment de la vérification |
+| 45755203107 · e2e | `8f5e61c` | **success** (desktop + mobile) |
 
-### 2.5 Absence de tests d'isolation multi-comptes exhaustive — CORRIGÉ
+Reproduction locale : clone propre `/tmp/ci-repro` au commit exact `8f5e61c`, `pnpm
+install --frozen-lockfile`, `pnpm build`, les trois commandes du smoke test avec
+`env -i` (HOME neuf, sans TTY, `CI=true`) — **les trois sortent 0**. L'échec du run
+45755203107 n'est donc pas reproductible au commit exact dans un environnement
+isolé ; il est transitoire ou spécifique au runner (à confirmer par le run en cours).
+Hypothèse éliminée : un état du poste (config, session, `.git`) — le clone n'en a aucune.
 
-Il existait un test ponctuel sur workspace/projet, mais pas de couverture systématique
-des sous-ressources. `apps/api/test/tenant-isolation.test.ts` couvre maintenant :
+### 5.4 Registre npm (comble la section 3 ci-dessus)
 
-- 22 lectures inter-comptes (projets, configuration, runs, findings, corrections,
-  sources, métriques, audits IA, insights, overview, webhooks, facturation,
-  notifications, clés API, mémoire IA, workspaces, membres, invitations) ;
-- 8 écritures inter-comptes (création de projet, PATCH, configuration, suppression,
-  webhook, checkout, conversation IA, import de sources) ;
-- l'accès à un projet étranger via son propre workspace ;
-- les conversations IA (liste, lecture, suppression) ;
-- le refus de toute route sans session.
+- `npm view proofcore version` → **0.6.0** ; `packages/cli/package.json` → **0.6.3**.
+- Le paquet publié n'existe pas sous `@proofcore/cli` (privé) ; le README documente
+  `npm install -g proofcore` — l'écart npm (0.6.0 → 0.6.3) attend le secret
+  `NPM_TOKEN` (voir `docs/deployment/CONNECTIONS.md`). La publication CLI vers npm
+  est branchée dans le workflow release mais saute sans le secret.
+- Décalage `git clone …/PROOFSTACK.git` / `cd PROOFCORE` cité par l'audit historique :
+  **plus aucune occurrence** dans le dépôt (README, docs, CLI) — réglé.
 
-Chaque lecture doit répondre **404** (jamais 403, qui confirmerait l'existence de l'id)
-et le corps ne doit contenir ni l'id utilisateur ni le nom du projet de l'autre compte.
+### 5.5 Nouvelles incohérences documentaires localisées (complète la section 3)
 
-## 3. Corrections de documentation
-
-- `docs/AUDIT_2026-11.md` classait C2 « aucun moyen de récupérer un compte » comme
-  ouvert. Le code livré contient pourtant `POST /api/account/forgot-password`,
-  `reset-password`, `verify-email/request|confirm`, la révocation des sessions et les
-  tests correspondants. Le constat est corrigé dans ce document.
-- `docs/DEVELOPMENT_STATUS.md` annonçait 534 tests, « no password recovery », « no CI »
-  et un lint propre. Les trois premiers points sont faux aujourd'hui ; la section
-  « Known gaps » est remplacée par un renvoi à ce rapport.
-- Les documents de la phase 9-20 sont créés dans `docs/PROOFCORE_*.md` avec le statut
-  réel de chaque capacité.
-
-## 4. Limites restantes (non corrigées dans cette passe)
-
-1. **MFA et OAuth absents** : aucune route, aucun schéma. Non annoncés comme disponibles.
-2. **Vérification d'e-mail non bloquante** : l'adresse est vérifiable, mais la connexion
-   n'exige pas `email_verified_at`. Un compte non vérifié reste utilisable.
-3. **Énumération à l'inscription** : `email_taken` répond 409, ce qui révèle l'existence
-   d'un compte. La connexion et le mot de passe oublié, eux, répondent de façon uniforme.
-4. **Limitation distribuée partielle** : les tentatives de connexion, le mot de passe
-   oublié, le changement de mot de passe et la recherche de support sont durables (D1,
-   table `auth_attempts`). L'inscription et les appels IA utilisent un limiteur en
-   mémoire par isolate ; les quotas mensuels, eux, sont durables.
-5. **Pas de protection DNS rebinding** : le Worker ne peut pas résoudre un nom avant le
-   `fetch`. Les adresses littérales et les redirections sont bloquées ; un nom public
-   qui résout vers une adresse privée n'est pas détecté.
-6. **Redirections du navigateur embarqué** : `page.goto` valide l'URL initiale, pas les
-   redirections internes de Chromium.
-7. **Secrets au repos** : les clés de fournisseurs IA sont chiffrées (AES-256-GCM). Les
-   secrets de webhooks sont stockés en clair (nécessaires à la signature HMAC) et les
-   liens de réinitialisation restent en clair dans `email_outbox` pour livraison
-   manuelle.
-8. **Pas de tâche de rétention ni de sauvegarde/restauration testée** : les plans
-   déclarent `report_retention_days`, et l'import calcule `retainedUntil`, mais aucune
-   suppression planifiée n'existe.
-9. **Pas de partage de rapport, pas d'export PDF/CSV de rapport, pas de recherche
-   plein-texte** : la pagination existe (limit/offset + index), la recherche exacte
-   n'est pas exposée.
-10. **Pas de métriques/traçage** : identifiants de requête et logs d'erreur structurés
-    existent ; ni OpenTelemetry, ni compteurs de latence.
-11. **Fournisseurs externes non vérifiés** : aucun credential EmailJS/Resend ni SasPay
-    live n'a été fourni. La livraison réelle et le paiement live restent NON VÉRIFIÉS.
-
-## 5. Verdict
-
-Le socle est cohérent et testé : authentification complète (hors MFA/OAuth), isolation
-multi-comptes prouvée, moteurs et rapports communs, facturation sandbox, notifications,
-support, e-mails avec journal de livraison honnête. La faille SSRF des webhooks sortants
-était la seule vulnérabilité exploitable identifiée dans cette passe ; elle est fermée
-et couverte par des tests.
-
-Le produit reste **PARTIEL** pour un usage commercial de masse : MFA, vérification
-d'e-mail obligatoire, rétention/sauvegarde, partage client et exports avancés manquent,
-et les fournisseurs externes n'ont pas été prouvés en conditions réelles.
+- `README.md:38` : « Overview, Projects, WORLD/FLOW/EXIT » — il y a cinq modules.
+- `docs/CLI_EXPERIENCE.md:26` : « Run the enabled modules (WORLD/FLOW/EXIT) ».
+- `docs/PROOFCORE_2_0_DELIVERY_REPORT.md:261` : ligne de tableau WORLD/FLOW/EXIT.
+- `docs/PROOFCORE_AI_ARCHITECTURE.md:53` : `module_configure` « WORLD/FLOW/EXIT ».
+- `docs/PROOFCORE_TRANSFORMATION_PROGRESS.md:120` : « WORLD/FLOW/EXIT PARTIEL ».
+- Les cinq modules fonctionnent (walk ci-dessus : `/app/modules/{world,flow,exit,fail,clean}`
+  rendent tous) et l'assistant IA outillé les couvre (`apps/api/src/routes/ai.ts`, 19 outils,
+  dont `fail_scan` et `clean_audit`).

@@ -1,81 +1,44 @@
-# PROOFCORE — matrice des capacités
+# PROOFCORE — Matrice des capacités
 
-État mesuré le 25 novembre 2026. Chaque « oui » renvoie à un test ou à un parcours
-exécuté dans cette passe. Une capacité sans preuve est marquée **PARTIEL**,
-**ABSENT** ou **NON VÉRIFIÉ** — jamais disponible.
+Légende : **VÉRIFIÉ** = artefact observé ; **PARTIEL** = existe mais incomplet ;
+**ABSENT** = non trouvé dans le code ; **NON VÉRIFIÉ** = non exécuté ou non inspecté.
 
-Vocabulaire :
+Format demandé par la règle de livraison :
 
-- **VÉRIFIÉ** : code + test exécuté et passé + parcours réel.
-- **PARTIEL** : fonctionne, avec une limite nommée.
-- **ABSENT** : non implémenté, non présenté comme disponible.
-- **NON VÉRIFIÉ** : code présent, preuve externe impossible sans credentials.
+| Fonction | Code présent | Test exécuté | Test réussi | Parcours vérifié | Production vérifiée |
+| -------- | ------------ | ------------ | ----------- | ---------------- | ------------------- |
+| Modules WORLD / FLOW / EXIT (`packages/modules/*`) | VÉRIFIÉ | NON VÉRIFIÉ (session) | NON VÉRIFIÉ | NON VÉRIFIÉ | NON VÉRIFIÉ |
+| Modules FAIL / CLEAN (`packages/core/src/page-scan.ts`, `site-audit.ts`) | VÉRIFIÉ | NON VÉRIFIÉ | NON VÉRIFIÉ | NON VÉRIFIÉ | NON VÉRIFIÉ |
+| Statuts de test partagés (`packages/contracts/src/statuses.ts`) | VÉRIFIÉ | NON VÉRIFIÉ | NON VÉRIFIÉ | — | — |
+| Limitation de tentatives de connexion (`RateLimiter`) | VÉRIFIÉ (mémoire, par processus) | NON VÉRIFIÉ | NON VÉRIFIÉ | NON VÉRIFIÉ | ABSENT (non distribué) |
+| Protection CSRF | ABSENT | — | — | — | — |
+| Rotation de session | NON VÉRIFIÉ | NON VÉRIFIÉ | — | — | — |
+| Audit IA de code (`apps/api/src/routes/project-intelligence.ts`) | VÉRIFIÉ (code) | PARTIEL (faux fournisseur local, d'après APP-MEMORY) | NON VÉRIFIÉ en session | NON VÉRIFIÉ | NON VÉRIFIÉ |
+| E-mail EmailJS (`apps/api/src/email.ts`) | VÉRIFIÉ (code) | ABSENT (aucun identifiant fourni) | — | NON VÉRIFIÉ | NON VÉRIFIÉ |
+| Analyse persistante unifiée (Analysis canonique) | ABSENT | — | — | — | — |
+| Assistant IA outillé sur les cinq modules | PARTIEL (commit `ab64664`) | NON VÉRIFIÉ | NON VÉRIFIÉ | NON VÉRIFIÉ | NON VÉRIFIÉ |
+| Fournisseur IA géré par PROOFCORE | ABSENT | — | — | — | — |
+| Remédiation et vérification technique | ABSENT | — | — | — | — |
+| Interface Simple / Studio unifiée | NON VÉRIFIÉ | — | — | NON VÉRIFIÉ | NON VÉRIFIÉ |
 
-## 1. Tableau de preuve
+## Ce qui ne doit pas être présenté comme opérationnel
 
-| Fonction                                    | Code présent                                        | Test exécuté                                     | Test réussi | Parcours vérifié                  | Production vérifiée | Statut                                         |
-| ------------------------------------------- | --------------------------------------------------- | ------------------------------------------------ | ----------- | --------------------------------- | ------------------- | ---------------------------------------------- |
-| Inscription e-mail/mot de passe             | `routes/auth.ts`                                    | `api.test.ts`, E2E signup                        | oui (805)   | desktop + mobile                  | non                 | VÉRIFIÉ (hors prod)                            |
-| Connexion / déconnexion                     | `routes/auth.ts`                                    | `auth.test.ts`, E2E                              | oui         | desktop + mobile                  | non                 | VÉRIFIÉ (hors prod)                            |
-| Session HttpOnly + expiration 7 j           | `auth.ts`, `guards.ts`                              | `api.test.ts`, E2E reload                        | oui         | cookie conservé au reload         | non                 | VÉRIFIÉ (hors prod)                            |
-| Révocation de session                       | `routes/account.ts`                                 | `account-selfservice.test.ts`                    | oui         | API                               | non                 | VÉRIFIÉ (hors prod)                            |
-| Mot de passe oublié                         | `routes/account.ts`                                 | `account.test.ts`                                | oui         | API + e-mail journalisé           | non                 | VÉRIFIÉ (envoi externe NON VÉRIFIÉ)            |
-| Réinitialisation à usage unique             | `routes/account.ts`, `store`                        | `account.test.ts`                                | oui         | API, anciennes sessions fermées   | non                 | VÉRIFIÉ (hors prod)                            |
-| Vérification d'adresse                      | `routes/account.ts`                                 | `account.test.ts`                                | oui         | API                               | non                 | PARTIEL — non exigée à la connexion            |
-| Changement de mot de passe                  | `routes/account.ts`                                 | `account-selfservice.test.ts`                    | oui         | révoque les autres sessions       | non                 | VÉRIFIÉ (hors prod)                            |
-| Suppression de compte                       | `routes/account.ts`                                 | `account-selfservice.test.ts`                    | oui         | confirmation typée + mot de passe | non                 | VÉRIFIÉ (hors prod)                            |
-| MFA (TOTP)                                  | aucun                                               | aucun                                            | —           | —                                 | —                   | ABSENT                                         |
-| OAuth (Google/GitHub)                       | aucun                                               | aucun                                            | —           | —                                 | —                   | ABSENT                                         |
-| Isolation multi-comptes                     | `http/guards.ts` + filtres workspace                | `tenant-isolation.test.ts` (5)                   | oui         | 22 lectures + 8 écritures         | non                 | VÉRIFIÉ (hors prod)                            |
-| Rôles owner/admin/member/viewer             | `store`, `routes/workspace.ts`                      | `invitations.test.ts`, `api.test.ts`             | oui         | API                               | non                 | VÉRIFIÉ (hors prod)                            |
-| Invitations avec acceptation                | `routes/workspace.ts`, `routes/account.ts`          | `invitations.test.ts`                            | oui         | API + notification                | non                 | VÉRIFIÉ (hors prod)                            |
-| Validation Zod + plafond 2 Mo               | `http/guards.ts`                                    | `pagination-and-guards.test.ts`                  | oui         | API                               | non                 | VÉRIFIÉ (hors prod)                            |
-| Anti-SSRF scanner / IA / navigateur         | `page-scan.ts`, `routes/ai.ts`, `routes/browser.ts` | `page-audits.test.ts`, `read-repo.test.ts`       | oui         | API                               | non                 | PARTIEL — DNS rebinding non couvert            |
-| Anti-SSRF webhooks sortants                 | `outbound.ts`                                       | `webhook-guard.test.ts` (31)                     | oui         | enregistrement + livraison        | non                 | VÉRIFIÉ (hors prod)                            |
-| Limitation des tentatives de connexion      | `routes/auth.ts` + D1                               | `lockout.test.ts`                                | oui         | API                               | non                 | VÉRIFIÉ (hors prod)                            |
-| Limitation IA distribuée                    | limiteur mémoire + quota                            | `ai.test.ts`                                     | oui (quota) | API                               | non                 | PARTIEL — le limiteur par isolate ne l'est pas |
-| Chiffrement des clés IA                     | `ai-crypto.ts`                                      | `ai.test.ts`                                     | oui         | clé jamais renvoyée               | non                 | VÉRIFIÉ (hors prod)                            |
-| Assistant IA contextuel (19 outils)         | `routes/ai.ts`, `module-copilot.ts`                 | `ai.test.ts`, `module-copilot.test.ts`           | oui         | web `/app/ai`                     | non                 | PARTIEL — fournisseur réel non vérifié         |
-| IA ↔ 5 modules (état, config, run, analyse) | `module-copilot.ts`                                 | `module-copilot.test.ts` (5 tests)               | oui         | web `/app/ai` + API               | non                 | VÉRIFIÉ (hors prod)                            |
-| FLOW navigateur réel (journey)              | `packages/cli/src/journey-runner.ts`                | `journey-browser.test.ts` (Chromium)             | oui         | CLI locale                        | non                 | VÉRIFIÉ (machine de test)                      |
-| Fencing des contenus non fiables            | `project-intelligence.ts`                           | `untrusted-file-content.test.ts` (6)             | oui         | API                               | non                 | VÉRIFIÉ                                        |
-| Mémoire IA auditable/supprimable            | `routes/ai.ts`, `workspace_memory`                  | `ai.test.ts`                                     | oui         | API + UI                          | non                 | VÉRIFIÉ (hors prod)                            |
-| Moteur commun + WORLD/FLOW/EXIT             | `packages/engine`, `modules/*`                      | `engine`, `world`, `flow`, `exit`                | oui         | CLI + API                         | non                 | VÉRIFIÉ (hors prod)                            |
-| FAIL / CLEAN (HTTP)                         | `packages/core/page-scan.ts`                        | `page-audits.test.ts`, `page-scan.test.ts`       | oui         | `/app/scan` + API                 | non                 | PARTIEL — pas d'upload CLI `--sync`            |
-| Rapports JSON/JUnit/HTML/texte              | `adapters/reporting`                                | `statuses.test.ts`, CLI                          | oui         | web + CLI                         | non                 | VÉRIFIÉ                                        |
-| Export PDF/CSV de rapport                   | aucun                                               | aucun                                            | —           | —                                 | —                   | ABSENT                                         |
-| Partage de rapport / lien public            | aucun                                               | aucun                                            | —           | —                                 | —                   | ABSENT                                         |
-| Pagination des listes                       | `readPage`, index migration 0010                    | `pagination-and-guards.test.ts`                  | oui         | API + UI                          | non                 | VÉRIFIÉ                                        |
-| Recherche plein-texte                       | aucun                                               | aucun                                            | —           | —                                 | —                   | ABSENT                                         |
-| Facturation sandbox                         | `packages/billing`, `adapters/payments/sandbox`     | `billing.test.ts`, `billing-saspay.test.ts`, E2E | oui         | checkout + settle E2E             | non                 | VÉRIFIÉ (sandbox)                              |
-| Paiement SasPay live                        | `adapters/payments/saspay.ts`                       | tests unitaires                                  | oui         | —                                 | non                 | NON VÉRIFIÉ — credentials absents              |
-| Webhooks entrants signés + anti-rejeu       | `packages/billing/webhooks.ts`                      | `webhooks.test.ts`, `api.test.ts`                | oui         | API                               | non                 | VÉRIFIÉ (hors prod)                            |
-| Webhooks sortants signés                    | `outbound.ts`                                       | `webhooks.test.ts`, `webhook-guard.test.ts`      | oui         | receiver HTTP local               | non                 | VÉRIFIÉ (hors prod)                            |
-| Quotas et consommation                      | `packages/billing/usage.ts`, `meter`                | `billing.test.ts`, `ai.test.ts`                  | oui         | API + UI                          | non                 | VÉRIFIÉ (hors prod)                            |
-| Reçus / historique commercial               | `billing-store.ts`, `routes/billing.ts`             | `billing.test.ts`                                | oui         | E2E billing                       | non                 | VÉRIFIÉ (hors prod)                            |
-| E-mails transactionnels                     | `email.ts`                                          | `account.test.ts`                                | oui         | outbox                            | non                 | NON VÉRIFIÉ — fournisseur absent               |
-| Notifications in-app                        | `notifications.ts`, migration 0019                  | `api.test.ts`                                    | oui         | UI                                | non                 | VÉRIFIÉ (hors prod)                            |
-| Support avec référence + réponse            | `routes/account.ts`, `routes/admin.ts`              | `account.test.ts`, `admin.test.ts`               | oui         | API + console                     | non                 | VÉRIFIÉ (hors prod)                            |
-| Design Ink & Object                         | `styles/global.css`, composants                     | E2E captures                                     | oui         | desktop + mobile                  | non                 | VÉRIFIÉ (hors prod)                            |
-| Responsive                                  | CSS + E2E                                           | 2 viewports, no-overflow                         | oui         | 1280×800 + 412×915                | non                 | PARTIEL — matrice 14 tailles non rejouée       |
-| Accessibilité WCAG 2.2 AA                   | composants                                          | aucun audit axe                                  | —           | clavier partiel                   | non                 | NON VÉRIFIÉ                                    |
-| Observabilité                               | `requestId`, logs JSON                              | aucun test dédié                                 | —           | —                                 | non                 | PARTIEL                                        |
-| Sauvegarde / restauration                   | aucun script                                        | aucun                                            | —           | —                                 | —                   | ABSENT                                         |
-| Rétention planifiée                         | entitlement seulement                               | aucun job                                        | —           | —                                 | —                   | ABSENT                                         |
+- Toute ligne « Analyse persistante unifiée », « Fournisseur IA géré », « Remédiation » : ABSENT.
+- Protection CSRF : ABSENT.
+- Tout ce qui est NON VÉRIFIÉ n'est pas une fonction validée, quel que soit le nombre de fichiers présents.
 
-## 2. Lecture
+## Mise à jour 26 novembre 2026 (vérification exécutée ce jour)
 
-- **VÉRIFIÉ** : 27 lignes, toutes adossées à un test exécuté dans cette passe.
-- **PARTIEL** : 7 lignes, chacune avec sa limite nommée.
-- **ABSENT** : 8 lignes (MFA, OAuth, PDF/CSV, partage, recherche, sauvegarde,
-  rétention planifiée). Aucune n'est vendue comme opérationnelle : la grille tarifaire
-  marque « bientôt » les quatre entitlements sans implémentation
-  (`github_integration`, `advanced_reports`, `client_sharing`, `priority_support`).
-- **NON VÉRIFIÉ** : e-mail réel, paiement live, accessibilité automatisée.
-
-## 3. Ce qui n'est pas une capacité
-
-Un dossier, une route ou un onglet ne prouve rien. Ne sont pas comptés comme
-fonctionnalités : les pages marketing des modules, les entitlements déclarés sans
-implémentation, les écrans qui affichent un état vide, et les webhooks seulement
-enregistrés sans livraison observée.
+| Fonction | Test exécuté | Test réussi | Parcours vérifié | Production vérifiée |
+| -------- | ------------ | ----------- | ---------------- | ------------------- |
+| Suite de tests complète (69 fichiers) | OUI (`pnpm test`) | OUI — 818/818 | — | — |
+| Typecheck + build | OUI | OUI (0 erreur TS) | — | — |
+| Pages publiques : /, /download, /pricing, /docs, /changelog, /security, /signin | OUI (Playwright, 1440×900) | OUI — 0 erreur console, 0 réponse ≥ 400 | OUI | OUI (Vercel + Pages, déploiements du jour) |
+| Espace de travail : /app, /app/projects, /app/modules, /app/modules/{world,flow,exit,fail,clean}, /app/scan, /app/start, /app/billing, /app/settings, /app/workspace, /app/cli, /app/interact, /app/ai, /app/guide, /app/notifications | OUI (compte jetable réel) | OUI | OUI | OUI (déployé et vérifié le jour même sur les deux hôtes) |
+| Pile dépliable des cinq questions (`CardStack`, `expandable`) — clic sur la pile déplie les cinq cartes, chacune cliquable et nommée | OUI (local + production) | OUI — navigation vers `/app/modules/exit` vérifiée, repli par carte du dessus / clic dehors / Échap | OUI | OUI (Vercel + Pages) |
+| Pile de projets (`FolderFloat`, matter-js) sur la vue d'ensemble | OUI (local + production) | OUI — physique, drag, navigation vers un projet | OUI | OUI |
+| Install switch Uiverse sur les cartes desktop de /download | OUI (local + production) | OUI — téléchargement réel + état « Installée » | OUI | OUI |
+| Assistant IA outillé (19 outils, `apps/api/src/routes/ai.ts`) | OUI (localement) | OUI (parcours navigateur `/app/ai`) | PARTIEL (pas de vérification production end-to-end ce jour) | NON VÉRIFIÉ |
+| `/app/terminal` | OUI | NON — 404 sur `/api/terminal/start` (instance locale) | NON | NON VÉRIFIÉ |
+| `/app/admin` | OUI | NON — 503 sur `/api/v1/admin/overview` (ADMIN_EMAILS vide) | NON | NON VÉRIFIÉ |
+| npm `proofcore` 0.6.3 | OUI (`npm view`) | NON — registre à 0.6.0 (secret `NPM_TOKEN` manquant) | — | NON |

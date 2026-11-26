@@ -1,47 +1,33 @@
-# PROOFCORE — registre des risques
+# PROOFCORE — Registre des risques
 
-Date : 25 novembre 2026. Échelle : **Critique** (exploitation directe ou perte de
-données), **Élevé** (bloque une vente ou une promesse), **Moyen** (limite d'usage),
-**Faible** (finition). Un risque n'est « clos » que si le correctif est couvert par un
-test exécuté.
+Mise à jour après vérification (2026-11-25). Chaque statut renvoie à une preuve observée.
+Statuts : VÉRIFIÉ, PARTIEL, ABSENT, NON VÉRIFIÉ.
 
-## 1. Risques ouverts
+| ID | Risque | Preuve | Gravité | Statut |
+| -- | ------ | ------ | ------- | ------ |
+| R1 | Protection CSRF de l'API | `apps/api/src/app.ts:107-131` contrôle `Origin` sur les écritures `/api/*` (hors webhooks) ; cookie `SameSite=Lax` (`apps/api/src/auth.ts:146`). Pas de jeton CSRF. Requêtes sans `Origin` non refusées. | Élevée | PARTIEL |
+| R2 | Limitation de tentatives non distribuée (mémoire par processus) | `apps/api/src/http/errors.ts:133`, utilisée dans `routes/auth.ts` | Moyenne | PARTIEL |
+| R3 | `pnpm lint` racine en échec | `/tmp/lint-root.log` (2026-11-25) : seules erreurs dans `mobile-audit.tmp.mjs`, `mobile-signup-debug.tmp.mjs`, `mobile-marketing-debug.tmp.mjs` (non suivis). Code produit non touché. | Faible (CI non concernée) | PARTIEL — à corriger après accord de suppression |
+| R4 | Espace disque presque plein | `artifacts/.work` et `artifacts/.cache` supprimés (≈1,4 Go, autorisé). `~/.cache/electron` refusé par le garde-fou. `~/.cache/ms-playwright` (2,9 Go) reste. | Élevée pour les builds | PARTIEL |
+| R5 | Statut de la CI non vérifié | Run 45600283899 : échec au smoke CLI (`audit --help` renvoyait 2). Correctif dans `packages/cli/src/index.ts` (`asksHelp`), test `cli.test.ts` échoue sans le correctif (`expected 2 to be +0`). Run #105 non identifié. | Élevée | PARTIEL (cause locale corrigée, run #105 NON VÉRIFIÉ) |
+| R6 | Documentation contradictoire (moteurs, versions) | `README.md` ligne 100 : `npm install -g proofcore` ; `packages/cli/package.json` : `@proofcore/cli` 0.6.3, `"private": true` | Moyenne | ABSENT (le paquet publié n'existe pas) |
+| R7 | Chemin cité par l'audit inexistant (`packages/engine/src/contracts/statuses.ts`) | Fichier absent ; le vrai chemin est `packages/contracts/src/statuses.ts` | Faible | Documenter le vrai chemin |
+| R8 | Modifications non commitées dans des pages produit | `git status` ; fichiers de tiers listés dans le journal de session | Moyenne | Ouvert — à trancher avant commit |
+| R9 | Rotation de session | `apps/api/src/auth.ts:104` crée un jeton et son hash ; la rotation à la connexion n'est pas démontrée | Moyenne | NON VÉRIFIÉ |
+| R10 | Tests instables sous charge (`page-scan`, `cli.test.ts`) | Suite complète 2026-11-25 : 69 fichiers, 818 tests réussis | Moyenne | PARTIEL — non reproduit ce jour, assertions inchangées |
+| R11 | Clés fournisseur IA stockées chiffrées en base | `apps/api/src/routes/ai.ts` : `apiKeyEncrypted` écrit ~1028 et ~1075, déchiffré ~933, 1030, 1121, 1243. Contredit AGENTS.md (clé dans l'environnement). | Élevée | ABSENT (conformité AGENTS.md) — décision de l'utilisateur requise |
+| R12 | Serveur MCP exposé alors que AGENTS.md dit « PROOFCORE n'est pas un serveur MCP » | `packages/cli/src/mcp-server.ts` : outils avec `destructiveHint: true` | Élevée (contrat) | ABSENT — décision produit requise |
+| R13 | Autorisation des routes IA | `apps/api/test/tenant-isolation.test.ts` : 5/5 réussis (404 inter-comptes, refus sans session) ; `module-copilot.test.ts` 5/5 ; `webhook-guard.test.ts` 31/31 | Élevée | VÉRIFIÉ (tests API) — parcours navigateur réel NON VÉRIFIÉ en production |
 
-| ID  | Risque                                                 | Preuve                                                                     | Impact                      | Mitigation / état                                                                                                                             |
-| --- | ------------------------------------------------------ | -------------------------------------------------------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| R1  | Aucun second facteur : un mot de passe volé suffit     | aucune route TOTP dans `apps/api/src/routes`                               | Élevé                       | **Ouvert.** À implémenter (TOTP + codes de secours + révocation). Non annoncé comme disponible.                                               |
-| R2  | Adresse e-mail non vérifiée à la connexion             | `session` renvoie `emailVerified` mais `sign-in` ne l'exige pas            | Moyen                       | **Ouvert.** Blocage configurable à ajouter ; sinon un compte peut usurper une adresse.                                                        |
-| R3  | Énumération de comptes à l'inscription                 | `createUser` lève `email_taken`, mappé 409                                 | Moyen                       | **Ouvert.** Réponse générique + vérification par e-mail, ou acceptation documentée. Connexion et forgot-password sont uniformes.              |
-| R4  | Limiteur d'inscription/IA en mémoire par isolate       | `RateLimiter` dans `http/errors.ts`                                        | Moyen                       | **Partiel.** Les quotas mensuels et les tentatives de connexion sont durables ; le reste ne l'est pas. Pas de Redis/DO dans l'infra.          |
-| R5  | DNS rebinding sur les URL sortantes                    | `fetch` du Worker ne résout pas avant l'appel ; gardes sur l'hôte littéral | Moyen                       | **Partiel.** Adresses littérales, métadonnées, ULA, link-local et redirections bloquées ; un nom public résolvant en privé n'est pas détecté. |
-| R6  | Redirections du navigateur embarqué                    | `page.goto(assertPublicUrl(...))` valide le départ, pas les hops Chromium  | Moyen                       | **Ouvert.** Interception des requêtes CDP à ajouter.                                                                                          |
-| R7  | Secrets de webhooks en clair au repos                  | `workspace_webhooks.secret` nécessaire à HMAC                              | Moyen                       | **Accepté, documenté.** Chiffrement au repos possible avec `AI_KEYS_SECRET` ; rotation à ajouter.                                             |
-| R8  | Liens de réinitialisation en clair dans `email_outbox` | `email.ts` journalise le corps complet                                     | Moyen                       | **Ouvert.** Nécessaire à la livraison manuelle ; chiffrer le corps ou ne stocker que le jeton haché + un lien reconstruit.                    |
-| R9  | Pas de rétention planifiée                             | entitlement `report_retention_days`, aucun job de purge                    | Élevé (conformité)          | **Ouvert.** Job + politique écrite + preuve sur environnement non productif.                                                                  |
-| R10 | Pas de sauvegarde/restauration testée                  | aucun script dans `tooling/`                                               | Critique (perte de données) | **Ouvert.** Procédure D1/Neon + restore drill à documenter et exécuter.                                                                       |
-| R11 | Pas de partage client malgré l'entitlement             | `client_sharing` déclaré, aucune route de partage                          | Élevé (vente)               | **Atténué commercialement** : la grille affiche « bientôt ». À implémenter ou retirer.                                                        |
-| R12 | Pas d'export PDF/CSV de rapport                        | seuls JSON/JUnit/HTML/texte existent                                       | Moyen                       | **Ouvert.** Le PDF chargé dans le web sert aux pièces jointes du chat, pas aux rapports.                                                      |
-| R13 | FAIL/CLEAN non poussés par le CLI                      | aucun `proofcore audit --sync`                                             | Moyen                       | **Ouvert.** Les pages modules restent alimentées par les scans web et l'assistant.                                                            |
-| R14 | Aucune métrique de latence/erreur                      | `X-Request-Id` + logs JSON des 5xx seulement                               | Moyen                       | **Partiel.** Corrélation possible, agrégation absente.                                                                                        |
-| R15 | Accessibilité non auditée                              | aucun axe-core, aucun test clavier systématique                            | Moyen                       | **Ouvert.** Ne pas revendiquer WCAG 2.2 AA sans audit.                                                                                        |
-| R16 | Fournisseurs externes non prouvés                      | aucun credential EmailJS/Resend/SasPay live                                | Élevé (exploitation)        | **NON VÉRIFIÉ.** Le code journalise l'absence ; aucune promesse de livraison réelle.                                                          |
+Aucun risque n'est déclaré résolu dans ce registre. Les statuts VÉRIFIÉ ne s'appuient que
+sur les artefacts cités.
 
-## 2. Risque clos dans cette passe
+## Ajouts du 26 novembre 2026 (vérification en direct)
 
-| ID  | Risque                                                                                                      | Preuve avant                                                                 | Correctif                                                          | Preuve après                                                                 |
-| --- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
-| R0  | SSRF via les webhooks sortants : `169.254.169.254`, CGNAT, ULA IPv6, `.svc`, ports de service, redirections | `isValidWebhookUrl` ne bloquait que `127.`, `10.`, `172.16/12`, `192.168/16` | Garde complet + `redirect: "manual"` + revalidation à la livraison | `webhook-guard.test.ts` : 31 tests, dont refus 302 et cible stockée invalide |
-| R0b | Inscription mobile abandonnée par saturation du thread principal                                            | E2E Pixel 7 en échec, requête abortée à 6 s                                  | Plafond DPR 1,5 sur le fond WebGL                                  | E2E mobile 19/19                                                             |
-
-## 3. Risques à traiter avant une vente
-
-Ordre recommandé, du plus bloquant au moins bloquant :
-
-1. **R10** sauvegarde/restauration (perte de données = fin de confiance).
-2. **R9** rétention (conformité et promesse des plans).
-3. **R1/R2** MFA et vérification d'e-mail (identité).
-4. **R11/R12** partage client et exports (promesses commerciales).
-5. **R4/R5/R6** défenses réseau et débit (robustesse).
-6. **R8** secrets d'e-mail au repos.
-
-Aucun de ces points ne doit être coché « fait » sur la seule présence d'une route.
+| ID | Risque | Preuve | Gravité | Statut |
+| -- | ------ | ------ | ------- | ------ |
+| R14 | CI : échec smoke CLI — cause trouvée, correctif commité | Runs 45755203107 + 45756582954 (`8f5e61c`, `e5b5e63`) : `audit --help` sort 2 sur le runner. Reproduit au commit exact dans le clone `/tmp/ci-repro`. **Cause réelle** : le correctif `asksHelp` (`packages/cli/src/index.ts`) et ses deux tests existaient uniquement dans l'arbre de travail, jamais commités — le clone au HEAD sortait 2, le même clone patché sort 0. Commit `54fdbbe` avec les deux fichiers exacts. | Élevée | CORRIGÉ (commit `54fdbbe`, run de vérification à confirmer) |
+| R15 | URLs mortes atteignables au clavier | `/legal` → 404 (les vraies routes sont `/legal/{terms,privacy,cookies}`), `/app/account` → 404, `/app/local-agent` → 404 (la vraie route est `/app/agent`). Aucun lien de navigation ne pointe vers ces 404. | Faible | OUVERT — redirections à ajouter (phase 8), pas de parcours cassé |
+| R16 | npm en retard sur les releases | `npm view proofcore version` → 0.6.0 ; dépôt 0.6.3 ; publication branchée au secret `NPM_TOKEN` (absent). | Moyenne | OUVERT — action propriétaire (`gh secret set NPM_TOKEN`) puis re-run du dernier run release |
+| R17 | Documentations contradictoires localisées | `README.md:38`, `docs/CLI_EXPERIENCE.md:26`, `docs/PROOFCORE_2_0_DELIVERY_REPORT.md:261`, `docs/PROOFCORE_AI_ARCHITECTURE.md:53`, `docs/PROOFCORE_TRANSFORMATION_PROGRESS.md:120` — « WORLD/FLOW/EXIT » alors que les cinq modules sont livrés et vérifiés (walk du jour). | Faible | OUVERT — correction mécanique en phase 1.4 |
+| R18 | Fail/CLEAN vivent hors de `packages/modules/` | `packages/modules/` = {world,flow,exit} ; fail/clean dans `packages/core/src/page-scan.ts` + `site-audit.ts` | Faible (structurel) | OUVERT — à réconcilier avec le registre de capacités (phase 3.1) |
