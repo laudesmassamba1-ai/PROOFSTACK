@@ -900,7 +900,30 @@ export function AiChatPage(): React.ReactElement {
   const [toolsOpen, setToolsOpen] = useState(false);
   const [immersive, setImmersive] = useState(false);
   const [browserUrl, setBrowserUrl] = useState<string | undefined>(undefined);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // On a phone the history is an overlay, not a column: opening it by default would
+  // hide the conversation the user came for. It starts closed below 900px and opens
+  // only on request.
+  const [sidebarOpen, setSidebarOpen] = useState(
+    () => typeof window === "undefined" || !window.matchMedia("(max-width: 900px)").matches
+  );
+
+  useEffect(() => {
+    const narrow = window.matchMedia("(max-width: 900px)");
+    const close = () => {
+      if (narrow.matches) setSidebarOpen(false);
+    };
+    narrow.addEventListener("change", close);
+    return () => narrow.removeEventListener("change", close);
+  }, []);
+
+  useEffect(() => {
+    if (!sidebarOpen || !window.matchMedia("(max-width: 900px)").matches) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSidebarOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [sidebarOpen]);
 
   useEffect(() => {
     window.dispatchEvent(new CustomEvent("proofcore.chat.immersive", { detail: immersive }));
@@ -1538,6 +1561,14 @@ export function AiChatPage(): React.ReactElement {
   return (
     <div className="chat-shell">
       {/* ---------------------------------------------------- sidebar */}
+      {sidebarOpen ? (
+        <button
+          type="button"
+          className="chat-sidebar-backdrop"
+          aria-label={fr ? "Fermer les conversations" : "Close conversations"}
+          onClick={() => setSidebarOpen(false)}
+        />
+      ) : null}
       <aside className={`chat-sidebar ${sidebarOpen ? "" : "is-collapsed"}`}>
         <div className="chat-sidebar-head">
           <button type="button" onClick={startNewChat} className="chat-new-chat">
@@ -1738,16 +1769,20 @@ export function AiChatPage(): React.ReactElement {
             className={`chat-action-btn ${browserOpen ? "is-on" : ""}`}
             onClick={() => setBrowserOpen((open) => !open)}
             aria-pressed={browserOpen}
+            aria-label={fr ? "Navigateur" : "Browser"}
           >
-            <Monitor size={13} /> {fr ? "Navigateur" : "Browser"}
+            <Monitor size={13} />
+            <span className="chat-action-label">{fr ? "Navigateur" : "Browser"}</span>
           </button>
           <button
             type="button"
             className={`chat-action-btn ${toolsOpen ? "is-on" : ""}`}
             onClick={() => setToolsOpen((open) => !open)}
             aria-pressed={toolsOpen}
+            aria-label={fr ? "Outils" : "Tools"}
           >
-            <Wrench size={13} /> {fr ? "Outils" : "Tools"}
+            <Wrench size={13} />
+            <span className="chat-action-label">{fr ? "Outils" : "Tools"}</span>
           </button>
           <button
             type="button"
