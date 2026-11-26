@@ -1,5 +1,6 @@
 import { Activity, GitCompare, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { FindingRemediation, type Remediation } from "../../components/app/FindingRemediation.js";
 import { Empty, ErrorState, Loading } from "../../components/app/ui.js";
 import { useI18n } from "../../i18n/index.js";
 import { PageHeader } from "../../layouts/AppLayout.js";
@@ -54,6 +55,7 @@ interface Analysis {
 
 interface Finding {
   key: string;
+  analysisId: string;
   module: string;
   controlId: string;
   title: string;
@@ -152,6 +154,7 @@ export function AnalysesPage() {
   const [comparison, setComparison] = useState<Comparison | null>(null);
   const [compareError, setCompareError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
+  const [remediations, setRemediations] = useState<Record<string, Remediation>>({});
 
   const loadList = useCallback(async () => {
     if (!session.workspaceId) return;
@@ -170,6 +173,28 @@ export function AnalysesPage() {
   useEffect(() => {
     void loadList();
   }, [loadList]);
+
+  useEffect(() => {
+    if (!session.workspaceId) return;
+    let cancelled = false;
+    apiFetch<{ remediations: PageBody<Remediation> }>(
+      `/api/v1/remediations?workspaceId=${encodeURIComponent(session.workspaceId)}&limit=100`
+    )
+      .then((body) => {
+        if (cancelled) return;
+        const next: Record<string, Remediation> = {};
+        for (const item of body.remediations.items) {
+          next[`${item.analysisId}:${item.findingKey}`] = item;
+        }
+        setRemediations(next);
+      })
+      .catch(() => {
+        // A remediation read failure must not hide the findings themselves.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session.workspaceId]);
 
   useEffect(() => {
     if (!session.workspaceId || !selected) return;
@@ -228,6 +253,8 @@ export function AnalysesPage() {
       />
     );
   }
+
+  const workspaceId = session.workspaceId;
 
   return (
     <>
@@ -519,6 +546,25 @@ export function AnalysesPage() {
                               </div>
                             </dl>
                           </details>
+                          <FindingRemediation
+                            workspaceId={workspaceId}
+                            analysisId={finding.analysisId}
+                            findingKey={finding.key}
+                            existing={remediations[`${finding.analysisId}:${finding.key}`] ?? null}
+                            candidates={others.map((item) => ({
+                              id: item.id,
+                              label: `${item.target} · ${item.source} · ${formatDate(item.createdAt)}`,
+                            }))}
+                            onChange={(next) => {
+                              const key = `${finding.analysisId}:${finding.key}`;
+                              setRemediations((current) => {
+                                const copy = { ...current };
+                                if (next) copy[key] = next;
+                                else delete copy[key];
+                                return copy;
+                              });
+                            }}
+                          />
                         </li>
                       ))}
                     </ul>
