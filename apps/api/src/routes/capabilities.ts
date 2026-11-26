@@ -1,9 +1,13 @@
 import {
   ANALYSIS_PROFILES,
+  ANALYSIS_TARGET_TYPES,
+  type AnalysisTargetType,
   CAPABILITIES,
   CAPABILITY_VERSION,
   capabilitiesForModule,
   modulesForTargetType,
+  planAnalysis,
+  profileById,
 } from "@proofcore/core";
 import { Hono } from "hono";
 import { HttpError } from "../http/errors.js";
@@ -53,6 +57,37 @@ export function capabilityRoutes(services: Services): Hono<AppEnv> {
         WORKFLOW: modulesForTargetType("WORKFLOW"),
         LOCAL_ENVIRONMENT: modulesForTargetType("LOCAL_ENVIRONMENT"),
       },
+    });
+  });
+
+  /**
+   * What a named profile would actually run, before anything runs.
+   *
+   * This is the answer the UI shows before a person presses "start": the applicable
+   * modules, the capabilities behind them, and the modules that cannot run here with the
+   * reason. Registered before `/capabilities/:capabilityId` so "plan" is not read as an id.
+   */
+  app.get("/capabilities/plan", async (c) => {
+    await requireUser(c, services);
+    const profileId = c.req.query("profile") ?? "";
+    const targetType = (c.req.query("targetType") ?? "PAGE") as AnalysisTargetType;
+    if (!(ANALYSIS_TARGET_TYPES as readonly string[]).includes(targetType)) {
+      throw new HttpError(400, "unknown_target_type", "Unknown target type: " + targetType);
+    }
+    const profile = profileById(profileId);
+    if (!profile) {
+      throw new HttpError(400, "unknown_profile", "Unknown profile: " + profileId, {
+        available: ANALYSIS_PROFILES.map((item) => item.id),
+      });
+    }
+    const plan = planAnalysis({ targetType, requestedModules: profile.modules });
+    return c.json({
+      profile: { id: profile.id, name: profile.en.name, targetType: profile.targetType },
+      requestedTargetType: targetType,
+      plan,
+      // A profile built for a PAGE is not silently widened to a SITE: the caller sees
+      // that the plan covers fewer modules than the profile names.
+      complete: plan.unavailable.length === 0,
     });
   });
 

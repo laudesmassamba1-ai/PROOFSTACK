@@ -98,4 +98,57 @@ describe("capabilities API", () => {
     });
     expect(missing.status).toBe(404);
   });
+
+  it("previews what a named profile would run, and what cannot run here", async () => {
+    const cookie = await signUp("plan@example.com");
+    const response = await harness.request(
+      "/api/v1/capabilities/plan?profile=conversion&targetType=PAGE",
+      { headers: { cookie } }
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      profile: { id: string };
+      plan: { applicableModules: string[]; unavailable: unknown[]; capabilities: string[] };
+      complete: boolean;
+    };
+    expect(body.profile.id).toBe("conversion");
+    expect(body.plan.applicableModules).toEqual(["world", "flow", "exit"]);
+    expect(body.plan.capabilities.length).toBeGreaterThan(0);
+    expect(body.complete).toBe(true);
+  });
+
+  it("refuses to pretend a PAGE profile runs on an API target", async () => {
+    const cookie = await signUp("plan-api@example.com");
+    const response = await harness.request(
+      "/api/v1/capabilities/plan?profile=conversion&targetType=API",
+      { headers: { cookie } }
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      plan: { applicableModules: string[]; unavailable: { module: string; reason: string }[] };
+      complete: boolean;
+    };
+    expect(body.plan.applicableModules).toEqual([]);
+    expect(body.plan.unavailable.map((entry) => entry.module)).toEqual([
+      "world",
+      "flow",
+      "exit",
+    ]);
+    expect(body.plan.unavailable[0]?.reason.length).toBeGreaterThan(10);
+    expect(body.complete).toBe(false);
+  });
+
+  it("rejects an unknown profile with the ids that exist", async () => {
+    const cookie = await signUp("plan-unknown@example.com");
+    const response = await harness.request(
+      "/api/v1/capabilities/plan?profile=do-everything&targetType=PAGE",
+      { headers: { cookie } }
+    );
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as {
+      error: { code: string; details?: { available?: string[] } };
+    };
+    expect(body.error.code).toBe("unknown_profile");
+    expect(body.error.details?.available).toContain("conversion");
+  });
 });
