@@ -401,3 +401,12 @@ pnpm cloud:deploy --dry-run
 - Biome : le commentaire `biome-ignore` d'un hook doit être **au-dessus de la ligne `useEffect`** (l'ancre du diagnostic), pas au-dessus du tableau de dépendances ; un callback nommé `escape` déclenche `noShadowRestrictedNames`.
 - Le tree commit de l'autre agent (`8f5e61c`) a de nouveau embarqué le changement CSS de cette passe.
 - Vérifié en local (déploiement, navigation, trois replis, reduced-motion, mobile 390 px sans scroll) et en production sur Vercel + Pages (inscription/connexion jetable : déploiement ok, 0 carte cachée, les cinq noms visibles, navigation ok, zéro erreur console). 818 tests verts.
+
+## 2026-11-26 (mission de reconstruction — phase 0 faite, phase 1.1 rouge→vert)
+
+- **Phase 0 exécutée** : cartographie réelle inscrite dans `docs/PROOFCORE_{DEEP_AUDIT,CAPABILITY_MATRIX,ARCHITECTURE_MAP,RISK_REGISTER}` (sections du 26 nov. — 43 routes web, ~106 endpoints API/15 fichiers, 32 tables, 59 contrôles, 19 outils IA, walk navigateur de 8 pages publiques + 14 pages app avec compte jetable). Anomalies de walk : `/legal` `/app/account` `/app/local-agent` = 404 sans lien vers elles (R15), `/app/terminal` 404 API, `/app/admin` 503 (ADMIN_EMAILS vide).
+- **Deux sous-agents Claude Sonnet 5.5 lancés en parallèle ont échoué** (« repeated API errors » côté fournisseur) — reprise intégrale dans le fil principal.
+- **CI master rouge→vert** : cause réelle du smoke CLI trouvée en reproduisant au commit exact dans un clone propre — le correctif `asksHelp` (`packages/cli/src/index.ts`) et ses 2 tests existaient **seulement dans l'arbre de travail, jamais commités**. Commit `54fdbbe` (les 2 fichiers exacts), formatage biome des tables markdown des 4 docs (`dd7f3e4`) → **run 45761985280 : SUCCESS** (4m45s, e2e incluse). Première CI verte après les runs 45755203107/45756582954.
+- Leçon de diagnostic : quand un échec CI ne se reproduit pas localement, vérifier **ce que contient le HEAD commité** vs l'arbre de travail (`git diff HEAD --stat`) — un correctif non commité est invisible pour la CI.
+- Reste phase 1 : npm 0.6.0→0.6.3 (secret `NPM_TOKEN`, action propriétaire), incohérences docs « WORLD/FLOW/EXIT » localisées (R17), publication CLI sans build core isolé.
+- **Mission longue : phases 2-9 (Analysis canonique, registre de capacités, Findings engine, Simple/Studio, orchestrateur IA, remédiation, UI, sécurité) — à planifier par lots de sessions.**
