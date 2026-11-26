@@ -2,25 +2,27 @@
 
 **Make software work everywhere.**
 
-PROOFCORE is an integrated software quality and reliability suite with three
-modules that share one execution engine, one report format, one CLI and one
-dashboard:
+PROOFCORE is an integrated software quality and reliability suite. Five control
+families share one execution engine, one report format, one CLI and one dashboard:
 
-| Module    | Question it answers                                                        |
-| --------- | -------------------------------------------------------------------------- |
-| **WORLD** | Can users from different countries use the software correctly?             |
-| **FLOW**  | Can users complete the critical operations (checkout, payments, webhooks)? |
-| **EXIT**  | Can users retrieve their data without losing or corrupting it?             |
+| Family    | Question it answers                                                        | What it actually measures |
+| --------- | -------------------------------------------------------------------------- | ------------------------- |
+| **WORLD** | Can users from different countries use the software correctly?             | HTTP and rendered-DOM checks across locales and timezones |
+| **FLOW**  | Can users complete the critical operations (checkout, payments, webhooks)? | Declared browser journey steps, executed by the CLI's real Chromium |
+| **EXIT**  | Can users retrieve their data without losing or corrupting it?             | Data retrieval and export checks against a configured source |
+| **FAIL**  | Are the HTTP security settings what they should be?                        | Passive header/configuration checks; no intrusion test |
+| **CLEAN** | Is the content and structure sound?                                        | Static HTML, or rendered DOM when a browser is available; otherwise `NOT_MEASURED` |
 
 The product is a monorepo: checks execute on the developer's machine or in CI against
 an HTTP target and synthetic fixtures, while the SaaS layer stores accounts, projects,
-reports, usage and billing. The assistant drives a real Chromium over the DevTools
-Protocol and runs a real terminal; customer browser journeys inside WORLD and FLOW
-are not implemented yet — see the status file.
+analyses, findings, usage and billing. The assistant drives a real Chromium over the
+DevTools Protocol and runs a real terminal. FLOW journeys run in that browser through
+the CLI; a server-side run without a browser records every journey as `SKIPPED` with
+the reason instead of reporting it as passed.
 
 ## Status
 
-Implemented and tested: the shared engine and all three modules, the CLI with JSON/
+Implemented and tested: the shared engine and all five families, the CLI with JSON/
 JUnit/HTML reports, the SaaS API (auth, workspaces, projects, run ingestion, API keys,
 billing, webhooks), the authenticated workspace and the terminal console. `pnpm test`
 runs the full Vitest suite; `pnpm lint`, `pnpm typecheck` and `pnpm build` pass.
