@@ -277,11 +277,11 @@ export function Overview() {
                   itemColor="var(--surface)"
                   itemTextColor="var(--ink)"
                   labelColor="var(--paper)"
-                  width={200}
-                  height={132}
-                  radius={12}
-                  spread={typeof window !== "undefined" && window.innerWidth < 700 ? 120 : 180}
-                  lift={24}
+                  width={typeof window !== "undefined" && window.innerWidth < 768 ? 150 : 200}
+                  height={typeof window !== "undefined" && window.innerWidth < 768 ? 98 : 132}
+                  radius={10}
+                  spread={typeof window !== "undefined" && window.innerWidth < 700 ? 90 : 180}
+                  lift={18}
                 />
               </div>
             ) : null}

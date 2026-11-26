@@ -10861,21 +10861,22 @@ body:has(.app-main-chat) .app-footer {
     font-size: 0.72rem;
   }
 
-  /* le deck des faits : cartes plus courtes, chiffres calmés */
+  /* le deck des faits : des cartes bien plus courtes, chiffres calmés */
   .app-kpi-stack {
-    height: 116px;
+    height: 88px;
   }
 
   .kpi-card {
-    padding: 11px 12px 10px;
+    padding: 9px 11px 8px;
+    border-radius: 11px;
   }
 
   .kpi-label {
-    font-size: 0.62rem;
+    font-size: 0.58rem;
   }
 
   .kpi-value {
-    font-size: 1.35rem;
+    font-size: 1.15rem;
   }
 
   .kpi-card .kpi-note,
@@ -10900,6 +10901,61 @@ body:has(.app-main-chat) .app-footer {
 
   .app-section-title {
     font-size: 1rem;
+  }
+
+  /* les panneaux carrés (état vide, ateliers, usage) respiraient trop :
+     paddings resserrés, la pièce du glyphe du module détail à 120px */
+  .app-empty {
+    padding: 18px 14px 22px;
+  }
+
+  .app-empty .tester-scene {
+    width: min(140px, 60%);
+  }
+
+  .app-workbench-head {
+    padding: 12px 14px 10px;
+  }
+
+  .app-module-object-stage {
+    height: 120px;
+    margin: 0 -4px;
+    position: relative;
+  }
+
+  .app-module-object-stage .module-object,
+  .app-module-object-stage canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+  }
+
+  .app-module-figure {
+    font-size: 1.45rem;
+  }
+
+  /* l'appel « du verdict à la correction » : texte pleine largeur, le bouton
+     passe dessous — l'icône ne doit plus écraser le texte sur 60px */
+  .app-module-ai-call {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: start;
+  }
+
+  .app-module-ai-call .min-w-0 {
+    grid-column: 2;
+  }
+
+  .app-module-ai-call .app-btn {
+    grid-column: 2;
+    justify-self: start;
+    margin-top: 2px;
+  }
+
+  .app-module-ai-call svg {
+    margin-top: 2px;
   }
 
   /* la carte « prochaine action » : le titre ne crie plus sur trois lignes */

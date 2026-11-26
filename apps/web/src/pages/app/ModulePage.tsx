@@ -245,7 +245,7 @@ export function ModulePage() {
 
       {/* The module says what was measured. The AI reads the code and says where and how
           to change it. That link is the difference between a dashboard and a fix. */}
-      <section className="mt-4 flex flex-wrap items-center gap-3 rounded-[var(--radius)] border border-black/10 px-4 py-3">
+      <section className="mt-4 flex flex-wrap items-center gap-3 rounded-[var(--radius)] border border-black/10 px-4 py-3 app-module-ai-call">
         <Brain size={18} className="shrink-0 text-primary" aria-hidden />
         <div className="min-w-0 flex-1 break-words">
           <p className="text-sm font-medium break-words">
