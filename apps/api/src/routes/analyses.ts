@@ -6,13 +6,20 @@ import {
   type AnalysisStatus,
   analysisDurationMs,
   canTransitionAnalysis,
+  compareFindings,
+  compareFindingsForDisplay,
   coverageLabel,
   coverageRatio,
+  FINDING_STATUS_LABELS,
+  FINDING_STATUSES,
+  groupByCause,
   outcomeStatus,
   planAnalysis,
+  summarizeFindings,
 } from "@proofcore/core";
 import { Hono } from "hono";
 import { z } from "zod";
+import { findingsForAnalysis } from "../findings.js";
 import { HttpError } from "../http/errors.js";
 import { readBody, requireWorkspace } from "../http/guards.js";
 import { pageBody, readPage } from "../http/pagination.js";
@@ -209,6 +216,101 @@ export function analysisRoutes(services: Services): Hono<AppEnv> {
       query: c.req.query("q") ?? null,
     });
     return c.json(pageBody(rows.map(analysisDto), total, page));
+  });
+
+  /**
+   * Compare two analyses finding by finding.
+   *
+   * Declared non-comparable when one side measured nothing: "0 difference" on two empty
+   * runs is the most reassuring lie a report can tell.
+   */
+  app.get("/analyses/compare", async (c) => {
+    const { workspace } = await requireWorkspace(c, services, c.req.query("workspaceId"));
+    const baseId = c.req.query("base");
+    const targetId = c.req.query("target");
+    if (!baseId || !targetId) {
+      throw new HttpError(400, "comparison_required", "Both base and target are required.");
+    }
+    const [base, target] = await Promise.all([
+      services.store.getAnalysis(workspace.id, baseId),
+      services.store.getAnalysis(workspace.id, targetId),
+    ]);
+    if (!base || !target) throw new HttpError(404, "analysis_not_found", "Analysis not found.");
+    const [before, after] = await Promise.all([
+      findingsForAnalysis(services, base),
+      findingsForAnalysis(services, target),
+    ]);
+    const comparison = compareFindings(before.findings, after.findings, {
+      before: before.measuredModules,
+      after: after.measuredModules,
+    });
+    return c.json({
+      base: analysisDto(base),
+      target: analysisDto(target),
+      comparison,
+    });
+  });
+
+  /**
+   * The findings of one analysis, grouped by cause.
+   *
+   * Filters are applied before grouping and pagination, so a group always says how many
+   * of the filtered findings it holds, and a page never splits a group's counts.
+   */
+  app.get("/analyses/:analysisId/findings", async (c) => {
+    const { workspace } = await requireWorkspace(c, services, c.req.query("workspaceId"));
+    const analysis = await services.store.getAnalysis(workspace.id, c.req.param("analysisId"));
+    if (!analysis) throw new HttpError(404, "analysis_not_found", "Analysis not found.");
+    const loaded = await findingsForAnalysis(services, analysis);
+
+    const csv = (name: string): string[] =>
+      (c.req.query(name) ?? "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0);
+
+    const statuses = csv("status");
+    for (const status of statuses) {
+      if (!FINDING_STATUSES.includes(status as never)) {
+        throw new HttpError(400, "invalid_status", "Unknown finding status: " + status);
+      }
+    }
+    const severities = csv("severity");
+    const priorities = csv("priority");
+    const causes = csv("cause");
+    const query = (c.req.query("q") ?? "").toLowerCase();
+
+    const filtered = loaded.findings.filter((finding) => {
+      if (statuses.length > 0 && !statuses.includes(finding.status)) return false;
+      if (severities.length > 0 && !severities.includes(finding.severity)) return false;
+      if (priorities.length > 0 && !priorities.includes(finding.priority)) return false;
+      if (causes.length > 0 && !causes.includes(finding.cause)) return false;
+      if (query) {
+        const haystack =
+          finding.title +
+          " " +
+          finding.controlId +
+          " " +
+          finding.explanation.fact +
+          " " +
+          (finding.url ?? "");
+        if (!haystack.toLowerCase().includes(query)) return false;
+      }
+      return true;
+    });
+    filtered.sort(compareFindingsForDisplay);
+    const page = readPage(c);
+    const items = filtered.slice(page.offset, page.offset + page.limit);
+
+    return c.json({
+      analysis: analysisDto(analysis),
+      loaded: loaded.loaded,
+      findings: pageBody(items, filtered.length, page),
+      counts: summarizeFindings(filtered),
+      groups: groupByCause(filtered),
+      measuredModules: loaded.measuredModules,
+      statuses: FINDING_STATUS_LABELS,
+    });
   });
 
   app.get("/analyses/:analysisId", async (c) => {
