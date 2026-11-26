@@ -42,7 +42,10 @@
     "cloud:deploy:api": "node tooling/scripts/deploy-cloudflare.mjs --only api",
     "cloud:deploy:web": "node tooling/scripts/deploy-cloudflare.mjs --only web",
     "smoke:deploy": "node tooling/scripts/smoke-deploy.mjs",
-    "releases:sync": "node tooling/scripts/sync-release-manifest.mjs"
+    "releases:sync": "node tooling/scripts/sync-release-manifest.mjs",
+    "db:backup": "node tooling/scripts/db-backup.mjs",
+    "db:restore": "node tooling/scripts/db-restore.mjs",
+    "db:drill": "node tooling/scripts/db-roundtrip.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",

@@ -68,16 +68,20 @@ Statut : **PARTIEL**. Ne pas promettre une progression persistante pour un scan 
 
 ## 6. Sauvegarde, restauration, rétention
 
-| Élément               | État                                                                                                                                     |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Sauvegarde D1         | **ABSENT** : aucun script ni plan de sauvegarde dans `tooling/`                                                                          |
-| Sauvegarde Neon       | **ABSENT** : repose sur les sauvegardes du fournisseur, non testées ici                                                                  |
-| Restauration          | **ABSENT** : aucune procédure écrite, aucun exercice réalisé                                                                             |
-| Rétention             | entitlément `report_retention_days` déclaré (7/90/365/730) et `retainedUntil` calculé à l'import de run, mais **aucune purge planifiée** |
-| Suppression de compte | implémentée avec confirmation ; supprime les workspaces possédés et les données liées                                                    |
+| Élément               | État                                                                                                                                                                                                                                                     |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sauvegarde D1         | **PARTIEL** : `pnpm db:backup` produit un dump + manifeste SHA-256 et les compteurs de chaque table ; export local exercé, export distant **NON VÉRIFIÉ** (aucun credential Cloudflare)                                                                  |
+| Sauvegarde Neon       | **ABSENT** : repose sur les sauvegardes du fournisseur, non testées ici                                                                                                                                                                                  |
+| Restauration          | **PARTIEL** : `pnpm db:restore` vérifie taille + SHA-256, refuse une cible non vide, puis compare chaque compteur ; exercice local réussi (38 tables, 30 lignes), restauration distante **NON VÉRIFIÉE**. Procédure : `docs/PROOFCORE_BACKUP_RESTORE.md` |
+| Rétention             | **VÉRIFIÉ** : cron `17 3 * * *`, purge paresseuse en lecture et balayage global, couverts par `apps/api/test/retention.test.ts`                                                                                                                          |
+| Suppression de compte | implémentée avec confirmation ; supprime les workspaces possédés et les données liées                                                                                                                                                                    |
 
-Une donnée sans sauvegarde restaurée n'est pas une donnée de production. Ces trois
-points bloquent une exploitation commerciale sérieuse.
+Une donnée sans sauvegarde restaurée n'est pas une donnée de production. La chaîne D1
+est désormais outillée et l'exercice local a réellement restauré puis relu les données
+(`pnpm db:drill`). Ce qui reste bloquant : l'export/restauration **distants** n'ont pas
+été exécutés faute de credentials, Neon n'a aucun exercice, et la planification
+quotidienne (`db-backup.yml`) échoue explicitement tant que les secrets Cloudflare ne
+sont pas configurés.
 
 ## 7. Fournisseurs externes
 
@@ -98,8 +102,11 @@ Un message n'est jamais annoncé « envoyé » si le fournisseur n'a pas accept�
 ### Bloquant
 
 - [ ] Sauvegarde D1/Neon planifiée + restauration testée sur un environnement non
-      productif.
-- [ ] Purge de rétention planifiée, alignée sur les plans.
+      productif. — D1 : script + exercice local réussis ; planification ajoutée mais
+      inactive tant que les secrets Cloudflare manquent ; Neon et restauration
+      distante NON VÉRIFIÉS.
+- [x] Purge de rétention planifiée, alignée sur les plans (cron `17 3 * * *` + purge
+      paresseuse, testée).
 - [ ] MFA et vérification d'e-mail obligatoire.
 - [ ] Credentials EmailJS/Resend testés (un envoi réel accepté).
 - [ ] SasPay live testé avec un paiement de bout en bout et un webhook signé.

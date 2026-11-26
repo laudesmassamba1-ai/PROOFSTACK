@@ -17,6 +17,9 @@ coverage/
 .wrangler.example/
 .worker-secrets/
 
+# Database dumps: customer data and session tokens, never committed
+backups/
+
 # Test & tool output
 test-results/
 playwright-report/

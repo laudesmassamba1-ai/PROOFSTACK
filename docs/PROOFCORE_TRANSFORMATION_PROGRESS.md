@@ -97,37 +97,37 @@ Les statuts utilisés : **FAIT**, **PARTIEL**, **BLOQUÉ**, **NON COMMENCÉ**.
 
 ## Étape I — Production
 
-| Élément                 | État         | Limite                                                                                                                                                                        |
-| ----------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Isolation multi-comptes | FAIT         | 30 assertions inter-comptes                                                                                                                                                   |
-| Anti-SSRF webhooks      | FAIT         | 31 tests                                                                                                                                                                      |
-| Rate limiting           | PARTIEL      | durable pour l'auth, local pour le reste                                                                                                                                      |
-| Secrets                 | PARTIEL      | clés IA chiffrées ; webhooks/e-mails en clair                                                                                                                                 |
-| Webhooks paiement       | FAIT         | signature, anti-rejeu, vérification serveur                                                                                                                                   |
-| Observabilité           | PARTIEL      | request-id + logs 5xx, pas de métriques                                                                                                                                       |
-| Sauvegarde/restauration | NON COMMENCÉ | bloquant                                                                                                                                                                      |
-| Rétention               | FAIT         | purge paresseuse à la lecture + balayage planifié (cron 03:17 UTC) + clés d'idempotence 30 j ; 4 tests (`retention.test.ts`) ; la réponse d'upload donne la date d'expiration |
-| Déploiement             | NON EXÉCUTÉ  | non demandé dans cette passe                                                                                                                                                  |
+| Élément                 | État        | Limite                                                                                                                                                                                                                                                                                                                                         |
+| ----------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Isolation multi-comptes | FAIT        | 30 assertions inter-comptes                                                                                                                                                                                                                                                                                                                    |
+| Anti-SSRF webhooks      | FAIT        | 31 tests                                                                                                                                                                                                                                                                                                                                       |
+| Rate limiting           | PARTIEL     | durable pour l'auth, local pour le reste                                                                                                                                                                                                                                                                                                       |
+| Secrets                 | PARTIEL     | clés IA chiffrées ; webhooks/e-mails en clair                                                                                                                                                                                                                                                                                                  |
+| Webhooks paiement       | FAIT        | signature, anti-rejeu, vérification serveur                                                                                                                                                                                                                                                                                                    |
+| Observabilité           | PARTIEL     | request-id + logs 5xx, pas de métriques                                                                                                                                                                                                                                                                                                        |
+| Sauvegarde/restauration | PARTIEL     | `pnpm db:backup` / `db:restore` + manifeste SHA-256 et compteurs ; exercice local réel réussi (38 tables, 30 lignes, refus d'un dump altéré et d'une cible non vide) ; export et restauration **distants NON VÉRIFIÉS** (aucun credential) ; procédure `docs/PROOFCORE_BACKUP_RESTORE.md` ; workflow quotidien ajouté mais échoue sans secrets |
+| Rétention               | FAIT        | purge paresseuse à la lecture + balayage planifié (cron 03:17 UTC) + clés d'idempotence 30 j ; 4 tests (`retention.test.ts`) ; la réponse d'upload donne la date d'expiration                                                                                                                                                                  |
+| Déploiement             | NON EXÉCUTÉ | non demandé dans cette passe                                                                                                                                                                                                                                                                                                                   |
 
 ## Étape J — Recette
 
-| Parcours                   | État             | Preuve                                             |
-| -------------------------- | ---------------- | -------------------------------------------------- |
-| Débutant (web mobile)      | FAIT             | E2E `app-mobile.spec.ts`                           |
-| Compte/session/facturation | FAIT             | E2E `journey.spec.ts`                              |
-| IA contextuelle            | PARTIEL          | tests API avec fournisseur simulé                  |
-| IA ↔ modules               | FAIT (hors prod) | config → run → historique → analyse, 5 tests       |
-| WORLD/FLOW/EXIT            | PARTIEL          | tests modules ; parcours navigateur CLI non rejoué |
-| FAIL/CLEAN                 | FAIT             | tests page-scan + audits                           |
-| Sécurité multi-comptes     | FAIT             | `tenant-isolation.test.ts`                         |
-| Responsive                 | PARTIEL          | 2 viewports                                        |
-| Production readiness       | BLOQUÉ           | sauvegarde/restauration + credentials externes     |
+| Parcours                   | État             | Preuve                                                       |
+| -------------------------- | ---------------- | ------------------------------------------------------------ |
+| Débutant (web mobile)      | FAIT             | E2E `app-mobile.spec.ts`                                     |
+| Compte/session/facturation | FAIT             | E2E `journey.spec.ts`                                        |
+| IA contextuelle            | PARTIEL          | tests API avec fournisseur simulé                            |
+| IA ↔ modules               | FAIT (hors prod) | config → run → historique → analyse, 5 tests                 |
+| WORLD/FLOW/EXIT            | PARTIEL          | tests modules ; parcours navigateur CLI non rejoué           |
+| FAIL/CLEAN                 | FAIT             | tests page-scan + audits                                     |
+| Sécurité multi-comptes     | FAIT             | `tenant-isolation.test.ts`                                   |
+| Responsive                 | PARTIEL          | 2 viewports                                                  |
+| Production readiness       | BLOQUÉ           | sauvegarde distante/Neon non exercées + credentials externes |
 
 ## Ce qui change le verdict
 
 Trois preuves manquent pour passer de « démontrable » à « exploitable » :
 
-1. une restauration réellement exécutée ;
+1. une restauration **distante** réellement exécutée (l'exercice local D1 est fait) ;
 2. un envoi e-mail réellement accepté ;
 3. un paiement live réellement vérifié par webhook.
 

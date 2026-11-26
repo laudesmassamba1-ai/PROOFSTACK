@@ -1,0 +1,83 @@
+name: D1 backup
+
+# Daily logical backup of the production D1 database, kept for 90 days.
+#
+# This is an alarm, not a decoration: if the Cloudflare credentials are missing the
+# job fails with an explicit message. A green run that silently skipped the backup
+# would be worse than no schedule at all. Configure the two repository secrets
+# (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID) and read
+# docs/PROOFCORE_BACKUP_RESTORE.md before relying on it.
+#
+# 02:43 UTC is before the 03:17 retention sweep in apps/api/wrangler.toml, so the
+# backup captures the state the product had at the end of the day, not after a purge.
+
+on:
+  schedule:
+    - cron: "43 2 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: d1-backup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    name: export · verify · upload
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Require Cloudflare credentials
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID must be set. No backup was taken."
+            exit 1
+          fi
+
+      - name: Export and verify
+        run: node tooling/scripts/db-backup.mjs --remote --out backups --json
+
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-backup-${{ github.run_id }}
+          path: |
+            backups/*.sql
+            backups/*.manifest.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Summarize
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const file = fs.readdirSync("backups").find((name) => name.endsWith(".manifest.json"));
+            if (!file) throw new Error("no manifest was produced");
+            const manifest = JSON.parse(fs.readFileSync(`backups/${file}`, "utf8"));
+            const summary = [
+              "### D1 backup",
+              "",
+              `- database: \`${manifest.database}\``,
+              `- tables: ${Object.keys(manifest.tables).length}`,
+              `- rows: ${manifest.rowCount}`,
+              `- size: ${manifest.sizeBytes} bytes`,
+              `- sha256: \`${manifest.sha256}\``,
+              `- created: ${manifest.createdAt}`,
+            ].join("\n");
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary}\n`);
+          '
