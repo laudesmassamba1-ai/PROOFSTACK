@@ -13,6 +13,8 @@ import {
   type AnalysisTargetType,
   iso,
   ProofCoreError,
+  type RemediationStatus,
+  type RemediationStepRecord,
   slugify,
   uuid,
 } from "@proofcore/core";
@@ -42,6 +44,65 @@ import {
  * text; a corrupt column degrades to an empty object instead of throwing during a
  * list call that only needed one row.
  */
+/** A remediation row: the fix, its chain, and the analysis that proved it. */
+export interface RemediationRecord {
+  id: string;
+  workspaceId: string;
+  projectId: string | null;
+  analysisId: string;
+  findingKey: string;
+  module: string;
+  controlId: string;
+  title: string;
+  status: RemediationStatus;
+  severity: string;
+  priority: string;
+  cause: string;
+  ownerId: string | null;
+  dueAt: string | null;
+  steps: RemediationStepRecord[];
+  fix: string;
+  verification: string;
+  proof: string;
+  verificationAnalysisId: string | null;
+  verificationOutcome: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  appliedAt: string | null;
+  verifiedAt: string | null;
+}
+
+function remediationFromRow(row: Row): RemediationRecord {
+  return {
+    id: str(row, "id"),
+    workspaceId: str(row, "workspace_id"),
+    projectId: nullableStr(row, "project_id"),
+    analysisId: str(row, "analysis_id"),
+    findingKey: str(row, "finding_key"),
+    module: str(row, "module"),
+    controlId: str(row, "control_id"),
+    title: str(row, "title"),
+    status: str(row, "status") as RemediationStatus,
+    severity: str(row, "severity"),
+    priority: str(row, "priority"),
+    cause: str(row, "cause"),
+    ownerId: nullableStr(row, "owner_id"),
+    dueAt: nullableStr(row, "due_at"),
+    steps: parseJson<RemediationStepRecord[]>(row.steps, []),
+    fix: str(row, "fix"),
+    verification: str(row, "verification"),
+    proof: str(row, "proof"),
+    verificationAnalysisId: nullableStr(row, "verification_analysis_id"),
+    verificationOutcome: nullableStr(row, "verification_outcome"),
+    createdBy: str(row, "created_by"),
+    createdAt: str(row, "created_at"),
+    updatedAt: str(row, "updated_at"),
+    appliedAt: nullableStr(row, "applied_at"),
+    verifiedAt: nullableStr(row, "verified_at"),
+  };
+}
+
 export interface AnalysisRecord {
   id: string;
   workspaceId: string;
@@ -2463,6 +2524,222 @@ export class AppStore {
       createdAt: str(row, "created_at"),
       retainedUntil: nullableStr(row, "retained_until"),
     }));
+  }
+
+  /**
+   * A remediation row.
+   *
+   * The steps are JSON because the chain is read and written as one value; the verification
+   * fields are columns because a report filters on them ("verified this week").
+   */
+  async createRemediation(input: {
+    id: string;
+    workspaceId: string;
+    projectId: string | null;
+    analysisId: string;
+    findingKey: string;
+    module: string;
+    controlId: string;
+    title: string;
+    severity: string;
+    priority: string;
+    cause: string;
+    ownerId: string | null;
+    dueAt: string | null;
+    steps: RemediationStepRecord[];
+    fix: string;
+    verification: string;
+    proof: string;
+    createdBy: string;
+  }): Promise<RemediationRecord> {
+    const now = iso(this.clock());
+    await this.db
+      .prepare(
+        `INSERT INTO remediations
+           (id, workspace_id, project_id, analysis_id, finding_key, module, control_id, title,
+            status, severity, priority, cause, owner_id, due_at, steps, fix, verification, proof,
+            created_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'proposed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        input.id,
+        input.workspaceId,
+        input.projectId,
+        input.analysisId,
+        input.findingKey,
+        input.module,
+        input.controlId,
+        input.title,
+        input.severity,
+        input.priority,
+        input.cause,
+        input.ownerId,
+        input.dueAt,
+        json(input.steps),
+        input.fix,
+        input.verification,
+        input.proof,
+        input.createdBy,
+        now,
+        now
+      )
+      .run();
+    const record = await this.getRemediation(input.workspaceId, input.id);
+    if (!record) throw new Error("remediation disappeared after insert");
+    return record;
+  }
+
+  async getRemediation(workspaceId: string, id: string): Promise<RemediationRecord | null> {
+    const row = await this.db
+      .prepare("SELECT * FROM remediations WHERE id = ? AND workspace_id = ?")
+      .bind(id, workspaceId)
+      .first<Row>();
+    return row ? remediationFromRow(row) : null;
+  }
+
+  async findRemediationByFinding(
+    workspaceId: string,
+    analysisId: string,
+    findingKey: string
+  ): Promise<RemediationRecord | null> {
+    const row = await this.db
+      .prepare(
+        "SELECT * FROM remediations WHERE workspace_id = ? AND analysis_id = ? AND finding_key = ?"
+      )
+      .bind(workspaceId, analysisId, findingKey)
+      .first<Row>();
+    return row ? remediationFromRow(row) : null;
+  }
+
+  async listRemediations(
+    workspaceId: string,
+    filters: {
+      limit: number;
+      offset: number;
+      status?: string;
+      priority?: string;
+      projectId?: string;
+      ownerId?: string;
+    }
+  ): Promise<{ rows: RemediationRecord[]; total: number }> {
+    const where = ["workspace_id = ?"];
+    const bind: unknown[] = [workspaceId];
+    if (filters.status) {
+      where.push("status = ?");
+      bind.push(filters.status);
+    }
+    if (filters.priority) {
+      where.push("priority = ?");
+      bind.push(filters.priority);
+    }
+    if (filters.projectId) {
+      where.push("project_id = ?");
+      bind.push(filters.projectId);
+    }
+    if (filters.ownerId) {
+      where.push("owner_id = ?");
+      bind.push(filters.ownerId);
+    }
+    const clause = where.join(" AND ");
+    const totalRow = await this.db
+      .prepare("SELECT COUNT(*) AS count FROM remediations WHERE " + clause)
+      .bind(...bind)
+      .first<Row>();
+    const rows = await this.db
+      .prepare(
+        "SELECT * FROM remediations WHERE " +
+          clause +
+          " ORDER BY CASE priority WHEN 'P0' THEN 0 WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 ELSE 3 END," +
+          " created_at DESC LIMIT ? OFFSET ?"
+      )
+      .bind(...bind, filters.limit, filters.offset)
+      .all<Row>();
+    return { rows: rows.map(remediationFromRow), total: Number(totalRow?.count ?? 0) };
+  }
+
+  /**
+   * Update a remediation, optionally only if it is still in an expected state.
+   *
+   * The expected-state guard is what stops two tabs from applying two different fixes to
+   * the same finding: the second update finds no row and the route answers 409.
+   */
+  async updateRemediation(input: {
+    workspaceId: string;
+    id: string;
+    patch: {
+      status?: RemediationStatus;
+      ownerId?: string | null;
+      dueAt?: string | null;
+      steps?: RemediationStepRecord[];
+      appliedAt?: string | null;
+      verifiedAt?: string | null;
+      verificationAnalysisId?: string | null;
+      verificationOutcome?: string | null;
+    };
+    expected?: readonly RemediationStatus[];
+  }): Promise<RemediationRecord | null> {
+    const sets: string[] = [];
+    const values: unknown[] = [];
+    const patch = input.patch;
+    if (patch.status !== undefined) {
+      sets.push("status = ?");
+      values.push(patch.status);
+    }
+    if (patch.ownerId !== undefined) {
+      sets.push("owner_id = ?");
+      values.push(patch.ownerId);
+    }
+    if (patch.dueAt !== undefined) {
+      sets.push("due_at = ?");
+      values.push(patch.dueAt);
+    }
+    if (patch.steps !== undefined) {
+      sets.push("steps = ?");
+      values.push(json(patch.steps));
+    }
+    if (patch.appliedAt !== undefined) {
+      sets.push("applied_at = ?");
+      values.push(patch.appliedAt);
+    }
+    if (patch.verifiedAt !== undefined) {
+      sets.push("verified_at = ?");
+      values.push(patch.verifiedAt);
+    }
+    if (patch.verificationAnalysisId !== undefined) {
+      sets.push("verification_analysis_id = ?");
+      values.push(patch.verificationAnalysisId);
+    }
+    if (patch.verificationOutcome !== undefined) {
+      sets.push("verification_outcome = ?");
+      values.push(patch.verificationOutcome);
+    }
+    if (sets.length === 0) return this.getRemediation(input.workspaceId, input.id);
+    sets.push("updated_at = ?");
+    const guard =
+      input.expected && input.expected.length > 0
+        ? " AND status IN (" + input.expected.map(() => "?").join(", ") + ")"
+        : "";
+    values.push(iso(this.clock()), input.id, input.workspaceId);
+    if (input.expected) values.push(...input.expected);
+    const result = await this.db
+      .prepare(
+        "UPDATE remediations SET " + sets.join(", ") + " WHERE id = ? AND workspace_id = ?" + guard
+      )
+      .bind(...values)
+      .run();
+    if (Number(result.changes ?? 0) === 0) return null;
+    return this.getRemediation(input.workspaceId, input.id);
+  }
+
+  /** Every remediation still open, for a project dashboard. */
+  async openRemediationCount(workspaceId: string): Promise<number> {
+    const row = await this.db
+      .prepare(
+        "SELECT COUNT(*) AS count FROM remediations WHERE workspace_id = ? AND status IN ('proposed','approved','applied')"
+      )
+      .bind(workspaceId)
+      .first<Row>();
+    return Number(row?.count ?? 0);
   }
 
   async recentFindings(workspaceId: string, limit = 8): Promise<FindingRecord[]> {

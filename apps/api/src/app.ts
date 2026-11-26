@@ -22,6 +22,7 @@ import { machineRoutes } from "./routes/machine.js";
 import { notificationRoutes } from "./routes/notifications.js";
 import { projectIntelligenceRoutes } from "./routes/project-intelligence.js";
 import { releaseRoutes } from "./routes/releases.js";
+import { remediationRoutes } from "./routes/remediations.js";
 import { webhookRoutes } from "./routes/webhooks.js";
 import { workspaceRoutes } from "./routes/workspace.js";
 
@@ -185,6 +186,7 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
   app.route("/api/v1/ai", aiRoutes(services));
   app.route("/api/v1", analysisRoutes(services));
   app.route("/api/v1", capabilityRoutes(services));
+  app.route("/api/v1", remediationRoutes(services));
   app.route("/api/v1", auditRoutes(services));
   app.route("/api/v1/browser", browserRoutes(services));
   app.route("/api/v1", billingRoutes(services));
