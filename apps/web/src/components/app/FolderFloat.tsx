@@ -203,8 +203,9 @@ export function FolderFloat({
     onOpenChange?: FolderFloatProps["onOpenChange"];
     drift: number;
     reduce: boolean;
-  }>({ drift, reduce: false });
-  latest.current = { onSelect, onOpenChange, drift, reduce: false };
+    lite: boolean;
+  }>({ drift, reduce: false, lite: false });
+  latest.current = { onSelect, onOpenChange, drift, reduce: false, lite: false };
   const popTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const liveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const list: FolderFloatItem[] = items.map((item) =>
@@ -381,7 +382,7 @@ export function FolderFloat({
 
   useEffect(() => {
     clearTimeout(liveTimer.current);
-    if (!open || !physics || latest.current.reduce) {
+    if (!open || !physics || latest.current.reduce || latest.current.lite) {
       if (!open) stopPhysics();
       else if (!physics) stopPhysics();
       return undefined;
@@ -392,12 +393,23 @@ export function FolderFloat({
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    /* Petit écran ou puce modeste : le dossier flotte sans simulation. La
+     * physique matter-js tourne à 60 Hz pour un effet décoratif — sur un
+     * vieux téléphone c'est la dépense la plus chère de la page. L'éventail
+     * garde sa position CSS et le toucher : rien ne se perd à l'œil. */
+    const liteMq = window.matchMedia("(max-width: 767px)");
     const sync = () => {
       latest.current.reduce = mq.matches;
+      latest.current.lite =
+        liteMq.matches || (navigator.hardwareConcurrency ?? 8) <= 4;
     };
     sync();
     mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
+    liteMq.addEventListener("change", sync);
+    return () => {
+      mq.removeEventListener("change", sync);
+      liteMq.removeEventListener("change", sync);
+    };
   }, []);
 
   useEffect(

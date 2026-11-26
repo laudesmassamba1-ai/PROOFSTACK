@@ -13,6 +13,14 @@ import { useEffect, useRef } from "react";
 const REDUCED = (): boolean =>
   typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+/** Appareil modeste ou petit écran : le canvas tourne, mais à l'économie —
+ *  définition réduite et 8 images par seconde au lieu de 60. La trame ASCII
+ *  scintille lentement : l'œil ne fait pas la différence, la puce si. */
+const LITE = (): boolean =>
+  typeof window !== "undefined" &&
+  (window.matchMedia("(max-width: 767px)").matches ||
+    (navigator.hardwareConcurrency ?? 8) <= 4);
+
 /** Boucle rAF gatée par IntersectionObserver — rien ne tourne hors écran. */
 function useGlyphLoop(
   canvasRef: { current: HTMLCanvasElement | null },
@@ -27,9 +35,11 @@ function useGlyphLoop(
     if (!ctx) return;
     let raf = 0;
     let visible = true;
+    const lite = LITE();
+    let last = 0;
     const fit = (): number => {
       const rect = canvas.getBoundingClientRect();
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const dpr = Math.min(window.devicePixelRatio || 1, lite ? 1.25 : 2);
       const w = Math.max(1, Math.round(rect.width * dpr));
       const h = Math.max(1, Math.round(rect.height * dpr));
       if (canvas.width !== w || canvas.height !== h) {
@@ -53,6 +63,11 @@ function useGlyphLoop(
     const tick = (): void => {
       raf = visible ? requestAnimationFrame(tick) : 0;
       if (!visible) return;
+      if (lite) {
+        const now = performance.now();
+        if (now - last < 120) return;
+        last = now;
+      }
       const dpr = fit();
       drawRef.current(
         ctx,
