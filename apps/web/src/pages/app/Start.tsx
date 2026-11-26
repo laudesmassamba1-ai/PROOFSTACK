@@ -1,7 +1,7 @@
 import { ArrowRight, Info, Loader2, ScanLine } from "lucide-react";
 import type React from "react";
 import { useCallback, useState } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { Card, ErrorState } from "../../components/app/ui.js";
 import { useI18n } from "../../i18n/index.js";
 import { PageHeader } from "../../layouts/AppLayout.js";
@@ -94,7 +94,10 @@ export function StartPage(): React.ReactElement {
   const session = useSession();
   const { locale } = useI18n();
   const fr = locale === "fr";
-  const [url, setUrl] = useState("");
+  // The onboarding hands its answer over in the URL: the address someone typed once is
+  // not typed again on the scan screen.
+  const [search] = useSearchParams();
+  const [url, setUrl] = useState(() => search.get("target") ?? "");
   const [scan, setScan] = useState<GuidedScan | null>(null);
   const [preview, setPreview] = useState<ScanPreview | null>(null);
   const [auditId, setAuditId] = useState<string | null>(null);

@@ -1,4 +1,4 @@
-import { ArrowRight, FolderPlus, Terminal } from "lucide-react";
+import { ArrowRight, Compass, FolderPlus, Terminal } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
@@ -125,6 +125,7 @@ export function Overview() {
   const [data, setData] = useState<Overview | null>(null);
   const [insights, setInsights] = useState<Insights | null>(null);
   const [error, setError] = useState<ApiError | Error | null>(null);
+  const [onboarded, setOnboarded] = useState<boolean | null>(null);
 
   const load = useCallback(async () => {
     if (!workspaceId) return;
@@ -132,6 +133,12 @@ export function Overview() {
     try {
       setData(await apiFetch<Overview>(`/api/v1/overview?workspaceId=${workspaceId}`));
       setInsights(await apiFetch<Insights>(`/api/v1/insights?workspaceId=${workspaceId}&days=14`));
+      // The onboarding nudge is a claim about this workspace, so it is read from the API
+      // rather than guessed from a local flag.
+      const state = await apiFetch<{ onboarding: { completed: boolean } }>(
+        `/api/v1/onboarding?workspaceId=${workspaceId}`
+      );
+      setOnboarded(state.onboarding.completed);
     } catch (caught) {
       setError(caught as ApiError);
     }
@@ -203,6 +210,25 @@ export function Overview() {
 
   return (
     <div className="app-page app-overview">
+      {onboarded === false ? (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md border border-line bg-canvas px-4 py-3">
+          <Compass size={16} className="text-muted" aria-hidden />
+          <p className="text-sm">
+            <span className="font-medium">
+              {fr ? "Quatre questions avant de mesurer." : "Four questions before measuring."}
+            </span>{" "}
+            <span className="text-muted">
+              {fr
+                ? "Elles décident des contrôles lancés et de ce qui restera non mesuré."
+                : "They decide which controls run and what will stay unmeasured."}
+            </span>
+          </p>
+          <Link to="/app/onboarding" className="app-btn app-btn-primary app-btn-sm ml-auto">
+            {fr ? "Configurer en 2 minutes" : "Set up in 2 minutes"}
+            <ArrowRight size={13} />
+          </Link>
+        </div>
+      ) : null}
       <EnhancedCard className="pk-enter" enable3d={undefined}>
         <section className="app-situation">
           <span className="dot-field" aria-hidden />

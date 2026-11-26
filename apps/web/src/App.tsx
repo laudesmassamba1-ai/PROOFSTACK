@@ -92,6 +92,9 @@ const AiChat = lazy(() => import("./pages/app/AiChat.js").then((m) => ({ default
 const RemediationsPage = lazy(() =>
   import("./pages/app/Remediations.js").then((m) => ({ default: m.RemediationsPage }))
 );
+const OnboardingPage = lazy(() =>
+  import("./pages/app/Onboarding.js").then((m) => ({ default: m.OnboardingPage }))
+);
 const AnalysesPage = lazy(() =>
   import("./pages/app/Analyses.js").then((m) => ({ default: m.AnalysesPage }))
 );
@@ -176,6 +179,7 @@ export function App() {
           <Route path="scan" element={<ScanPage />} />
           <Route path="analyses" element={<AnalysesPage />} />
           <Route path="remediations" element={<RemediationsPage />} />
+          <Route path="onboarding" element={<OnboardingPage />} />
           <Route path="interact" element={<InteractPage />} />
           <Route path="start" element={<StartPage />} />
           <Route path="guide" element={<GuidePage />} />

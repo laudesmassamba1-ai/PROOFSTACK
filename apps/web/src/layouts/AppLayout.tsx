@@ -8,6 +8,7 @@ import {
   ClipboardCheck,
   CloudOff,
   Command,
+  Compass,
   CreditCard,
   FolderKanban,
   Globe2,
@@ -286,6 +287,7 @@ export function AppLayout() {
     const list: Array<[string, string, ReactNode]> = [
       [t("ws.nav.overview"), "/app", <LayoutDashboard key="overview" size={15} />],
       [t("ws.nav.projects"), "/app/projects", <FolderKanban key="projects" size={15} />],
+      [t("ws.nav.onboarding"), "/app/onboarding", <Compass key="onboarding" size={15} />],
       [locale === "fr" ? "Analyser" : "Scan", "/app/start", <Search key="start" size={15} />],
       ["Analyses", "/app/analyses", <Activity key="analyses" size={15} />],
       [
@@ -321,6 +323,7 @@ export function AppLayout() {
               to === "/app/start" ||
               to === "/app/analyses" ||
               to === "/app/remediations" ||
+              to === "/app/onboarding" ||
               to === "/app/modules" ||
               to === "/app/guide"
           )
