@@ -85,8 +85,32 @@ export function errorText(error: unknown, fr: boolean): string {
       return "Cette offre n'est pas disponible à l'achat direct.";
     case "no_chargeable_currency":
       return "Aucun tarif n'existe pour cette offre dans cette devise.";
-    case "ai_not_configured":
+    case "ai_not_configured": {
+      // Two very different situations, one code: a deployment without a managed
+      // provider (nothing the user can do but connect a key, or keep working without
+      // AI), and a half-finished setup. Saying "connect a key" when the deployment
+      // offers one is wrong; saying "unavailable" when a personal key works is worse.
+      const details = candidate?.details;
+      const managed =
+        typeof details === "object" && details !== null
+          ? (details as { managed?: unknown }).managed
+          : undefined;
+      if (managed === false) {
+        return "L'assistant IA n'est pas activé sur ce déploiement. Les contrôles et les rapports fonctionnent sans IA ; tu peux connecter ta propre clé dans les réglages.";
+      }
       return "Connecte d'abord un fournisseur d'IA (clé enregistrée et chiffrée).";
+    }
+    case "managed_ai_quota": {
+      const details = candidate?.details;
+      const limit =
+        typeof details === "object" && details !== null
+          ? (details as { callsPerMonth?: unknown }).callsPerMonth
+          : undefined;
+      const horizon = minutes ? `Réessaie dans ${minutes} min` : "Réessaie plus tard";
+      return typeof limit === "number"
+        ? `Quota mensuel de l'assistant géré atteint (${limit} demandes). ${horizon}, ou connecte ta propre clé.`
+        : `Quota mensuel de l'assistant géré atteint. ${horizon}, ou connecte ta propre clé.`;
+    }
     case "ai_rate_limited":
     case "provider_rate_limited":
       return minutes

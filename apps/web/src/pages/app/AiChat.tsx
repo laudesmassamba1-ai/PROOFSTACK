@@ -334,9 +334,30 @@ function describeFailure(
       : "The provider rejected the saved key. Replace it in the settings.";
   }
   if (code === "ai_not_configured") {
+    if (data.error?.details?.managed === false) {
+      return fr
+        ? "L'assistant IA n'est pas activé sur ce déploiement. Les contrôles et les rapports fonctionnent sans IA ; tu peux connecter ta propre clé dans les réglages."
+        : "The AI assistant is not enabled on this deployment. Controls and reports work without AI; you can connect your own key in the settings.";
+    }
     return fr
       ? "Aucun modèle connecté. Ouvre les réglages."
       : "No model connected. Open the settings.";
+  }
+  if (code === "managed_ai_quota") {
+    const minutes =
+      typeof data.error?.details?.retryAfterSeconds === "number"
+        ? Math.max(1, Math.ceil((data.error.details.retryAfterSeconds as number) / 60))
+        : null;
+    const horizon = minutes
+      ? fr
+        ? `Réessaie dans ${minutes} min`
+        : `Retry in ${minutes} min`
+      : fr
+        ? "Réessaie plus tard"
+        : "Retry later";
+    return fr
+      ? `Quota mensuel de l'assistant géré atteint. ${horizon}, ou connecte ta propre clé.`
+      : `The managed assistant's monthly quota is reached. ${horizon}, or connect your own key.`;
   }
   if (code === "ai_rate_limited") {
     return fr
