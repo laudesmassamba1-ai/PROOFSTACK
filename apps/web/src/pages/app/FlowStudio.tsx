@@ -151,6 +151,13 @@ function issueText(code: string, message: string, fr: boolean): string {
   return ISSUE_TEXT[code]?.[fr ? "fr" : "en"] ?? message;
 }
 
+const STATUS_TEXT: Record<string, { fr: string; en: string }> = {
+  PASS: { fr: "conforme", en: "passed" },
+  WARN: { fr: "vigilance", en: "warning" },
+  FAIL: { fr: "échec", en: "failed" },
+  SKIPPED: { fr: "non exécuté", en: "skipped" },
+};
+
 const TONE: Record<string, string> = {
   PASS: "app-badge app-badge-success",
   WARN: "app-badge app-badge-warning",
@@ -772,7 +779,9 @@ export function FlowStudioPage() {
               <ul className="flow-findings">
                 {report.report.findings.map((finding) => (
                   <li key={finding.id}>
-                    <span className={TONE[finding.status] ?? "app-badge"}>{finding.status}</span>
+                    <span className={TONE[finding.status] ?? "app-badge"}>
+                      {STATUS_TEXT[finding.status]?.[fr ? "fr" : "en"] ?? finding.status}
+                    </span>
                     <div>
                       <p>{finding.observed}</p>
                       <p className="text-muted">{finding.why}</p>

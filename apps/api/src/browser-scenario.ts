@@ -25,7 +25,10 @@ interface ScenarioPageLike {
   url(): string;
   evaluate?: ((expression: string) => Promise<unknown>) | undefined;
   keyboard: { press(key: string): Promise<void>; type(text: string): Promise<void> };
-  mouse: { click(x: number, y: number): Promise<void>; wheel(options: { deltaY: number }): Promise<void> };
+  mouse: {
+    click(x: number, y: number): Promise<void>;
+    wheel(options: { deltaY: number }): Promise<void>;
+  };
   on(event: string, handler: (...args: unknown[]) => void): void;
 }
 
@@ -33,7 +36,9 @@ async function puppeteerModule(): Promise<{
   launch: (binding: unknown, options?: Record<string, unknown>) => Promise<BrowserLike>;
 }> {
   const module = (await import("@cloudflare/puppeteer")) as unknown as {
-    default: { launch: (binding: unknown, options?: Record<string, unknown>) => Promise<BrowserLike> };
+    default: {
+      launch: (binding: unknown, options?: Record<string, unknown>) => Promise<BrowserLike>;
+    };
   };
   return module.default;
 }
@@ -67,13 +72,16 @@ export async function executeBrowserScenario(
   input: ScenarioExecutionInput
 ): Promise<ScenarioExecution> {
   const binding = env?.BROWSER;
-  if (!binding) {
+  const local = services.localScenario;
+  if (!binding && !local) {
     throw new HttpError(
       503,
       "browser_unavailable",
-      "Ce déploiement n'a pas de navigateur (liaison BROWSER absente). Le même scénario peut être exécuté par la CLI : proofcore audit interact."
+      "Ce déploiement n'expose aucun navigateur : ni liaison Cloudflare BROWSER, ni Chromium local. Le même scénario peut être exécuté par la CLI : proofcore audit interact."
     );
   }
+  // The environment is recorded, so a report never implies the wrong engine ran it.
+  const environment = binding ? "cloudflare-browser" : "local-chromium";
 
   const id = `ana_${uuid().replaceAll("-", "").slice(0, 20)}`;
   const startedAt = services.clock();
@@ -99,7 +107,7 @@ export async function executeBrowserScenario(
     applicableModules: requestedModules,
     engine: "browser-scenario",
     engineVersion: "1",
-    environment: "cloudflare-browser",
+    environment,
     status: "running",
     coverage,
     startedAt: iso(startedAt),
@@ -112,15 +120,31 @@ export async function executeBrowserScenario(
   });
 
   try {
-    const puppeteer = await puppeteerModule();
-    const browser = await puppeteer.launch(binding);
-    try {
-      const page = (await browser.pages())[0] ?? (await browser.newPage());
-      await page.setViewport({ width: 1280, height: 800 });
-      const report = await runScenario(page as never, input.steps, {
+    let report: ScenarioReport;
+    if (!binding) {
+      // The Node server's own Chromium. The runner is injected, so this module still
+      // builds for the Worker, where the field is absent and the refusal above stands.
+      report = await local!({
+        url: input.url,
         name: input.name ?? "Browser interaction",
+        steps: input.steps,
         allowDestructive: input.allowDestructive === true,
       });
+    } else {
+      const puppeteer = await puppeteerModule();
+      const browser = await puppeteer.launch(binding);
+      try {
+        const page = (await browser.pages())[0] ?? (await browser.newPage());
+        await page.setViewport({ width: 1280, height: 800 });
+        report = await runScenario(page as never, input.steps, {
+          name: input.name ?? "Browser interaction",
+          allowDestructive: input.allowDestructive === true,
+        });
+      } finally {
+        await browser.close().catch(() => undefined);
+      }
+    }
+    {
       const counts = { PASS: 0, WARN: 0, FAIL: 0, SKIPPED: 0 };
       for (const finding of report.findings) counts[finding.status] += 1;
       const endedAt = services.clock();
@@ -154,8 +178,6 @@ export async function executeBrowserScenario(
         },
       });
       return { report, analysisId: id };
-    } finally {
-      await browser.close().catch(() => undefined);
     }
   } catch (error) {
     const endedAt = services.clock();

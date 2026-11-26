@@ -7,6 +7,7 @@ import type { EmailSender } from "../email.js";
 import { createEmailSender } from "../email.js";
 import type { AppConfig } from "../env.js";
 import { createProjectKnowledge, type ProjectKnowledge } from "../project-knowledge.js";
+import type { ScenarioReport, ScenarioStep } from "../scenario.js";
 import {
   type ApiKeyRecord,
   AppStore,
@@ -21,6 +22,13 @@ import { SqlBillingStore } from "../store/billing-store.js";
  * The same object graph is built by the Worker, the Node dev server and every test,
  * so an integration test exercises the exact wiring production uses.
  */
+export interface LocalScenarioInput {
+  url: string;
+  name: string;
+  steps: ScenarioStep[];
+  allowDestructive: boolean;
+}
+
 export interface Services {
   n8n?: { trigger: (event: string, payload: PaymentAutomationEvent) => Promise<void> };
 
@@ -35,6 +43,16 @@ export interface Services {
   email: EmailSender;
   /** Absent when NEON_DATABASE_URL is not configured: file audits then answer 503. */
   projectKnowledge: ProjectKnowledge | null;
+  /**
+   * A real browser on this machine, for the Node server only.
+   *
+   * The deployed Worker drives Cloudflare's Browser Rendering binding; the local server
+   * has no such binding, but the machine already has a Chromium and the CLI already
+   * drives it over CDP. Injecting that runner keeps one execution path and lets the same
+   * scenario run locally without a paid service or a downloaded browser. Absent in the
+   * Worker and in tests: there, a scenario that needs a browser is refused, not faked.
+   */
+  localScenario?: (input: LocalScenarioInput) => Promise<ScenarioReport>;
   clock: () => Date;
   /**
    * The page scanner, injected so a route can be tested without reaching the network.
