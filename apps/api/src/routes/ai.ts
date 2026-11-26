@@ -10,9 +10,10 @@ import {
 } from "../ai-providers.js";
 import { browsePage, describeBrowsedPage } from "../browser-render.js";
 import { quotaErrorFromDecision } from "../http/entitlement-http.js";
-import { clientAddress, HttpError, RateLimiter } from "../http/errors.js";
+import { clientAddress, HttpError } from "../http/errors.js";
 import { readBody, requireWorkspace } from "../http/guards.js";
 import { pageBody, readPage } from "../http/pagination.js";
+import { checkDistributedRateLimit } from "../http/rate-limit.js";
 import type { AppEnv, Services } from "../http/services.js";
 import {
   analyzeRun,
@@ -863,7 +864,6 @@ function systemPrompt(
 
 export function aiRoutes(services: Services): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
-  const limiter = new RateLimiter(services.config.aiRateLimitPerHour, 60 * 60_000);
 
   /**
    * The local agent's model calls.
@@ -921,7 +921,13 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
     }
 
     const address = clientAddress({ get: (name) => c.req.header(name) });
-    const limited = limiter.check(`relay|${address}|${user.id}`);
+    // Distributed: the budget follows the account across isolates and colos.
+    const limited = await checkDistributedRateLimit(services, {
+      scope: "ai.relay",
+      key: address + "|" + user.id,
+      limit: services.config.aiRateLimitPerHour,
+      windowMs: 60 * 60_000,
+    });
     if (!limited.allowed) {
       c.header("Retry-After", String(limited.retryAfterSeconds));
       throw new HttpError(429, "ai_rate_limited", "Too many model calls. Wait a moment.", {
@@ -1213,7 +1219,12 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
   app.post("/chat", async (c) => {
     const user = c.get("user");
     const address = clientAddress({ get: (name) => c.req.header(name) });
-    const limited = limiter.check(`${address}|${user.id}`);
+    const limited = await checkDistributedRateLimit(services, {
+      scope: "ai.chat",
+      key: address + "|" + user.id,
+      limit: services.config.aiRateLimitPerHour,
+      windowMs: 60 * 60_000,
+    });
     if (!limited.allowed) {
       c.header("Retry-After", String(limited.retryAfterSeconds));
       // Say when, not just "later": a message without a horizon sends the user away for

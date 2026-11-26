@@ -2732,6 +2732,43 @@ export class AppStore {
   }
 
   /** Every remediation still open, for a project dashboard. */
+
+  /**
+   * One atomic increment of a fixed-window counter.
+   *
+   * RETURNING is what makes this a decision rather than a guess: the count that decides
+   * is the count this call produced, even when ten isolates hit the same key at once.
+   */
+  async hitRateLimit(input: {
+    scope: string;
+    key: string;
+    windowMs: number;
+    now: Date;
+  }): Promise<{ count: number; resetAt: string }> {
+    const start = input.now.toISOString();
+    const expiresAt = new Date(input.now.getTime() + input.windowMs).toISOString();
+    const row = await this.db
+      .prepare(
+        `INSERT INTO rate_limits (scope, key, window_start, count, expires_at)
+         VALUES (?, ?, ?, 1, ?)
+         ON CONFLICT(scope, key) DO UPDATE SET
+           count = CASE
+             WHEN rate_limits.expires_at <= excluded.window_start THEN 1
+             ELSE rate_limits.count + 1
+           END,
+           window_start = excluded.window_start,
+           expires_at = CASE
+             WHEN rate_limits.expires_at <= excluded.window_start THEN excluded.expires_at
+             ELSE rate_limits.expires_at
+           END
+         RETURNING count, expires_at`
+      )
+      .bind(input.scope, input.key, start, expiresAt)
+      .first<Row>();
+    if (!row) throw new Error("rate limit counter did not return a row");
+    return { count: Number(row.count), resetAt: str(row, "expires_at") };
+  }
+
   async openRemediationCount(workspaceId: string): Promise<number> {
     const row = await this.db
       .prepare(

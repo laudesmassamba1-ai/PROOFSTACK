@@ -120,6 +120,17 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
       return;
     }
     if (c.req.method !== "GET" && c.req.method !== "HEAD" && c.req.method !== "OPTIONS") {
+      // Fetch metadata is the second line of CSRF defence: a browser states where the
+      // request came from even when an old one sends no Origin (a plain form post, for
+      // instance). A cookie-authenticated write from another site is refused outright.
+      const fetchSite = c.req.header("sec-fetch-site");
+      if (fetchSite === "cross-site") {
+        throw new HttpError(
+          403,
+          "cross_site_write",
+          "A write from another site is refused. Reload the app and retry from it."
+        );
+      }
       const origin = c.req.header("origin");
       if (origin && !originAllowed(config.webOrigins, origin)) {
         // The origin is echoed in `details` on purpose: without it the message reads like
