@@ -57,6 +57,7 @@ Format demandé par la règle de livraison :
 | Analysis canonique (cycle de vie, annulation, pagination) | VÉRIFIÉ (`0021_analyses.sql`, `routes/analyses.ts`) | OUI (`apps/api/test/analyses.test.ts`, 10 cas) | OUI | OUI (`/app/analyses`, 26 nov.) | NON VÉRIFIÉ |
 | Remédiation vérifiée par seconde mesure | VÉRIFIÉ (`0022`, `routes/remediations.ts`, `core/remediation.ts`) | OUI (`remediations.test.ts`, 9 cas) | OUI | OUI (26 nov. : `verified` et `inconclusive` obtenus à l'écran) | NON VÉRIFIÉ |
 | Onboarding quatre questions + recommandation du registre | VÉRIFIÉ (`0024`, `routes/onboarding.ts`, page `Onboarding.tsx`) | OUI (`onboarding.test.ts`, 5 cas) | OUI | OUI (26 nov. : site → profil `security`, API → refus honnête) | NON VÉRIFIÉ |
+| Cinq cibles de départ + pages lues / non suivies | VÉRIFIÉ (`Start.tsx`, `App.tsx` ; crawl `audits.ts`) | NON — pas de harnais DOM dans `apps/web` | — | OUI (26 nov. : site `www.w3.org`, 2 pages sur 5, 3 adresses non suivies avec raison ; « Un parcours » mène à FLOW) | NON VÉRIFIÉ |
 | File de remédiations (filtres, étape suivante, liens) | VÉRIFIÉ (`Remediations.tsx`) | NON — pas de harnais DOM dans `apps/web` | — | OUI (26 nov., filtre et lien profond cliqués) | NON VÉRIFIÉ |
 | CSRF (origine + `Sec-Fetch-Site`) | VÉRIFIÉ (`app.ts`) | OUI (`security.test.ts`) | OUI | — | NON VÉRIFIÉ |
 | Rate limiting distribué | VÉRIFIÉ (`0023_rate_limits.sql`, `hitRateLimit`) | OUI (suite complète) | OUI | — | NON VÉRIFIÉ |
