@@ -15,6 +15,7 @@ import {
   groupByCause,
   outcomeStatus,
   planAnalysis,
+  profileById,
   summarizeFindings,
 } from "@proofcore/core";
 import { Hono } from "hono";
@@ -82,6 +83,8 @@ const createSchema = z
     target: z.string().min(1).max(2000),
     scope: z.string().min(1).max(120).optional(),
     requestedModules: moduleList.default([]),
+    /** A named profile: expands to its modules before the registry is consulted. */
+    profile: z.string().min(1).max(40).optional(),
     /** What the runner established it can actually do on this target. */
     applicableModules: moduleList.optional(),
     engine: z.string().min(1).max(64).default("proofcore"),
@@ -143,6 +146,22 @@ export function analysisRoutes(services: Services): Hono<AppEnv> {
     const user = c.get("user");
     const body = await readBody(c, createSchema);
     const { workspace, role } = await requireWorkspace(c, services, body.workspaceId);
+    // A profile is a promise about what will be measured; an unknown one is a client bug,
+    // not a reason to silently run the default.
+    const profile = body.profile ? profileById(body.profile) : undefined;
+    if (body.profile && !profile) {
+      throw new HttpError(400, "unknown_profile", `Unknown analysis profile: ${body.profile}`);
+    }
+    if (profile && profile.targetType !== body.targetType) {
+      throw new HttpError(
+        400,
+        "profile_target_mismatch",
+        `Profile ${profile.id} runs on ${profile.targetType}, not ${body.targetType}.`
+      );
+    }
+    const requestedModules = profile
+      ? [...new Set([...profile.modules, ...body.requestedModules])]
+      : body.requestedModules;
     if (role === "viewer") {
       throw new HttpError(403, "insufficient_role", "Viewers cannot start an analysis.");
     }
@@ -157,12 +176,12 @@ export function analysisRoutes(services: Services): Hono<AppEnv> {
     // apply is stored as skipped with its reason, never silently dropped.
     const plan = planAnalysis({
       targetType: body.targetType,
-      requestedModules: body.requestedModules,
+      requestedModules,
       surface: body.source,
     });
     const applicable = body.applicableModules ?? plan.applicableModules;
     const coverage: AnalysisCoverage = {
-      requestedModules: body.requestedModules,
+      requestedModules,
       applicableModules: applicable,
       measuredModules: [],
       skipped: plan.unavailable.map((entry) => ({ module: entry.module, reason: entry.reason })),
@@ -176,7 +195,7 @@ export function analysisRoutes(services: Services): Hono<AppEnv> {
       targetType: body.targetType,
       target: body.target,
       scope: body.scope ?? body.targetType,
-      requestedModules: body.requestedModules,
+      requestedModules,
       applicableModules: applicable,
       engine: body.engine,
       engineVersion: body.engineVersion,

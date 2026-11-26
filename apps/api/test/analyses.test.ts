@@ -292,3 +292,62 @@ describe("analyses", () => {
     expect(audit).not.toHaveProperty("payload_copy");
   });
 });
+
+describe("analysis profiles", () => {
+  it("expands a named profile into its modules and records the plan", async () => {
+    const auth = await signUp("profile@example.com");
+    const response = await harness.request("/api/v1/analyses", {
+      method: "POST",
+      headers: { cookie: auth.cookie },
+      body: JSON.stringify({
+        workspaceId: auth.workspaceId,
+        source: "API",
+        targetType: "SITE",
+        target: "https://shop.example",
+        profile: "seo",
+      }),
+    });
+    expect(response.status).toBe(201);
+    const body = (await response.json()) as {
+      analysis: { coverage: { requestedModules: string[]; applicableModules: string[] } };
+    };
+    expect(body.analysis.coverage.requestedModules.sort()).toEqual(["clean", "exit"]);
+    expect(body.analysis.coverage.applicableModules).toContain("exit");
+  });
+
+  it("refuses an unknown profile instead of running the default", async () => {
+    const auth = await signUp("unknown-profile@example.com");
+    const response = await harness.request("/api/v1/analyses", {
+      method: "POST",
+      headers: { cookie: auth.cookie },
+      body: JSON.stringify({
+        workspaceId: auth.workspaceId,
+        source: "API",
+        targetType: "SITE",
+        target: "https://shop.example",
+        profile: "magic",
+      }),
+    });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error?: { code?: string } };
+    expect(body.error?.code).toBe("unknown_profile");
+  });
+
+  it("refuses a profile that does not run on this target type", async () => {
+    const auth = await signUp("mismatch@example.com");
+    const response = await harness.request("/api/v1/analyses", {
+      method: "POST",
+      headers: { cookie: auth.cookie },
+      body: JSON.stringify({
+        workspaceId: auth.workspaceId,
+        source: "API",
+        targetType: "SITE",
+        target: "https://shop.example",
+        profile: "quick",
+      }),
+    });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error?: { code?: string } };
+    expect(body.error?.code).toBe("profile_target_mismatch");
+  });
+});
