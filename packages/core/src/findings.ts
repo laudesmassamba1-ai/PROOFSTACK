@@ -397,8 +397,7 @@ export function buildFinding(input: BuildFindingInput): Finding {
   const control = controlFor(input.module as ScanModule, input.controlId);
   const copy = control ? control[locale] : null;
   const severity = severityOf(control, input.module);
-  const blocksJourney =
-    input.module === "flow" && (status === "FAILED" || status === "WARNING");
+  const blocksJourney = input.module === "flow" && (status === "FAILED" || status === "WARNING");
   const priority = priorityOf({
     severity,
     ...(control ? { complexity: control.complexity } : {}),
@@ -550,7 +549,15 @@ export interface FindingComparison {
   persisting: Finding[];
   worsened: Finding[];
   improved: Finding[];
-  counts: Record<FindingChange, number> & { total: number };
+  /**
+   * Problems from the reference whose page the target never read.
+   *
+   * They are not "resolved": the page left the crawl, the URL changed, or the module
+   * stopped covering it. Reporting them as fixed is the one comparison mistake that
+   * makes a product look better while a real problem stays open.
+   */
+  unmeasured: Finding[];
+  counts: Record<FindingChange, number> & { total: number; unmeasured: number };
   /** Measured modules on each side, so "nothing changed" can be read with its scope. */
   measured: { before: string[]; after: string[] };
 }
@@ -595,6 +602,7 @@ export function compareFindings(
   const persisting: Finding[] = [];
   const worsened: Finding[] = [];
   const improved: Finding[] = [];
+  const unmeasured: Finding[] = [];
   const reasons: string[] = [];
 
   const comparable = measured.before.length > 0 && measured.after.length > 0;
@@ -626,9 +634,22 @@ export function compareFindings(
       else improved.push(current);
     } else persisting.push(current);
   }
+  // A page counts as re-read when the target still carries a finding for that URL, or
+  // when the finding is site-level (no URL) and the module ran again.
+  const afterUrls = new Set(
+    after.map((finding) => finding.url).filter((url): url is string => url !== null)
+  );
   for (const [key, previous] of beforeByKey) {
     if (afterByKey.has(key)) continue;
-    if (failing(previous)) resolved.push(previous);
+    if (!failing(previous)) continue;
+    if (previous.url === null || afterUrls.has(previous.url)) resolved.push(previous);
+    else unmeasured.push(previous);
+  }
+  if (unmeasured.length > 0) {
+    reasons.push(
+      unmeasured.length +
+        " constat(s) de la référence portent sur des pages que l'analyse cible n'a pas relues ; ils ne sont pas comptés comme corrigés."
+    );
   }
 
   const sortFindings = (items: Finding[]) => items.sort(compareFindingsForDisplay);
@@ -637,6 +658,7 @@ export function compareFindings(
   sortFindings(persisting);
   sortFindings(worsened);
   sortFindings(improved);
+  sortFindings(unmeasured);
 
   return {
     comparable,
@@ -646,18 +668,16 @@ export function compareFindings(
     persisting,
     worsened,
     improved,
+    unmeasured,
     counts: {
       appeared: appeared.length,
       resolved: resolved.length,
       persisting: persisting.length,
       worsened: worsened.length,
       improved: improved.length,
+      unmeasured: unmeasured.length,
       total:
-        appeared.length +
-        resolved.length +
-        persisting.length +
-        worsened.length +
-        improved.length,
+        appeared.length + resolved.length + persisting.length + worsened.length + improved.length,
     },
     measured: { before: [...measured.before], after: [...measured.after] },
   };

@@ -33,7 +33,13 @@ describe("finding statuses", () => {
   });
 
   it("treats every no-verdict status as inconclusive, never as a pass", () => {
-    for (const status of ["SKIPPED", "BLOCKED", "ERROR", "NOT_APPLICABLE", "NOT_CONFIGURED"] as const) {
+    for (const status of [
+      "SKIPPED",
+      "BLOCKED",
+      "ERROR",
+      "NOT_APPLICABLE",
+      "NOT_CONFIGURED",
+    ] as const) {
       expect(isInconclusive(status)).toBe(true);
     }
     expect(isInconclusive("PASSED")).toBe(false);
@@ -145,13 +151,15 @@ describe("comparison", () => {
     expect(result.counts.total).toBe(0);
   });
 
-  it("refuses to treat a change of URL as a fix", () => {
+  it("does not call a finding fixed when the target never read that page", () => {
     const before = [make("hsts", "FAIL", "https://shop.example/a")];
     const after = [make("hsts", "PASS", "https://shop.example/b")];
     const result = compareFindings(before, after, measured);
-    // Different pages: the old finding has no counterpart, the new page has no finding.
-    expect(result.resolved).toHaveLength(1);
+    // The old page left the crawl: its finding was not corrected, it went unobserved.
+    expect(result.resolved).toHaveLength(0);
+    expect(result.unmeasured.map((item) => item.url)).toEqual(["https://shop.example/a"]);
     expect(result.appeared).toHaveLength(0);
+    expect(result.reasons.join(" ")).toContain("pas relues");
   });
 
   it("summarises statuses without counting an inconclusive finding as a pass", () => {
