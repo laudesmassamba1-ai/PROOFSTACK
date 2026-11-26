@@ -36,10 +36,9 @@ function useGlyphLoop(
     let raf = 0;
     let visible = true;
     const lite = LITE();
-    let last = 0;
     const fit = (): number => {
       const rect = canvas.getBoundingClientRect();
-      const dpr = Math.min(window.devicePixelRatio || 1, lite ? 1.25 : 2);
+      const dpr = Math.min(window.devicePixelRatio || 1, lite ? 1.5 : 2);
       const w = Math.max(1, Math.round(rect.width * dpr));
       const h = Math.max(1, Math.round(rect.height * dpr));
       if (canvas.width !== w || canvas.height !== h) {
@@ -63,11 +62,6 @@ function useGlyphLoop(
     const tick = (): void => {
       raf = visible ? requestAnimationFrame(tick) : 0;
       if (!visible) return;
-      if (lite) {
-        const now = performance.now();
-        if (now - last < 120) return;
-        last = now;
-      }
       const dpr = fit();
       drawRef.current(
         ctx,
@@ -133,18 +127,33 @@ const cell = (
   };
 };
 
-/** Échantillonne un tracé vectoriel offscreen en grille de caractères. */
+/** Échantillonne un tracé vectoriel offscreen en grille de caractères.
+ *  Le canvas de travail est un singleton réutilisé : le créer et le jeter à
+ *  chaque image met le ramasse-miettes à genoux sur un téléphone modeste. */
+let scratch: { cv: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null = null;
+
 function rasterize(
   w: number,
   h: number,
   step: number,
   paint: (c: CanvasRenderingContext2D) => void
 ): Uint8ClampedArray {
-  const off = document.createElement("canvas");
-  off.width = Math.ceil(w);
-  off.height = Math.ceil(h);
-  const c = off.getContext("2d");
-  if (!c) return new Uint8ClampedArray(0);
+  if (!scratch) {
+    const cv = document.createElement("canvas");
+    const ctx = cv.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return new Uint8ClampedArray(0);
+    scratch = { cv, ctx };
+  }
+  const off = scratch.cv;
+  const c = scratch.ctx;
+  const cw = Math.ceil(w);
+  const ch = Math.ceil(h);
+  if (off.width !== cw || off.height !== ch) {
+    off.width = cw;
+    off.height = ch;
+  } else {
+    c.clearRect(0, 0, cw, ch);
+  }
   c.strokeStyle = "#fff";
   c.fillStyle = "#fff";
   c.lineWidth = Math.max(2, step * 0.5);
@@ -205,11 +214,24 @@ export function NameStrip({ className = "" }: { className?: string }) {
     const tt = t % loop;
     const { font, gap } = nameLayout(w, h);
     const step = Math.max(5, Math.round(font / 6.4));
-    const off = document.createElement("canvas");
-    off.width = Math.ceil(w);
-    off.height = Math.ceil(h);
-    const oc = off.getContext("2d");
-    if (!oc) return;
+    /* Le même canvas de travail que rasterize : créé une fois, réutilisé à
+     * chaque image — l'allocation par image noierait le GC d'un vieux téléphone. */
+    if (!scratch) {
+      const cv = document.createElement("canvas");
+      const sctx = cv.getContext("2d", { willReadFrequently: true });
+      if (!sctx) return;
+      scratch = { cv, ctx: sctx };
+    }
+    const off = scratch.cv;
+    const oc = scratch.ctx;
+    const cw = Math.ceil(w);
+    const ch = Math.ceil(h);
+    if (off.width !== cw || off.height !== ch) {
+      off.width = cw;
+      off.height = ch;
+    } else {
+      oc.clearRect(0, 0, cw, ch);
+    }
     oc.font = `700 ${font}px ui-monospace, monospace`;
     oc.textBaseline = "middle";
     const widths = NAMES.map((n) => oc.measureText(n).width);
@@ -229,8 +251,8 @@ export function NameStrip({ className = "" }: { className?: string }) {
         sx += (widths[i] ?? 0) + gap;
       });
       oc.globalAlpha = 1;
-      const img = oc.getImageData(0, 0, off.width, off.height);
-      return { data: img.data, iw: off.width };
+      const img = oc.getImageData(0, 0, cw, ch);
+      return { data: img.data, iw: cw };
     })();
     paintGrid(ctx, w, h, data.data, data.iw, step, tt, 0.18);
   });
@@ -333,6 +355,9 @@ function sigil(kind: GlyphKind, t: number): (c: CanvasRenderingContext2D) => voi
   };
 }
 
+/** Cache des trames alpha quantifiées à 20 Hz — dix entrées, éviction FIFO. */
+const rasterCache = new Map<string, { data: Uint8ClampedArray; iw: number }>();
+
 export function ModuleGlyph({
   kind,
   tone = "dark",
@@ -346,8 +371,22 @@ export function ModuleGlyph({
   const ref = useRef<HTMLCanvasElement | null>(null);
   useGlyphLoop(ref, (ctx, w, h, t) => {
     const step = Math.max(4, Math.round(Math.min(w, h) / 36));
-    const data = rasterize(w, h, step, sigil(kind, t));
-    paintGrid(ctx, w, h, data, Math.ceil(w), step, t, 0.06, tone);
+    /* La géométrie du sceau bouge lentement : on la quantifie à 20 Hz et on
+     * met la trame alpha en cache. À 60 images par seconde, l'échantillonnage
+     * vectoriel ne repasse qu'un cycle sur deux — le reste du temps, on
+     * repeint seulement les caractères avec le vrai t pour le scintillement. */
+    const tq = Math.round(t * 20) / 20;
+    const key = `${kind}|${Math.ceil(w)}x${Math.ceil(h)}|${step}|${tq}`;
+    let hit = rasterCache.get(key);
+    if (!hit) {
+      hit = { data: rasterize(w, h, step, sigil(kind, tq)), iw: Math.ceil(w) };
+      rasterCache.set(key, hit);
+      if (rasterCache.size > 10) {
+        const oldest = rasterCache.keys().next().value;
+        if (oldest !== undefined) rasterCache.delete(oldest);
+      }
+    }
+    paintGrid(ctx, w, h, hit.data, hit.iw, step, t, 0.06, tone);
   });
   return <canvas ref={ref} className={`block h-full w-full ${className}`} />;
 }
