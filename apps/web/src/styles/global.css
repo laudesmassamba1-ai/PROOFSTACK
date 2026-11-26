@@ -10762,23 +10762,135 @@ body:has(.app-main-chat) .app-footer {
     min-height: 0;
   }
 
-  /* la scène du glyphe respire entre l'en-tête et le nom */
+  /* les cartes du téléphone sont compactes : la pièce du glyphe est plus
+     basse, le nom et les textes redescendent à l'échelle de lecture */
+  .app-object-card {
+    padding: 11px 12px 12px;
+    border-radius: 14px;
+  }
+
+  .app-object-index {
+    font-size: 8px;
+  }
+
+  .app-object-card .app-badge {
+    padding: 1px 7px;
+    font-size: 7.5px;
+  }
+
   .app-object-stage {
-    margin: 2px -8px 0;
-    min-height: 170px;
+    margin: 1px -4px 0;
+    min-height: 104px;
+  }
+
+  .module-object {
+    max-width: 132px;
+  }
+
+  .module-object-world {
+    max-width: 140px;
+  }
+
+  .module-object-flow,
+  .module-object-exit {
+    max-width: 126px;
   }
 
   .app-object-card-foot {
-    gap: 6px;
-    margin-top: 14px;
+    gap: 4px;
+    margin-top: 10px;
   }
 
   .app-object-name {
-    font-size: 1.45rem;
+    font-size: 1.02rem;
+  }
+
+  .app-object-card-foot p {
+    font-size: 0.7rem;
+    line-height: 1.35;
+    min-height: 0;
+  }
+
+  .app-object-state {
+    font-size: 0.66rem;
   }
 
   .app-object-open {
-    margin-top: 8px;
+    margin-top: 6px;
+    font-size: 0.64rem;
+    gap: 5px;
+  }
+
+  /* les portes d'entrée (analyser, suivre, automatiser) : plus denses */
+  .app-door {
+    padding: 0.85rem 0.9rem 0.9rem;
+  }
+
+  .app-door h3 {
+    font-size: 0.92rem;
+  }
+
+  .app-door p {
+    font-size: 0.78rem;
+    line-height: 1.45;
+  }
+
+  .app-door .app-text-link {
+    font-size: 0.72rem;
+  }
+
+  /* le deck des faits : cartes plus courtes, chiffres calmés */
+  .app-kpi-stack {
+    height: 116px;
+  }
+
+  .kpi-card {
+    padding: 11px 12px 10px;
+  }
+
+  .kpi-label {
+    font-size: 0.62rem;
+  }
+
+  .kpi-value {
+    font-size: 1.35rem;
+  }
+
+  .kpi-card .kpi-note,
+  .kpi-card p:last-child {
+    font-size: 0.64rem;
+  }
+
+  /* la situation : titre et chiffres à l'échelle du téléphone */
+  .app-situation-headline {
+    font-size: clamp(1.9rem, 9.5vw, 2.6rem);
+    margin-top: 14px;
+  }
+
+  .app-situation .app-support {
+    margin-top: 12px;
+    font-size: 0.78rem;
+  }
+
+  .app-stamp-value {
+    font-size: 1.35rem;
+  }
+
+  .app-section-title {
+    font-size: 1rem;
+  }
+
+  /* la carte « prochaine action » : le titre ne crie plus sur trois lignes */
+  .app-next-action {
+    padding: 18px 16px;
+  }
+
+  .app-next-title {
+    font-size: clamp(1.5rem, 7.5vw, 2rem);
+  }
+
+  .app-next-body {
+    font-size: 0.78rem;
   }
 
   /* les panneaux d'atelier (exécutions, échecs, usage) : l'en-tête s'empile,
