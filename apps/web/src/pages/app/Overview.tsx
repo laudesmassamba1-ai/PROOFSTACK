@@ -115,6 +115,12 @@ export function Overview() {
   const { workspaceId } = useSession();
   const { locale, t } = useI18n();
   const fr = locale === "fr";
+
+  /* Sur téléphone, la main fait moins de la moitié d'un écran : le fan qui
+     tourne les cartes déborde de la page. On remplace le fan par un deck
+     vertical (recul vers le haut, aucune rotation) qui tient dans l'écran,
+     et on resserre l'écart. Le clic déplie toujours les cinq questions. */
+  const narrowDeck = typeof window !== "undefined" && window.innerWidth < 700;
   const { theme } = useTheme();
   const navigate = useNavigate();
   const [data, setData] = useState<Overview | null>(null);
@@ -537,10 +543,10 @@ export function Overview() {
                 ? "Les cinq questions — cliquez la pile pour déplier"
                 : "The five questions — click the pile to deal it out"
             }
-            layout="fan"
+            layout={narrowDeck ? "deck" : "fan"}
             visible={5}
-            spread={0.5}
-            depth={0.5}
+            spread={narrowDeck ? 0.3 : 0.5}
+            depth={narrowDeck ? 0.4 : 0.5}
             radius={20}
             threshold={90}
             expandable

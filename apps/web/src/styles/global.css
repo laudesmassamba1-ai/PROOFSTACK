@@ -10714,3 +10714,95 @@ body:has(.app-main-chat) .app-footer {
     width: auto;
   }
 }
+
+/* ── Overview — disposition mobile sur mesure ────────────────────────────── */
+@media (max-width: 767px) {
+  /* les têtes de section s'empilent : l'eyebrow au-dessus du titre, plus de
+     « 02 / LES CINQ QUESTIONS   WORLD. FLOW. EXIT… » compressé sur une ligne */
+  .app-section-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+
+  /* la scène 3D du module ne mord plus sur les bords de la carte */
+  .app-object-stage {
+    margin: 2px -8px 0;
+    min-height: 168px;
+  }
+
+  .module-object {
+    max-width: 240px;
+  }
+
+  .module-object-world {
+    max-width: 250px;
+  }
+
+  .module-object-flow,
+  .module-object-exit {
+    max-width: 230px;
+  }
+
+  /* le deck des cinq questions : une seule carte face à vous, les suivantes
+     reculent vers le haut — la pile reste dans l'écran, rien ne déborde.
+     La marge laisse la place aux cartes qui dépassent au-dessus de la pile. */
+  .app-module-stack {
+    width: 100%;
+    height: 540px;
+    margin-top: 48px;
+  }
+
+  .app-object-card {
+    min-height: 440px;
+  }
+
+  /* les panneaux d'atelier (exécutions, échecs, usage) : l'en-tête s'empile,
+     le lien « Tous les projets » et le badge passent sous le titre */
+  .app-workbench-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  /* le deck des faits : un peu plus bas sur un petit écran */
+  .app-kpi-stack {
+    height: 140px;
+  }
+
+  .kpi-card {
+    padding: 13px 14px 11px;
+  }
+
+  .kpi-value {
+    font-size: 1.6rem;
+  }
+
+  /* les faits de la situation : les libellés ne se coupent plus */
+  .app-stamp-facts {
+    gap: 7px;
+  }
+
+  .app-stamp-value {
+    font-size: 1.7rem;
+  }
+
+  /* la barre d'action finale : boutons pleine largeur, empilés */
+  .app-next-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .app-next-actions .app-btn {
+    justify-content: center;
+    width: 100%;
+  }
+
+  /* table des exécutions : la zone de défilement garde ses limites */
+  .app-table-wrap {
+    margin-inline: -14px;
+    padding-inline: 14px;
+  }
+}
