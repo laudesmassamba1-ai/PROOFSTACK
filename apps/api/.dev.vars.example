@@ -23,6 +23,16 @@ NEON_DATABASE_URL=
 # --- AI provider key encryption --------------------------------------------
 # 32-byte hex value: openssl rand -hex 32. Required for /app/ai and AI audits.
 AI_KEYS_SECRET=
+# Optional managed assistant: the deployment's own provider, used when a person has not
+# connected a key. All three of PROVIDER, MODEL and API_KEY are required together; leave
+# them empty to keep personal keys only. The key is server-side and never returned.
+MANAGED_AI_PROVIDER=
+MANAGED_AI_MODEL=
+MANAGED_AI_API_KEY=
+# Optional: override the provider base URL (self-hosted or OpenAI-compatible gateway).
+MANAGED_AI_BASE_URL=
+# Assistant turns allowed per account per rolling month on the managed key. Default 300.
+MANAGED_AI_CALLS_PER_MONTH=300
 
 # --- EmailJS (optional, preferred over Resend) ------------------------------
 # Enable "Allow EmailJS API for non-browser applications" in the EmailJS account.
