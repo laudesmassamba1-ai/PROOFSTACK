@@ -116,11 +116,10 @@ export function Overview() {
   const { locale, t } = useI18n();
   const fr = locale === "fr";
 
-  /* Sur téléphone, la main fait moins de la moitié d'un écran : le fan qui
-     tourne les cartes déborde de la page. On remplace le fan par un deck
-     vertical (recul vers le haut, aucune rotation) qui tient dans l'écran,
-     et on resserre l'écart. Le clic déplie toujours les cinq questions. */
-  const narrowDeck = typeof window !== "undefined" && window.innerWidth < 700;
+  /* Sur téléphone (<768px, le même seuil que le CSS) : la pile à chevauchement
+     cachait les noms des modules et son cadre mordait sur les cartes. Le fan
+     reste sur bureau ; le téléphone reçoit une liste verticale complète. */
+  const narrowDeck = typeof window !== "undefined" && window.innerWidth < 768;
   const { theme } = useTheme();
   const navigate = useNavigate();
   const [data, setData] = useState<Overview | null>(null);
@@ -532,73 +531,83 @@ export function Overview() {
           </h2>
         </div>
 
-        {/* The five questions as one fanned deck: the top card faces you, the
-            four behind recede bottom-right, and a drag (or a flick) sends the
-            top one to the back — the next question comes forward. A plain click
-            still opens the module: the link survives, only the drag cycles. */}
-        <div className="app-module-stack" data-reveal>
-          <Stack
-            ariaLabel={
-              fr
-                ? "Les cinq questions — cliquez la pile pour déplier"
-                : "The five questions — click the pile to deal it out"
-            }
-            layout={narrowDeck ? "deck" : "fan"}
-            visible={5}
-            spread={narrowDeck ? 0.3 : 0.5}
-            depth={narrowDeck ? 0.4 : 0.5}
-            radius={20}
-            threshold={90}
-            expandable
-            cards={MODULE_IDS.map((module, index) => {
-              const latestModuleRun = data.recentRuns.find((run) => run.totals[module]);
-              const totals = latestModuleRun?.totals[module] ?? EMPTY_TOTALS;
-              const moduleRecord = data.modules.find((item) => item.module === module);
-              const covered = moduleRecord?.lastRunAt ?? latestModuleRun?.startedAt;
-              return (
-                <Link
-                  key={module}
-                  to={`/app/modules/${module}`}
-                  className={`app-object-card module-${module} app-object-card-${index + 1}`}
-                >
-                  <div className="app-object-card-head">
-                    <span className="app-object-index">0{index + 1}</span>
-                    {covered ? (
-                      <StatusBadge status={moduleRecord?.status ?? latestModuleRun?.status ?? ""} />
-                    ) : (
-                      <span className="app-badge">{t("ws.status.notTested")}</span>
-                    )}
-                  </div>
-                  <div className="app-object-stage">
-                    <ModuleGlyph
-                      kind={module as "world" | "flow" | "exit" | "fail" | "clean"}
-                      tone={theme === "dark" ? "dark" : "ink"}
-                    />
-                  </div>
-                  <div className="app-object-card-foot">
-                    <h3 className="app-object-name">{module.toUpperCase()}</h3>
-                    <p className="min-h-[2.7em] max-w-[30ch] text-[0.76rem] font-medium leading-[1.35] text-ink">
-                      {fr ? MODULE_QUESTIONS[module].fr : MODULE_QUESTIONS[module].en}
-                    </p>
-                    <p className="app-object-state">
-                      {covered
-                        ? t("ws.module.latestSummary", {
-                            passed: totals.passed,
-                            failed: totals.failed,
-                            skipped: totals.skipped,
-                            warnings: totals.warnings,
-                          })
-                        : t("ws.module.latestNone")}
-                    </p>
-                    <span className="app-object-open">
-                      {t("ws.overview.openModule")} <ArrowRight size={13} />
-                    </span>
-                  </div>
-                </Link>
-              );
-            })}
-          />
-        </div>
+        {/* La carte d'un module : soit dans le fan de bureau, soit dans la liste
+            verticale du téléphone — le même contenu, une seule source. Sur
+            téléphone la pile à chevauchement cachait les noms et coupait les
+            cartes : une liste simple, chaque module entier, son nom toujours
+            lisible. */}
+        {(() => {
+          const moduleCard = (module: ModuleId, index: number) => {
+            const latestModuleRun = data.recentRuns.find((run) => run.totals[module]);
+            const totals = latestModuleRun?.totals[module] ?? EMPTY_TOTALS;
+            const moduleRecord = data.modules.find((item) => item.module === module);
+            const covered = moduleRecord?.lastRunAt ?? latestModuleRun?.startedAt;
+            return (
+              <Link
+                key={module}
+                to={`/app/modules/${module}`}
+                className={`app-object-card module-${module} app-object-card-${index + 1}`}
+              >
+                <div className="app-object-card-head">
+                  <span className="app-object-index">0{index + 1}</span>
+                  {covered ? (
+                    <StatusBadge status={moduleRecord?.status ?? latestModuleRun?.status ?? ""} />
+                  ) : (
+                    <span className="app-badge">{t("ws.status.notTested")}</span>
+                  )}
+                </div>
+                <div className="app-object-stage">
+                  <ModuleGlyph
+                    kind={module as "world" | "flow" | "exit" | "fail" | "clean"}
+                    tone={theme === "dark" ? "dark" : "ink"}
+                  />
+                </div>
+                <div className="app-object-card-foot">
+                  <h3 className="app-object-name">{module.toUpperCase()}</h3>
+                  <p className="max-w-[30ch] text-[0.76rem] font-medium leading-[1.35] text-ink">
+                    {fr ? MODULE_QUESTIONS[module].fr : MODULE_QUESTIONS[module].en}
+                  </p>
+                  <p className="app-object-state">
+                    {covered
+                      ? t("ws.module.latestSummary", {
+                          passed: totals.passed,
+                          failed: totals.failed,
+                          skipped: totals.skipped,
+                          warnings: totals.warnings,
+                        })
+                      : t("ws.module.latestNone")}
+                  </p>
+                  <span className="app-object-open">
+                    {t("ws.overview.openModule")} <ArrowRight size={13} />
+                  </span>
+                </div>
+              </Link>
+            );
+          };
+          return narrowDeck ? (
+            <div className="app-module-list" data-reveal>
+              {MODULE_IDS.map((module, index) => moduleCard(module, index))}
+            </div>
+          ) : (
+            <div className="app-module-stack" data-reveal>
+              <Stack
+                ariaLabel={
+                  fr
+                    ? "Les cinq questions — cliquez la pile pour déplier"
+                    : "The five questions — click the pile to deal it out"
+                }
+                layout="fan"
+                visible={5}
+                spread={0.5}
+                depth={0.5}
+                radius={20}
+                threshold={90}
+                expandable
+                cards={MODULE_IDS.map((module, index) => moduleCard(module, index))}
+              />
+            </div>
+          );
+        })()}
       </section>
 
       {/* The trend panels are the page's most expensive real estate. Before the first

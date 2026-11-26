@@ -10745,17 +10745,40 @@ body:has(.app-main-chat) .app-footer {
     max-width: 230px;
   }
 
-  /* le deck des cinq questions : une seule carte face à vous, les suivantes
-     reculent vers le haut — la pile reste dans l'écran, rien ne déborde.
-     La marge laisse la place aux cartes qui dépassent au-dessus de la pile. */
+  /* le deck des cinq questions disparaît du téléphone : la pile à
+     chevauchement cachait les noms des modules et son cadre coupait les
+     cartes. À sa place, une liste verticale — chaque module entier, son
+     nom toujours visible, aucun cadre qui mord sur le voisin. */
   .app-module-stack {
-    width: 100%;
-    height: 540px;
-    margin-top: 48px;
+    display: none;
+  }
+
+  .app-module-list {
+    display: grid;
+    gap: 12px;
   }
 
   .app-object-card {
-    min-height: 440px;
+    min-height: 0;
+  }
+
+  /* la scène du glyphe respire entre l'en-tête et le nom */
+  .app-object-stage {
+    margin: 2px -8px 0;
+    min-height: 170px;
+  }
+
+  .app-object-card-foot {
+    gap: 6px;
+    margin-top: 14px;
+  }
+
+  .app-object-name {
+    font-size: 1.45rem;
+  }
+
+  .app-object-open {
+    margin-top: 8px;
   }
 
   /* les panneaux d'atelier (exécutions, échecs, usage) : l'en-tête s'empile,
