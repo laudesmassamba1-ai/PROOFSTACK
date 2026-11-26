@@ -520,6 +520,133 @@ describe("ai chat", () => {
     expect(firstBody.max_tokens).toBe(1600); // deep
   });
 
+  it("validates a FLOW scenario with the editor's rules and saves nothing", async () => {
+    const { request, signUp } = harness;
+    const { cookie, workspaceId } = await signUp("ai-scenario@example.com");
+    const profile = await request("/api/v1/ai/profile", {
+      method: "PUT",
+      cookie,
+      body: JSON.stringify({
+        providerId: "custom",
+        baseUrl: upstreamBase,
+        model: "test-model",
+        apiKey: "sk-scenario-key-789",
+      }),
+    });
+    expect(profile.status, await profile.clone().text()).toBe(200);
+
+    const scenario = (steps: unknown[]) =>
+      JSON.stringify({ name: "Parcours d'achat", target: "https://shop.example/checkout", steps });
+    const seen: string[] = [];
+    upstreamState.respond = (attempt, body) => {
+      if (attempt === 1) {
+        return {
+          status: 200,
+          body: {
+            choices: [
+              {
+                message: {
+                  role: "assistant",
+                  content: null,
+                  tool_calls: [
+                    {
+                      id: "call_flow_1",
+                      type: "function",
+                      function: {
+                        name: "validate_scenario",
+                        arguments: scenario([
+                          {
+                            id: "s1",
+                            kind: "navigate",
+                            label: "Ouvrir la page",
+                            value: "https://shop.example/",
+                          },
+                          { id: "s2", kind: "click", label: "Payer" },
+                        ]),
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        };
+      }
+      const parsed = body as { messages: { role: string; content: string }[] };
+      const toolMessages = parsed.messages.filter((message) => message.role === "tool");
+      seen.push(toolMessages.at(-1)?.content ?? "");
+      if (attempt === 2) {
+        return {
+          status: 200,
+          body: {
+            choices: [
+              {
+                message: {
+                  role: "assistant",
+                  content: null,
+                  tool_calls: [
+                    {
+                      id: "call_flow_2",
+                      type: "function",
+                      function: {
+                        name: "validate_scenario",
+                        arguments: scenario([
+                          {
+                            id: "s1",
+                            kind: "navigate",
+                            label: "Ouvrir la page",
+                            value: "https://shop.example/",
+                          },
+                          { id: "s2", kind: "click", label: "Payer", target: "Payer" },
+                        ]),
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        };
+      }
+      return {
+        status: 200,
+        body: {
+          choices: [{ message: { role: "assistant", content: "Le parcours est prêt." } }],
+        },
+      };
+    };
+
+    const chat = await request("/api/v1/ai/chat", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({
+        workspaceId,
+        message: "Prépare un parcours d'achat",
+        effort: "deep",
+      }),
+    });
+    expect(chat.status, await chat.clone().text()).toBe(200);
+    const body = (await chat.json()) as {
+      message: string;
+      trace: { tool: string; summary: string }[];
+    };
+    expect(body.message).toContain("prêt");
+    expect(body.trace.map((entry) => entry.tool)).toEqual([
+      "validate_scenario",
+      "validate_scenario",
+    ]);
+    expect(seen[0]).toContain('"valid": false');
+    expect(seen[0]).toContain("missing_target");
+    expect(seen[1]).toContain('"valid": true');
+    expect(seen[1]).toContain("https://shop.example/");
+    expect(body.trace[0]?.summary).toContain("refusé");
+
+    // The read tool validated; it did not save. A write still needs the user's request.
+    const list = await request(`/api/v1/flow/scenarios?workspaceId=${workspaceId}`, { cookie });
+    expect(list.status).toBe(200);
+    expect(((await list.json()) as { scenarios: unknown[] }).scenarios).toHaveLength(0);
+  });
+
   it("maps an upstream 401 to ai_invalid_key and never invents an answer", async () => {
     const { request, signUp } = harness;
     const { cookie, workspaceId } = await signUp("ai-401@example.com");

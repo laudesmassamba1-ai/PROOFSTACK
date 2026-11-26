@@ -24,6 +24,7 @@ export const AI_TOOL_PERMISSIONS: Record<string, PermissionClass> = {
   list_analyses: "read",
   analysis_findings: "read",
   compare_analyses: "read",
+  validate_scenario: "read",
   list_remediations: "read",
 
   // Analysis: spends time, quota or someone else's network. Capped per turn.

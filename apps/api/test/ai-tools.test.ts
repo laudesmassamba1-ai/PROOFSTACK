@@ -80,6 +80,7 @@ describe("assistant tool catalogue", () => {
     expect(names).toContain("capabilities");
     expect(names).toContain("analysis_findings");
     expect(names).toContain("open_remediation");
+    expect(names).toContain("validate_scenario");
     for (const tool of body.tools) {
       expect(body.classes).toContain(tool.permission);
       expect(tool.description.length).toBeGreaterThan(10);
@@ -101,6 +102,7 @@ describe("assistant tool catalogue", () => {
   it("refuses an unclassified tool by default", () => {
     expect(permissionOf("a_tool_nobody_classified")).toBe("sensitive");
     expect(permissionOf("analysis_findings")).toBe("read");
+    expect(permissionOf("validate_scenario")).toBe("read");
     expect(permissionOf("open_remediation")).toBe("write");
   });
 

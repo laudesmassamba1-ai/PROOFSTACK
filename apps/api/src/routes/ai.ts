@@ -9,6 +9,7 @@ import {
   shortId,
   stableStringify,
   summarizeFindings,
+  validateFlowScenario,
 } from "@proofcore/core";
 import { type Context, Hono } from "hono";
 import { z } from "zod";
@@ -834,6 +835,21 @@ const TOOLS: { name: string; description: string; parameters: Record<string, unk
         severity: { type: "string" },
       },
       required: ["analysisId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "validate_scenario",
+    description:
+      "Validate a FLOW scenario before proposing it: the same rules the editor and the runner enforce. Returns the canonical target, the normalised steps, or every refusal with its step and code. It does not save and does not run — saving is a write the user must ask for.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        target: { type: "string" },
+        steps: { type: "array", items: { type: "object" } },
+      },
+      required: ["name", "target", "steps"],
       additionalProperties: false,
     },
   },
@@ -2070,6 +2086,39 @@ async function executeTool(
             2
           ),
           summary: `${filtered.length} constat(s)`,
+        };
+      }
+      case "validate_scenario": {
+        const steps = Array.isArray(args.steps) ? args.steps : [];
+        const result = validateFlowScenario({
+          name: typeof args.name === "string" ? args.name : "",
+          target: typeof args.target === "string" ? args.target : "",
+          steps,
+        });
+        if (!result.ok) {
+          return {
+            content: stableStringify(
+              {
+                valid: false,
+                issues: result.issues,
+                hint: "Fix every issue before proposing the scenario. Saving one the runner would skip is not a scenario.",
+              },
+              2
+            ),
+            summary: `scénario refusé (${result.issues.length})`,
+          };
+        }
+        return {
+          content: stableStringify(
+            {
+              valid: true,
+              scenario: result.scenario,
+              saved: false,
+              next: "The user can save it in FLOW Studio (/app/flow) or run the same steps with proofcore audit interact.",
+            },
+            2
+          ),
+          summary: `scénario valide · ${result.scenario.steps.length} étape(s)`,
         };
       }
       case "compare_analyses": {
