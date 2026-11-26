@@ -9,6 +9,7 @@ import { useState } from "react";
 import { useI18n } from "../../i18n/index.js";
 import { type ApiError, apiFetch } from "../../lib/api.js";
 import { errorText } from "../../lib/errorText.js";
+import { REMEDIATION_OUTCOME_LABEL, REMEDIATION_STATUS_LABEL } from "../../lib/remediationText.js";
 
 /**
  * The remediation chain, on the finding itself.
@@ -62,21 +63,6 @@ const STATUS_TONE: Record<string, string> = {
   verified: "text-success",
   failed: "text-danger",
   dismissed: "text-muted",
-};
-
-const STATUS_LABEL: Record<string, { fr: string; en: string }> = {
-  proposed: { fr: "proposée", en: "proposed" },
-  approved: { fr: "approuvée", en: "approved" },
-  applied: { fr: "appliquée, à vérifier", en: "applied, to verify" },
-  verified: { fr: "vérifiée par une analyse", en: "verified by an analysis" },
-  failed: { fr: "échec de vérification", en: "verification failed" },
-  dismissed: { fr: "écartée", en: "dismissed" },
-};
-
-const OUTCOME_LABEL: Record<string, { fr: string; en: string }> = {
-  verified: { fr: "vérifiée par mesure", en: "verified by measurement" },
-  still_failing: { fr: "toujours en échec", en: "still failing" },
-  inconclusive: { fr: "non concluant", en: "inconclusive" },
 };
 
 const NEXT_STATUS: Partial<Record<RemediationStatus, RemediationStatus[]>> = {
@@ -170,7 +156,7 @@ export function FindingRemediation({
     <div className="mt-2 rounded-[var(--radius)] bg-surface-alt px-3 py-2">
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <span className={`font-medium ${STATUS_TONE[existing.status] ?? "text-muted"}`}>
-          {STATUS_LABEL[existing.status]?.[fr ? "fr" : "en"] ?? existing.status}
+          {REMEDIATION_STATUS_LABEL[existing.status]?.[fr ? "fr" : "en"] ?? existing.status}
         </span>
         <span className="text-muted">
           {existing.steps.length}/{Object.keys(REMEDIATION_STEP_LABELS).length}{" "}
@@ -184,7 +170,7 @@ export function FindingRemediation({
         {existing.verificationOutcome ? (
           <span className="text-muted">
             ·{" "}
-            {OUTCOME_LABEL[existing.verificationOutcome]?.[fr ? "fr" : "en"] ??
+            {REMEDIATION_OUTCOME_LABEL[existing.verificationOutcome]?.[fr ? "fr" : "en"] ??
               existing.verificationOutcome}
           </span>
         ) : null}
@@ -236,7 +222,7 @@ export function FindingRemediation({
                   })
                 }
               >
-                {STATUS_LABEL[status]?.[fr ? "fr" : "en"] ?? status}
+                {REMEDIATION_STATUS_LABEL[status]?.[fr ? "fr" : "en"] ?? status}
               </button>
             ))
           : null}

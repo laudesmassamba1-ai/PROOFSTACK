@@ -1,5 +1,6 @@
 import { Activity, GitCompare, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router";
 import { FindingRemediation, type Remediation } from "../../components/app/FindingRemediation.js";
 import { Empty, ErrorState, Loading } from "../../components/app/ui.js";
 import { useI18n } from "../../i18n/index.js";
@@ -143,6 +144,8 @@ function CoverageLine({ coverage, fr }: { coverage: Coverage; fr: boolean }) {
 
 export function AnalysesPage() {
   const session = useSession();
+  const [search] = useSearchParams();
+  const requested = search.get("analysis");
   const { locale } = useI18n();
   const fr = locale === "fr";
   const [list, setList] = useState<Analysis[] | null>(null);
@@ -164,11 +167,17 @@ export function AnalysesPage() {
         `/api/v1/analyses?workspaceId=${encodeURIComponent(session.workspaceId)}&limit=50`
       );
       setList(body.items);
-      setSelected((current) => current ?? body.items[0]?.id ?? null);
+      // A link from the remediation queue names the analysis to open; without it the
+      // page keeps whatever was already selected, then falls back to the newest.
+      if (requested && body.items.some((item) => item.id === requested)) {
+        setSelected(requested);
+      } else {
+        setSelected((current) => current ?? body.items[0]?.id ?? null);
+      }
     } catch (caught) {
       setListError(caught as ApiError);
     }
-  }, [session.workspaceId]);
+  }, [requested, session.workspaceId]);
 
   useEffect(() => {
     void loadList();

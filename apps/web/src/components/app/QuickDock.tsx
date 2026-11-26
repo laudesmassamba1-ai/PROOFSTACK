@@ -4,6 +4,7 @@ import {
   BookOpen,
   Boxes,
   Brain,
+  ClipboardCheck,
   CreditCard,
   FolderPlus,
   Globe2,
@@ -58,6 +59,11 @@ export function QuickDock() {
       icon: <Activity size={20} />,
       label: "Analyses",
       onClick: go("/app/analyses"),
+    },
+    {
+      icon: <ClipboardCheck size={20} />,
+      label: fr ? "Remédiations" : "Remediations",
+      onClick: go("/app/remediations"),
     },
     {
       icon: <LayoutGrid size={20} />,

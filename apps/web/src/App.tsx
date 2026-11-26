@@ -89,6 +89,9 @@ const Settings = lazy(() =>
 );
 const Admin = lazy(() => import("./pages/app/Admin.js").then((m) => ({ default: m.Admin })));
 const AiChat = lazy(() => import("./pages/app/AiChat.js").then((m) => ({ default: m.AiChatPage })));
+const RemediationsPage = lazy(() =>
+  import("./pages/app/Remediations.js").then((m) => ({ default: m.RemediationsPage }))
+);
 const AnalysesPage = lazy(() =>
   import("./pages/app/Analyses.js").then((m) => ({ default: m.AnalysesPage }))
 );
@@ -172,6 +175,7 @@ export function App() {
           <Route path="modules" element={<ModulesIndex />} />
           <Route path="scan" element={<ScanPage />} />
           <Route path="analyses" element={<AnalysesPage />} />
+          <Route path="remediations" element={<RemediationsPage />} />
           <Route path="interact" element={<InteractPage />} />
           <Route path="start" element={<StartPage />} />
           <Route path="guide" element={<GuidePage />} />

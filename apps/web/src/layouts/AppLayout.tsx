@@ -5,6 +5,7 @@ import {
   Boxes,
   Brain,
   ChevronDown,
+  ClipboardCheck,
   CloudOff,
   Command,
   CreditCard,
@@ -287,6 +288,11 @@ export function AppLayout() {
       [t("ws.nav.projects"), "/app/projects", <FolderKanban key="projects" size={15} />],
       [locale === "fr" ? "Analyser" : "Scan", "/app/start", <Search key="start" size={15} />],
       ["Analyses", "/app/analyses", <Activity key="analyses" size={15} />],
+      [
+        t("ws.nav.remediations"),
+        "/app/remediations",
+        <ClipboardCheck key="remediations" size={15} />,
+      ],
       [locale === "fr" ? "Guide" : "Guide", "/app/guide", <BookOpen key="guide" size={15} />],
       ["MODULES", "/app/modules", <LayoutGrid key="modules" size={15} />],
       [t("ws.nav.workspace"), "/app/workspace", <Boxes key="workspace" size={15} />],
@@ -314,6 +320,7 @@ export function AppLayout() {
               to === "/app/projects" ||
               to === "/app/start" ||
               to === "/app/analyses" ||
+              to === "/app/remediations" ||
               to === "/app/modules" ||
               to === "/app/guide"
           )
