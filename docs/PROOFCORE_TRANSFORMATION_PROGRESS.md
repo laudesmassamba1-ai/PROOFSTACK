@@ -97,17 +97,17 @@ Les statuts utilisés : **FAIT**, **PARTIEL**, **BLOQUÉ**, **NON COMMENCÉ**.
 
 ## Étape I — Production
 
-| Élément                 | État         | Limite                                        |
-| ----------------------- | ------------ | --------------------------------------------- |
-| Isolation multi-comptes | FAIT         | 30 assertions inter-comptes                   |
-| Anti-SSRF webhooks      | FAIT         | 31 tests                                      |
-| Rate limiting           | PARTIEL      | durable pour l'auth, local pour le reste      |
-| Secrets                 | PARTIEL      | clés IA chiffrées ; webhooks/e-mails en clair |
-| Webhooks paiement       | FAIT         | signature, anti-rejeu, vérification serveur   |
-| Observabilité           | PARTIEL      | request-id + logs 5xx, pas de métriques       |
-| Sauvegarde/restauration | NON COMMENCÉ | bloquant                                      |
+| Élément                 | État         | Limite                                                                                                                                                                        |
+| ----------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Isolation multi-comptes | FAIT         | 30 assertions inter-comptes                                                                                                                                                   |
+| Anti-SSRF webhooks      | FAIT         | 31 tests                                                                                                                                                                      |
+| Rate limiting           | PARTIEL      | durable pour l'auth, local pour le reste                                                                                                                                      |
+| Secrets                 | PARTIEL      | clés IA chiffrées ; webhooks/e-mails en clair                                                                                                                                 |
+| Webhooks paiement       | FAIT         | signature, anti-rejeu, vérification serveur                                                                                                                                   |
+| Observabilité           | PARTIEL      | request-id + logs 5xx, pas de métriques                                                                                                                                       |
+| Sauvegarde/restauration | NON COMMENCÉ | bloquant                                                                                                                                                                      |
 | Rétention               | FAIT         | purge paresseuse à la lecture + balayage planifié (cron 03:17 UTC) + clés d'idempotence 30 j ; 4 tests (`retention.test.ts`) ; la réponse d'upload donne la date d'expiration |
-| Déploiement             | NON EXÉCUTÉ  | non demandé dans cette passe                  |
+| Déploiement             | NON EXÉCUTÉ  | non demandé dans cette passe                                                                                                                                                  |
 
 ## Étape J — Recette
 
