@@ -1,4 +1,11 @@
-import { buildFinding, type Finding, findingKey, type ScanStatus } from "@proofcore/core";
+import {
+  buildFinding,
+  compareFindings,
+  type Finding,
+  type FindingComparison,
+  findingKey,
+  type ScanStatus,
+} from "@proofcore/core";
 import type { Services } from "./http/services.js";
 import type { AnalysisRecord } from "./store/app-store.js";
 
@@ -163,4 +170,36 @@ export async function findingsForAnalysis(
 /** The stable identity two analyses are compared on. */
 export function findingIdentity(finding: Finding): string {
   return findingKey(finding.module, finding.controlId, finding.url);
+}
+
+/**
+ * The comparison behind both `GET /analyses/compare` and the assistant's
+ * `compare_analyses` tool.
+ *
+ * One implementation on purpose: a chat answer and a report that disagree about whether
+ * a problem was fixed would make the second opinion worthless.
+ */
+export async function compareAnalysisPair(
+  services: Services,
+  workspaceId: string,
+  baseId: string,
+  targetId: string
+): Promise<{ base: AnalysisRecord; target: AnalysisRecord; comparison: FindingComparison } | null> {
+  const [base, target] = await Promise.all([
+    services.store.getAnalysis(workspaceId, baseId),
+    services.store.getAnalysis(workspaceId, targetId),
+  ]);
+  if (!base || !target) return null;
+  const [before, after] = await Promise.all([
+    findingsForAnalysis(services, base),
+    findingsForAnalysis(services, target),
+  ]);
+  return {
+    base,
+    target,
+    comparison: compareFindings(before.findings, after.findings, {
+      before: before.measuredModules,
+      after: after.measuredModules,
+    }),
+  };
 }

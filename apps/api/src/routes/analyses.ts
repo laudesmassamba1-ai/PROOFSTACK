@@ -6,7 +6,6 @@ import {
   type AnalysisStatus,
   analysisDurationMs,
   canTransitionAnalysis,
-  compareFindings,
   compareFindingsForDisplay,
   coverageLabel,
   coverageRatio,
@@ -20,7 +19,7 @@ import {
 } from "@proofcore/core";
 import { Hono } from "hono";
 import { z } from "zod";
-import { findingsForAnalysis } from "../findings.js";
+import { compareAnalysisPair, findingsForAnalysis } from "../findings.js";
 import { HttpError } from "../http/errors.js";
 import { readBody, requireWorkspace } from "../http/guards.js";
 import { pageBody, readPage } from "../http/pagination.js";
@@ -250,23 +249,12 @@ export function analysisRoutes(services: Services): Hono<AppEnv> {
     if (!baseId || !targetId) {
       throw new HttpError(400, "comparison_required", "Both base and target are required.");
     }
-    const [base, target] = await Promise.all([
-      services.store.getAnalysis(workspace.id, baseId),
-      services.store.getAnalysis(workspace.id, targetId),
-    ]);
-    if (!base || !target) throw new HttpError(404, "analysis_not_found", "Analysis not found.");
-    const [before, after] = await Promise.all([
-      findingsForAnalysis(services, base),
-      findingsForAnalysis(services, target),
-    ]);
-    const comparison = compareFindings(before.findings, after.findings, {
-      before: before.measuredModules,
-      after: after.measuredModules,
-    });
+    const pair = await compareAnalysisPair(services, workspace.id, baseId, targetId);
+    if (!pair) throw new HttpError(404, "analysis_not_found", "Analysis not found.");
     return c.json({
-      base: analysisDto(base),
-      target: analysisDto(target),
-      comparison,
+      base: analysisDto(pair.base),
+      target: analysisDto(pair.target),
+      comparison: pair.comparison,
     });
   });
 

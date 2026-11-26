@@ -257,6 +257,9 @@ describe("analysis comparison", () => {
       };
     };
     expect(body.comparison.comparable).toBe(true);
+    // The response always carries the unmeasured list, so a client cannot read a
+    // "resolved" count without also being able to show what was never re-read.
+    expect(body.comparison).toHaveProperty("unmeasured");
     expect(body.comparison.persisting.map((item) => item.controlId)).toEqual(["hsts"]);
     expect(body.comparison.appeared.map((item) => item.controlId)).toEqual(["tls"]);
     expect(body.comparison.resolved.map((item) => item.controlId).sort()).toEqual([

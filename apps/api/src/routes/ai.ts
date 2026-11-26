@@ -21,7 +21,7 @@ import {
 } from "../ai-providers.js";
 import { AnalysisBudget, MAX_ANALYSIS_CALLS_PER_TURN, permissionOf } from "../ai-tool-policy.js";
 import { browsePage, describeBrowsedPage } from "../browser-render.js";
-import { findingsForAnalysis } from "../findings.js";
+import { compareAnalysisPair, findingsForAnalysis } from "../findings.js";
 import { quotaErrorFromDecision } from "../http/entitlement-http.js";
 import { clientAddress, HttpError } from "../http/errors.js";
 import { readBody, requireWorkspace } from "../http/guards.js";
@@ -834,6 +834,17 @@ const TOOLS: { name: string; description: string; parameters: Record<string, unk
         severity: { type: "string" },
       },
       required: ["analysisId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "compare_analyses",
+    description:
+      "What changed between two analyses of the same target: appeared, resolved, persisting, worsened, improved, and unmeasured (pages the later run never read). Use the two ids from list_analyses. Never claims a problem is fixed when the later analysis did not measure that page.",
+    parameters: {
+      type: "object",
+      properties: { base: { type: "string" }, target: { type: "string" } },
+      required: ["base", "target"],
       additionalProperties: false,
     },
   },
@@ -2046,6 +2057,61 @@ async function executeTool(
             2
           ),
           summary: filtered.length + " constat(s)",
+        };
+      }
+      case "compare_analyses": {
+        const base = typeof args.base === "string" ? args.base : "";
+        const target = typeof args.target === "string" ? args.target : "";
+        if (!base || !target) {
+          return {
+            content: stableStringify({ error: "base and target are required" }),
+            summary: "invalid request",
+          };
+        }
+        const pair = await compareAnalysisPair(services, workspaceId, base, target);
+        if (!pair) {
+          return {
+            content: stableStringify({
+              error: "analysis_not_found",
+              hint: "Call list_analyses to get two real ids.",
+            }),
+            summary: "analyse introuvable",
+          };
+        }
+        const brief = (item: (typeof pair.comparison.appeared)[number]) => ({
+          module: item.module,
+          controlId: item.controlId,
+          status: item.status,
+          severity: item.severity,
+          url: item.url,
+        });
+        const { comparison } = pair;
+        return {
+          content: stableStringify(
+            {
+              base,
+              target,
+              comparable: comparison.comparable,
+              reasons: comparison.reasons,
+              counts: comparison.counts,
+              measured: comparison.measured,
+              appeared: comparison.appeared.slice(0, 20).map(brief),
+              resolved: comparison.resolved.slice(0, 20).map(brief),
+              persisting: comparison.persisting.slice(0, 20).map(brief),
+              worsened: comparison.worsened.slice(0, 20).map(brief),
+              improved: comparison.improved.slice(0, 20).map(brief),
+              unmeasured: comparison.unmeasured.slice(0, 20).map(brief),
+            },
+            2
+          ),
+          summary: comparison.comparable
+            ? comparison.counts.appeared +
+              " nouveau(x), " +
+              comparison.counts.resolved +
+              " corrigé(s), " +
+              comparison.counts.unmeasured +
+              " non relu(s)"
+            : "comparaison non concluante",
         };
       }
       case "list_remediations": {
