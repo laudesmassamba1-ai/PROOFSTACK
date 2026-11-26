@@ -24,7 +24,7 @@ async function bootstrap(extra: Record<string, string> = {}) {
   const config = readConfig(env);
   return {
     request: (path: string, init: RequestInit = {}) =>
-      built.app.request("http://localhost" + path, {
+      built.app.request(`http://localhost${path}`, {
         ...init,
         headers: { "content-type": "application/json", origin: config.webOrigin, ...init.headers },
       }),

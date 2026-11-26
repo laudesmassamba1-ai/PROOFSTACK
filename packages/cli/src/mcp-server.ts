@@ -1064,7 +1064,7 @@ export async function readMcpResource(
 ): Promise<{ uri: string; mimeType: string; text: string }> {
   const known = mcpResourceDescriptors().find((resource) => resource.uri === uri);
   if (!known) {
-    throw new McpProtocolError(ERR_INVALID_PARAMS, "Unknown resource: " + uri);
+    throw new McpProtocolError(ERR_INVALID_PARAMS, `Unknown resource: ${uri}`);
   }
   if (uri === "proofcore://project/summary") {
     const summary = await projectSummary(cwd);
@@ -1097,7 +1097,7 @@ export async function getMcpPrompt(
 }> {
   const known = mcpPromptDescriptors().find((prompt) => prompt.name === name);
   if (!known) {
-    throw new McpProtocolError(ERR_INVALID_PARAMS, "Unknown prompt: " + name);
+    throw new McpProtocolError(ERR_INVALID_PARAMS, `Unknown prompt: ${name}`);
   }
   const text = (lines: string[]): { role: "user"; content: { type: "text"; text: string } } => ({
     role: "user",
@@ -1115,10 +1115,10 @@ export async function getMcpPrompt(
         description: known.description,
         messages: [
           text([
-            "Analyse " + (target ?? "the configured target") + " with PROOFCORE.",
+            `Analyse ${target ?? "the configured target"} with PROOFCORE.`,
             "1. Call project_summary, then doctor.",
             "2. Call validate_config and fix what it reports before running.",
-            "3. Call run_tests" + (modules ? " with modules: " + modules : "") + ".",
+            `3. Call run_tests${modules ? ` with modules: ${modules}` : ""}.`,
             "4. Call last_report and read it from disk; do not paraphrase a result you did not read.",
             "Report every check, including the ones that passed, and state what was not measured.",
           ]),
@@ -1146,7 +1146,7 @@ export async function getMcpPrompt(
         description: known.description,
         messages: [
           text([
-            "Fix the PROOFCORE finding: " + finding + ".",
+            `Fix the PROOFCORE finding: ${finding}.`,
             "1. Read the last report and quote the evidence for this finding.",
             "2. Find the code that causes it with search_code and read_file.",
             "3. Propose the smallest fix, and wait for approval before writing.",
@@ -1168,7 +1168,7 @@ export async function getMcpPrompt(
         ],
       };
     default:
-      throw new McpProtocolError(ERR_INVALID_PARAMS, "Unknown prompt: " + name);
+      throw new McpProtocolError(ERR_INVALID_PARAMS, `Unknown prompt: ${name}`);
   }
 }
 

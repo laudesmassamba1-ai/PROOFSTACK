@@ -279,7 +279,6 @@ export interface WorkspaceWebhookRecord {
   lastError: string | null;
 }
 
-
 export interface OnboardingRecord {
   workspaceId: string;
   experience: "simple" | "studio";
@@ -1420,7 +1419,6 @@ export class AppStore {
       .all<Row>();
     return rows.map((row) => ({ ...mapWorkspace(row), role: str(row, "role") as Role }));
   }
-
 
   async getOnboarding(workspaceId: string): Promise<OnboardingRecord | null> {
     const row = await this.db
@@ -2725,7 +2723,7 @@ export class AppStore {
     }
     const clause = where.join(" AND ");
     const totalRow = await this.db
-      .prepare("SELECT COUNT(*) AS count FROM remediations WHERE " + clause)
+      .prepare(`SELECT COUNT(*) AS count FROM remediations WHERE ${clause}`)
       .bind(...bind)
       .first<Row>();
     const rows = await this.db
@@ -2800,13 +2798,13 @@ export class AppStore {
     sets.push("updated_at = ?");
     const guard =
       input.expected && input.expected.length > 0
-        ? " AND status IN (" + input.expected.map(() => "?").join(", ") + ")"
+        ? ` AND status IN (${input.expected.map(() => "?").join(", ")})`
         : "";
     values.push(iso(this.clock()), input.id, input.workspaceId);
     if (input.expected) values.push(...input.expected);
     const result = await this.db
       .prepare(
-        "UPDATE remediations SET " + sets.join(", ") + " WHERE id = ? AND workspace_id = ?" + guard
+        `UPDATE remediations SET ${sets.join(", ")} WHERE id = ? AND workspace_id = ?${guard}`
       )
       .bind(...values)
       .run();
@@ -3371,7 +3369,6 @@ function mapDeviceGrant(row: Row): DeviceGrantRecord {
     ip: nullableStr(row, "ip"),
   };
 }
-
 
 function mapOnboarding(row: Row): OnboardingRecord {
   return {

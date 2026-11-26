@@ -129,7 +129,7 @@ export function remediationRoutes(services: Services) {
     }
     const now = services.clock().toISOString();
     const seed = seedRemediation(finding, now);
-    const id = "rem_" + crypto.randomUUID().replaceAll("-", "").slice(0, 20);
+    const id = `rem_${crypto.randomUUID().replaceAll("-", "").slice(0, 20)}`;
     const record = await services.store.createRemediation({
       id,
       workspaceId: workspace.id,
@@ -158,7 +158,7 @@ export function remediationRoutes(services: Services) {
     const page = readPage(c);
     const status = c.req.query("status");
     if (status && !REMEDIATION_STATUSES.includes(status as RemediationStatus)) {
-      throw new HttpError(400, "invalid_status", "Unknown remediation status: " + status);
+      throw new HttpError(400, "invalid_status", `Unknown remediation status: ${status}`);
     }
     const { rows, total } = await services.store.listRemediations(workspace.id, {
       limit: page.limit,
@@ -196,7 +196,7 @@ export function remediationRoutes(services: Services) {
       throw new HttpError(
         409,
         "remediation_finished",
-        "A remediation in state " + current.status + " cannot be reopened by a status change."
+        `A remediation in state ${current.status} cannot be reopened by a status change.`
       );
     }
     if (body.status === "verified") {
@@ -210,7 +210,7 @@ export function remediationRoutes(services: Services) {
       throw new HttpError(
         409,
         "remediation_status_conflict",
-        "A remediation in state " + current.status + " cannot become " + body.status + ".",
+        `A remediation in state ${current.status} cannot become ${body.status}.`,
         { currentStatus: current.status }
       );
     }

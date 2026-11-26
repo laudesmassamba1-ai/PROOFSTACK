@@ -22,7 +22,7 @@ async function bootstrap() {
   const config = readConfig(ENV);
   return {
     request: (path: string, init: RequestInit = {}) =>
-      built.app.request("http://localhost" + path, {
+      built.app.request(`http://localhost${path}`, {
         ...init,
         headers: { "content-type": "application/json", origin: config.webOrigin, ...init.headers },
       }),
@@ -90,7 +90,7 @@ async function analysisWith(
   const id = ((await created.json()) as { analysis: { id: string } }).analysis.id;
   for (const body of [{ status: "running" }, { status: "completed", result }]) {
     const patched = await harness.request(
-      "/api/v1/analyses/" + id + "?workspaceId=" + auth.workspaceId,
+      `/api/v1/analyses/${id}?workspaceId=${auth.workspaceId}`,
       { method: "PATCH", headers: { cookie: auth.cookie }, body: JSON.stringify(body) }
     );
     expect(patched.status, await patched.clone().text()).toBe(200);
@@ -131,7 +131,7 @@ function patch(
   id: string,
   body: unknown
 ): Promise<Response> {
-  return harness.request("/api/v1/remediations/" + id + "?workspaceId=" + auth.workspaceId, {
+  return harness.request(`/api/v1/remediations/${id}?workspaceId=${auth.workspaceId}`, {
     method: "PATCH",
     headers: { cookie: auth.cookie },
     body: JSON.stringify(body),
@@ -232,7 +232,7 @@ describe("remediations", () => {
     await patch(auth, remediation.id, { status: "applied" });
 
     const stillFailing = await analysisWith(auth, SCAN);
-    const failed = await harness.request("/api/v1/remediations/" + remediation.id + "/verify", {
+    const failed = await harness.request(`/api/v1/remediations/${remediation.id}/verify`, {
       method: "POST",
       headers: { cookie: auth.cookie },
       body: JSON.stringify({ workspaceId: auth.workspaceId, analysisId: stillFailing }),
@@ -267,7 +267,7 @@ describe("remediations", () => {
         },
       ],
     });
-    const response = await harness.request("/api/v1/remediations/" + remediation.id + "/verify", {
+    const response = await harness.request(`/api/v1/remediations/${remediation.id}/verify`, {
       method: "POST",
       headers: { cookie: auth.cookie },
       body: JSON.stringify({ workspaceId: auth.workspaceId, analysisId: proof }),
@@ -297,7 +297,7 @@ describe("remediations", () => {
       "fail:hsts@https://shop.example/checkout"
     );
     const blank = await analysisWith(auth, { findings: [] });
-    const response = await harness.request("/api/v1/remediations/" + remediation.id + "/verify", {
+    const response = await harness.request(`/api/v1/remediations/${remediation.id}/verify`, {
       method: "POST",
       headers: { cookie: auth.cookie },
       body: JSON.stringify({ workspaceId: auth.workspaceId, analysisId: blank }),
@@ -312,7 +312,7 @@ describe("remediations", () => {
     const analysisId = await analysisWith(auth, SCAN);
     await openRemediation(auth, analysisId, "fail:hsts@https://shop.example/checkout");
     await openRemediation(auth, analysisId, "clean:html_lang@https://shop.example/checkout");
-    const response = await harness.request("/api/v1/remediations?workspaceId=" + auth.workspaceId, {
+    const response = await harness.request(`/api/v1/remediations?workspaceId=${auth.workspaceId}`, {
       headers: { cookie: auth.cookie },
     });
     expect(response.status).toBe(200);

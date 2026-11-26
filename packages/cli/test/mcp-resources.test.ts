@@ -7,7 +7,6 @@ import {
   mcpPromptDescriptors,
   mcpResourceDescriptors,
   ProofcoreMcpServer,
-  readMcpResource,
 } from "../src/mcp-server.js";
 
 /**

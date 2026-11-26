@@ -129,11 +129,7 @@ describe("capabilities API", () => {
       complete: boolean;
     };
     expect(body.plan.applicableModules).toEqual([]);
-    expect(body.plan.unavailable.map((entry) => entry.module)).toEqual([
-      "world",
-      "flow",
-      "exit",
-    ]);
+    expect(body.plan.unavailable.map((entry) => entry.module)).toEqual(["world", "flow", "exit"]);
     expect(body.plan.unavailable[0]?.reason.length).toBeGreaterThan(10);
     expect(body.complete).toBe(false);
   });

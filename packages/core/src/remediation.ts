@@ -167,12 +167,12 @@ export function verificationOutcome(after: Finding | undefined): {
   if (after.status === "FAILED" || after.status === "WARNING") {
     return {
       outcome: "still_failing",
-      reason: "Le contrôle re-mesuré échoue encore : " + after.explanation.fact,
+      reason: `Le contrôle re-mesuré échoue encore : ${after.explanation.fact}`,
     };
   }
   return {
     outcome: "inconclusive",
-    reason: "Le contrôle re-mesuré est " + after.status + ", ce qui ne prouve pas la correction.",
+    reason: `Le contrôle re-mesuré est ${after.status}, ce qui ne prouve pas la correction.`,
   };
 }
 

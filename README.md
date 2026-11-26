@@ -89,6 +89,7 @@ pnpm proofcore -- doctor                    # verify node, config and module wir
 pnpm proofcore -- test --module world,flow,exit
 pnpm proofcore -- report text
 pnpm proofcore -- sync
+pnpm proofcore -- audit fail https://site.example --sync
 ```
 
 ## Install the CLI globally
@@ -245,7 +246,8 @@ mode `0600`; it never stores the password. Use
 `ui` or `status`. For CI, `PROOFCORE_SESSION_COOKIE` supplies the cookie without a file.
 The default API is the live Vercel deployment. Creating a project is the only mutating
 action in the console; test execution and uploads still run locally with
-`proofcore test` and `proofcore sync`, and billing/admin stay read-only.
+`proofcore test` and `proofcore sync` — or one command, with
+`proofcore scan <url> --sync` — and billing/admin stay read-only.
 
 Without `SASPAY_API_KEY` and `SASPAY_WEBHOOK_SECRET`, checkout uses the deterministic
 sandbox provider: no money moves, and paid access is still granted only after the

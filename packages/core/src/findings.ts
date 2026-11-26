@@ -380,7 +380,7 @@ function isFindingStatus(value: string): value is FindingStatus {
  * URL. Two analyses that read different pages cannot declare a page finding "fixed".
  */
 export function findingKey(module: string, controlId: string, url: string | null): string {
-  return url ? module + ":" + controlId + "@" + url : module + ":" + controlId;
+  return url ? `${module}:${controlId}@${url}` : `${module}:${controlId}`;
 }
 
 /**
@@ -442,7 +442,7 @@ export function buildFinding(input: BuildFindingInput): Finding {
       confidence: confidenceText,
     },
     evidence: {
-      method: control?.method ?? "module " + input.module,
+      method: control?.method ?? `module ${input.module}`,
       observed: input.observed,
       expected: control?.result ?? null,
       url: input.url ?? null,

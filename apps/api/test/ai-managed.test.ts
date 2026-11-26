@@ -77,7 +77,7 @@ beforeAll(async () => {
       });
     });
     server.listen(0, "127.0.0.1", () => {
-      resolve("http://127.0.0.1:" + (server.address() as AddressInfo).port + "/v1");
+      resolve(`http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`);
     });
     afterAll(() => server.close());
   });

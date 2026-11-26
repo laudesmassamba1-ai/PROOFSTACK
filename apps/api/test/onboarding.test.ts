@@ -19,7 +19,7 @@ async function bootstrap() {
   const config = readConfig(ENV);
   return {
     request: (path: string, init: RequestInit = {}) =>
-      built.app.request("http://localhost" + path, {
+      built.app.request(`http://localhost${path}`, {
         ...init,
         headers: { "content-type": "application/json", origin: config.webOrigin, ...init.headers },
       }),
@@ -60,7 +60,7 @@ interface OnboardingBody {
 describe("workspace onboarding", () => {
   it("starts simple, empty, and honest about what is missing", async () => {
     const auth = await signUp("new@example.com");
-    const response = await harness.request("/api/v1/onboarding?workspaceId=" + auth.workspaceId, {
+    const response = await harness.request(`/api/v1/onboarding?workspaceId=${auth.workspaceId}`, {
       headers: { cookie: auth.cookie },
     });
     expect(response.status).toBe(200);
@@ -73,7 +73,7 @@ describe("workspace onboarding", () => {
 
   it("recommends nothing until both the project type and the goal are known", async () => {
     const auth = await signUp("half@example.com");
-    const partial = await harness.request("/api/v1/onboarding?workspaceId=" + auth.workspaceId, {
+    const partial = await harness.request(`/api/v1/onboarding?workspaceId=${auth.workspaceId}`, {
       method: "PUT",
       headers: { cookie: auth.cookie },
       body: JSON.stringify({ projectType: "shop" }),
@@ -86,7 +86,7 @@ describe("workspace onboarding", () => {
 
   it("completes with the profile that answers the goal", async () => {
     const auth = await signUp("done@example.com");
-    const response = await harness.request("/api/v1/onboarding?workspaceId=" + auth.workspaceId, {
+    const response = await harness.request(`/api/v1/onboarding?workspaceId=${auth.workspaceId}`, {
       method: "PUT",
       headers: { cookie: auth.cookie },
       body: JSON.stringify({
@@ -106,7 +106,7 @@ describe("workspace onboarding", () => {
 
   it("switches to studio without losing the answers already given", async () => {
     const auth = await signUp("studio@example.com");
-    await harness.request("/api/v1/onboarding?workspaceId=" + auth.workspaceId, {
+    await harness.request(`/api/v1/onboarding?workspaceId=${auth.workspaceId}`, {
       method: "PUT",
       headers: { cookie: auth.cookie },
       body: JSON.stringify({
@@ -116,7 +116,7 @@ describe("workspace onboarding", () => {
         target: "https://shop.example",
       }),
     });
-    const switched = await harness.request("/api/v1/onboarding?workspaceId=" + auth.workspaceId, {
+    const switched = await harness.request(`/api/v1/onboarding?workspaceId=${auth.workspaceId}`, {
       method: "PUT",
       headers: { cookie: auth.cookie },
       body: JSON.stringify({ experience: "studio" }),
@@ -130,7 +130,7 @@ describe("workspace onboarding", () => {
 
   it("rejects an unknown goal instead of silently ignoring it", async () => {
     const auth = await signUp("bad@example.com");
-    const response = await harness.request("/api/v1/onboarding?workspaceId=" + auth.workspaceId, {
+    const response = await harness.request(`/api/v1/onboarding?workspaceId=${auth.workspaceId}`, {
       method: "PUT",
       headers: { cookie: auth.cookie },
       body: JSON.stringify({ goal: "make_money" }),

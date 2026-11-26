@@ -6,7 +6,6 @@ import {
   isInconclusive,
   normalizeStatus,
   priorityOf,
-  severityOf,
   summarizeFindings,
 } from "../src/index.js";
 
@@ -18,7 +17,7 @@ function make(controlId: string, status: "PASS" | "WARN" | "FAIL" | "SKIPPED", u
     module: "fail",
     controlId,
     status,
-    observed: "observed " + controlId,
+    observed: `observed ${controlId}`,
     url: url ?? "https://shop.example/",
     detectedAt: "2026-01-01T00:00:00.000Z",
   });

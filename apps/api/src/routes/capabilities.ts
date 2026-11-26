@@ -72,11 +72,11 @@ export function capabilityRoutes(services: Services): Hono<AppEnv> {
     const profileId = c.req.query("profile") ?? "";
     const targetType = (c.req.query("targetType") ?? "PAGE") as AnalysisTargetType;
     if (!(ANALYSIS_TARGET_TYPES as readonly string[]).includes(targetType)) {
-      throw new HttpError(400, "unknown_target_type", "Unknown target type: " + targetType);
+      throw new HttpError(400, "unknown_target_type", `Unknown target type: ${targetType}`);
     }
     const profile = profileById(profileId);
     if (!profile) {
-      throw new HttpError(400, "unknown_profile", "Unknown profile: " + profileId, {
+      throw new HttpError(400, "unknown_profile", `Unknown profile: ${profileId}`, {
         available: ANALYSIS_PROFILES.map((item) => item.id),
       });
     }

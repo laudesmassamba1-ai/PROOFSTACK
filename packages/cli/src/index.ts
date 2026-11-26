@@ -83,6 +83,12 @@ import {
 } from "./memory.js";
 import { assembleProviders, blockingSafetyWarnings } from "./providers.js";
 import { describeSandbox, runInSandbox } from "./sandbox.js";
+import {
+  saveScanRun,
+  scanRunFromScanResult,
+  summarizeScanRun,
+  uploadScanRun,
+} from "./scan-sync.js";
 import { analyzeStack, readStackFacts } from "./stack-check.js";
 import {
   apiGet,
@@ -2666,9 +2672,10 @@ async function commandScan(flags: GlobalFlags, args: string[], only: string[]): 
     "--max-pages",
     "--max-depth",
     "--path-prefix",
+    "--project",
   ]);
   if (!target) {
-    err(flags, red(flags, "Usage: proofcore scan <url> [--crawl] [--only fail,clean] [--explain]"));
+    err(flags, red(flags, "Usage: proofcore scan <url> [--sync] [--only fail,clean] [--explain]"));
     err(flags, dim(flags, "Read the whole site: proofcore scan https://site.example --crawl"));
     err(flags, dim(flags, "Example: proofcore scan http://localhost:3000"));
     return 64;
@@ -2687,6 +2694,8 @@ async function commandScan(flags: GlobalFlags, args: string[], only: string[]): 
       }
     | undefined;
   let ownershipToken: string | undefined;
+  let sync = false;
+  let projectOverride: string | undefined;
   let crawl: { maxPages?: number; maxDepth?: number; pathPrefix?: string } | undefined;
   const extraOnly: string[] = [];
   for (let i = 0; i < args.length; i += 1) {
@@ -2807,6 +2816,15 @@ async function commandScan(flags: GlobalFlags, args: string[], only: string[]): 
         err(flags, red(flags, "--verify-token expects the token shown in the app"));
         return 64;
       }
+    } else if (arg === "--sync") {
+      sync = true;
+    } else if (arg === "--project") {
+      const value = args[++i] ?? "";
+      if (!value || value.startsWith("-")) {
+        err(flags, red(flags, "--project expects a project id, e.g. prj_…"));
+        return 64;
+      }
+      projectOverride = value;
     }
   }
   if (login && (!login.url || !login.email)) {
@@ -3093,12 +3111,86 @@ async function commandScan(flags: GlobalFlags, args: string[], only: string[]): 
     );
   }
 
+  // `--sync` records the scan in the cloud BEFORE anything else: an AI explain that
+  // fails must not cost the operator their run in the dashboard. The report is also
+  // saved on disk, so a failed upload can be retried verbatim with `proofcore sync`.
+  if (sync) {
+    const code = await syncScanRun(flags, result, wanted, projectOverride);
+    if (code !== 0) return code;
+  }
+
   if (explain) {
     const code = await explainScan(flags, result, findings);
     if (code !== 0) return code;
   }
 
   return findings.some((item) => item.status === "FAIL") ? 1 : 0;
+}
+
+/**
+ * `--sync`: record the scan in the cloud before anything else.
+ *
+ * Three gates, each with its own honest failure message: sync must be configured, the
+ * project token must exist, and the API must confirm which tenant the key speaks for.
+ * The project id comes from a project-scoped key, or from `--project` — a scan cannot
+ * invent one, and the dashboard refuses a run without a project.
+ */
+async function syncScanRun(
+  flags: GlobalFlags,
+  result: Awaited<ReturnType<typeof scanPage>>,
+  wanted: ReadonlySet<string>,
+  projectOverride: string | undefined
+): Promise<number> {
+  let loaded: LoadedConfig;
+  try {
+    loaded = await loadConfig({ cwd: flags.cwd });
+  } catch (error) {
+    err(flags, red(flags, describeError(error).message));
+    return 2;
+  }
+  const { config } = loaded;
+  if (!config.sync.enabled || !config.sync.apiUrl) {
+    err(
+      flags,
+      red(flags, "Sync is not configured. Set sync.enabled = true and sync.apiUrl in your config.")
+    );
+    return 2;
+  }
+  const token = process.env[config.sync.tokenEnvVar];
+  if (!token) {
+    err(
+      flags,
+      red(flags, `${config.sync.tokenEnvVar} is not set. Run \`proofcore login\` for instructions.`)
+    );
+    return 2;
+  }
+  const identity = await resolveSyncIdentity(config.sync.apiUrl, token);
+  if (!identity) {
+    err(
+      flags,
+      red(
+        flags,
+        "The API did not confirm which workspace this key belongs to. Nothing was uploaded."
+      )
+    );
+    return 2;
+  }
+  const projectId = projectOverride ?? identity.projectId;
+  if (!projectId) {
+    err(
+      flags,
+      red(flags, "Sync needs a project: use a project-scoped key (psk_…) or pass --project <id>.")
+    );
+    return 2;
+  }
+
+  const run = scanRunFromScanResult(result, wanted, {
+    workspaceId: identity.workspaceId,
+    projectId,
+  });
+  const summary = summarizeScanRun(run);
+  saveScanRun(flags, loaded.root, config.output.dir, run);
+  return uploadScanRun(flags, config.sync.apiUrl, token, run, summary, config.sync.maxPayloadBytes);
 }
 
 /**

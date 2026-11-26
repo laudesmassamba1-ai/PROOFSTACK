@@ -279,7 +279,7 @@ export function analysisRoutes(services: Services): Hono<AppEnv> {
     const statuses = csv("status");
     for (const status of statuses) {
       if (!FINDING_STATUSES.includes(status as never)) {
-        throw new HttpError(400, "invalid_status", "Unknown finding status: " + status);
+        throw new HttpError(400, "invalid_status", `Unknown finding status: ${status}`);
       }
     }
     const severities = csv("severity");

@@ -1028,7 +1028,7 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
     // Distributed: the budget follows the account across isolates and colos.
     const limited = await checkDistributedRateLimit(services, {
       scope: "ai.relay",
-      key: address + "|" + user.id,
+      key: `${address}|${user.id}`,
       limit: services.config.aiRateLimitPerHour,
       windowMs: 60 * 60_000,
     });
@@ -1325,7 +1325,7 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
     const address = clientAddress({ get: (name) => c.req.header(name) });
     const limited = await checkDistributedRateLimit(services, {
       scope: "ai.chat",
-      key: address + "|" + user.id,
+      key: `${address}|${user.id}`,
       limit: services.config.aiRateLimitPerHour,
       windowMs: 60 * 60_000,
     });
@@ -1369,14 +1369,27 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
           providerModel: stored.providerModel,
           apiKey: await decryptApiKey(services.config, stored.apiKeyEncrypted),
         }
-      : {
-          mode: "managed" as const,
-          provider: managedConfig!.provider,
-          providerKind: managedConfig!.providerKind,
-          providerBaseUrl: managedConfig!.baseUrl,
-          providerModel: managedConfig!.model,
-          apiKey: managedConfig!.apiKey,
-        };
+      : (() => {
+          // The guard above already threw for "nothing configured": this branch only runs
+          // with a managed provider present. Stating it once here — with an honest 500 if
+          // the invariant is ever violated — beats a non-null assertion, which would tell
+          // TypeScript to look away at every one of the four call sites below.
+          if (!managedConfig) {
+            throw new HttpError(
+              500,
+              "ai_managed_unavailable",
+              "Le fournisseur géré a disparu pendant la requête. Réessaie."
+            );
+          }
+          return {
+            mode: "managed" as const,
+            provider: managedConfig.provider,
+            providerKind: managedConfig.providerKind,
+            providerBaseUrl: managedConfig.baseUrl,
+            providerModel: managedConfig.model,
+            apiKey: managedConfig.apiKey,
+          };
+        })();
     const apiKey = connection.apiKey;
 
     // The managed key is the deployment's money: cap it per account and month before
@@ -1385,7 +1398,7 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
     if (connection.mode === "managed" && managedConfig) {
       const quota = await checkDistributedRateLimit(services, {
         scope: "ai.managed",
-        key: workspace.id + ":" + user.id,
+        key: `${workspace.id}:${user.id}`,
         windowMs: 31 * 24 * 60 * 60 * 1000,
         limit: managedConfig.callsPerMonth,
       });
@@ -1975,7 +1988,7 @@ async function executeTool(
             },
             2
           ),
-          summary: ANALYSIS_PROFILES.length + " profils, " + CAPABILITIES.length + " capacités",
+          summary: `${ANALYSIS_PROFILES.length} profils, ${CAPABILITIES.length} capacités`,
         };
       }
       case "list_analyses": {
@@ -2005,7 +2018,7 @@ async function executeTool(
             },
             2
           ),
-          summary: total + " analyse(s)",
+          summary: `${total} analyse(s)`,
         };
       }
       case "analysis_findings": {
@@ -2056,7 +2069,7 @@ async function executeTool(
             },
             2
           ),
-          summary: filtered.length + " constat(s)",
+          summary: `${filtered.length} constat(s)`,
         };
       }
       case "compare_analyses": {
@@ -2140,7 +2153,7 @@ async function executeTool(
             },
             2
           ),
-          summary: total + " remédiation(s)",
+          summary: `${total} remédiation(s)`,
         };
       }
       case "open_remediation": {
@@ -2192,7 +2205,7 @@ async function executeTool(
         const now = services.clock().toISOString();
         const seed = seedRemediation(finding, now);
         const record = await services.store.createRemediation({
-          id: "rem_" + crypto.randomUUID().replaceAll("-", "").slice(0, 20),
+          id: `rem_${crypto.randomUUID().replaceAll("-", "").slice(0, 20)}`,
           workspaceId,
           projectId: analysis.projectId,
           analysisId,

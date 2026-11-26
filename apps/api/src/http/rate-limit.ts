@@ -55,7 +55,7 @@ function localDecision(
   input: { scope: string; key: string; limit: number; windowMs: number },
   now: number
 ): RateLimitDecision {
-  const key = input.scope + "|" + input.key;
+  const key = `${input.scope}|${input.key}`;
   const entry = local.get(key);
   if (!entry || entry.resetAt <= now) {
     local.set(key, { count: 1, resetAt: now + input.windowMs });

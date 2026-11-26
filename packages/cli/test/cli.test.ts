@@ -473,6 +473,122 @@ describe("CLI", () => {
     }
   });
 
+  it("audit --sync uploads the scan as a run the dashboard can find", async () => {
+    const seen: {
+      id?: string;
+      modules?: string[];
+      workspaceId?: string;
+      projectId?: string;
+      failTotals?: { total: number; failed: number; passed: number; skipped: number };
+      failStatus?: string;
+      findingCount?: number;
+    }[] = [];
+    const headersSeen: Record<string, string | undefined>[] = [];
+    const server = createServer((request, response) => {
+      if (request.method === "GET" && request.url?.startsWith("/v1/project")) {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(
+          JSON.stringify({
+            workspace: { id: "ws_from_key" },
+            project: { id: "prj_from_key" },
+          })
+        );
+        return;
+      }
+      if (request.method === "POST" && request.url === "/v1/runs") {
+        let body = "";
+        request.setEncoding("utf8");
+        request.on("data", (chunk: string) => {
+          body += chunk;
+        });
+        request.on("end", () => {
+          headersSeen.push({
+            idempotencyKey: request.headers["idempotency-key"] as string | undefined,
+          });
+          const parsed = JSON.parse(body) as {
+            run?: {
+              id?: string;
+              modules?: string[];
+              workspaceId?: string;
+              projectId?: string;
+              moduleRuns?: {
+                module: string;
+                status: string;
+                totals: { total: number; failed: number; passed: number; skipped: number };
+                cases: unknown[];
+              }[];
+              findings?: unknown[];
+            };
+          };
+          const fail = parsed.run?.moduleRuns?.find((mr) => mr.module === "fail");
+          seen.push({
+            id: parsed.run?.id,
+            modules: parsed.run?.modules,
+            workspaceId: parsed.run?.workspaceId,
+            projectId: parsed.run?.projectId,
+            failTotals: fail?.totals,
+            failStatus: fail?.status,
+            findingCount: parsed.run?.findings?.length,
+          });
+          response.writeHead(200, { "content-type": "application/json" });
+          response.end(JSON.stringify({ runId: parsed.run?.id, recorded: true }));
+        });
+        return;
+      }
+      // The scanned target: plain http on loopback, so the FAIL module has real things
+      // to observe (no TLS, no HSTS, no CSP) and the totals are not a fiction.
+      response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      response.end(
+        "<!doctype html><html><head><title>t</title></head><body><h1>ok</h1></body></html>"
+      );
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = (server.address() as AddressInfo).port;
+
+    try {
+      const dir = await project();
+      await writeFile(
+        join(dir, "proofcore.config.json"),
+        JSON.stringify({
+          schemaVersion: 1,
+          project: { name: "Scan sync", baseUrl: `http://127.0.0.1:${port}` },
+          modules: { world: { enabled: true }, flow: { enabled: true }, exit: { enabled: true } },
+          enabledModules: ["world", "flow", "exit"],
+          sync: { enabled: true, apiUrl: `http://127.0.0.1:${port}` },
+        }),
+        "utf8"
+      );
+
+      const result = await cli(["audit", "fail", `http://127.0.0.1:${port}`, "--sync"], dir, {
+        PROOFCORE_PROJECT_TOKEN: "psk_test",
+      });
+      // The audit found real findings (plain http on loopback), so the command exits 1:
+      // an exit 0 here would mean the checks ran over nothing.
+      expect(result.code).toBe(1);
+      expect(result.stdout).toContain("Synced run scan_");
+      expect(seen).toHaveLength(1);
+      const uploaded = seen[0] ?? {};
+      expect(uploaded.modules).toEqual(["fail"]);
+      expect(uploaded.workspaceId).toBe("ws_from_key");
+      expect(uploaded.projectId).toBe("prj_from_key");
+      // The totals the client sent agree with its own cases: the API recomputes them,
+      // a payload that claims different numbers is wrong on its face.
+      expect(uploaded.failTotals?.total).toBeGreaterThan(0);
+      expect(uploaded.failTotals?.failed).toBeGreaterThan(0);
+      expect(uploaded.failStatus).toBe("FAILED");
+      // WARN and FAIL become findings; PASS and SKIPPED stay answers, not defects.
+      expect(uploaded.findingCount).toBe(
+        (uploaded.failTotals?.failed ?? 0) +
+          (uploaded.failTotals ? ((uploaded.failTotals as { warnings?: number }).warnings ?? 0) : 0)
+      );
+      // The idempotency key derives from the scan identity, so the same report retried
+      // is recorded once.
+      expect(headersSeen[0]?.idempotencyKey).toMatch(/^sync:scan_/);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
   it("test writes the report files it says it wrote", async () => {
     const dir = await project();
     await cli(["init", "--yes", "Report run"], dir);

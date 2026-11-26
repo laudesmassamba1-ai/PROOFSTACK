@@ -147,8 +147,8 @@ export function recommendProfile(input: {
             en: "A shop with a sales goal starts with the purchase journey.",
           }
         : {
-            fr: "Le profil " + profile.id + " répond à cet objectif.",
-            en: "The " + profile.id + " profile answers this goal.",
+            fr: `Le profil ${profile.id} répond à cet objectif.`,
+            en: `The ${profile.id} profile answers this goal.`,
           },
   };
 }

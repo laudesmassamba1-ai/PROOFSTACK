@@ -28,13 +28,13 @@ Les statuts utilisés : **FAIT**, **PARTIEL**, **BLOQUÉ**, **NON COMMENCÉ**.
 
 ## Étape C — Analyse centralisée
 
-| Élément                                                 | État         | Limite                                          |
-| ------------------------------------------------------- | ------------ | ----------------------------------------------- |
-| Runs, findings, evidence, historique, rapports          | FAIT         | pipeline commun                                 |
-| FAIL/CLEAN alimentés par le web et l'assistant          | FAIT         | —                                               |
-| Upload des audits CLI comme runs                        | NON COMMENCÉ | `proofcore audit --sync` absent                 |
-| Rapport produit (identité, périmètre, méthode, limites) | PARTIEL      | HTML/JSON/CLI ; pas de PDF/CSV                  |
-| Partage en lecture seule                                | NON COMMENCÉ | entitlement `client_sharing` marqué « bientôt » |
+| Élément                                                 | État         | Limite                                                                                                                                             |
+| ------------------------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Runs, findings, evidence, historique, rapports          | FAIT         | pipeline commun                                                                                                                                    |
+| FAIL/CLEAN alimentés par le web et l'assistant          | FAIT         | —                                                                                                                                                  |
+| Upload des audits CLI comme runs                        | FAIT         | `proofcore scan/audit --sync` → `POST /v1/runs` ; test e2e `cli.test.ts` « audit --sync uploads the scan as a run » + reprise idempotente vérifiée |
+| Rapport produit (identité, périmètre, méthode, limites) | PARTIEL      | HTML/JSON/CLI ; pas de PDF/CSV                                                                                                                     |
+| Partage en lecture seule                                | NON COMMENCÉ | entitlement `client_sharing` marqué « bientôt »                                                                                                    |
 
 ## Étape D — Expérience utilisateur
 

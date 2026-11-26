@@ -28,6 +28,7 @@ proofcore world | flow | exit       Run one core module locally
 proofcore module <id> [args]        Run one core module or an audit
 proofcore modules                   Show local wiring and the run command per module
 proofcore fail|clean <url>          Run an audit module locally
+proofcore scan|audit <url> --sync   Record the scan in the cloud as a run (project token)
 proofcore report [text|json|junit|html]   Render the last run
 proofcore projects                  List projects (session required)
 proofcore sync                      Push the last run to the API (project token)
@@ -97,8 +98,22 @@ How it works, and what makes it trustworthy:
 
 No prompts in scripts. Set `PROOFCORE_SESSION_COOKIE` for session-bound
 commands (`ui`, `projects`), or create a **project token** in the dashboard
-(`psk_…`) and export `PROOFCORE_PROJECT_TOKEN` for `proofcore sync`. Project
-tokens authorize machine-to-machine reporting; they are unrelated to login.
+(`psk_…`) and export `PROOFCORE_PROJECT_TOKEN` for `proofcore sync` and
+`proofcore scan --sync`. Project tokens authorize machine-to-machine
+reporting; they are unrelated to login.
+
+### 4. Syncing a page scan
+
+`proofcore scan <url> --sync` and `proofcore audit fail|clean <url> --sync`
+record the scan in the dashboard as a run, through the same
+`POST /v1/runs` pipeline a `proofcore test` uses. The mapping is honest by
+construction: PASS/SKIPPED checks stay answers (never findings), only WARN
+and FAIL become findings; a not-measured check is never a pass. The project
+id comes from a project-scoped key, or from `--project prj_…` for an
+account-scoped key. The report is saved to
+`.proofcore/reports/last-scan.json` before the upload, so a network failure
+can be retried verbatim with `proofcore sync` — the same Idempotency-Key is
+resent and the API records the run once.
 
 ## Runtime animations
 

@@ -18,8 +18,7 @@ const REDUCED = (): boolean =>
  *  scintille lentement : l'œil ne fait pas la différence, la puce si. */
 const LITE = (): boolean =>
   typeof window !== "undefined" &&
-  (window.matchMedia("(max-width: 767px)").matches ||
-    (navigator.hardwareConcurrency ?? 8) <= 4);
+  (window.matchMedia("(max-width: 767px)").matches || (navigator.hardwareConcurrency ?? 8) <= 4);
 
 /** Boucle rAF gatée par IntersectionObserver — rien ne tourne hors écran. */
 function useGlyphLoop(
