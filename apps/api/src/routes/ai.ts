@@ -1334,17 +1334,65 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
     const body = await readBody(c, chatRequestSchema);
     const { workspace } = await requireWorkspace(c, services, body.workspaceId);
 
-    // Provider: the stored profile is the default; the request may not carry a
-    // key anymore — trusting client keys made the key insecure to handle.
-    const profile = await services.store.getAiProfile(user.id);
-    if (!profile) {
+    // Provider: a stored personal profile wins; otherwise the deployment's managed
+    // provider, if the operator configured one. Both keys stay server-side — the request
+    // never carries a credential, and no endpoint returns one.
+    const stored = await services.store.getAiProfile(user.id);
+    const managedConfig = stored ? null : services.config.managedAi;
+    if (!stored && !managedConfig) {
       throw new HttpError(
         400,
         "ai_not_configured",
-        "Connect your AI provider first (API key saved encrypted)."
+        "Aucun fournisseur IA n'est configuré. Les contrôles déterministes restent " +
+          "disponibles sans IA ; connecte ta clé dans Réglages, ou demande à " +
+          "l'administrateur d'activer le fournisseur géré.",
+        { managed: false, personal: false, deterministic: true }
       );
     }
-    const apiKey = await decryptApiKey(services.config, profile.apiKeyEncrypted);
+    const connection = stored
+      ? {
+          mode: "personal" as const,
+          provider: stored.providerId,
+          providerKind: stored.providerKind,
+          providerBaseUrl: stored.providerBaseUrl,
+          providerModel: stored.providerModel,
+          apiKey: await decryptApiKey(services.config, stored.apiKeyEncrypted),
+        }
+      : {
+          mode: "managed" as const,
+          provider: managedConfig!.provider,
+          providerKind: managedConfig!.providerKind,
+          providerBaseUrl: managedConfig!.baseUrl,
+          providerModel: managedConfig!.model,
+          apiKey: managedConfig!.apiKey,
+        };
+    const apiKey = connection.apiKey;
+
+    // The managed key is the deployment's money: cap it per account and month before
+    // the first provider call, and say when it reopens instead of "later".
+    let managedRemaining: number | null = null;
+    if (connection.mode === "managed" && managedConfig) {
+      const quota = await checkDistributedRateLimit(services, {
+        scope: "ai.managed",
+        key: workspace.id + ":" + user.id,
+        windowMs: 31 * 24 * 60 * 60 * 1000,
+        limit: managedConfig.callsPerMonth,
+      });
+      if (!quota.allowed) {
+        c.header("Retry-After", String(quota.retryAfterSeconds));
+        throw new HttpError(
+          429,
+          "managed_ai_quota",
+          "Le quota mensuel de l'assistant géré est atteint. Les contrôles restent " +
+            "disponibles ; connecte ta propre clé pour continuer maintenant.",
+          {
+            retryAfterSeconds: quota.retryAfterSeconds,
+            callsPerMonth: managedConfig.callsPerMonth,
+          }
+        );
+      }
+      managedRemaining = quota.remaining;
+    }
 
     // Pure gate (quantity 0): asking the assistant a question is free, but a workspace
     // that has spent its monthly AI-audit budget gets the upgrade message here rather
@@ -1415,9 +1463,9 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
       const remaining = deadline - Date.now();
       if (remaining < 3_000) break;
       const result = await callUpstream({
-        kind: profile.providerKind,
-        baseUrl: profile.providerBaseUrl,
-        model: profile.providerModel,
+        kind: connection.providerKind,
+        baseUrl: connection.providerBaseUrl,
+        model: connection.providerModel,
         apiKey,
         system: prompt,
         messages,
@@ -1514,9 +1562,9 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
         slice.map(async (lens) => {
           try {
             const response = await callUpstream({
-              kind: profile.providerKind,
-              baseUrl: profile.providerBaseUrl,
-              model: profile.providerModel,
+              kind: connection.providerKind,
+              baseUrl: connection.providerBaseUrl,
+              model: connection.providerModel,
               apiKey,
               system: [
                 "You are a reviewer inside PROOFCORE. You do not write the answer.",
@@ -1555,9 +1603,9 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
     if (usable.length > 0) {
       try {
         const synthesis = await callUpstream({
-          kind: profile.providerKind,
-          baseUrl: profile.providerBaseUrl,
-          model: profile.providerModel,
+          kind: connection.providerKind,
+          baseUrl: connection.providerBaseUrl,
+          model: connection.providerModel,
           apiKey,
           system: [
             systemPrompt(workspace.name, effort, memoryForPrompt),
@@ -1616,9 +1664,9 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
     if (finalContent.length > 0) {
       try {
         const curated = await callUpstream({
-          kind: profile.providerKind,
-          baseUrl: profile.providerBaseUrl,
-          model: profile.providerModel,
+          kind: connection.providerKind,
+          baseUrl: connection.providerBaseUrl,
+          model: connection.providerModel,
           apiKey,
           system: [
             "You maintain the long-term memory of a workspace in PROOFCORE.",
@@ -1704,6 +1752,14 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
       message: finalContent,
       trace,
       effort,
+      // Who actually answered, and under which key. A managed answer and a personal one
+      // are the same product, but the user is entitled to know which quota it spent.
+      ai: {
+        mode: connection.mode,
+        provider: connection.provider,
+        model: connection.providerModel,
+        managedCallsRemaining: managedRemaining,
+      },
       turns: trace.length,
       // The panel is reported, including the lenses that could not run: the caller
       // decides how to show "2 of 4 reviewers answered".

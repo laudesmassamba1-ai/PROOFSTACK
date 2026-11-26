@@ -1,5 +1,6 @@
 import type { PaymentProvider } from "@proofcore/adapter-payments";
 import { normalizeEmail } from "@proofcore/billing";
+import { findProvider } from "./ai-providers.js";
 import { createPaymentProvider, hasSasPayCredentials } from "./providers.js";
 
 /**
@@ -73,6 +74,21 @@ export interface AppConfig {
    * where only a runaway client can reach it.
    */
   aiRateLimitPerHour: number;
+  /**
+   * The deployment's own AI provider, used when a person has not connected one.
+   *
+   * Null unless the operator set a provider id, a key AND a model: a half-configured
+   * provider would report "managed AI available" and then fail on the first question.
+   * The key never leaves the server and is never returned by an endpoint.
+   */
+  managedAi: {
+    provider: string;
+    providerKind: "openai" | "anthropic";
+    baseUrl: string;
+    model: string;
+    apiKey: string;
+    callsPerMonth: number;
+  } | null;
   cfBrowserToken: string | undefined;
   /**
    * Optional GitHub token for the public release feed.
@@ -91,6 +107,30 @@ function positiveInt(raw: string | undefined, fallback: number): number {
   const value = Number(raw);
   if (!Number.isFinite(value) || value <= 0) return fallback;
   return Math.min(Math.round(value), 10_000);
+}
+
+/**
+ * The managed provider, or null.
+ *
+ * All three values are required together. A deployment that sets only a key is not
+ * "almost ready": it is not configured, and the assistant says so instead of making a
+ * request to a guessed endpoint.
+ */
+function readManagedAi(env: Env): AppConfig["managedAi"] {
+  const id = env.MANAGED_AI_PROVIDER?.trim();
+  const apiKey = env.MANAGED_AI_API_KEY?.trim();
+  const model = env.MANAGED_AI_MODEL?.trim();
+  if (!id || !apiKey || !model) return null;
+  const provider = findProvider(id);
+  if (!provider) return null;
+  return {
+    provider: provider.id,
+    providerKind: provider.kind,
+    baseUrl: (env.MANAGED_AI_BASE_URL?.trim() || provider.baseUrl).replace(/\/+$/, ""),
+    model,
+    apiKey,
+    callsPerMonth: positiveInt(env.MANAGED_AI_CALLS_PER_MONTH, 300),
+  };
 }
 
 export function readConfig(env: Env): AppConfig {
@@ -126,6 +166,7 @@ export function readConfig(env: Env): AppConfig {
     supportEmail: env.SUPPORT_EMAIL ?? "support@proofcore.dev",
     cfAccountId: env.CF_ACCOUNT_ID?.trim() || undefined,
     aiRateLimitPerHour: positiveInt(env.AI_RATE_LIMIT_PER_HOUR, 5000),
+    managedAi: readManagedAi(env),
     cfBrowserToken: env.CF_BROWSER_TOKEN?.trim() || undefined,
     githubToken: env.GITHUB_TOKEN?.trim() || undefined,
   };
