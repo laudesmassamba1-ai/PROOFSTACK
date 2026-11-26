@@ -37,7 +37,8 @@ with `/api/*`, `/v1/*` and `/health` proxied to the
 cookies stay same-origin. The Worker uses D1 (`proofcore`), migrations applied.
 
 The marketing shell, home page, pricing and account forms are bilingual. The workspace
-shell, Overview, Projects, WORLD/FLOW/EXIT, CLI, Billing and Settings are FR/EN. The
+shell, Overview, Projects, the five control families (WORLD, FLOW, EXIT, FAIL, CLEAN),
+CLI, Billing and Settings are FR/EN. The
 creator operations console (`/app/admin`) keeps English operational copy and is not part
 of the customer workspace language switch.
 

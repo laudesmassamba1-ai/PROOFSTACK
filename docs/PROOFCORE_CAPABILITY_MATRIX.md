@@ -27,6 +27,12 @@ Format demandé par la règle de livraison :
 - Protection CSRF : ABSENT.
 - Tout ce qui est NON VÉRIFIÉ n'est pas une fonction validée, quel que soit le nombre de fichiers présents.
 
+> **Cette consigne est levée pour cinq lignes.** Le tableau du début date du 26 novembre
+> 2026 au matin. Depuis, le CSRF, la limitation distribuée, la ressource Analysis canonique,
+> la remédiation vérifiée et le fournisseur IA géré existent dans le code et sont couverts
+> par des tests qui passent. Le tableau de fin de document les remplace ; ne pas s'appuyer
+> sur le tableau historique pour affirmer qu'une de ces capacités est absente.
+
 ## Mise à jour 26 novembre 2026 (vérification exécutée ce jour)
 
 | Fonction                                                                                                                                                                                                                               | Test exécuté               | Test réussi                                                                                         | Parcours vérifié                                            | Production vérifiée                                      |
@@ -42,3 +48,23 @@ Format demandé par la règle de livraison :
 | `/app/terminal`                                                                                                                                                                                                                        | OUI                        | NON — 404 sur `/api/terminal/start` (instance locale)                                               | NON                                                         | NON VÉRIFIÉ                                              |
 | `/app/admin`                                                                                                                                                                                                                           | OUI                        | NON — 503 sur `/api/v1/admin/overview` (ADMIN_EMAILS vide)                                          | NON                                                         | NON VÉRIFIÉ                                              |
 | npm `proofcore` 0.6.3                                                                                                                                                                                                                  | OUI (`npm view`)           | NON — registre à 0.6.0 (secret `NPM_TOKEN` manquant)                                                | —                                                           | NON                                                      |
+
+## Tableau de remplacement — 26 novembre 2026 (soir)
+
+| Fonction | Code présent | Tests exécutés | Résultat | Parcours vérifié | Production |
+| --- | --- | --- | --- | --- | --- |
+| Cinq familles (WORLD, FLOW, EXIT, FAIL, CLEAN) | VÉRIFIÉ (`packages/modules/*`, `packages/core/src/page-scan.ts`) | OUI (suite complète) | OUI, 931/931 | OUI (26 nov., `/app/modules/*`) | NON VÉRIFIÉ pour les écrans neufs |
+| Analysis canonique (cycle de vie, annulation, pagination) | VÉRIFIÉ (`0021_analyses.sql`, `routes/analyses.ts`) | OUI (`apps/api/test/analyses.test.ts`, 10 cas) | OUI | OUI (`/app/analyses`, 26 nov.) | NON VÉRIFIÉ |
+| Remédiation vérifiée par seconde mesure | VÉRIFIÉ (`0022`, `routes/remediations.ts`, `core/remediation.ts`) | OUI (`remediations.test.ts`, 9 cas) | OUI | OUI (26 nov. : `verified` et `inconclusive` obtenus à l'écran) | NON VÉRIFIÉ |
+| Onboarding quatre questions + recommandation du registre | VÉRIFIÉ (`0024`, `routes/onboarding.ts`, page `Onboarding.tsx`) | OUI (`onboarding.test.ts`, 5 cas) | OUI | OUI (26 nov. : site → profil `security`, API → refus honnête) | NON VÉRIFIÉ |
+| File de remédiations (filtres, étape suivante, liens) | VÉRIFIÉ (`Remediations.tsx`) | NON — pas de harnais DOM dans `apps/web` | — | OUI (26 nov., filtre et lien profond cliqués) | NON VÉRIFIÉ |
+| CSRF (origine + `Sec-Fetch-Site`) | VÉRIFIÉ (`app.ts`) | OUI (`security.test.ts`) | OUI | — | NON VÉRIFIÉ |
+| Rate limiting distribué | VÉRIFIÉ (`0023_rate_limits.sql`, `hitRateLimit`) | OUI (suite complète) | OUI | — | NON VÉRIFIÉ |
+| Sessions : liste, révocation, révocation des autres sessions au changement de mot de passe | VÉRIFIÉ (`routes/account.ts`) | OUI (`account-selfservice.test.ts`) | OUI | — | NON VÉRIFIÉ |
+| Fournisseur IA géré + priorité du profil personnel | VÉRIFIÉ (`env.ts`, `routes/ai.ts`) | OUI (`ai-managed.test.ts`, 4 cas) | OUI | — | NON VÉRIFIÉ |
+| CLEAN honnête : coquille rendue côté client → `SKIPPED` + verdict `not_measured` | VÉRIFIÉ (`page-scan.ts`) | OUI (`packages/core/test/page-scan.test.ts`) | OUI | — | — |
+| Suite complète | — | OUI (`npx vitest run`, 26 nov. soir) | OUI — 86 fichiers, 931 tests, `EXIT:0` | — | — |
+| Matrice 13 viewports | — | NON | — | NON | NON |
+
+Le tableau du début et la section « Ce qui ne doit pas être présenté comme opérationnel »
+restent lisibles comme l'état du matin du 26 novembre ; ce tableau-ci est l'état du soir.

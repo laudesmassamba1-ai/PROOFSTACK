@@ -23,7 +23,7 @@ ships in the same tarball and behaves identically.
 proofcore init                      Create proofcore.config.ts in this directory
 proofcore doctor                    Check the runtime, config and module wiring
 proofcore validate                  Validate the configuration and exit
-proofcore test [modules]            Run the enabled modules (WORLD/FLOW/EXIT)
+proofcore test [modules]            Run every enabled family (WORLD, FLOW, EXIT, FAIL, CLEAN)
 proofcore world | flow | exit       Run one core module locally
 proofcore module <id> [args]        Run one core module or an audit
 proofcore modules                   Show local wiring and the run command per module

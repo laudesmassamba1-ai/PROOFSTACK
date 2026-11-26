@@ -50,7 +50,7 @@ mêmes filtres `workspace_id` que l'API, et les conversations sont liées à
 | `fetch_web`, `browse_url`, `probe_url`                                                | lecture réseau avec garde d'URL                         |
 | `fail_scan`, `clean_audit`, `site_audit`                                              | contrôles HTTP mesurés                                  |
 | `read_repo`                                                                           | lecture d'un dépôt public avec garde                    |
-| `module_configure`                                                                    | écriture validée : WORLD/FLOW/EXIT                      |
+| `module_configure`                                                                    | écriture validée : les cinq familles (WORLD, FLOW, EXIT, FAIL, CLEAN) |
 | `module_run`, `analyze_run`                                                           | lancement réel + diagnostic d'un run stocké             |
 | `remember`                                                                            | écriture : un fait de mémoire borné                     |
 
