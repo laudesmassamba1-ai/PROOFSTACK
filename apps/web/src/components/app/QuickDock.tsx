@@ -1,4 +1,5 @@
 import {
+  Activity,
   BadgeCheck,
   BookOpen,
   Boxes,
@@ -52,6 +53,11 @@ export function QuickDock() {
       icon: <ScanLine size={20} />,
       label: fr ? "Analyser une adresse" : "Scan an address",
       onClick: go("/app/start"),
+    },
+    {
+      icon: <Activity size={20} />,
+      label: "Analyses",
+      onClick: go("/app/analyses"),
     },
     {
       icon: <LayoutGrid size={20} />,
