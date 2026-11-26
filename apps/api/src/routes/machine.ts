@@ -229,6 +229,9 @@ export function machineRoutes(services: Services): Hono<AppEnv> {
       runId: saved.runId,
       reportId: saved.reportId,
       recorded: true,
+      // The retention the plan bought, as a date the customer can plan around — not
+      // a policy they discover when the report is already gone.
+      retainedUntil: saved.retainedUntil ?? null,
       usage: {
         monthlyTestRuns: snapshot.usage.test_run ?? 0,
         limit: typeof limit === "number" ? limit : 0,

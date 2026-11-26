@@ -19,15 +19,34 @@ type WorkerEnv = {
 let cachedProvider: PaymentProvider | null = null;
 let cachedProviderKind: string | null = null;
 
+function build(env: WorkerEnv) {
+  const bindings = env as Env;
+  const kind = bindings.SASPAY_API_KEY && bindings.SASPAY_WEBHOOK_SECRET ? "saspay" : "sandbox";
+  if (!cachedProvider || cachedProviderKind !== kind) {
+    cachedProvider = createPaymentProvider(bindings);
+    cachedProviderKind = kind;
+  }
+  return createApp({ db: d1Database(env.DB), env: bindings, provider: cachedProvider });
+}
+
 export default {
   async fetch(request: Request, env: WorkerEnv): Promise<Response> {
-    const bindings = env as Env;
-    const kind = bindings.SASPAY_API_KEY && bindings.SASPAY_WEBHOOK_SECRET ? "saspay" : "sandbox";
-    if (!cachedProvider || cachedProviderKind !== kind) {
-      cachedProvider = createPaymentProvider(bindings);
-      cachedProviderKind = kind;
-    }
-    const { app } = createApp({ db: d1Database(env.DB), env: bindings, provider: cachedProvider });
-    return app.fetch(request, env);
+    const { app } = build(env);
+    return app.fetch(request, env as Env);
+  },
+
+  /**
+   * Retention sweep, daily.
+   *
+   * A report nobody deletes is a promise nobody keeps: `report_retention_days` is
+   * written into every row at upload time, and this is the job that honours it.
+   * Lazy purges on read keep a workspace honest between sweeps; this one keeps the
+   * whole database honest even for workspaces nobody has opened in months.
+   */
+  async scheduled(_event: unknown, env: WorkerEnv): Promise<void> {
+    const { services } = build(env);
+    const now = services.clock().toISOString();
+    await services.store.purgeAllExpiredReports(now);
+    await services.store.purgeExpiredIdempotencyKeys(now);
   },
 };

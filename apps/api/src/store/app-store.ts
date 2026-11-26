@@ -2441,7 +2441,7 @@ export class AppStore {
     workspaceId: string;
     totals: Record<string, RunTotals>;
     retainedUntil?: string;
-  }): Promise<{ runId: string; reportId: string }> {
+  }): Promise<{ runId: string; reportId: string; retainedUntil: string | null }> {
     const { run } = input;
     const runId = run.id;
     // Reuse the report of an already-uploaded run: a retry with a fresh idempotency
@@ -2517,7 +2517,7 @@ export class AppStore {
         )
         .run();
     }
-    return { runId, reportId };
+    return { runId, reportId, retainedUntil: input.retainedUntil ?? null };
   }
 
   async listRuns(
@@ -2588,6 +2588,51 @@ export class AppStore {
       .first<Row>();
     if (!row) return null;
     return parseJson<TestRun | null>(row.payload, null);
+  }
+
+  /**
+   * Retention, actually enforced.
+   *
+   * Every stored report carries the `retained_until` its workspace's plan bought
+   * (`report_retention_days`), but a row nobody deletes is a promise nobody keeps: the
+   * payload outlives the entitlement and the customer's data outlives the customer's
+   * consent. Purging is the other half of writing `retained_until` down.
+   *
+   * The run row itself stays: it is the ledger (totals, status, usage), not the
+   * customer's content. Findings go with their report — they cascade — so a purged run
+   * shows in history as what it now is: a run whose report expired.
+   */
+  async purgeExpiredReports(workspaceId: string, now: string): Promise<number> {
+    const result = await this.db
+      .prepare(
+        "DELETE FROM reports WHERE workspace_id = ? AND retained_until IS NOT NULL AND retained_until <= ?"
+      )
+      .bind(workspaceId, now)
+      .run();
+    return result.changes;
+  }
+
+  /** The scheduled sweep: one statement across every workspace. */
+  async purgeAllExpiredReports(now: string): Promise<number> {
+    const result = await this.db
+      .prepare("DELETE FROM reports WHERE retained_until IS NOT NULL AND retained_until <= ?")
+      .bind(now)
+      .run();
+    return result.changes;
+  }
+
+  /**
+   * Upload idempotency keys only need to live as long as a retry can plausibly take:
+   * past that window they are dead weight that grows forever. Thirty days is generous —
+   * the CLI's own retries happen within minutes.
+   */
+  async purgeExpiredIdempotencyKeys(now: string, keepDays = 30): Promise<number> {
+    const cutoff = new Date(new Date(now).getTime() - keepDays * 86_400_000).toISOString();
+    const result = await this.db
+      .prepare("DELETE FROM idempotency_keys WHERE created_at <= ?")
+      .bind(cutoff)
+      .run();
+    return result.changes;
   }
 
   async listReports(workspaceId: string, projectId: string, limit = 25) {

@@ -546,6 +546,8 @@ export function workspaceRoutes(services: Services): Hono<AppEnv> {
     const { workspace } = await requireWorkspace(c, services, c.req.query("workspaceId"));
     const project = await services.store.getProject(workspace.id, c.req.param("projectId"));
     if (!project) throw new HttpError(404, "project_not_found", "Project not found.");
+    // Lazy purge: a report nobody has opened in a while still expires on schedule.
+    await services.store.purgeExpiredReports(workspace.id, services.clock().toISOString());
     const page = readPage(c);
     const [runs, total] = await Promise.all([
       services.store.listRuns(workspace.id, project.id, page.limit, page.offset),
@@ -575,6 +577,9 @@ export function workspaceRoutes(services: Services): Hono<AppEnv> {
   /** The stored run payload, exactly as the engine produced it. */
   app.get("/reports/:reportId", async (c) => {
     const { workspace } = await requireWorkspace(c, services, c.req.query("workspaceId"));
+    // Reading is also the moment the promise is checked: an expired report is deleted
+    // before it can be served.
+    await services.store.purgeExpiredReports(workspace.id, services.clock().toISOString());
     const payload = await services.store.getReportPayload(workspace.id, c.req.param("reportId"));
     if (!payload) throw new HttpError(404, "report_not_found", "Report not found.");
 

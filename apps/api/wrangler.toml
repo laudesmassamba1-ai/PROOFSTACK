@@ -17,6 +17,13 @@ migrations_dir = "migrations"
 [observability]
 enabled = true
 
+# Retention sweep, daily at 03:17 UTC. Reports past their plan's
+# `report_retention_days` and dead idempotency keys are deleted by
+# the worker's `scheduled` handler; reads also purge lazily, so a
+# workspace stays honest between sweeps.
+[triggers]
+crons = ["17 3 * * *"]
+
 # Secrets are never placed in this file. Set them with:
 #   wrangler secret put SASPAY_API_KEY
 #   wrangler secret put SASPAY_WEBHOOK_SECRET

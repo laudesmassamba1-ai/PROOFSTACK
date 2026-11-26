@@ -5,12 +5,12 @@
 PROOFCORE is an integrated software quality and reliability suite. Five control
 families share one execution engine, one report format, one CLI and one dashboard:
 
-| Family    | Question it answers                                                        | What it actually measures |
-| --------- | -------------------------------------------------------------------------- | ------------------------- |
-| **WORLD** | Can users from different countries use the software correctly?             | HTTP and rendered-DOM checks across locales and timezones |
-| **FLOW**  | Can users complete the critical operations (checkout, payments, webhooks)? | Declared browser journey steps, executed by the CLI's real Chromium |
-| **EXIT**  | Can users retrieve their data without losing or corrupting it?             | Data retrieval and export checks against a configured source |
-| **FAIL**  | Are the HTTP security settings what they should be?                        | Passive header/configuration checks; no intrusion test |
+| Family    | Question it answers                                                        | What it actually measures                                                          |
+| --------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| **WORLD** | Can users from different countries use the software correctly?             | HTTP and rendered-DOM checks across locales and timezones                          |
+| **FLOW**  | Can users complete the critical operations (checkout, payments, webhooks)? | Declared browser journey steps, executed by the CLI's real Chromium                |
+| **EXIT**  | Can users retrieve their data without losing or corrupting it?             | Data retrieval and export checks against a configured source                       |
+| **FAIL**  | Are the HTTP security settings what they should be?                        | Passive header/configuration checks; no intrusion test                             |
 | **CLEAN** | Is the content and structure sound?                                        | Static HTML, or rendered DOM when a browser is available; otherwise `NOT_MEASURED` |
 
 The product is a monorepo: checks execute on the developer's machine or in CI against

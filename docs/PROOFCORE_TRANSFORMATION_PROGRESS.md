@@ -106,7 +106,7 @@ Les statuts utilisés : **FAIT**, **PARTIEL**, **BLOQUÉ**, **NON COMMENCÉ**.
 | Webhooks paiement       | FAIT         | signature, anti-rejeu, vérification serveur   |
 | Observabilité           | PARTIEL      | request-id + logs 5xx, pas de métriques       |
 | Sauvegarde/restauration | NON COMMENCÉ | bloquant                                      |
-| Rétention               | NON COMMENCÉ | entitlement sans purge                        |
+| Rétention               | FAIT         | purge paresseuse à la lecture + balayage planifié (cron 03:17 UTC) + clés d'idempotence 30 j ; 4 tests (`retention.test.ts`) ; la réponse d'upload donne la date d'expiration |
 | Déploiement             | NON EXÉCUTÉ  | non demandé dans cette passe                  |
 
 ## Étape J — Recette
