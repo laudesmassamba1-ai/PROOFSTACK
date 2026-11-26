@@ -10,17 +10,17 @@ Statuts utilisés dans ce document : **VÉRIFIÉ** (artefact observé), **PARTIE
 
 ## 1. Ce qui a été vérifié
 
-| Point | Statut | Preuve |
-| ----- | ------ | ------ |
-| Lint du dépôt suivi par Git | PARTIEL | `pnpm lint` échoue uniquement à cause de trois fichiers `*.tmp.mjs` non suivis à la racine (erreurs `useDomNodeTextContent`, format). Le code produit n'est pas en cause ; la CI repart d'un checkout et ne les voit pas. |
+| Point                                 | Statut  | Preuve                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lint du dépôt suivi par Git           | PARTIEL | `pnpm lint` échoue uniquement à cause de trois fichiers `*.tmp.mjs` non suivis à la racine (erreurs `useDomNodeTextContent`, format). Le code produit n'est pas en cause ; la CI repart d'un checkout et ne les voit pas.                                                                                                             |
 | Fichiers cités par l'audit historique | PARTIEL | `apps/web/src/pages/app/Start.tsx` (389 l.), `ProjectConfig.tsx` (1067 l.), `apps/api/src/routes/audits.ts` (1172 l.), `apps/api/src/routes/ai.ts` (2685 l.), `packages/cli/src/audit.ts` (495 l.) existent. **`packages/engine/src/contracts/statuses.ts` est absent** : les statuts sont dans `packages/contracts/src/statuses.ts`. |
-| Statuts de test | VÉRIFIÉ | `packages/contracts/src/statuses.ts` : PENDING, RUNNING, PASSED, FAILED, WARNING, SKIPPED, ERROR, BLOCKED, NOT_APPLICABLE, NOT_CONFIGURED. Statuts de run : PENDING, RUNNING, COMPLETED, PARTIAL, FAILED, ERROR, CANCELLED, NOTHING_VERIFIED. |
-| Modules | VÉRIFIÉ | `packages/modules/` contient `world`, `flow`, `exit` uniquement. FAIL et CLEAN sont dans `packages/core/src/page-scan.ts` (`ScanModule = "fail" \| "clean" \| "flow" \| "world" \| "exit"`) et `packages/cli/src/audit.ts` (`kind: "fail"` / `"clean"`). |
-| Protection CSRF | ABSENT | Aucune occurrence de `csrf` dans `apps/api/src`. |
-| Rate limiting | PARTIEL | `RateLimiter` (`apps/api/src/http/errors.ts:133`) : compteur en `Map` mémoire, par processus/isolat. Non distribué. Utilisé par `auth.ts` (connexion 10 / 5 min, inscription configurable). |
-| Révocation de session | PARTIEL | Révocation présente dans `auth.ts`, `device.ts`, `account.ts`, `machine.ts`, `billing.ts`, `workspace.ts`, `store/app-store.ts`. Rotation : NON VÉRIFIÉ. |
-| Tests | VÉRIFIÉ | 69 fichiers `*.test.*` / `*.spec.*` hors `node_modules` et `dist`. |
-| Espace disque | VÉRIFIÉ | 5,2 Go libres sur 232 Go (98 % utilisé). Les builds et installations lourdes sont à risque. |
+| Statuts de test                       | VÉRIFIÉ | `packages/contracts/src/statuses.ts` : PENDING, RUNNING, PASSED, FAILED, WARNING, SKIPPED, ERROR, BLOCKED, NOT_APPLICABLE, NOT_CONFIGURED. Statuts de run : PENDING, RUNNING, COMPLETED, PARTIAL, FAILED, ERROR, CANCELLED, NOTHING_VERIFIED.                                                                                         |
+| Modules                               | VÉRIFIÉ | `packages/modules/` contient `world`, `flow`, `exit` uniquement. FAIL et CLEAN sont dans `packages/core/src/page-scan.ts` (`ScanModule = "fail" \| "clean" \| "flow" \| "world" \| "exit"`) et `packages/cli/src/audit.ts` (`kind: "fail"` / `"clean"`).                                                                              |
+| Protection CSRF                       | ABSENT  | Aucune occurrence de `csrf` dans `apps/api/src`.                                                                                                                                                                                                                                                                                      |
+| Rate limiting                         | PARTIEL | `RateLimiter` (`apps/api/src/http/errors.ts:133`) : compteur en `Map` mémoire, par processus/isolat. Non distribué. Utilisé par `auth.ts` (connexion 10 / 5 min, inscription configurable).                                                                                                                                           |
+| Révocation de session                 | PARTIEL | Révocation présente dans `auth.ts`, `device.ts`, `account.ts`, `machine.ts`, `billing.ts`, `workspace.ts`, `store/app-store.ts`. Rotation : NON VÉRIFIÉ.                                                                                                                                                                              |
+| Tests                                 | VÉRIFIÉ | 69 fichiers `*.test.*` / `*.spec.*` hors `node_modules` et `dist`.                                                                                                                                                                                                                                                                    |
+| Espace disque                         | VÉRIFIÉ | 5,2 Go libres sur 232 Go (98 % utilisé). Les builds et installations lourdes sont à risque.                                                                                                                                                                                                                                           |
 
 ## 2. Ce qui n'a pas été vérifié (à compléter)
 
@@ -56,26 +56,27 @@ en parallèle dans le même arbre. Cette section ne décrit que ce qui a été e
 - `pnpm build` : succès (racine, deux fois ce jour).
 
 ### 5.2 Pages rendues dans un navigateur (Playwright, 1440×900 ; app connectée avec
+
 un compte jetable réel ; API locale `:8787` en vie)
 
-| Route | H1 rendu | Anomalies |
-| ----- | -------- | --------- |
-| `/`, `/download`, `/pricing`, `/docs`, `/changelog`, `/security`, `/signin` | correctes | aucune ; 0 erreur console, 0 réponse ≥ 400 |
-| `/legal` | « Page introuvable » | les routes existantes sont `/legal/terms`, `/legal/privacy`, `/legal/cookies` — pas de raccourci `/legal` |
-| `/app`, `/app/projects`, `/app/modules`, `/app/modules/{world,flow,exit,fail,clean}` | correctes | aucune |
-| `/app/scan`, `/app/start`, `/app/billing`, `/app/settings`, `/app/workspace`, `/app/cli`, `/app/interact`, `/app/ai`, `/app/guide`, `/app/notifications` | correctes | aucune |
-| `/app/terminal` | Terminal | **404 sur `/api/terminal/start`** (le démarrage du terminal local n'est pas servi par cette instance API locale) |
-| `/app/admin` | Opérations | **503 sur `/api/v1/admin/overview`** (instance locale ; ADMIN_EMAILS vide par défaut) |
-| `/app/account`, `/app/local-agent` | « Page introuvable » | URL saisies à la main : les vraies routes sont `/app/settings` (Account.tsx est rendu ailleurs) et `/app/agent`. Aucun lien de navigation ne pointe vers ces 404 — URLs mortes, pas de parcours cassé |
+| Route                                                                                                                                                    | H1 rendu             | Anomalies                                                                                                                                                                                             |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`, `/download`, `/pricing`, `/docs`, `/changelog`, `/security`, `/signin`                                                                              | correctes            | aucune ; 0 erreur console, 0 réponse ≥ 400                                                                                                                                                            |
+| `/legal`                                                                                                                                                 | « Page introuvable » | les routes existantes sont `/legal/terms`, `/legal/privacy`, `/legal/cookies` — pas de raccourci `/legal`                                                                                             |
+| `/app`, `/app/projects`, `/app/modules`, `/app/modules/{world,flow,exit,fail,clean}`                                                                     | correctes            | aucune                                                                                                                                                                                                |
+| `/app/scan`, `/app/start`, `/app/billing`, `/app/settings`, `/app/workspace`, `/app/cli`, `/app/interact`, `/app/ai`, `/app/guide`, `/app/notifications` | correctes            | aucune                                                                                                                                                                                                |
+| `/app/terminal`                                                                                                                                          | Terminal             | **404 sur `/api/terminal/start`** (le démarrage du terminal local n'est pas servi par cette instance API locale)                                                                                      |
+| `/app/admin`                                                                                                                                             | Opérations           | **503 sur `/api/v1/admin/overview`** (instance locale ; ADMIN_EMAILS vide par défaut)                                                                                                                 |
+| `/app/account`, `/app/local-agent`                                                                                                                       | « Page introuvable » | URL saisies à la main : les vraies routes sont `/app/settings` (Account.tsx est rendu ailleurs) et `/app/agent`. Aucun lien de navigation ne pointe vers ces 404 — URLs mortes, pas de parcours cassé |
 
 ### 5.3 CI observée via `gh` (comble la section 2.2 ci-dessus)
 
-| Run | Commit | Résultat |
-| --- | ------ | -------- |
-| 45600283899 (antérieure) | — | échec smoke CLI — cause corrigée (`asksHelp`), voir R5 du registre |
-| 45755203107 | `8f5e61c` | **failure** au smoke CLI : `--version` OK (0.6.3), `--help` sort 2, aucune trace d'erreur au log |
-| 45756582954 | `e5b5e63` | en cours au moment de la vérification |
-| 45755203107 · e2e | `8f5e61c` | **success** (desktop + mobile) |
+| Run                      | Commit    | Résultat                                                                                         |
+| ------------------------ | --------- | ------------------------------------------------------------------------------------------------ |
+| 45600283899 (antérieure) | —         | échec smoke CLI — cause corrigée (`asksHelp`), voir R5 du registre                               |
+| 45755203107              | `8f5e61c` | **failure** au smoke CLI : `--version` OK (0.6.3), `--help` sort 2, aucune trace d'erreur au log |
+| 45756582954              | `e5b5e63` | en cours au moment de la vérification                                                            |
+| 45755203107 · e2e        | `8f5e61c` | **success** (desktop + mobile)                                                                   |
 
 Reproduction locale : clone propre `/tmp/ci-repro` au commit exact `8f5e61c`, `pnpm
 install --frozen-lockfile`, `pnpm build`, les trois commandes du smoke test avec

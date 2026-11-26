@@ -2,19 +2,19 @@
 
 ## Packages (vérifiés par listage)
 
-| Dossier | Rôle observé |
-| ------- | ------------ |
-| `apps/web` | Site et application React (pages publiques et `pages/app/*`). |
-| `apps/api` | API (routes Hono-style sous `src/routes/`), auth, billing, IA, store. |
-| `apps/desktop` | Application Electron, sidecar `proofcore serve`. |
-| `packages/cli` | CLI `proofcore` (audit, scan, agent, hub, update, doctor, memory). |
-| `packages/core` | Scans de page et de site (`page-scan.ts`, `site-audit.ts`, `controls.ts`). FAIL et CLEAN vivent ici. |
-| `packages/engine` | Runner de tests, contexte, types, empreinte. |
-| `packages/contracts` | Vocabulaires partagés (statuts, schémas zod). |
-| `packages/modules/{world,flow,exit}` | Trois modules de contrôle. |
-| `packages/adapters/{ai,browser,payments,reporting}` | Adaptateurs externes. |
-| `packages/billing`, `packages/config` | Offres et configuration. |
-| `tooling/scripts` | Build, installeurs, déploiement Cloudflare, smoke tests. |
+| Dossier                                             | Rôle observé                                                                                         |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `apps/web`                                          | Site et application React (pages publiques et `pages/app/*`).                                        |
+| `apps/api`                                          | API (routes Hono-style sous `src/routes/`), auth, billing, IA, store.                                |
+| `apps/desktop`                                      | Application Electron, sidecar `proofcore serve`.                                                     |
+| `packages/cli`                                      | CLI `proofcore` (audit, scan, agent, hub, update, doctor, memory).                                   |
+| `packages/core`                                     | Scans de page et de site (`page-scan.ts`, `site-audit.ts`, `controls.ts`). FAIL et CLEAN vivent ici. |
+| `packages/engine`                                   | Runner de tests, contexte, types, empreinte.                                                         |
+| `packages/contracts`                                | Vocabulaires partagés (statuts, schémas zod).                                                        |
+| `packages/modules/{world,flow,exit}`                | Trois modules de contrôle.                                                                           |
+| `packages/adapters/{ai,browser,payments,reporting}` | Adaptateurs externes.                                                                                |
+| `packages/billing`, `packages/config`               | Offres et configuration.                                                                             |
+| `tooling/scripts`                                   | Build, installeurs, déploiement Cloudflare, smoke tests.                                             |
 
 ## Flux de données (vérifié dans les noms de fichiers, pas encore tracé de bout en bout)
 
