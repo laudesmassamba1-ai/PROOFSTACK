@@ -243,6 +243,29 @@ export function ModulePage() {
         </div>
       </section>
 
+      {module === "flow" ? (
+        <section className="mt-4 flex flex-wrap items-center gap-3 rounded-[var(--radius)] border border-black/10 px-4 py-3">
+          <RouteIcon size={18} className="shrink-0 text-primary" aria-hidden />
+          <div className="min-w-0 flex-1 break-words">
+            <p className="text-sm font-medium break-words">
+              {fr
+                ? "Construire le parcours, pas seulement le lire"
+                : "Build the journey, not just read it"}
+            </p>
+            <p className="mt-0.5 text-xs leading-relaxed text-muted break-words">
+              {fr
+                ? "FLOW Studio enregistre les étapes, les revalide et les exécute dans un vrai navigateur quand ce déploiement en a un."
+                : "FLOW Studio saves the steps, re-validates them and runs them in a real browser when this deployment has one."}
+            </p>
+          </div>
+          <Link to="/app/flow" className="app-btn app-btn-primary app-btn-sm">
+            <RouteIcon size={13} />
+            {fr ? "Ouvrir FLOW Studio" : "Open FLOW Studio"}
+            <ArrowRight size={13} />
+          </Link>
+        </section>
+      ) : null}
+
       {/* The module says what was measured. The AI reads the code and says where and how
           to change it. That link is the difference between a dashboard and a fix. */}
       <section className="mt-4 flex flex-wrap items-center gap-3 rounded-[var(--radius)] border border-black/10 px-4 py-3 app-module-ai-call">

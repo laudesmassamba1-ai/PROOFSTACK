@@ -53,10 +53,11 @@ Format demandé par la règle de livraison :
 
 | Fonction | Code présent | Tests exécutés | Résultat | Parcours vérifié | Production |
 | --- | --- | --- | --- | --- | --- |
-| Cinq familles (WORLD, FLOW, EXIT, FAIL, CLEAN) | VÉRIFIÉ (`packages/modules/*`, `packages/core/src/page-scan.ts`) | OUI (suite complète) | OUI, 931/931 | OUI (26 nov., `/app/modules/*`) | NON VÉRIFIÉ pour les écrans neufs |
+| Cinq familles (WORLD, FLOW, EXIT, FAIL, CLEAN) | VÉRIFIÉ (`packages/modules/*`, `packages/core/src/page-scan.ts`) | OUI (suite complète) | OUI, 944/944 | OUI (26 nov., `/app/modules/*`) | NON VÉRIFIÉ pour les écrans neufs |
 | Analysis canonique (cycle de vie, annulation, pagination) | VÉRIFIÉ (`0021_analyses.sql`, `routes/analyses.ts`) | OUI (`apps/api/test/analyses.test.ts`, 10 cas) | OUI | OUI (`/app/analyses`, 26 nov.) | NON VÉRIFIÉ |
 | Remédiation vérifiée par seconde mesure | VÉRIFIÉ (`0022`, `routes/remediations.ts`, `core/remediation.ts`) | OUI (`remediations.test.ts`, 9 cas) | OUI | OUI (26 nov. : `verified` et `inconclusive` obtenus à l'écran) | NON VÉRIFIÉ |
 | Onboarding quatre questions + recommandation du registre | VÉRIFIÉ (`0024`, `routes/onboarding.ts`, page `Onboarding.tsx`) | OUI (`onboarding.test.ts`, 5 cas) | OUI | OUI (26 nov. : site → profil `security`, API → refus honnête) | NON VÉRIFIÉ |
+| FLOW Studio (éditeur, validation partagée, exécution) | VÉRIFIÉ (définition, validation, CRUD) / NON VÉRIFIÉ (exécution navigateur) | OUI — 7 tests validateur `scenario-spec` + 6 tests API `flow-studio` | OUI (6/6 API, 7/7 core) | OUI (26 nov. : scénario créé, rechargé, refusé sans navigateur avec l'alternative CLI, supprimé) | NON VÉRIFIÉ — l'exécution réelle demande la liaison Cloudflare `BROWSER` |
 | Cinq cibles de départ + pages lues / non suivies | VÉRIFIÉ (`Start.tsx`, `App.tsx` ; crawl `audits.ts`) | NON — pas de harnais DOM dans `apps/web` | — | OUI (26 nov. : site `www.w3.org`, 2 pages sur 5, 3 adresses non suivies avec raison ; « Un parcours » mène à FLOW) | NON VÉRIFIÉ |
 | File de remédiations (filtres, étape suivante, liens) | VÉRIFIÉ (`Remediations.tsx`) | NON — pas de harnais DOM dans `apps/web` | — | OUI (26 nov., filtre et lien profond cliqués) | NON VÉRIFIÉ |
 | CSRF (origine + `Sec-Fetch-Site`) | VÉRIFIÉ (`app.ts`) | OUI (`security.test.ts`) | OUI | — | NON VÉRIFIÉ |
@@ -64,7 +65,7 @@ Format demandé par la règle de livraison :
 | Sessions : liste, révocation, révocation des autres sessions au changement de mot de passe | VÉRIFIÉ (`routes/account.ts`) | OUI (`account-selfservice.test.ts`) | OUI | — | NON VÉRIFIÉ |
 | Fournisseur IA géré + priorité du profil personnel | VÉRIFIÉ (`env.ts`, `routes/ai.ts`) | OUI (`ai-managed.test.ts`, 4 cas) | OUI | — | NON VÉRIFIÉ |
 | CLEAN honnête : coquille rendue côté client → `SKIPPED` + verdict `not_measured` | VÉRIFIÉ (`page-scan.ts`) | OUI (`packages/core/test/page-scan.test.ts`) | OUI | — | — |
-| Suite complète | — | OUI (`npx vitest run`, 26 nov. soir) | OUI — 86 fichiers, 931 tests, `EXIT:0` | — | — |
+| Suite complète | — | OUI (`npx vitest run`, 26 nov. soir) | OUI — 88 fichiers, 944 tests, `EXIT:0` | — | — |
 | Matrice 13 viewports | — | NON | — | NON | NON |
 
 Le tableau du début et la section « Ce qui ne doit pas être présenté comme opérationnel »

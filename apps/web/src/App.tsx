@@ -66,6 +66,9 @@ const InteractPage = lazy(() =>
 const ScanPage = lazy(() =>
   import("./pages/app/Scan.js").then((module) => ({ default: module.ScanPage }))
 );
+const FlowStudioPage = lazy(() =>
+  import("./pages/app/FlowStudio.js").then((module) => ({ default: module.FlowStudioPage }))
+);
 const StartPage = lazy(() =>
   import("./pages/app/Start.js").then((module) => ({ default: module.StartPage }))
 );
@@ -182,6 +185,7 @@ export function App() {
           <Route path="onboarding" element={<OnboardingPage />} />
           <Route path="interact" element={<InteractPage />} />
           <Route path="start" element={<StartPage />} />
+          <Route path="flow" element={<FlowStudioPage />} />
           <Route path="guide" element={<GuidePage />} />
           <Route path="modules/:module" element={<AppModulePage />} />
           <Route path="cli" element={<Cli />} />

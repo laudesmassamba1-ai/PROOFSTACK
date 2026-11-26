@@ -4,7 +4,8 @@ import { z } from "zod";
 import { clientAddress, HttpError, RateLimiter } from "../http/errors.js";
 import { readBody, requireWorkspace } from "../http/guards.js";
 import type { AppEnv, Services } from "../http/services.js";
-import { defaultScenario, runScenario, unavailableReport } from "../scenario.js";
+import { executeBrowserScenario } from "../browser-scenario.js";
+import { defaultScenario } from "../scenario.js";
 
 /**
  * The interactive browser, beside the chat.
@@ -392,42 +393,27 @@ export function browserRoutes(services: Services): Hono<AppEnv> {
    */
   app.post("/scenario", async (c) => {
     const user = c.get("user");
-    const binding = c.env?.BROWSER;
-    if (!binding) {
-      return c.json(
-        unavailableReport("Ce déploiement n'a pas de navigateur (liaison BROWSER absente)."),
-        503
-      );
-    }
     const body = await readBody(c, scenarioSchema);
     const target = assertPublicUrl(normalizeUrl(body.url));
-    await requireWorkspace(c, services, body.workspaceId, ["owner", "admin", "member"]);
+    const access = await requireWorkspace(c, services, body.workspaceId, [
+      "owner",
+      "admin",
+      "member",
+    ]);
 
-    const puppeteer = await puppeteerModule();
-    const browser = await puppeteer.launch(binding);
-    try {
-      const page = (await browser.pages())[0] ?? (await browser.newPage());
-      await page.setViewport({ width: 1280, height: 800 });
-      const steps = body.steps ?? defaultScenario(target.toString());
-      const report = await runScenario(page, steps, {
-        name: "Browser interaction",
-        allowDestructive: body.allowDestructive,
-      });
-      await services.store.appendAudit({
-        workspaceId: body.workspaceId,
-        actor: user.id,
-        action: "browser.scenario",
-        detail: {
-          url: target.toString(),
-          stepsRun: report.stepsRun,
-          failed: report.findings.filter((f) => f.status === "FAIL").length,
-          destructive: body.allowDestructive,
-        },
-      });
-      return c.json(report);
-    } finally {
-      await browser.close().catch(() => undefined);
-    }
+    // Steps that were not supplied fall back to the built-in smoke journey: the manual
+    // panel can run a page without inventing a scenario, and the Analysis says which steps
+    // actually ran.
+    const steps = body.steps ?? defaultScenario(target.toString());
+    const execution = await executeBrowserScenario(services, c.env, {
+      workspaceId: access.workspace.id,
+      userId: user.id,
+      url: target.toString(),
+      name: "Browser interaction",
+      steps,
+      allowDestructive: body.allowDestructive,
+    });
+    return c.json({ ...execution.report, analysisId: execution.analysisId });
   });
 
   app.post("/close", async (c) => {

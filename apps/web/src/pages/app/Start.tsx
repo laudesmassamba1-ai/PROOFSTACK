@@ -120,7 +120,7 @@ const TARGETS: {
     en: "A journey",
     scopeFr: "Exige un navigateur d'exécution : se construit et s'exécute dans FLOW.",
     scopeEn: "Needs a browser runner: built and executed in FLOW.",
-    to: "/app/modules/flow",
+    to: "/app/flow",
     ctaFr: "Ouvrir FLOW",
     ctaEn: "Open FLOW",
   },

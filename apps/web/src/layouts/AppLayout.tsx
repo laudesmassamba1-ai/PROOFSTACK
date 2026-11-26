@@ -300,6 +300,7 @@ export function AppLayout() {
       [t("ws.nav.workspace"), "/app/workspace", <Boxes key="workspace" size={15} />],
       ["WORLD", "/app/modules/world", <Globe2 key="world" size={15} />],
       ["FLOW", "/app/modules/flow", <RouteIcon key="flow" size={15} />],
+      ["FLOW STUDIO", "/app/flow", <RouteIcon key="flow-studio" size={15} />],
       ["EXIT", "/app/modules/exit", <PackageOpen key="exit" size={15} />],
       ["FAIL", "/app/modules/fail", <ShieldAlert key="fail" size={15} />],
       ["CLEAN", "/app/modules/clean", <BadgeCheck key="clean" size={15} />],

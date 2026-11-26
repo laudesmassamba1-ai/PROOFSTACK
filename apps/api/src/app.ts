@@ -18,6 +18,7 @@ import { browserRoutes } from "./routes/browser.js";
 import { capabilityRoutes } from "./routes/capabilities.js";
 import { controlRoutes } from "./routes/controls.js";
 import { deviceRoutes } from "./routes/device.js";
+import { flowStudioRoutes } from "./routes/flow-studio.js";
 import { machineRoutes } from "./routes/machine.js";
 import { notificationRoutes } from "./routes/notifications.js";
 import { onboardingRoutes } from "./routes/onboarding.js";
@@ -201,6 +202,7 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
   app.route("/api/v1", remediationRoutes(services));
   app.route("/api/v1", onboardingRoutes(services));
   app.route("/api/v1", auditRoutes(services));
+  app.route("/api/v1", flowStudioRoutes(services));
   app.route("/api/v1/browser", browserRoutes(services));
   app.route("/api/v1", billingRoutes(services));
   app.route("/api/v1/admin", adminRoutes(services));

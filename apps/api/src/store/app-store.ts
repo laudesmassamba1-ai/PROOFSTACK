@@ -11,6 +11,7 @@ import {
   type AnalysisSource,
   type AnalysisStatus,
   type AnalysisTargetType,
+  type FlowStep,
   iso,
   ProofCoreError,
   type RemediationStatus,
@@ -140,6 +141,37 @@ const EMPTY_COVERAGE: AnalysisCoverage = {
   measuredModules: [],
   skipped: [],
 };
+
+/** The saved definition of a FLOW scenario. */
+export interface FlowScenarioRecord {
+  id: string;
+  workspaceId: string;
+  projectId: string | null;
+  name: string;
+  target: string;
+  steps: FlowStep[];
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  lastRunAt: string | null;
+  lastReport: unknown;
+}
+
+function flowScenarioFromRow(row: Row): FlowScenarioRecord {
+  return {
+    id: str(row, "id"),
+    workspaceId: str(row, "workspace_id"),
+    projectId: nullableStr(row, "project_id"),
+    name: str(row, "name"),
+    target: str(row, "target"),
+    steps: parseJson<FlowStep[]>(row.steps, []),
+    createdBy: str(row, "created_by"),
+    createdAt: str(row, "created_at"),
+    updatedAt: str(row, "updated_at"),
+    lastRunAt: nullableStr(row, "last_run_at"),
+    lastReport: parseJson<unknown>(row.last_report, null),
+  };
+}
 
 function analysisFromRow(row: Row): AnalysisRecord {
   return {
@@ -1418,6 +1450,110 @@ export class AppStore {
       .bind(userId)
       .all<Row>();
     return rows.map((row) => ({ ...mapWorkspace(row), role: str(row, "role") as Role }));
+  }
+
+  /** Saved FLOW scenarios: the reusable definition, not the execution history. */
+  async createFlowScenario(input: {
+    id: string;
+    workspaceId: string;
+    projectId: string | null;
+    name: string;
+    target: string;
+    steps: FlowStep[];
+    createdBy: string;
+    now: Date;
+  }): Promise<FlowScenarioRecord> {
+    const at = iso(input.now);
+    await this.db
+      .prepare(
+        `INSERT INTO flow_scenarios
+           (id, workspace_id, project_id, name, target, steps, created_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        input.id,
+        input.workspaceId,
+        input.projectId,
+        input.name,
+        input.target,
+        json(input.steps),
+        input.createdBy,
+        at,
+        at
+      )
+      .run();
+    const created = await this.getFlowScenario(input.workspaceId, input.id);
+    if (!created) {
+      throw new ProofCoreError({ message: "flow scenario disappeared after insert", category: "INTERNAL" });
+    }
+    return created;
+  }
+
+  async listFlowScenarios(
+    workspaceId: string,
+    projectId?: string | null
+  ): Promise<FlowScenarioRecord[]> {
+    const rows = projectId
+      ? await this.db
+          .prepare(
+            "SELECT * FROM flow_scenarios WHERE workspace_id = ? AND project_id = ? ORDER BY updated_at DESC"
+          )
+          .bind(workspaceId, projectId)
+          .all<Row>()
+      : await this.db
+          .prepare("SELECT * FROM flow_scenarios WHERE workspace_id = ? ORDER BY updated_at DESC")
+          .bind(workspaceId)
+          .all<Row>();
+    return rows.map(flowScenarioFromRow);
+  }
+
+  async getFlowScenario(workspaceId: string, id: string): Promise<FlowScenarioRecord | null> {
+    const row = await this.db
+      .prepare("SELECT * FROM flow_scenarios WHERE workspace_id = ? AND id = ?")
+      .bind(workspaceId, id)
+      .first<Row>();
+    return row ? flowScenarioFromRow(row) : null;
+  }
+
+  async updateFlowScenario(input: {
+    workspaceId: string;
+    id: string;
+    name: string;
+    target: string;
+    steps: FlowStep[];
+    now: Date;
+  }): Promise<FlowScenarioRecord | null> {
+    const result = await this.db
+      .prepare(
+        "UPDATE flow_scenarios SET name = ?, target = ?, steps = ?, updated_at = ? WHERE workspace_id = ? AND id = ?"
+      )
+      .bind(input.name, input.target, json(input.steps), iso(input.now), input.workspaceId, input.id)
+      .run();
+    if (result.changes === 0) return null;
+    return this.getFlowScenario(input.workspaceId, input.id);
+  }
+
+  async deleteFlowScenario(workspaceId: string, id: string): Promise<boolean> {
+    const result = await this.db
+      .prepare("DELETE FROM flow_scenarios WHERE workspace_id = ? AND id = ?")
+      .bind(workspaceId, id)
+      .run();
+    return result.changes > 0;
+  }
+
+  /** Keep the last report beside the definition; the execution itself is an Analysis. */
+  async recordFlowScenarioRun(input: {
+    workspaceId: string;
+    id: string;
+    report: unknown;
+    now: Date;
+  }): Promise<void> {
+    await this.db
+      .prepare(
+        "UPDATE flow_scenarios SET last_run_at = ?, last_report = ? WHERE workspace_id = ? AND id = ?"
+      )
+      .bind(iso(input.now), json(input.report), input.workspaceId, input.id)
+      .run();
   }
 
   async getOnboarding(workspaceId: string): Promise<OnboardingRecord | null> {

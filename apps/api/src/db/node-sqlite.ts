@@ -86,6 +86,7 @@ export function migrationFiles(): { id: string; sql: string }[] {
     "0022_remediations.sql",
     "0023_rate_limits.sql",
     "0024_workspace_onboarding.sql",
+    "0025_flow_scenarios.sql",
   ];
   return names.map((name) => ({ id: name, sql: readFileSync(join(MIGRATIONS_DIR, name), "utf8") }));
 }
