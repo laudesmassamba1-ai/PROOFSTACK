@@ -5,16 +5,16 @@ Les statuts utilisés : **FAIT**, **PARTIEL**, **BLOQUÉ**, **NON COMMENCÉ**.
 
 ## Étape A — Stabilisation
 
-| Élément                       | État    | Preuve                                                                          |
-| ----------------------------- | ------- | ------------------------------------------------------------------------------- |
-| Installation reproductible    | FAIT    | `pnpm install`, workspace pnpm                                                  |
-| Lint                          | FAIT    | 496 fichiers, 0 erreur (21 diagnostics corrigés dans cette passe)               |
-| Types                         | FAIT    | `pnpm typecheck` OK                                                             |
-| Tests                         | FAIT    | 811 tests, 69 fichiers                                                          |
-| Build                         | FAIT    | `pnpm verify` inclut le build web                                               |
-| CI                            | FAIT    | `.github/workflows/ci.yml` ; non déclenchée (pas de push)                       |
-| Sécurité du dépôt             | PARTIEL | `.env*` ignoré, `.env.example` sans valeurs ; pas de scan de secrets automatisé |
-| Documentation de vérification | FAIT    | ce document + `PROOFCORE_2_0_DELIVERY_REPORT.md`                                |
+| Élément                       | État    | Preuve                                                                                                                                                                                                                       |
+| ----------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Installation reproductible    | FAIT    | `pnpm install`, workspace pnpm                                                                                                                                                                                               |
+| Lint                          | FAIT    | 496 fichiers, 0 erreur (21 diagnostics corrigés dans cette passe)                                                                                                                                                            |
+| Types                         | FAIT    | `pnpm typecheck` OK                                                                                                                                                                                                          |
+| Tests                         | FAIT    | 811 tests, 69 fichiers                                                                                                                                                                                                       |
+| Build                         | FAIT    | `pnpm verify` inclut le build web                                                                                                                                                                                            |
+| CI                            | FAIT    | `.github/workflows/ci.yml` déclenchée et VERTE sur master (runs 45789093588 et 45795161825, 26 nov.) ; les échecs publics précédents venaient du lint (concaténations, formatage, assertions non-null) — corrigés et rejoués |
+| Sécurité du dépôt             | PARTIEL | `.env*` ignoré, `.env.example` sans valeurs ; pas de scan de secrets automatisé                                                                                                                                              |
+| Documentation de vérification | FAIT    | ce document + `PROOFCORE_2_0_DELIVERY_REPORT.md`                                                                                                                                                                             |
 
 ## Étape B — Cartographie technique
 
