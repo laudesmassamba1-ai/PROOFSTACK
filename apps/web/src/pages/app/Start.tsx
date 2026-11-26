@@ -18,6 +18,12 @@ import { useSession } from "../../lib/session.js";
  *
  * The full report stays one link away: this screen answers "is my site okay?", it does not
  * replace the scan page where login, verification and history live.
+ *
+ * The address is not the only thing worth analysing, though, and the five targets are not
+ * equivalent. A page is one request; a site is a bounded crawl that costs the target requests
+ * and is not part of the free analysis; a journey needs a browser runner; an API and a project
+ * are run from the surfaces that own the repository or the contract. This screen says so
+ * before the click instead of letting a single field imply that everything is the same.
  */
 
 type ScanStatus = "PASS" | "WARN" | "FAIL" | "SKIPPED";
@@ -47,6 +53,21 @@ interface ScanPreview {
   locked: { module: string; id: string }[];
 }
 
+/** The crawl section, only present when the site — not just the address — was read. */
+interface ScanSite {
+  pages: {
+    url: string;
+    status: number;
+    depth: number;
+    measured: boolean;
+    error: string | null;
+  }[];
+  skipped: { url: string; reason: string }[];
+  truncated: boolean;
+  truncatedBy: "pages" | "depth" | "time" | "bytes" | null;
+  requests: number;
+}
+
 interface GuidedScan {
   url: string;
   finalUrl: string;
@@ -57,7 +78,73 @@ interface GuidedScan {
   /** Absent on a free analysis: module scores would reveal the withheld 40 %. */
   modules?: GuidedModule[];
   clientRendered: boolean;
+  site?: ScanSite;
 }
+
+type TargetChoice = "page" | "site" | "journey" | "api" | "project";
+
+/**
+ * The five targets, with what each one really costs and where it runs.
+ *
+ * Only the first two execute here. The other three name the surface that owns them: a
+ * journey needs a browser runner, an API needs a contract, a project needs a repository.
+ * Showing them disabled would hide a real capability; showing them executable would be a lie.
+ */
+const TARGETS: {
+  id: TargetChoice;
+  fr: string;
+  en: string;
+  scopeFr: string;
+  scopeEn: string;
+  to?: string;
+  ctaFr?: string;
+  ctaEn?: string;
+}[] = [
+  {
+    id: "page",
+    fr: "Une page",
+    en: "One page",
+    scopeFr: "Une adresse, une requête. Inclus dans l'analyse gratuite.",
+    scopeEn: "One address, one request. Part of the free analysis.",
+  },
+  {
+    id: "site",
+    fr: "Tout le site",
+    en: "The whole site",
+    scopeFr: "Pages suivies dans le périmètre, budget de pages, adresses non suivies listées.",
+    scopeEn: "Pages followed in scope, a page budget, and every address left out is listed.",
+  },
+  {
+    id: "journey",
+    fr: "Un parcours",
+    en: "A journey",
+    scopeFr: "Exige un navigateur d'exécution : se construit et s'exécute dans FLOW.",
+    scopeEn: "Needs a browser runner: built and executed in FLOW.",
+    to: "/app/modules/flow",
+    ctaFr: "Ouvrir FLOW",
+    ctaEn: "Open FLOW",
+  },
+  {
+    id: "api",
+    fr: "Une API",
+    en: "An API",
+    scopeFr: "Contrats et réponses : lancé depuis la CLI, l'IA ou l'API, puis visible ici.",
+    scopeEn: "Contracts and responses: run from the CLI, the AI or the API, then seen here.",
+    to: "/app/cli",
+    ctaFr: "Voir la CLI",
+    ctaEn: "See the CLI",
+  },
+  {
+    id: "project",
+    fr: "Un projet",
+    en: "A project",
+    scopeFr: "Contrôles sur le code et les fichiers autorisés, depuis un projet suivi.",
+    scopeEn: "Controls over code and permitted files, from a tracked project.",
+    to: "/app/projects",
+    ctaFr: "Ouvrir les projets",
+    ctaEn: "Open projects",
+  },
+];
 
 const LABELS: Record<string, { fr: string; en: string }> = {
   fail: { fr: "Sécurité", en: "Security" },
@@ -87,6 +174,21 @@ function report(scan: GuidedScan): string {
     scan.clientRendered
       ? "Attention : la page est rendue côté client, donc les constats sur le contenu et la mise en page ne portent que sur le HTML initial."
       : "",
+    ...(scan.site
+      ? [
+          "",
+          `Exploration de site : ${scan.site.pages.filter((page) => page.measured).length} page(s) examinée(s) sur ${scan.site.pages.length + scan.site.skipped.length} découverte(s), ${scan.site.requests} requête(s).`,
+          ...(scan.site.skipped.length > 0
+            ? [
+                "Adresses non examinées (ne pas conclure à leur sujet) :",
+                ...scan.site.skipped.slice(0, 20).map((page) => `- ${page.url} — ${page.reason}`),
+              ]
+            : []),
+          scan.site.truncated
+            ? `Exploration arrêtée par la limite : ${scan.site.truncatedBy ?? "budget"}.`
+            : "",
+        ]
+      : []),
   ].join("\n");
 }
 
@@ -98,6 +200,9 @@ export function StartPage(): React.ReactElement {
   // not typed again on the scan screen.
   const [search] = useSearchParams();
   const [url, setUrl] = useState(() => search.get("target") ?? "");
+  const [choice, setChoice] = useState<TargetChoice>("page");
+  /** A crawl asks the target for several pages: the budget is chosen, not guessed. */
+  const [maxPages, setMaxPages] = useState(10);
   const [scan, setScan] = useState<GuidedScan | null>(null);
   const [preview, setPreview] = useState<ScanPreview | null>(null);
   const [auditId, setAuditId] = useState<string | null>(null);
@@ -142,6 +247,9 @@ export function StartPage(): React.ReactElement {
   );
 
   const run = async () => {
+    // The other three targets are opened where they run; a retry of a page error must not
+    // quietly post a page scan after the person selected "a journey".
+    if (choice !== "page" && choice !== "site") return;
     if (!session.workspaceId || busy) return;
     const target = url.trim();
     if (!/^https?:\/\/\S+/i.test(target)) {
@@ -167,7 +275,10 @@ export function StartPage(): React.ReactElement {
         preview?: ScanPreview;
       }>("/api/v1/audits", {
         method: "POST",
-        body: { workspaceId: session.workspaceId, url: target },
+        body:
+          choice === "site"
+            ? { workspaceId: session.workspaceId, url: target, crawl: { maxPages } }
+            : { workspaceId: session.workspaceId, url: target },
       });
       setScan(body.audit);
       setPreview(body.preview ?? null);
@@ -189,50 +300,133 @@ export function StartPage(): React.ReactElement {
         eyebrow={fr ? "DÉMARRER / UNE ADRESSE" : "START / ONE ADDRESS"}
         title={fr ? "UNE ADRESSE. UN RÉSULTAT LISIBLE." : "ONE ADDRESS. A RESULT YOU CAN READ."}
         description={
-          fr
-            ? "Colle l'adresse de ton site. Aucun projet à créer, aucune commande à taper, rien à installer : le résultat arrive avec sa lecture."
-            : "Paste your site's address. No project to create, no command to type, nothing to install: the result arrives with its reading."
+          choice === "site"
+            ? fr
+              ? "Le site est exploré dans un périmètre borné, page par page. Ce qui n'a pas été lu est listé, jamais compté comme sain."
+              : "The site is crawled within a bounded scope, page by page. What was not read is listed, never counted as healthy."
+            : choice === "page"
+              ? fr
+                ? "Colle l'adresse de ton site. Aucun projet à créer, aucune commande à taper, rien à installer : le résultat arrive avec sa lecture."
+                : "Paste your site's address. No project to create, no command to type, nothing to install: the result arrives with its reading."
+              : fr
+                ? "Cinq cibles, cinq périmètres. Ce que cette page ne peut pas exécuter est ouvert là où cela tourne réellement."
+                : "Five targets, five scopes. What this page cannot run opens where it actually runs."
         }
       />
 
-      <Card className="scan-bar">
-        <ScanLine size={17} aria-hidden className="scan-bar-icon" />
-        <label className="sr-only" htmlFor="start-url">
-          {fr ? "Adresse du site" : "Site address"}
-        </label>
-        <input
-          id="start-url"
-          type="url"
-          value={url}
-          onChange={(event) => setUrl(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") void run();
-          }}
-          placeholder="https://votre-site.com"
-          className="app-input scan-input"
-          spellCheck={false}
-          autoComplete="url"
-        />
-        <button
-          type="button"
-          className="app-btn app-btn-primary"
-          onClick={() => void run()}
-          disabled={busy}
-        >
-          {busy ? (
-            <Loader2 size={14} className="animate-spin" aria-hidden />
-          ) : (
-            <ScanLine size={14} aria-hidden />
-          )}
-          {busy
-            ? fr
-              ? "Analyse en cours…"
-              : "Scanning…"
-            : fr
-              ? "Voir le résultat"
-              : "See the result"}
-        </button>
-      </Card>
+      <fieldset className="start-targets">
+        <legend className="sr-only">
+          {fr ? "Ce que tu veux analyser" : "What you want to analyse"}
+        </legend>
+        {TARGETS.map((item) => {
+          const active = choice === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              className={active ? "start-target is-active" : "start-target"}
+              aria-pressed={active}
+              disabled={busy}
+              onClick={() => setChoice(item.id)}
+            >
+              <span className="start-target-name">{fr ? item.fr : item.en}</span>
+              <span className="start-target-scope">{fr ? item.scopeFr : item.scopeEn}</span>
+            </button>
+          );
+        })}
+      </fieldset>
+
+      {choice === "page" || choice === "site" ? (
+        <>
+          <Card className="scan-bar">
+            <ScanLine size={17} aria-hidden className="scan-bar-icon" />
+            <label className="sr-only" htmlFor="start-url">
+              {choice === "site"
+                ? fr
+                  ? "Adresse du site à explorer"
+                  : "Site address to crawl"
+                : fr
+                  ? "Adresse du site"
+                  : "Site address"}
+            </label>
+            <input
+              id="start-url"
+              type="url"
+              value={url}
+              onChange={(event) => setUrl(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") void run();
+              }}
+              placeholder="https://votre-site.com"
+              className="app-input scan-input"
+              spellCheck={false}
+              autoComplete="url"
+            />
+            <button
+              type="button"
+              className="app-btn app-btn-primary"
+              onClick={() => void run()}
+              disabled={busy}
+            >
+              {busy ? (
+                <Loader2 size={14} className="animate-spin" aria-hidden />
+              ) : (
+                <ScanLine size={14} aria-hidden />
+              )}
+              {busy
+                ? fr
+                  ? "Analyse en cours…"
+                  : "Scanning…"
+                : fr
+                  ? choice === "site"
+                    ? "Explorer le site"
+                    : "Voir le résultat"
+                  : choice === "site"
+                    ? "Explore the site"
+                    : "See the result"}
+            </button>
+          </Card>
+
+          {choice === "site" ? (
+            <div className="start-budget">
+              <label htmlFor="start-max-pages" className="app-eyebrow">
+                {fr ? "Budget de pages" : "Page budget"}
+              </label>
+              <input
+                id="start-max-pages"
+                type="number"
+                min={1}
+                max={50}
+                value={maxPages}
+                onChange={(event) =>
+                  setMaxPages(Math.max(1, Math.min(50, Number(event.target.value) || 1)))
+                }
+                className="app-input start-budget-input"
+              />
+              <p className="start-budget-note">
+                {fr
+                  ? "L'exploration demande plusieurs pages à la cible : elle n'est pas couverte par l'analyse gratuite. Les adresses non suivies sont listées avec leur raison."
+                  : "The crawl requests several pages from the target: it is not part of the free analysis. Addresses left out are listed with the reason."}
+              </p>
+            </div>
+          ) : null}
+        </>
+      ) : (
+        (() => {
+          const item = TARGETS.find((entry) => entry.id === choice);
+          return (
+            <Card className="start-elsewhere">
+              <p className="app-eyebrow">{fr ? item?.fr : item?.en}</p>
+              <p className="start-elsewhere-scope">{fr ? item?.scopeFr : item?.scopeEn}</p>
+              {item?.to ? (
+                <Link to={item.to} className="app-btn app-btn-primary">
+                  {fr ? item.ctaFr : item.ctaEn} <ArrowRight size={14} aria-hidden />
+                </Link>
+              ) : null}
+            </Card>
+          );
+        })()
+      )}
 
       {error ? <ErrorState error={error} onRetry={() => void run()} /> : null}
 
@@ -246,6 +440,79 @@ export function StartPage(): React.ReactElement {
 
       {scan ? (
         <div className="mt-4 space-y-4">
+          {scan.site ? (
+            <Card
+              title={
+                fr
+                  ? "CE QUI A ÉTÉ LU — ET CE QUI NE L'A PAS ÉTÉ"
+                  : "WHAT WAS READ — AND WHAT WASN'T"
+              }
+              description={
+                fr
+                  ? "Une page non suivie n'est pas une page saine : elle n'a simplement pas été mesurée."
+                  : "A page left out is not a healthy page: it simply was not measured."
+              }
+            >
+              <div className="space-y-3 px-5 py-4">
+                <p className="text-sm tabular-nums">
+                  {scan.site.pages.filter((page) => page.measured).length}{" "}
+                  {fr ? "page(s) examinée(s) sur" : "page(s) examined of"}{" "}
+                  {scan.site.pages.length + scan.site.skipped.length}{" "}
+                  {fr ? "découverte(s)" : "discovered"} · {scan.site.requests}{" "}
+                  {fr ? "requête(s)" : "request(s)"}
+                </p>
+                {scan.site.truncated ? (
+                  <p className="start-site-truncated">
+                    {fr
+                      ? `Exploration arrêtée par le budget : ${scan.site.truncatedBy ?? "limite"}. Le résultat porte sur ces pages, pas sur le site entier.`
+                      : `Crawl stopped by the budget: ${scan.site.truncatedBy ?? "limit"}. The result covers these pages, not the whole site.`}
+                  </p>
+                ) : null}
+                <ul className="start-site-pages">
+                  {scan.site.pages.slice(0, 20).map((page) => (
+                    <li key={page.url}>
+                      <code>{page.url.replace(/^https?:\/\//, "")}</code>
+                      <span className="text-muted">
+                        {" "}
+                        · HTTP {page.status}
+                        {page.measured ? "" : fr ? " · non mesurée" : " · not measured"}
+                        {page.error ? ` — ${page.error}` : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {scan.site.pages.length > 20 ? (
+                  <p className="text-xs text-muted">
+                    + {scan.site.pages.length - 20} {fr ? "autre(s)" : "more"}
+                  </p>
+                ) : null}
+                {scan.site.skipped.length > 0 ? (
+                  <details className="start-site-skipped">
+                    <summary>
+                      {scan.site.skipped.length}{" "}
+                      {fr
+                        ? "adresse(s) volontairement non suivie(s) — leur état est inconnu"
+                        : "address(es) deliberately not followed — their state is unknown"}
+                    </summary>
+                    <ul>
+                      {scan.site.skipped.slice(0, 30).map((page) => (
+                        <li key={page.url}>
+                          <code>{page.url.replace(/^https?:\/\//, "")}</code> —{" "}
+                          <span className="text-muted">{page.reason}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                ) : null}
+                {auditId ? (
+                  <Link to={`/app/scan?audit=${auditId}`} className="app-btn app-btn-ghost">
+                    {fr ? "Ouvrir le rapport complet" : "Open the full report"}{" "}
+                    <ArrowRight size={14} aria-hidden />
+                  </Link>
+                ) : null}
+              </div>
+            </Card>
+          ) : null}
           <Card
             title={`${scan.finalUrl.replace(/^https?:\/\//, "")}`}
             description={`HTTP ${scan.status} · ${Math.round(scan.bytes / 1024)} kB · ${scan.durationMs} ms`}

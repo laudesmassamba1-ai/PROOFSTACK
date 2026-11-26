@@ -6584,6 +6584,134 @@ p {
   font-size: 0.8rem;
 }
 
+/* ---------- /app/start: what is actually being analysed ---------- */
+
+.start-targets {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 0;
+  border: 0;
+  /* Five targets are not five equal buttons: the scope line is the part that decides. */
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  margin-bottom: 14px;
+}
+
+.start-target {
+  display: grid;
+  gap: 4px;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.start-target:hover {
+  border-color: var(--ink-soft);
+}
+
+.start-target[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--surface-alt);
+}
+
+.start-target:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.start-target:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.start-target-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.start-target-scope {
+  color: var(--ink-soft);
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.start-budget {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 12px 16px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
+
+.start-budget-input {
+  width: 84px;
+  font-family: var(--font-mono);
+}
+
+.start-budget-note {
+  flex: 1 1 320px;
+  color: var(--ink-soft);
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+
+.start-elsewhere {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  align-items: start;
+}
+
+.start-elsewhere-scope {
+  max-width: 62ch;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.start-site-truncated {
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.start-site-pages,
+.start-site-skipped ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.74rem;
+  line-height: 1.6;
+}
+
+.start-site-pages code,
+.start-site-skipped code {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
+}
+
+.start-site-skipped summary {
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.start-site-skipped ul {
+  margin-top: 8px;
+  padding-left: 14px;
+}
+
 .scan-auth {
   display: grid;
   gap: 8px;
