@@ -1130,6 +1130,8 @@ export function AiChatPage(): React.ReactElement {
 
   const loadConversation = useCallback(async (id: string) => {
     setActiveId(id);
+    /* sur téléphone l'historique recouvre le fil : il se referme dès l'ouverture */
+    if (window.matchMedia("(max-width: 900px)").matches) setSidebarOpen(false);
     const response = await fetch(`/api/v1/ai/conversations/${id}`, { credentials: "include" });
     if (!response.ok) return;
     const data = (await response.json()) as {

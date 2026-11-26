@@ -10460,9 +10460,13 @@ body:has(.app-main-chat) .app-footer {
   }
 }
 
-/* ── Chat IA : petit écran ──────────────────────────────────────────────── */
-/* sur téléphone le chat devient vraiment bord à bord : plus d'encadrement */
+/* ── Chat IA — version mobile sur mesure ──────────────────────────────────
+   Sur téléphone ce n'est pas la version bureau réduite : chaque zone est
+   redessinée à sa taille (barre compacte, accueil sobre, composer dense,
+   panneau d'outils presque plein écran) et tout champ passe à 16px pour
+   couper le zoom automatique d'iPhone au focus. */
 @media (max-width: 767px) {
+  /* bord à bord : plus d'encadrement de fenêtre */
   body:has(.app-main-chat) .app-shell {
     padding: 0;
   }
@@ -10472,49 +10476,198 @@ body:has(.app-main-chat) .app-footer {
     border-radius: 0;
   }
 
+  /* ── barre du chat : compacte, rien ne se chevauche ── */
   .chat-topbar {
-    padding: 8px 10px;
-    gap: 8px;
+    padding: 6px 8px;
+    gap: 5px;
   }
 
-  .chat-composer-tools {
-    flex-wrap: wrap;
+  .chat-topbar-title {
     gap: 6px;
+    font-size: 0.76rem;
+    letter-spacing: -0.01em;
+  }
+
+  .chat-topbar-title svg {
+    width: 13px;
+    height: 13px;
+    flex: 0 0 auto;
+  }
+
+  .chat-topbar .chat-icon-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+  }
+
+  .chat-topbar .chat-icon-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .chat-topbar .chat-action-btn {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .chat-topbar .chat-action-btn svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  .chat-workspace-chip,
+  .chat-topbar-export {
+    display: none;
+  }
+
+  /* ── accueil : sobre, lisible d'un geste ── */
+  .chat-greeting {
+    padding: 12px 16px 4px;
+  }
+
+  .chat-greeting-mark svg {
+    width: 30px;
+    height: 30px;
+  }
+
+  .chat-greeting-title {
+    margin-top: 10px;
+    font-size: clamp(1.35rem, 6.4vw, 1.75rem);
+  }
+
+  .chat-greeting-support {
+    margin-top: 6px;
+    font-size: 0.76rem;
+  }
+
+  .chat-scroll {
+    padding: 12px 12px 6px;
+  }
+
+  /* ── composer : dense, pouce-friendly ── */
+  .chat-composer-zone {
+    padding: 6px 8px 10px;
+  }
+
+  .chat-composer textarea {
+    padding: 10px 12px 2px;
+    /* 16px minimum : iOS zoome sur tout champ plus petit */
+    font-size: 16px;
   }
 
   .chat-composer-bar {
+    gap: 6px;
+    padding: 0 6px 7px;
+  }
+
+  .chat-effort-trigger {
+    padding: 4px 8px;
+    font-size: 0.68rem;
+    gap: 4px;
+  }
+
+  .chat-attach-btn {
+    width: 30px;
+    height: 30px;
+  }
+
+  .chat-attach-btn svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .chat-send {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+  }
+
+  .chat-send svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* ── historique en surimpression : plus étroit ── */
+  .chat-sidebar {
+    width: min(86vw, 300px);
+    min-width: min(86vw, 300px);
+  }
+
+  /* ── messages ── */
+  .chat-msg-ai {
     gap: 8px;
   }
 
-  /* le panneau d'outils coulisse presque bord à bord sur téléphone */
+  .chat-msg-avatar svg {
+    width: 11px;
+    height: 11px;
+  }
+
+  .chat-prose {
+    font-size: 0.84rem;
+  }
+
+  /* ── panneau d'outils : presque plein écran, rangées denses ── */
   .chat-tools {
-    top: 8px;
-    right: 8px;
-    bottom: 8px;
+    top: 6px;
+    right: 6px;
+    bottom: 6px;
+    width: min(360px, 94%);
     border-radius: 14px;
   }
 
   .chat-tools-head {
-    padding: 12px 14px 8px;
+    padding: 10px 14px 6px;
   }
 
   .chat-tools-note {
-    padding: 0 14px 8px;
+    padding: 0 14px 6px;
+    font-size: 0.68rem;
   }
 
   .chat-tools-list {
-    padding: 2px 8px 10px;
+    padding: 2px 6px 8px;
   }
 
   .chat-tools-list button {
-    grid-template-columns: 26px 1fr auto;
-    padding: 7px 8px;
+    grid-template-columns: 24px 1fr auto;
+    gap: 8px;
+    padding: 6px 7px;
+    border-radius: 10px;
   }
 
   .chat-tools-icon {
-    width: 26px;
-    height: 26px;
-    border-radius: 8px;
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+  }
+
+  .chat-tools-icon svg {
+    width: 11px;
+    height: 11px;
+  }
+
+  .chat-tools-text code {
+    font-size: 0.64rem;
+  }
+
+  .chat-tools-text span {
+    font-size: 0.68rem;
+    line-height: 1.3;
+  }
+
+  /* ── coupe-file : aucun champ du chat ne déclenche le zoom iOS ── */
+  .chat-shell input,
+  .chat-shell textarea,
+  .chat-shell select {
+    font-size: 16px;
+  }
+
+  .chat-search input {
+    font-size: 16px;
+    padding: 7px 10px 7px 32px;
   }
 }
 
@@ -10523,5 +10676,41 @@ body:has(.app-main-chat) .app-footer {
   .chat-tools-backdrop,
   .chat-tools-list li {
     animation: none;
+  }
+}
+
+/* ── Chat IA — écran très étroit (<420px) ─────────────────────────────────
+   Les boîtes de dialogue du chat (fournisseurs, réglages) se déplient en
+   une colonne : deux colonnes à 360px écrasent les libellés. */
+@media (max-width: 419px) {
+  .chat-dialog {
+    width: calc(100vw - 24px);
+    max-width: none;
+    padding: 16px;
+    border-radius: 16px;
+  }
+
+  .chat-provider-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* nom tronqué proprement, note masquée : le nom reste lisible */
+  .chat-provider .truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .chat-provider-note {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  /* le sélecteur d'effort et les pièces jointes tiennent sur une ligne */
+  .chat-composer-zone .chat-effort-menu {
+    left: 8px;
+    right: 8px;
+    width: auto;
   }
 }
