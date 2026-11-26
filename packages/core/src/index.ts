@@ -14,6 +14,7 @@ export * from "./money.js";
 export * from "./onboarding.js";
 export * from "./page-scan.js";
 export * from "./remediation.js";
+export * from "./onboarding.js";
 export * from "./result.js";
 export * from "./session.js";
 export * from "./site-audit.js";

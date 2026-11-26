@@ -279,6 +279,7 @@ export interface WorkspaceWebhookRecord {
   lastError: string | null;
 }
 
+
 export interface OnboardingRecord {
   workspaceId: string;
   experience: "simple" | "studio";
@@ -1419,6 +1420,7 @@ export class AppStore {
       .all<Row>();
     return rows.map((row) => ({ ...mapWorkspace(row), role: str(row, "role") as Role }));
   }
+
 
   async getOnboarding(workspaceId: string): Promise<OnboardingRecord | null> {
     const row = await this.db
@@ -3369,6 +3371,7 @@ function mapDeviceGrant(row: Row): DeviceGrantRecord {
     ip: nullableStr(row, "ip"),
   };
 }
+
 
 function mapOnboarding(row: Row): OnboardingRecord {
   return {

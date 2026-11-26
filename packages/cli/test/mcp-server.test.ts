@@ -49,7 +49,11 @@ describe("proofcore MCP server", () => {
     });
     expect(response.result?.protocolVersion).toBe("2025-06-18");
     const capabilities = response.result?.capabilities as Record<string, unknown> | undefined;
-    expect(capabilities).toEqual({ tools: { listChanged: false } });
+    expect(capabilities).toEqual({
+      tools: { listChanged: false },
+      resources: { subscribe: false, listChanged: false },
+      prompts: { listChanged: false },
+    });
     const info = response.result?.serverInfo as { name: string; version: string };
     expect(info).toBeTruthy();
     expect(info.name).toBe("proofcore");
@@ -169,7 +173,7 @@ describe("proofcore MCP server", () => {
   });
 
   it("rejects unknown methods with -32601", async () => {
-    const response = await call(server(), 1, "prompts/list");
+    const response = await call(server(), 1, "sampling/createMessage");
     expect(response.error?.code).toBe(-32601);
   });
 

@@ -963,6 +963,215 @@ export type McpToolHandler = (
   context: { cwd: string }
 ) => Promise<unknown>;
 
+export interface McpResourceDescriptor {
+  uri: string;
+  name: string;
+  description: string;
+  mimeType: string;
+}
+
+export interface McpPromptDescriptor {
+  name: string;
+  description: string;
+  arguments: { name: string; description: string; required: boolean }[];
+}
+
+/**
+ * Resources are the read-only half of the server: a client can attach the project state
+ * or the last report to its context without spending a tool call.
+ */
+export function mcpResourceDescriptors(): McpResourceDescriptor[] {
+  return [
+    {
+      uri: "proofcore://project/summary",
+      name: "Project summary",
+      description:
+        "What this project is configured to analyse: target, environment, enabled modules, output directory and warnings.",
+      mimeType: "application/json",
+    },
+    {
+      uri: "proofcore://report/latest",
+      name: "Latest report",
+      description:
+        "The most recent stored JSON report. Answers an error when nothing has run yet — there is no empty report to attach.",
+      mimeType: "application/json",
+    },
+    {
+      uri: "proofcore://instructions",
+      name: "Analysis protocol",
+      description:
+        "The server's own instructions: the order in which to call the tools, and the honesty rules that apply to every answer.",
+      mimeType: "text/plain",
+    },
+  ];
+}
+
+export function mcpPromptDescriptors(): McpPromptDescriptor[] {
+  return [
+    {
+      name: "audit_target",
+      description:
+        "Analyse the configured target end to end: doctor, config validation, a real run, then a report read from disk.",
+      arguments: [
+        {
+          name: "target",
+          description: "The URL to analyse. Defaults to the configured target.",
+          required: false,
+        },
+        {
+          name: "modules",
+          description: "Comma-separated module ids to focus on. Defaults to the configured set.",
+          required: false,
+        },
+      ],
+    },
+    {
+      name: "explain_findings",
+      description:
+        "Read the last stored report and explain each finding: what was observed, why it matters, what to do.",
+      arguments: [
+        {
+          name: "audience",
+          description: "Who reads the answer: developer, product or client.",
+          required: false,
+        },
+      ],
+    },
+    {
+      name: "fix_finding",
+      description:
+        "Work one finding: read its evidence, find the code that causes it, propose a fix, then re-run to prove it.",
+      arguments: [
+        {
+          name: "finding",
+          description: "The finding id or title to fix.",
+          required: true,
+        },
+      ],
+    },
+    {
+      name: "release_check",
+      description: "Decide whether a release is safe to ship, from a real run and nothing else.",
+      arguments: [],
+    },
+  ];
+}
+
+/** One resource, read for real. A missing report is an error, never empty content. */
+export async function readMcpResource(
+  uri: string,
+  cwd: string
+): Promise<{ uri: string; mimeType: string; text: string }> {
+  const known = mcpResourceDescriptors().find((resource) => resource.uri === uri);
+  if (!known) {
+    throw new McpProtocolError(ERR_INVALID_PARAMS, "Unknown resource: " + uri);
+  }
+  if (uri === "proofcore://project/summary") {
+    const summary = await projectSummary(cwd);
+    return { uri, mimeType: known.mimeType, text: stableStringify(summary, 2) };
+  }
+  if (uri === "proofcore://report/latest") {
+    try {
+      const report = (await lastReport({ format: "json" }, cwd)) as { content: string };
+      return { uri, mimeType: known.mimeType, text: report.content };
+    } catch (error) {
+      // A resource that is not there yet is a bad request from the client's point of
+      // view, not an internal bug: say so with the reason it can act on.
+      throw new McpProtocolError(
+        ERR_INVALID_PARAMS,
+        error instanceof Error ? error.message : "No stored report yet."
+      );
+    }
+  }
+  return { uri, mimeType: known.mimeType, text: PROOFCORE_MCP_INSTRUCTIONS };
+}
+
+/** A prompt is a user message the client can fill from an argument, not a hidden tool. */
+export async function getMcpPrompt(
+  name: string,
+  args: Record<string, unknown>,
+  _cwd: string
+): Promise<{
+  description: string;
+  messages: { role: "user"; content: { type: "text"; text: string } }[];
+}> {
+  const known = mcpPromptDescriptors().find((prompt) => prompt.name === name);
+  if (!known) {
+    throw new McpProtocolError(ERR_INVALID_PARAMS, "Unknown prompt: " + name);
+  }
+  const text = (lines: string[]): { role: "user"; content: { type: "text"; text: string } } => ({
+    role: "user",
+    content: { type: "text", text: lines.join("\n") },
+  });
+  const target = typeof args.target === "string" && args.target.trim() ? args.target.trim() : null;
+  const modules =
+    typeof args.modules === "string" && args.modules.trim() ? args.modules.trim() : null;
+  const audience =
+    typeof args.audience === "string" && args.audience.trim() ? args.audience.trim() : "developer";
+
+  switch (name) {
+    case "audit_target":
+      return {
+        description: known.description,
+        messages: [
+          text([
+            "Analyse " + (target ?? "the configured target") + " with PROOFCORE.",
+            "1. Call project_summary, then doctor.",
+            "2. Call validate_config and fix what it reports before running.",
+            "3. Call run_tests" + (modules ? " with modules: " + modules : "") + ".",
+            "4. Call last_report and read it from disk; do not paraphrase a result you did not read.",
+            "Report every check, including the ones that passed, and state what was not measured.",
+          ]),
+        ],
+      };
+    case "explain_findings":
+      return {
+        description: known.description,
+        messages: [
+          text([
+            "Read the last PROOFCORE report with last_report, then explain it for a " +
+              audience +
+              ".",
+            "For each non-passing check give: what was observed, why it matters, the impact, the scope, how to verify it, and the fix.",
+            "Never invent a finding that the report does not contain, and never quote a score without its coverage.",
+          ]),
+        ],
+      };
+    case "fix_finding": {
+      const finding = typeof args.finding === "string" ? args.finding.trim() : "";
+      if (!finding) {
+        throw new McpProtocolError(ERR_INVALID_PARAMS, "fix_finding needs a finding id or title.");
+      }
+      return {
+        description: known.description,
+        messages: [
+          text([
+            "Fix the PROOFCORE finding: " + finding + ".",
+            "1. Read the last report and quote the evidence for this finding.",
+            "2. Find the code that causes it with search_code and read_file.",
+            "3. Propose the smallest fix, and wait for approval before writing.",
+            "4. Re-run the check with run_tests and compare: a fix is proven only by a passing re-measurement.",
+          ]),
+        ],
+      };
+    }
+    case "release_check":
+      return {
+        description: known.description,
+        messages: [
+          text([
+            "Decide whether this release is safe to ship, using PROOFCORE only.",
+            "Run doctor, validate_config and run_tests. Then read last_report.",
+            "Answer SHIP, SHIP WITH RISKS or DO NOT SHIP, and justify it with the checks and their coverage.",
+            "If a check could not run, say which one; a skipped check is never a pass.",
+          ]),
+        ],
+      };
+    default:
+      throw new McpProtocolError(ERR_INVALID_PARAMS, "Unknown prompt: " + name);
+  }
+}
+
 export async function handleMcpToolCall(
   name: string,
   args: Record<string, unknown>,
@@ -1659,7 +1868,11 @@ export class ProofcoreMcpServer {
       case "initialize":
         return {
           protocolVersion: acceptProtocolVersion(params.protocolVersion),
-          capabilities: { tools: { listChanged: false } },
+          capabilities: {
+            tools: { listChanged: false },
+            resources: { subscribe: false, listChanged: false },
+            prompts: { listChanged: false },
+          },
           serverInfo: {
             name: PROOFCORE_MCP_SERVER_NAME,
             version: PROOFCORE_MCP_SERVER_VERSION,
@@ -1670,6 +1883,24 @@ export class ProofcoreMcpServer {
         return {};
       case "tools/list":
         return { tools: mcpToolDescriptors() };
+      case "resources/list":
+        return { resources: mcpResourceDescriptors() };
+      case "resources/templates/list":
+        return { resourceTemplates: [] };
+      case "resources/read": {
+        const uri = typeof params.uri === "string" ? params.uri : "";
+        if (!uri) throw new McpProtocolError(ERR_INVALID_PARAMS, "resources/read needs a uri.");
+        const content = await readMcpResource(uri, this.cwd);
+        return { contents: [content] };
+      }
+      case "prompts/list":
+        return { prompts: mcpPromptDescriptors() };
+      case "prompts/get": {
+        const name = typeof params.name === "string" ? params.name : "";
+        if (!name) throw new McpProtocolError(ERR_INVALID_PARAMS, "prompts/get needs a name.");
+        const promptArgs = (params.arguments ?? {}) as Record<string, unknown>;
+        return await getMcpPrompt(name, promptArgs, this.cwd);
+      }
       case "tools/call": {
         const name = typeof params.name === "string" ? params.name : "";
         if (!name) {
@@ -1736,10 +1967,15 @@ export async function serveMcpStdio(server: ProofcoreMcpServer): Promise<void> {
   const write = (line: string): void => {
     process.stdout.write(`${line}\n`);
   };
+  // Responses are written in the order requests arrived. The queue is the point: a slow
+  // tool (a real run) must not let a later, faster answer overtake it, or a client that
+  // matches responses to its own request order is left reading the wrong result.
+  let queue: Promise<void> = Promise.resolve();
   rl.on("line", (line) => {
     const trimmed = line.trim();
     if (!trimmed) return;
-    void server.handleMessage(trimmed).then((response) => {
+    queue = queue.then(async () => {
+      const response = await server.handleMessage(trimmed);
       if (response !== null) write(response);
     });
   });
