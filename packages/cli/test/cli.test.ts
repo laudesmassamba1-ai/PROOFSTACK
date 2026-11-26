@@ -53,6 +53,19 @@ describe("CLI", () => {
     expect(result.stdout).toContain("exit codes");
   });
 
+  it("audit --help is a help request and exits 0 (CI runs it)", async () => {
+    const dir = await project();
+    const result = await cli(["audit", "--help"], dir);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("audit fail");
+  });
+
+  it("an unknown audit sub-command still exits 2 (harness error)", async () => {
+    const dir = await project();
+    const result = await cli(["audit", "bogus"], dir);
+    expect(result.code).toBe(2);
+  });
+
   it("prints a version", async () => {
     const dir = await project();
     const result = await cli(["--version"], dir);

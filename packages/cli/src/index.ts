@@ -389,7 +389,8 @@ async function main(argv: string[]): Promise<number> {
       if (kind !== "fail" && kind !== "clean") {
         printAuditHelp(flags);
         if (kind === "help") printAuditInteractHelp();
-        return kind ? 2 : 0;
+        const asksHelp = kind === "" || kind === "help" || kind === "--help" || kind === "-h";
+        return asksHelp ? 0 : 2;
       }
       const target = args.slice(1).find((arg) => !arg.startsWith("-"));
       if (!target) {
