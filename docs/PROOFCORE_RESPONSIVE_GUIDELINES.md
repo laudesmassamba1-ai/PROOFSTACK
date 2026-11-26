@@ -62,18 +62,20 @@ adresse, résultat, rapport complet, sans débordement.
   premier passage. Le parcours de test ferme désormais la carte comme un utilisateur.
   La taille de la carte sur petit écran reste à revoir (risque UX ouvert).
 
-## 6. Matrice cible non encore rejouée
+## 6. Matrice rejouée
 
-Les tailles suivantes doivent être capturées et comparées avant de revendiquer un
-responsive complet :
+Les tailles suivantes sont capturées et comparées à chaque exécution :
 
 `320×700`, `360×800`, `375×812`, `390×844`, `430×932`, `768×1024`, `820×1180`,
-`1024×768`, `1280×800`, `1366×768`, `1440×900`, `1600×900`, `1920×1080`,
-`2560×1440`.
+`1024×768`, `1280×800`, `1366×768`, `1440×900`, `1920×1080`, `2560×1440`.
 
-Statut : **PARTIEL**. Deux projets réels (desktop + Pixel 7) sont prouvés ; la matrice
-complète ne l'est pas. Les scripts `qa-*.mjs` existent mais n'ont pas été réexécutés
-dans cette passe.
+Statut : **VÉRIFIÉ (26 nov. 2026)**. `tests/e2e/viewports.spec.ts` charge six pages
+réelles (accueil, `/app`, démarrage, Analyses, FLOW Studio, modules) à chaque taille,
+attend la fin du chargement de l'espace de travail, fait défiler la page pour déclencher
+les révélations, puis échoue si la page dépasse la largeur du viewport ou si la console
+signale une erreur. Dernier passage : 78 captures, 0 débordement, 0 erreur console
+(`npx playwright test tests/e2e/viewports.spec.ts --project=desktop`). Les captures et
+`report.json` sont écrits dans `test-results/viewports/` (non versionnés).
 
 ## 7. Accessibilité liée au responsive
 
