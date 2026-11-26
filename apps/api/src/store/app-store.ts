@@ -6,7 +6,16 @@ import type {
   TestRun,
   TestStatus,
 } from "@proofcore/contracts";
-import { iso, ProofCoreError, slugify, uuid } from "@proofcore/core";
+import {
+  type AnalysisCoverage,
+  type AnalysisSource,
+  type AnalysisStatus,
+  type AnalysisTargetType,
+  iso,
+  ProofCoreError,
+  slugify,
+  uuid,
+} from "@proofcore/core";
 import {
   bool,
   type Database,
@@ -25,6 +34,85 @@ import {
  * argument, and every query filters on it. A route cannot "forget" the scope because
  * there is no method that returns a project by id alone.
  */
+
+/**
+ * The canonical Analysis row.
+ *
+ * JSON columns are parsed here so no route has to know that `coverage` was stored as
+ * text; a corrupt column degrades to an empty object instead of throwing during a
+ * list call that only needed one row.
+ */
+export interface AnalysisRecord {
+  id: string;
+  workspaceId: string;
+  projectId: string | null;
+  createdBy: string;
+  source: AnalysisSource;
+  targetType: AnalysisTargetType;
+  target: string;
+  scope: string;
+  requestedModules: string[];
+  applicableModules: string[];
+  engine: string;
+  engineVersion: string;
+  environment: string;
+  status: AnalysisStatus;
+  coverage: AnalysisCoverage;
+  startedAt: string;
+  endedAt: string | null;
+  durationMs: number | null;
+  result: unknown;
+  metadata: Record<string, unknown>;
+  reportId: string | null;
+  pageAuditId: string | null;
+  runId: string | null;
+  correlationId: string;
+  idempotencyKey: string | null;
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const EMPTY_COVERAGE: AnalysisCoverage = {
+  requestedModules: [],
+  applicableModules: [],
+  measuredModules: [],
+  skipped: [],
+};
+
+function analysisFromRow(row: Row): AnalysisRecord {
+  return {
+    id: str(row, "id"),
+    workspaceId: str(row, "workspace_id"),
+    projectId: nullableStr(row, "project_id"),
+    createdBy: str(row, "created_by"),
+    source: str(row, "source") as AnalysisSource,
+    targetType: str(row, "target_type") as AnalysisTargetType,
+    target: str(row, "target"),
+    scope: str(row, "scope"),
+    requestedModules: parseJson<string[]>(row.requested_modules, []),
+    applicableModules: parseJson<string[]>(row.applicable_modules, []),
+    engine: str(row, "engine"),
+    engineVersion: str(row, "engine_version"),
+    environment: str(row, "environment"),
+    status: str(row, "status") as AnalysisStatus,
+    coverage: parseJson<AnalysisCoverage>(row.coverage, EMPTY_COVERAGE),
+    startedAt: str(row, "started_at"),
+    endedAt: nullableStr(row, "ended_at"),
+    durationMs:
+      row.duration_ms === null || row.duration_ms === undefined ? null : num(row, "duration_ms"),
+    result: parseJson<unknown>(row.result, null),
+    metadata: parseJson<Record<string, unknown>>(row.metadata, {}),
+    reportId: nullableStr(row, "report_id"),
+    pageAuditId: nullableStr(row, "page_audit_id"),
+    runId: nullableStr(row, "run_id"),
+    correlationId: str(row, "correlation_id"),
+    idempotencyKey: nullableStr(row, "idempotency_key"),
+    error: nullableStr(row, "error"),
+    createdAt: str(row, "created_at"),
+    updatedAt: str(row, "updated_at"),
+  };
+}
 
 export type Role = "owner" | "admin" | "member" | "viewer";
 
@@ -1705,6 +1793,264 @@ export class AppStore {
       )
       .bind(workspaceId, projectId, limit)
       .all<Row>();
+  }
+
+  // ------------------------------------------------------------------ analyses
+
+  /**
+   * Create the canonical record for one execution.
+   *
+   * With an idempotency key, a retried POST returns the row the first attempt made
+   * instead of minting a second analysis for the same intent. The unique index is the
+   * authority; the read first is only an optimisation for the common retry case.
+   */
+  async createAnalysis(input: {
+    id: string;
+    workspaceId: string;
+    projectId: string | null;
+    createdBy: string;
+    source: AnalysisSource;
+    targetType: AnalysisTargetType;
+    target: string;
+    scope: string;
+    requestedModules: string[];
+    applicableModules: string[];
+    engine: string;
+    engineVersion: string;
+    environment: string;
+    status: AnalysisStatus;
+    coverage: AnalysisCoverage;
+    startedAt: string;
+    metadata?: Record<string, unknown>;
+    correlationId: string;
+    idempotencyKey?: string | null;
+    pageAuditId?: string | null;
+  }): Promise<AnalysisRecord> {
+    const key = input.idempotencyKey ?? null;
+    if (key) {
+      const existing = await this.findAnalysisByIdempotency(input.workspaceId, key);
+      if (existing) return existing;
+    }
+    const now = iso(this.clock());
+    await this.db
+      .prepare(
+        `INSERT INTO analyses
+           (id, workspace_id, project_id, created_by, source, target_type, target, scope,
+            requested_modules, applicable_modules, engine, engine_version, environment, status,
+            coverage, started_at, result, metadata, page_audit_id, correlation_id,
+            idempotency_key, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        input.id,
+        input.workspaceId,
+        input.projectId,
+        input.createdBy,
+        input.source,
+        input.targetType,
+        input.target,
+        input.scope,
+        json(input.requestedModules),
+        json(input.applicableModules),
+        input.engine,
+        input.engineVersion,
+        input.environment,
+        input.status,
+        json(input.coverage),
+        input.startedAt,
+        json(input.metadata ?? {}),
+        input.pageAuditId ?? null,
+        input.correlationId,
+        key,
+        now,
+        now
+      )
+      .run();
+    const created = await this.getAnalysis(input.workspaceId, input.id);
+    if (!created) {
+      throw new ProofCoreError({
+        message: `analysis ${input.id} was inserted but cannot be read back`,
+        category: "INTERNAL",
+        code: "analysis_not_readable",
+      });
+    }
+    return created;
+  }
+
+  async findAnalysisByIdempotency(
+    workspaceId: string,
+    idempotencyKey: string
+  ): Promise<AnalysisRecord | null> {
+    const row = await this.db
+      .prepare("SELECT * FROM analyses WHERE workspace_id = ? AND idempotency_key = ?")
+      .bind(workspaceId, idempotencyKey)
+      .first<Row>();
+    return row ? analysisFromRow(row) : null;
+  }
+
+  async getAnalysis(workspaceId: string, id: string): Promise<AnalysisRecord | null> {
+    const row = await this.db
+      .prepare("SELECT * FROM analyses WHERE workspace_id = ? AND id = ?")
+      .bind(workspaceId, id)
+      .first<Row>();
+    return row ? analysisFromRow(row) : null;
+  }
+
+  async listAnalyses(
+    workspaceId: string,
+    options: {
+      limit: number;
+      offset: number;
+      projectId?: string | null;
+      status?: AnalysisStatus | null;
+      source?: AnalysisSource | null;
+      targetType?: AnalysisTargetType | null;
+      /** Case-insensitive match on the target or the id, for the history search box. */
+      query?: string | null;
+    }
+  ): Promise<{ rows: AnalysisRecord[]; total: number }> {
+    const where: string[] = ["workspace_id = ?"];
+    const args: unknown[] = [workspaceId];
+    if (options.projectId) {
+      where.push("project_id = ?");
+      args.push(options.projectId);
+    }
+    if (options.status) {
+      where.push("status = ?");
+      args.push(options.status);
+    }
+    if (options.source) {
+      where.push("source = ?");
+      args.push(options.source);
+    }
+    if (options.targetType) {
+      where.push("target_type = ?");
+      args.push(options.targetType);
+    }
+    if (options.query) {
+      where.push("(LOWER(target) LIKE ? OR LOWER(id) LIKE ?)");
+      const pattern = `%${options.query.toLowerCase()}%`;
+      args.push(pattern, pattern);
+    }
+    const scope = where.join(" AND ");
+    const total = await this.db
+      .prepare(`SELECT COUNT(*) AS count FROM analyses WHERE ${scope}`)
+      .bind(...args)
+      .first<Row>();
+    const rows = await this.db
+      .prepare(
+        `SELECT * FROM analyses WHERE ${scope} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`
+      )
+      .bind(...args, options.limit, options.offset)
+      .all<Row>();
+    return { rows: rows.map(analysisFromRow), total: total ? num(total, "count") : 0 };
+  }
+
+  /**
+   * Apply a patch, optionally only when the row is still in one of `expected` states.
+   *
+   * The guard is how a finish and a cancel race each other: the second writer's UPDATE
+   * matches zero rows instead of overwriting the terminal state the first one set.
+   */
+  async updateAnalysis(input: {
+    workspaceId: string;
+    id: string;
+    patch: {
+      status?: AnalysisStatus;
+      coverage?: AnalysisCoverage;
+      result?: unknown;
+      error?: string | null;
+      endedAt?: string | null;
+      durationMs?: number | null;
+      pageAuditId?: string | null;
+      reportId?: string | null;
+      runId?: string | null;
+      metadata?: Record<string, unknown>;
+      applicableModules?: string[];
+    };
+    expected?: readonly AnalysisStatus[];
+  }): Promise<boolean> {
+    const sets: string[] = [];
+    const args: unknown[] = [];
+    const patch = input.patch;
+    if (patch.status !== undefined) {
+      sets.push("status = ?");
+      args.push(patch.status);
+    }
+    if (patch.coverage !== undefined) {
+      sets.push("coverage = ?");
+      args.push(json(patch.coverage));
+    }
+    if (patch.result !== undefined) {
+      sets.push("result = ?");
+      args.push(json(patch.result));
+    }
+    if (patch.error !== undefined) {
+      sets.push("error = ?");
+      args.push(patch.error);
+    }
+    if (patch.endedAt !== undefined) {
+      sets.push("ended_at = ?");
+      args.push(patch.endedAt);
+    }
+    if (patch.durationMs !== undefined) {
+      sets.push("duration_ms = ?");
+      args.push(patch.durationMs);
+    }
+    if (patch.pageAuditId !== undefined) {
+      sets.push("page_audit_id = ?");
+      args.push(patch.pageAuditId);
+    }
+    if (patch.reportId !== undefined) {
+      sets.push("report_id = ?");
+      args.push(patch.reportId);
+    }
+    if (patch.runId !== undefined) {
+      sets.push("run_id = ?");
+      args.push(patch.runId);
+    }
+    if (patch.metadata !== undefined) {
+      sets.push("metadata = ?");
+      args.push(json(patch.metadata));
+    }
+    if (patch.applicableModules !== undefined) {
+      sets.push("applicable_modules = ?");
+      args.push(json(patch.applicableModules));
+    }
+    if (sets.length === 0) return true;
+    sets.push("updated_at = ?");
+    args.push(iso(this.clock()));
+    const guard = input.expected?.length
+      ? ` AND status IN (${input.expected.map(() => "?").join(", ")})`
+      : "";
+    // Bind order follows the SQL: the workspace and id are in the WHERE prefix, the
+    // expected statuses belong to the guard appended after them.
+    args.push(input.workspaceId, input.id);
+    if (input.expected?.length) args.push(...input.expected);
+    const result = await this.db
+      .prepare(`UPDATE analyses SET ${sets.join(", ")} WHERE workspace_id = ? AND id = ?${guard}`)
+      .bind(...args)
+      .run();
+    return result.changes > 0;
+  }
+
+  /** Attach an already-stored page audit to its analysis (no payload copy). */
+  async linkPageAuditAnalysis(
+    workspaceId: string,
+    pageAuditId: string,
+    analysisId: string
+  ): Promise<void> {
+    await this.db
+      .prepare("UPDATE page_audits SET analysis_id = ? WHERE workspace_id = ? AND id = ?")
+      .bind(analysisId, workspaceId, pageAuditId)
+      .run();
+  }
+
+  async linkRunAnalysis(workspaceId: string, runId: string, analysisId: string): Promise<void> {
+    await this.db
+      .prepare("UPDATE test_runs SET analysis_id = ? WHERE workspace_id = ? AND id = ?")
+      .bind(analysisId, workspaceId, runId)
+      .run();
   }
 
   /** Correction states for one project, keyed by the caller. */

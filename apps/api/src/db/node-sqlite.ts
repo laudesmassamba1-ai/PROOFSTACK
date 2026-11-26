@@ -82,6 +82,7 @@ export function migrationFiles(): { id: string; sql: string }[] {
     "0018_correction_verification.sql",
     "0019_notifications.sql",
     "0020_free_preview.sql",
+    "0021_analyses.sql",
   ];
   return names.map((name) => ({ id: name, sql: readFileSync(join(MIGRATIONS_DIR, name), "utf8") }));
 }

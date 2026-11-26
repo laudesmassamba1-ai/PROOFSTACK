@@ -17,6 +17,7 @@ import { HttpError, RateLimiter } from "../http/errors.js";
 import { readBody, requireWorkspace } from "../http/guards.js";
 import { pageBody, readPage } from "../http/pagination.js";
 import type { AppEnv, Services } from "../http/services.js";
+import { recordScanAnalysis } from "./analyses.js";
 
 /**
  * Decides whether this scan is a free analysis.
@@ -478,6 +479,9 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
       );
     }
 
+    // Wall-clock start, kept so the canonical analysis reports the duration the scan
+    // actually took rather than the time the request spent in the queue.
+    const scanStartedAt = services.clock().toISOString();
     let result: Awaited<ReturnType<typeof scanPage>>;
     let site: Awaited<ReturnType<typeof auditSite>> | null = null;
     try {
@@ -554,6 +558,37 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
       ownership: result.ownership,
       redacted: result.redacted,
       projectId: body.projectId ?? null,
+      freePreview: isFree,
+    });
+
+    // The scan is now in the canonical history too. Recorded after the payload exists so
+    // the analysis always points at evidence that can be read back.
+    await recordScanAnalysis(services, {
+      auditId: id,
+      workspaceId: workspace.id,
+      projectId: body.projectId ?? null,
+      createdBy: user.id,
+      url: result.url,
+      source: "WEB",
+      startedAt: scanStartedAt,
+      endedAt: services.clock().toISOString(),
+      modules: result.findings.map((item) => String(item.module)),
+      ...(site === null
+        ? {}
+        : {
+            pages: {
+              discovered: site.site.pages.length + site.site.skipped.length,
+              scanned: site.site.pages.filter((page) => page.measured).length,
+            },
+          }),
+      // A live scan reads a real, reachable URL: that is the production environment.
+      environment: "production",
+      result: {
+        failed: result.findings.filter((item) => item.status === "FAIL").length,
+        warnings: result.findings.filter((item) => item.status === "WARN").length,
+        passed: result.findings.filter((item) => item.status === "PASS").length,
+        httpStatus: result.status,
+      },
       freePreview: isFree,
     });
 
@@ -691,6 +726,7 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
       ) => emit({ type: "step", id, label, status, ...(detail ? { detail } : {}) });
 
       try {
+        const scanStartedAt = services.clock().toISOString();
         await step("request", "Demande validée et quota réservé", "done");
         const fetchLabel = `Lecture de ${target.hostname} et analyse des cinq familles`;
         await step("fetch", fetchLabel, "running");
@@ -771,6 +807,34 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
           ownership: result.ownership,
           redacted: result.redacted,
           projectId: body.projectId ?? null,
+          freePreview: isFree,
+        });
+
+        await recordScanAnalysis(services, {
+          auditId: id,
+          workspaceId: workspace.id,
+          projectId: body.projectId ?? null,
+          createdBy: user.id,
+          url: result.url,
+          source: "WEB",
+          startedAt: scanStartedAt,
+          endedAt: services.clock().toISOString(),
+          modules: result.findings.map((item) => String(item.module)),
+          ...(run.site === null
+            ? {}
+            : {
+                pages: {
+                  discovered: run.site.site.pages.length + run.site.site.skipped.length,
+                  scanned: run.site.site.pages.filter((page) => page.measured).length,
+                },
+              }),
+          environment: "production",
+          result: {
+            failed,
+            warnings,
+            passed: result.findings.filter((item) => item.status === "PASS").length,
+            httpStatus: result.status,
+          },
           freePreview: isFree,
         });
 

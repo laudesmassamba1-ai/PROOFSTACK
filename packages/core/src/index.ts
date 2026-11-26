@@ -1,3 +1,5 @@
+export * from "./analysis.js";
+export * from "./capabilities.js";
 export * from "./controls.js";
 export * from "./crawl.js";
 export * from "./crypto.js";
