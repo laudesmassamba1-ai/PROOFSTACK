@@ -119,7 +119,11 @@ export function validateFlowScenario(input: unknown): FlowValidationResult {
     const step = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
     const kind = text(step.kind, 40) as FlowStepKind;
     if (!(FLOW_STEP_KINDS as readonly string[]).includes(kind)) {
-      issues.push({ step: index, code: "unknown_kind", message: `Unknown step kind: ${kind || "(empty)"}.` });
+      issues.push({
+        step: index,
+        code: "unknown_kind",
+        message: `Unknown step kind: ${kind || "(empty)"}.`,
+      });
       return;
     }
     const id = text(step.id, 60) || `step-${index + 1}`;
@@ -135,9 +139,17 @@ export function validateFlowScenario(input: unknown): FlowValidationResult {
 
     const targetText = text(step.target);
     const valueText = text(step.value, 2000);
-    const expectRaw = (step.expect && typeof step.expect === "object" ? step.expect : {}) as Record<string, unknown>;
+    const expectRaw = (step.expect && typeof step.expect === "object" ? step.expect : {}) as Record<
+      string,
+      unknown
+    >;
     const expect: FlowExpectation = {};
-    for (const key of ["urlContains", "textContains", "textNotContains", "headingContains"] as const) {
+    for (const key of [
+      "urlContains",
+      "textContains",
+      "textNotContains",
+      "headingContains",
+    ] as const) {
       const wanted = text(expectRaw[key], 300);
       if (wanted) expect[key] = wanted;
     }
@@ -146,19 +158,32 @@ export function validateFlowScenario(input: unknown): FlowValidationResult {
       issues.push({
         step: index,
         code: "missing_target",
-        message: kind === "click"
-          ? "A click needs the visible text of the control it clicks."
-          : "A type step needs the visible label of the field it fills.",
+        message:
+          kind === "click"
+            ? "A click needs the visible text of the control it clicks."
+            : "A type step needs the visible label of the field it fills.",
       });
     }
     if (kind === "navigate" && !httpUrl(valueText)) {
-      issues.push({ step: index, code: "missing_value", message: "A navigate step needs a full http(s) address." });
+      issues.push({
+        step: index,
+        code: "missing_value",
+        message: "A navigate step needs a full http(s) address.",
+      });
     }
     if (kind === "press" && valueText && valueText.length > 20) {
-      issues.push({ step: index, code: "invalid_key", message: "A key name is short: Enter, Tab, Escape." });
+      issues.push({
+        step: index,
+        code: "invalid_key",
+        message: "A key name is short: Enter, Tab, Escape.",
+      });
     }
     if (kind === "scroll" && valueText && !Number.isFinite(Number(valueText))) {
-      issues.push({ step: index, code: "invalid_scroll", message: "A scroll step needs a number of pixels." });
+      issues.push({
+        step: index,
+        code: "invalid_scroll",
+        message: "A scroll step needs a number of pixels.",
+      });
     }
     if (kind === "assert" && Object.keys(expect).length === 0) {
       issues.push({

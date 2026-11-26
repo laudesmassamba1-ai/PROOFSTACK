@@ -36,9 +36,7 @@ describe("validateFlowScenario", () => {
     });
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.issues).toEqual([
-      expect.objectContaining({ step: 0, code: "missing_target" }),
-    ]);
+    expect(result.issues).toEqual([expect.objectContaining({ step: 0, code: "missing_target" })]);
   });
 
   it("refuses an assertion that cannot fail", () => {

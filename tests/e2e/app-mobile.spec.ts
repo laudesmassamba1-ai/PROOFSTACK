@@ -30,15 +30,13 @@ async function signUp(page: Page): Promise<void> {
   await page.waitForURL(/\/app(\/|$)/, { timeout: 20_000 });
   // A first visit opens the consent card over the page. Dismiss it as a person
   // must before using the workspace, otherwise it intercepts later clicks.
+  // The card mounts with the lazy app shell, which on a phone can land several
+  // seconds after the URL changes, so wait for it instead of probing once.
   const consent = page.getByRole("dialog", { name: /cookies/i });
-  // The card mounts after the app shell, so a bare isVisible() races it.
-  const opened = await consent
-    .waitFor({ state: "visible", timeout: 3_000 })
-    .then(() => true)
-    .catch(() => false);
-  if (opened) {
-    await consent.getByRole("button", { name: /autoriser|allow/i }).click();
-  }
+  await consent.waitFor({ state: "visible", timeout: 20_000 });
+  await consent.getByRole("button", { name: /autoriser|allow/i }).click();
+  // The card fades out over 240 ms; wait for it to be gone, not just clicked.
+  await consent.waitFor({ state: "detached" });
 }
 
 test("mobile menu opens the guide in French and exposes expert mode", async ({

@@ -612,8 +612,8 @@ export function Settings() {
           {!members ? (
             <Loading label={fr ? "Chargement des membres…" : "Loading members…"} />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="app-table">
+            <div className="overflow-x-auto app-table-stack-wrap">
+              <table className="app-table app-table-stack">
                 <thead>
                   <tr>
                     <th>{fr ? "Membre" : "Member"}</th>
@@ -624,14 +624,16 @@ export function Settings() {
                 <tbody>
                   {members.map((member) => (
                     <tr key={member.userId}>
-                      <td>
+                      <td data-label={fr ? "Membre" : "Member"}>
                         <p className="font-medium">{member.name}</p>
-                        <p className="text-xs text-muted">{member.email}</p>
+                        <p className="break-all text-xs text-muted">{member.email}</p>
                       </td>
-                      <td>
+                      <td data-label={fr ? "Rôle" : "Role"}>
                         <span className="app-badge">{roleLabel(member.role)}</span>
                       </td>
-                      <td className="text-muted">{formatDay(member.joinedAt)}</td>
+                      <td data-label={fr ? "Arrivée" : "Joined"} className="text-muted">
+                        {formatDay(member.joinedAt)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -922,8 +924,8 @@ export function Settings() {
             }
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="app-table">
+          <div className="overflow-x-auto app-table-stack-wrap">
+            <table className="app-table app-table-stack">
               <thead>
                 <tr>
                   <th>{fr ? "Libellé" : "Label"}</th>
@@ -936,13 +938,19 @@ export function Settings() {
               <tbody>
                 {keys.map((key) => (
                   <tr key={key.id}>
-                    <td className="font-medium">{key.label}</td>
-                    <td className="app-mono text-muted">{key.prefix}…</td>
-                    <td className="text-xs text-muted">{key.scopes.join(", ")}</td>
-                    <td className="text-muted">
+                    <td data-label={fr ? "Libellé" : "Label"} className="font-medium">
+                      {key.label}
+                    </td>
+                    <td data-label={fr ? "Préfixe" : "Prefix"} className="app-mono text-muted">
+                      {key.prefix}…
+                    </td>
+                    <td data-label={fr ? "Portées" : "Scopes"} className="text-xs text-muted">
+                      {key.scopes.join(", ")}
+                    </td>
+                    <td data-label={fr ? "Dernier usage" : "Last used"} className="text-muted">
                       {key.revokedAt ? (fr ? "révoqué" : "revoked") : relativeTime(key.lastUsedAt)}
                     </td>
-                    <td>
+                    <td data-label={fr ? "Action" : "Action"}>
                       {key.revokedAt ? (
                         <span className="app-badge">{fr ? "révoqué" : "revoked"}</span>
                       ) : (
@@ -1061,8 +1069,8 @@ export function Settings() {
                     }
                   />
                 ) : webhooks.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="app-table">
+                  <div className="overflow-x-auto app-table-stack-wrap">
+                    <table className="app-table app-table-stack">
                       <thead>
                         <tr>
                           <th>{t("wh.url")}</th>
@@ -1074,11 +1082,13 @@ export function Settings() {
                       <tbody>
                         {webhooks.map((webhook) => (
                           <tr key={webhook.id}>
-                            <td className="max-w-[24rem]">
+                            <td data-label={t("wh.url")} className="max-w-[24rem]">
                               <code className="app-mono break-all text-xs">{webhook.url}</code>
                             </td>
-                            <td className="text-xs">{webhook.events.join(", ")}</td>
-                            <td className="text-xs text-muted">
+                            <td data-label={t("wh.events")} className="text-xs">
+                              {webhook.events.join(", ")}
+                            </td>
+                            <td data-label={t("wh.lastDelivery")} className="text-xs text-muted">
                               {webhook.lastStatus === null
                                 ? t("wh.never")
                                 : `HTTP ${webhook.lastStatus} · ${relativeTime(webhook.lastStatusAt)}`}
@@ -1088,7 +1098,7 @@ export function Settings() {
                                 </p>
                               ) : null}
                             </td>
-                            <td>
+                            <td data-label={fr ? "Action" : "Action"}>
                               <button
                                 type="button"
                                 className="app-btn app-btn-danger"

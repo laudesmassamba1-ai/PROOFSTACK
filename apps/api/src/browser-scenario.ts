@@ -121,10 +121,10 @@ export async function executeBrowserScenario(
 
   try {
     let report: ScenarioReport;
-    if (!binding) {
+    if (!binding && local) {
       // The Node server's own Chromium. The runner is injected, so this module still
       // builds for the Worker, where the field is absent and the refusal above stands.
-      report = await local!({
+      report = await local({
         url: input.url,
         name: input.name ?? "Browser interaction",
         steps: input.steps,

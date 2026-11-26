@@ -126,7 +126,7 @@ test.describe("marketing site", () => {
     if (await menu.isVisible()) await menu.click();
 
     const toggle = page
-      .getByRole("button", { name: /^(language|langue|français|english)$/i })
+      .getByRole("button", { name: /^(language|langue|français|english)\b/i })
       .first();
     await toggle.click();
 

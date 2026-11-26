@@ -546,7 +546,17 @@ export function accountRoutes(services: Services): Hono<AppEnv> {
         keepSessionId: current.id,
       }
     );
-    return c.json({ ok: true, revokedSessions: revoked });
+    // Revoking the *other* sessions is not enough: the token that asked for the change
+    // must be retired too, or a session captured before the change survives the very
+    // action taken to evict it. The browser keeps its session with a fresh secret.
+    const rotated = await createSessionToken();
+    const expiresAt = sessionExpiry(services.clock());
+    await services.store.rotateSession(current.id, rotated.tokenHash, expiresAt);
+    c.header(
+      "Set-Cookie",
+      serializeSessionCookie(rotated.token, { secure: services.config.secureCookies })
+    );
+    return c.json({ ok: true, revokedSessions: revoked, rotatedSession: true });
   });
 
   // -------------------------------------------------------- account deletion

@@ -238,8 +238,15 @@ describe("password budget on account endpoints", () => {
       body: JSON.stringify({ currentPassword: PASSWORD, newPassword: "another correct horse" }),
     });
     expect(ok.status).toBe(200);
+    // The password change rotates the token: the test continues with the cookie handed
+    // back by the response, which is exactly what a browser would do.
+    const rotatedCookie = (ok.headers.get("set-cookie") ?? "").split(";")[0];
+    const session = (await (
+      await harness.request("/api/auth/session", { headers: { cookie: rotatedCookie } })
+    ).json()) as { user: { id: string } | null };
+    expect(session.user).not.toBeNull();
     const cleared = await harness.store.countAuthAttempts(
-      `account:password:${((await (await harness.request("/api/auth/session", { headers: { cookie } })).json()) as { user: { id: string } }).user.id}`,
+      `account:password:${session.user?.id}`,
       new Date(Date.now() - 60 * 60_000)
     );
     expect(cleared).toBe(0);

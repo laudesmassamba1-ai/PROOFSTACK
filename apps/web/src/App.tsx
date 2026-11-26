@@ -160,6 +160,8 @@ export function App() {
           <Route path="reset-password" element={<ResetPassword />} />
           <Route path="verify-email" element={<VerifyEmail />} />
           <Route path="support" element={<Support />} />
+          {/* Ancienne URL publique sans page propre : elle menait au 404. */}
+          <Route path="legal" element={<Navigate to="/legal/terms" replace />} />
           <Route path="legal/terms" element={<Terms />} />
           <Route path="legal/privacy" element={<Privacy />} />
           <Route path="legal/cookies" element={<Cookies />} />
@@ -198,6 +200,9 @@ export function App() {
           {/* The local console lives inside the assistant, not as a second AI section. */}
           <Route path="ai/local" element={<LocalAgent />} />
           <Route path="agent" element={<Navigate to="/app/ai/local" replace />} />
+          {/* Anciennes URLs de l'espace de travail : redirection, plus de 404. */}
+          <Route path="account" element={<Navigate to="/app/settings" replace />} />
+          <Route path="local-agent" element={<Navigate to="/app/ai/local" replace />} />
           <Route path="admin" element={<Admin />} />
           {/* Known app routes must not fall through to the marketing 404. */}
           <Route path="*" element={<AppNotFound />} />

@@ -6,7 +6,7 @@ marketing. Quand une capacité est partielle, la colonne **Limites** dit exactem
 manque, et **Maturité** le dit en un mot.
 
 Méthode de vérification : lecture des routes (`apps/api/src/routes/*.ts`), des modules
-(`packages/modules/*/src`), du moteur de scan (`packages/core/src/page-scan.ts`), du CLI
+(`packages/modules/*/src`), du moteur de scan (`packages/core/src/page-scan.ts`) et des modules FAIL/CLEAN (`packages/modules/{fail,clean}/src`), du CLI
 (`packages/cli/src/index.ts`), du routeur web (`apps/web/src/App.tsx`), et exécution réelle
 de la suite de tests. État au moment de la rédaction : **712 tests, 59 fichiers, lint 0
 sur les fichiers livrés, typecheck web/API/CLI 0 erreur**.

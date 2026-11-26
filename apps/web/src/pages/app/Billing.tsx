@@ -632,8 +632,8 @@ export function Billing() {
             : "Metered once per subject: a retried upload or a re-run of the same id counts once."
         }
       >
-        <div className="overflow-x-auto">
-          <table className="app-table">
+        <div className="overflow-x-auto app-table-stack-wrap">
+          <table className="app-table app-table-stack">
             <thead>
               <tr>
                 <th>{fr ? "Compteur" : "Counter"}</th>
@@ -650,12 +650,19 @@ export function Billing() {
                 const text = usageCopy(counter.key, counter.counted, fr);
                 return (
                   <tr key={counter.key}>
-                    <td>{text.label}</td>
-                    <td className="text-right tabular-nums">{counter.used}</td>
-                    <td className="text-right tabular-nums">
+                    <td data-label={fr ? "Compteur" : "Counter"}>{text.label}</td>
+                    <td data-label={fr ? "Utilisé" : "Used"} className="text-right tabular-nums">
+                      {counter.used}
+                    </td>
+                    <td data-label={fr ? "Limite" : "Limit"} className="text-right tabular-nums">
                       {counter.limit === -1 ? (fr ? "illimité" : "unlimited") : counter.limit}
                     </td>
-                    <td className="text-xs text-muted">{text.counted}</td>
+                    <td
+                      data-label={fr ? "Traitement" : "Billing treatment"}
+                      className="text-xs text-muted"
+                    >
+                      {text.counted}
+                    </td>
                   </tr>
                 );
               })}
@@ -749,8 +756,8 @@ export function Billing() {
             {fr ? "Aucune tentative de paiement." : "No payment attempts yet."}
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="app-table">
+          <div className="overflow-x-auto app-table-stack-wrap">
+            <table className="app-table app-table-stack">
               <thead>
                 <tr>
                   <th>{fr ? "Créé" : "Created"}</th>
@@ -764,26 +771,31 @@ export function Billing() {
               <tbody>
                 {data.payments.map((payment) => (
                   <tr key={payment.id}>
-                    <td className="whitespace-nowrap text-xs">{formatDate(payment.createdAt)}</td>
-                    <td>
+                    <td data-label={fr ? "Créé" : "Created"} className="whitespace-nowrap text-xs">
+                      {formatDate(payment.createdAt)}
+                    </td>
+                    <td data-label={fr ? "Offre" : "Plan"}>
                       {planLabel(payment.planKey, payment.planKey, fr)}
                       <span className="ml-1 text-xs text-muted">
                         / {periodLabel(payment.period, fr)}
                       </span>
                     </td>
-                    <td className="text-right tabular-nums">
+                    <td data-label={fr ? "Montant" : "Amount"} className="text-right tabular-nums">
                       {formatMinor(payment.amount.minor, payment.amount.currency)}
                     </td>
-                    <td>
+                    <td data-label={fr ? "État" : "State"}>
                       <StatusBadge status={payment.state} />
                       {payment.failureReason ? (
                         <span className="ml-2 text-xs text-muted">{payment.failureReason}</span>
                       ) : null}
                     </td>
-                    <td className="text-xs">
+                    <td data-label={fr ? "Crédité" : "Credited"} className="text-xs">
                       {payment.credited ? (fr ? "oui" : "yes") : fr ? "non" : "no"}
                     </td>
-                    <td className="app-mono text-xs text-muted">
+                    <td
+                      data-label={fr ? "Référence" : "Reference"}
+                      className="app-mono text-xs text-muted"
+                    >
                       {payment.providerReference ?? "—"}
                     </td>
                   </tr>
@@ -810,8 +822,8 @@ export function Billing() {
               : "No receipts yet. One is issued when a payment is verified."}
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="app-table">
+          <div className="overflow-x-auto app-table-stack-wrap">
+            <table className="app-table app-table-stack">
               <thead>
                 <tr>
                   <th>{fr ? "Numéro" : "Number"}</th>
@@ -825,18 +837,25 @@ export function Billing() {
               <tbody>
                 {data.invoices.map((invoice) => (
                   <tr key={invoice.id}>
-                    <td className="app-mono text-xs">{invoice.number}</td>
-                    <td className="whitespace-nowrap text-xs">{formatDate(invoice.issuedAt)}</td>
-                    <td className="whitespace-nowrap text-xs">
+                    <td data-label={fr ? "Numéro" : "Number"} className="app-mono text-xs">
+                      {invoice.number}
+                    </td>
+                    <td data-label={fr ? "Émis" : "Issued"} className="whitespace-nowrap text-xs">
+                      {formatDate(invoice.issuedAt)}
+                    </td>
+                    <td
+                      data-label={fr ? "Période" : "Service period"}
+                      className="whitespace-nowrap text-xs"
+                    >
                       {formatDay(invoice.periodStart)} → {formatDay(invoice.periodEnd)}
                     </td>
-                    <td className="text-right tabular-nums">
+                    <td data-label="Total" className="text-right tabular-nums">
                       {formatMinor(invoice.total.minor, invoice.total.currency)}
                     </td>
-                    <td>
+                    <td data-label={fr ? "État" : "Status"}>
                       <StatusBadge status={invoice.status} />
                     </td>
-                    <td className="text-right">
+                    <td data-label={fr ? "Reçu" : "Receipt"} className="text-right">
                       <button
                         type="button"
                         className="app-btn"

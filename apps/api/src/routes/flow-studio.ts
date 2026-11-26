@@ -1,4 +1,4 @@
-import { type FlowValidationIssue, type FlowStep, validateFlowScenario } from "@proofcore/core";
+import { type FlowStep, type FlowValidationIssue, validateFlowScenario } from "@proofcore/core";
 import { Hono } from "hono";
 import { z } from "zod";
 import { executeBrowserScenario } from "../browser-scenario.js";
@@ -90,12 +90,9 @@ function validated(input: { name: string; target: string; steps: FlowStep[] }): 
   const result = validateFlowScenario(input);
   if (result.ok) return result.scenario;
   const issues: FlowValidationIssue[] = result.issues;
-  throw new HttpError(
-    400,
-    "invalid_scenario",
-    issues.map((issue) => issue.message).join(" "),
-    { issues }
-  );
+  throw new HttpError(400, "invalid_scenario", issues.map((issue) => issue.message).join(" "), {
+    issues,
+  });
 }
 
 export function flowStudioRoutes(services: Services): Hono<AppEnv> {

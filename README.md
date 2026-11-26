@@ -31,7 +31,8 @@ The creator's read-only operations console lives at `/app/admin`: users, workspa
 subscriptions, payments, runs and webhook delivery. It is gated by the API's
 `ADMIN_EMAILS` allowlist, which is empty by default and disables the page.
 
-Live: [proofcore-iota.vercel.app](https://proofcore-iota.vercel.app) for the web app,
+Live: [proofstack-iota.vercel.app](https://proofstack-iota.vercel.app) for the web app
+(the host keeps the repository's historical slug; the product is PROOFCORE),
 with `/api/*`, `/v1/*` and `/health` proxied to the
 [Cloudflare Worker](https://proofcore-api.laudesmassamba1.workers.dev) so session
 cookies stay same-origin. The Worker uses D1 (`proofcore`), migrations applied.
@@ -47,9 +48,10 @@ navigation, state-driven display type and one data-bound object per module. Desi
 records and real captures live under [`docs/design`](docs/design), including
 [`WORKSPACE_VISUAL_AUDIT.md`](docs/design/WORKSPACE_VISUAL_AUDIT.md).
 
-Not yet true: email verification and password recovery are absent; transactional email
-has EmailJS and Resend adapters but no production credentials were supplied, so delivery
-is unverified. SasPay's live path is untested without credentials, and prices still
+Not yet true: email verification and password recovery now exist end to end (`/forgot-password`,
+`/reset-password`, `/verify-email`, `POST /api/account/{forgot-password,reset-password,verify-email/request,verify-email/confirm}`),
+but transactional email has EmailJS and Resend adapters with no production credentials
+supplied, so actual delivery is unverified. SasPay's live path is untested without credentials, and prices still
 require a deploy to change. See
 [`docs/DEVELOPMENT_STATUS.md`](docs/DEVELOPMENT_STATUS.md) for the full, unvarnished
 list.
@@ -284,10 +286,10 @@ SasPay capabilities are in
 ```
 apps/web        React/Vite marketing site and dashboard
 apps/api        Hono API: Cloudflare Worker (D1) and Node 22 (SQLite)
-packages/core   money, text/Unicode, time, hashing, errors
+packages/core   money, text/Unicode, time, hashing, errors + the page/site scan engine
 packages/contracts  shared Zod schemas (config, engine, API, billing)
 packages/engine shared execution engine and reporting model
-packages/modules/world|flow|exit  the three test modules
+packages/modules/world|flow|exit|fail|clean  the five control modules
 packages/adapters/payments  SasPay + sandbox provider adapters
 packages/adapters/reporting JSON / JUnit / HTML / text renderers
 packages/adapters/ai        MCP / AI provider configuration (optional)

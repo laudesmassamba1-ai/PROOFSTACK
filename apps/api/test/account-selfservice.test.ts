@@ -73,6 +73,23 @@ describe("sessions", () => {
     expect(JSON.stringify(body)).not.toContain("ps_sess_");
   });
 
+  it("issues a distinct token for every sign-in", async () => {
+    const firstCookie = await signUp(harness, "rotate@example.com");
+    const second = await signIn(harness, "rotate@example.com", PASSWORD);
+    expect(second.status).toBe(200);
+    const secondCookie = (second.headers.get("set-cookie") ?? "").split(";")[0];
+    expect(secondCookie).toContain("ps_sess_");
+    expect(secondCookie).not.toBe(firstCookie);
+
+    // Both sessions stay independent: signing in again does not evict the first device.
+    for (const candidate of [firstCookie, secondCookie]) {
+      const session = await harness.request("/api/auth/session", {
+        headers: { cookie: candidate },
+      });
+      expect(((await session.json()) as { user: unknown }).user).not.toBeNull();
+    }
+  });
+
   it("revokes another session but answers 404 for someone else's", async () => {
     const ownerCookie = await signUp(harness, "revoke@example.com");
     const second = await signIn(harness, "revoke@example.com", PASSWORD);
@@ -120,7 +137,21 @@ describe("password change", () => {
       body: JSON.stringify({ currentPassword: PASSWORD, newPassword: NEW_PASSWORD }),
     });
     expect(ok.status).toBe(200);
-    expect(((await ok.json()) as { revokedSessions: number }).revokedSessions).toBe(1);
+    const changed = (await ok.json()) as { revokedSessions: number; rotatedSession: boolean };
+    expect(changed.revokedSessions).toBe(1);
+    expect(changed.rotatedSession).toBe(true);
+
+    // The token that asked for the change is rotated: the old cookie is dead, and the
+    // browser is handed a new one that still carries the session it just used.
+    const rotatedCookie = (ok.headers.get("set-cookie") ?? "").split(";")[0];
+    expect(rotatedCookie).toContain("ps_sess_");
+    expect(rotatedCookie).not.toBe(cookie);
+    const retired = await harness.request("/api/auth/session", { headers: { cookie } });
+    expect(((await retired.json()) as { user: unknown }).user).toBeNull();
+    const renewed = await harness.request("/api/auth/session", {
+      headers: { cookie: rotatedCookie },
+    });
+    expect(((await renewed.json()) as { user: unknown }).user).not.toBeNull();
 
     // The old password is dead, the new one works, and the revoked cookie is dead too.
     expect((await signIn(harness, "change@example.com", PASSWORD)).status).toBe(401);

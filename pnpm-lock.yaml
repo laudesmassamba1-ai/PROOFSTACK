@@ -175,6 +175,9 @@ importers:
       '@types/node':
         specifier: 22.19.2
         version: 22.19.2
+      axe-core:
+        specifier: ^4.14.1
+        version: 4.14.1
       esbuild:
         specifier: 0.28.2
         version: 0.28.2
@@ -446,7 +449,14 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
 
-  packages/core: {}
+  packages/core:
+    dependencies:
+      '@proofcore/module-clean':
+        specifier: workspace:*
+        version: link:../modules/clean
+      '@proofcore/module-fail':
+        specifier: workspace:*
+        version: link:../modules/fail
 
   packages/engine:
     dependencies:
@@ -456,6 +466,8 @@ importers:
       '@proofcore/core':
         specifier: workspace:*
         version: link:../core
+
+  packages/modules/clean: {}
 
   packages/modules/exit:
     dependencies:
@@ -468,6 +480,8 @@ importers:
       '@proofcore/engine':
         specifier: workspace:*
         version: link:../../engine
+
+  packages/modules/fail: {}
 
   packages/modules/flow:
     dependencies:
@@ -2028,6 +2042,10 @@ packages:
   at-least-node@1.0.0:
     resolution: {integrity: sha512-+q/t7Ekv1EDY2l6Gda6LLiX14rU9TV20Wa3ofeQmwPFZbOMo9DXrLbOjFaaclkXKWidIaopwAObQDqwWtGUjqg==}
     engines: {node: '>= 4.0.0'}
+
+  axe-core@4.14.1:
+    resolution: {integrity: sha512-FHfa+lmNjQZfJz1q8wKqIDwC6DExcHt/pkjNQb09a3NPjCKg2rhu5qb2S4r76ASyFNNtuFooJpZe37OgudVGtQ==}
+    engines: {node: '>=4'}
 
   balanced-match@1.0.2:
     resolution: {integrity: sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw==}
@@ -4925,6 +4943,8 @@ snapshots:
   asynckit@0.4.0: {}
 
   at-least-node@1.0.0: {}
+
+  axe-core@4.14.1: {}
 
   balanced-match@1.0.2: {}
 

@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import type { ZodType } from "zod";
-import { hashToken, readCookie, SESSION_COOKIE } from "../auth.js";
+import { hashToken, readCookie, rolledSessionExpiry, SESSION_COOKIE } from "../auth.js";
 import type { Role, UserRecord, WorkspaceRecord } from "../store/app-store.js";
 import { HttpError } from "./errors.js";
 import type { AppEnv, Services } from "./services.js";
@@ -25,10 +25,17 @@ export async function requireUser(c: Context<AppEnv>, services: Services): Promi
     await services.store.deleteSession(found.session.id);
     throw new HttpError(401, "session_expired", "Your session expired. Sign in again.");
   }
-  // Touch at most once per hour: D1 free-tier writes are a real budget.
+  // Touch at most once per hour: D1 free-tier writes are a real budget. The same write
+  // renews the idle window, capped by the session's creation date.
   const hourAgo = new Date(services.clock().getTime() - 3_600_000).toISOString();
   if (!found.session.lastSeenAt || found.session.lastSeenAt < hourAgo) {
-    await services.store.touchSession(found.session.id);
+    const rolled = rolledSessionExpiry(found.session.createdAt, services.clock());
+    if (rolled > found.session.expiresAt) {
+      found.session.expiresAt = rolled;
+      await services.store.extendSession(found.session.id, rolled);
+    } else {
+      await services.store.touchSession(found.session.id);
+    }
   }
   c.set("user", found.user);
   c.set("session", found.session);

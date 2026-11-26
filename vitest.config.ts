@@ -17,6 +17,8 @@ export default defineConfig({
       "@proofcore/module-world": src("packages/modules/world/src/index.ts"),
       "@proofcore/module-flow": src("packages/modules/flow/src/index.ts"),
       "@proofcore/module-exit": src("packages/modules/exit/src/index.ts"),
+      "@proofcore/module-fail": src("packages/modules/fail/src/index.ts"),
+      "@proofcore/module-clean": src("packages/modules/clean/src/index.ts"),
       "@proofcore/adapter-payments": src("packages/adapters/payments/src/index.ts"),
       "@proofcore/adapter-browser": src("packages/adapters/browser/src/index.ts"),
       "@proofcore/adapter-exports": src("packages/adapters/exports/src/index.ts"),

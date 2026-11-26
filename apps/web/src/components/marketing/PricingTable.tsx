@@ -111,7 +111,7 @@ export function PricingTable({ currentPlanKey }: { currentPlanKey?: string }) {
                 }`}
               >
                 {isFeatured ? (
-                  <span className="pk-flag absolute -top-3 left-6 flex items-center gap-1 px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em]">
+                  <span className="pk-flag absolute -top-3 left-6 flex items-center gap-1 px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em] max-lg:static max-lg:mb-4 max-lg:w-fit max-lg:self-start">
                     <BadgeCheck size={11} /> {t("mkt.pricing.featured")}
                   </span>
                 ) : null}
@@ -141,7 +141,7 @@ export function PricingTable({ currentPlanKey }: { currentPlanKey?: string }) {
                           { maximumFractionDigits: price.amount.currency === "XOF" ? 0 : 2 }
                         )}
                       </span>
-                      <span className="text-[0.84rem] opacity-55">
+                      <span className="text-[0.84rem] opacity-60">
                         {t(period === "monthly" ? "pricing.perMonth" : "pricing.perYear")}
                       </span>
                     </>

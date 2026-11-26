@@ -207,20 +207,8 @@ export function FlowStudioPage() {
   const validation = useMemo(() => validateFlowScenario(draft), [draft]);
   const dirty = JSON.stringify(draft) !== saved;
 
-  /**
-   * Open the first saved scenario once it arrives.
-   *
-   * Landing on an empty draft beside a saved scenario made the screen look as if the saved
-   * steps had been lost. The draft is only replaced while it is untouched: a name typed
-   * before the list loads must not be overwritten.
-   */
-  useEffect(() => {
-    if (draft.id || dirty) return;
-    const first = scenarios[0];
-    if (first) select(first);
-  }, [scenarios, draft.id, dirty]);
-
-  function select(scenario: Scenario) {
+  // Only state setters are read here, so the callback is stable across renders.
+  const select = useCallback((scenario: Scenario) => {
     const next: Draft = {
       id: scenario.id,
       name: scenario.name,
@@ -236,7 +224,20 @@ export function FlowStudioPage() {
     );
     setRunError(null);
     setServerIssues([]);
-  }
+  }, []);
+
+  /**
+   * Open the first saved scenario once it arrives.
+   *
+   * Landing on an empty draft beside a saved scenario made the screen look as if the saved
+   * steps had been lost. The draft is only replaced while it is untouched: a name typed
+   * before the list loads must not be overwritten.
+   */
+  useEffect(() => {
+    if (draft.id || dirty) return;
+    const first = scenarios[0];
+    if (first) select(first);
+  }, [scenarios, draft.id, dirty, select]);
 
   function create() {
     const next = emptyDraft();
@@ -509,6 +510,7 @@ export function FlowStudioPage() {
               </p>
               <ul>
                 {serverIssues.map((issue, index) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: the server list is replaced as a whole and never reordered or edited in place
                   <li key={`${issue.step ?? "s"}-${index}`}>
                     {issue.step !== undefined
                       ? `${fr ? "Étape" : "Step"} ${issue.step + 1} · `
@@ -716,11 +718,16 @@ export function FlowStudioPage() {
                     ) : null}
 
                     {issues.length > 0 ? (
-                      <ul className="flow-step-issues" role="alert">
-                        {issues.map((issue, at) => (
-                          <li key={at}>{issueText(issue.code, issue.message, fr)}</li>
-                        ))}
-                      </ul>
+                      <div role="alert">
+                        {/* The alert lives on the wrapper: role="alert" on the list itself
+                            removes its list role, and a <li> then has no list parent. */}
+                        <ul className="flow-step-issues">
+                          {issues.map((issue, at) => (
+                            // biome-ignore lint/suspicious/noArrayIndexKey: validation issues of one step, recomputed as a whole and never reordered in place
+                            <li key={at}>{issueText(issue.code, issue.message, fr)}</li>
+                          ))}
+                        </ul>
+                      </div>
                     ) : null}
                   </fieldset>
                 </li>

@@ -1,8 +1,11 @@
 import {
   ANALYSIS_PROFILES,
+  ANALYSIS_TARGET_TYPES,
+  type AnalysisTargetType,
   auditSite,
   CAPABILITIES,
   CAPABILITY_VERSION,
+  controlFor,
   ProofCoreError,
   scanPage,
   seedRemediation,
@@ -21,6 +24,7 @@ import {
   type ProviderDefinition,
 } from "../ai-providers.js";
 import { AnalysisBudget, MAX_ANALYSIS_CALLS_PER_TURN, permissionOf } from "../ai-tool-policy.js";
+import { suggestAnalysisProfile } from "../analysis-profile-suggest.js";
 import { browsePage, describeBrowsedPage } from "../browser-render.js";
 import { compareAnalysisPair, findingsForAnalysis } from "../findings.js";
 import { quotaErrorFromDecision } from "../http/entitlement-http.js";
@@ -37,7 +41,9 @@ import {
   moduleConfigView,
   moduleStatus,
   runModule,
+  validateModuleSettings,
 } from "../module-copilot.js";
+import { verifyRemediationWithAnalysis } from "../remediation-verify.js";
 
 /**
  * In-app AI experience: a real assistant with memory and tools.
@@ -584,6 +590,26 @@ const TOOLS: { name: string; description: string; parameters: Record<string, unk
     },
   },
   {
+    name: "validate_configuration",
+    description:
+      "Check a partial module settings patch exactly as a save would, without saving: the real PROOFCORE schema, merged with the active config, then the same validateConfig blockers. Use it before module_configure, or to explain why a configuration is refused. Empty settings validates the active configuration. WORLD, FLOW and EXIT only; FAIL and CLEAN have no stored settings.",
+    parameters: {
+      type: "object",
+      properties: {
+        projectId: { type: "string" },
+        module: { type: "string", enum: ["world", "flow", "exit", "fail", "clean"] },
+        settings: {
+          type: "object",
+          description:
+            "The same partial settings module_configure accepts. Omit or pass {} to validate the configuration already saved.",
+          additionalProperties: true,
+        },
+      },
+      required: ["projectId", "module"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "module_run",
     description:
       "Launch one module on the real engine. FAIL/CLEAN scan the project's own URL over HTTP; WORLD and FLOW run against the configured target and store a metered run in history. EXIT and browser-only FLOW journeys report not_runnable_here with the local command instead of pretending. Set confirm:true only when the user asked to run tests.",
@@ -808,6 +834,27 @@ const TOOLS: { name: string; description: string; parameters: Record<string, unk
     parameters: { type: "object", properties: {}, additionalProperties: false },
   },
   {
+    name: "suggest_analysis_profile",
+    description:
+      "Map the goal the person stated to one of the registered analysis profiles (quick, conversion, seo, security, full, project). Ranking uses only the registry's documented profile and capability wording, and returns the matched terms. It returns recommendation:null rather than inventing a profile when nothing matches. It launches nothing and does not check module readiness: call module_status before promising a run.",
+    parameters: {
+      type: "object",
+      properties: {
+        goal: {
+          type: "string",
+          description: "What the person wants to know, in their own words.",
+        },
+        targetType: {
+          type: "string",
+          enum: [...ANALYSIS_TARGET_TYPES],
+          description: "Optional: restrict to profiles registered for this target type.",
+        },
+      },
+      required: ["goal"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "list_analyses",
     description:
       "The workspace's analyses, newest first: id, project, target, type, status and coverage. An analysis is the canonical record; a run is one execution of it.",
@@ -888,6 +935,35 @@ const TOOLS: { name: string; description: string; parameters: Record<string, unk
       additionalProperties: false,
     },
   },
+  {
+    name: "finding_details",
+    description:
+      "One finding in full: verdict, severity, priority, confidence, cause, evidence, the control's written explanation, fix and verification, and the remediation tracking it if one exists. Use the key from analysis_findings. Read the evidence before recommending anything.",
+    parameters: {
+      type: "object",
+      properties: {
+        analysisId: { type: "string" },
+        findingKey: { type: "string" },
+      },
+      required: ["analysisId", "findingKey"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "verify_remediation",
+    description:
+      "Confirm a remediation with a later analysis of the same target. The analysis that produced the finding is refused, and an inconclusive verdict is reported as a refusal, never as a success. Only call when the user asked to verify a fix and a newer analysis exists.",
+    parameters: {
+      type: "object",
+      properties: {
+        remediationId: { type: "string" },
+        analysisId: { type: "string" },
+        confirm: { type: "boolean" },
+      },
+      required: ["remediationId", "analysisId", "confirm"],
+      additionalProperties: false,
+    },
+  },
 ];
 
 function systemPrompt(
@@ -937,6 +1013,13 @@ function systemPrompt(
     "  returns. Then call `module_configure` with the smallest partial change. Only set",
     "  confirm:true when the user explicitly asked to apply or save it; otherwise present",
     "  the exact settings as a proposal and wait.",
+    "- Use `validate_configuration` to check a proposed patch without saving it: it runs the",
+    "  same schema and blockers as a save. Quote its blocking issues; do not call a blocked",
+    "  configuration valid.",
+    "- When the person states a goal instead of a command, call `suggest_analysis_profile`",
+    "  and use only a profile it returns. Its recommendation can be null: then ask what they",
+    "  want to check rather than inventing a profile name. Check `module_status` before",
+    "  promising the run.",
     "- Run a module only when the user asked to run it, with `module_run` and confirm:true.",
     "  A run spends the workspace's monthly test-run quota and hits the customer's app.",
     "- After a run, call `analyze_run` (or read the run id it returned) before explaining.",
@@ -2007,6 +2090,27 @@ async function executeTool(
           summary: `${ANALYSIS_PROFILES.length} profils, ${CAPABILITIES.length} capacités`,
         };
       }
+      case "suggest_analysis_profile": {
+        const goal = typeof args.goal === "string" ? args.goal.trim() : "";
+        if (goal.length < 3) {
+          return {
+            content: stableStringify({
+              error: "goal is required: describe what the person wants to know",
+            }),
+            summary: "invalid goal",
+          };
+        }
+        const targetType = ANALYSIS_TARGET_TYPES.includes(args.targetType as AnalysisTargetType)
+          ? (args.targetType as AnalysisTargetType)
+          : undefined;
+        const suggestion = suggestAnalysisProfile(goal, targetType);
+        return {
+          content: stableStringify(suggestion, 2),
+          summary: suggestion.recommendation
+            ? `profil suggéré · ${suggestion.recommendation.id}`
+            : "aucun profil correspondant",
+        };
+      }
       case "list_analyses": {
         const limit =
           typeof args.limit === "number" && Number.isFinite(args.limit)
@@ -2281,6 +2385,127 @@ async function executeTool(
           summary: "remédiation ouverte",
         };
       }
+      case "finding_details": {
+        const analysisId = typeof args.analysisId === "string" ? args.analysisId : "";
+        const findingKeyArg = typeof args.findingKey === "string" ? args.findingKey : "";
+        if (!analysisId || !findingKeyArg) {
+          return {
+            content: stableStringify({ error: "analysisId and findingKey are required" }),
+            summary: "invalid request",
+          };
+        }
+        const analysis = await services.store.getAnalysis(workspaceId, analysisId);
+        if (!analysis) {
+          return {
+            content: stableStringify({
+              error: "analysis_not_found",
+              hint: "Call list_analyses to get a real id.",
+            }),
+            summary: "analyse introuvable",
+          };
+        }
+        const loadedFinding = await findingsForAnalysis(services, analysis);
+        const detail = loadedFinding.findings.find((item) => item.key === findingKeyArg);
+        if (!detail) {
+          return {
+            content: stableStringify({
+              error: "finding_not_found",
+              hint: "Call analysis_findings with this analysisId to get a real key.",
+            }),
+            summary: "constat introuvable",
+          };
+        }
+        const control = controlFor(detail.module as never, detail.controlId);
+        const remediation = await services.store.findRemediationByFinding(
+          workspaceId,
+          analysisId,
+          findingKeyArg
+        );
+        return {
+          content: stableStringify(
+            {
+              analysisId,
+              finding: detail,
+              control: control
+                ? {
+                    id: control.id,
+                    module: control.module,
+                    risk: control.risk,
+                    complexity: control.complexity,
+                    method: control.method,
+                    result: control.result,
+                    fr: control.fr,
+                    en: control.en,
+                    fixes: control.fixes,
+                  }
+                : null,
+              remediation: remediation
+                ? {
+                    id: remediation.id,
+                    status: remediation.status,
+                    priority: remediation.priority,
+                    nextStep: remediation.steps.at(-1) ?? null,
+                    verificationOutcome: remediation.verificationOutcome,
+                  }
+                : null,
+            },
+            2
+          ),
+          summary: `${detail.controlId} · ${detail.status}`,
+        };
+      }
+      case "verify_remediation": {
+        if (args.confirm !== true) {
+          return {
+            content: stableStringify({
+              error: "confirm must be true, and only when the user asked to verify this fix",
+            }),
+            summary: "not confirmed",
+          };
+        }
+        const remediationId = typeof args.remediationId === "string" ? args.remediationId : "";
+        const analysisId = typeof args.analysisId === "string" ? args.analysisId : "";
+        if (!remediationId || !analysisId) {
+          return {
+            content: stableStringify({ error: "remediationId and analysisId are required" }),
+            summary: "invalid request",
+          };
+        }
+        try {
+          const verified = await verifyRemediationWithAnalysis({
+            services,
+            workspaceId,
+            remediationId,
+            analysisId,
+          });
+          return {
+            content: stableStringify(
+              {
+                outcome: verified.outcome,
+                reason: verified.reason,
+                remediation: {
+                  id: verified.remediation.id,
+                  status: verified.remediation.status,
+                  verificationOutcome: verified.remediation.verificationOutcome,
+                },
+              },
+              2
+            ),
+            summary: `remédiation ${verified.outcome}`,
+          };
+        } catch (error) {
+          if (error instanceof HttpError) {
+            return {
+              content: stableStringify(
+                { error: error.code, message: error.message, ...(error.details ?? {}) },
+                2
+              ),
+              summary: "vérification refusée",
+            };
+          }
+          throw error;
+        }
+      }
       case "workspace_overview": {
         const projects = await services.store.listProjects(workspaceId);
         const runs = await services.store.recentRuns(workspaceId, 5);
@@ -2382,6 +2607,67 @@ async function executeTool(
         return {
           content: stableStringify(result, 2),
           summary: result.ok ? `${module.toUpperCase()} saved` : `${module.toUpperCase()} refused`,
+        };
+      }
+      case "validate_configuration": {
+        const projectId = typeof args.projectId === "string" ? args.projectId : "";
+        const module = copilotModule(args.module);
+        if (!projectId || !module) {
+          return {
+            content: stableStringify({ error: "projectId and module are required" }),
+            summary: "invalid module request",
+          };
+        }
+        const settings = args.settings ?? {};
+        if (typeof settings !== "object" || settings === null || Array.isArray(settings)) {
+          return {
+            content: stableStringify({ error: "settings must be an object" }),
+            summary: "invalid settings",
+          };
+        }
+        const check = await validateModuleSettings(
+          services,
+          workspaceId,
+          projectId,
+          module,
+          settings
+        );
+        if (!check.ok) {
+          return {
+            content: stableStringify(
+              {
+                valid: false,
+                projectId,
+                module,
+                saved: false,
+                error: check.error,
+                issues: check.issues ?? [],
+              },
+              2
+            ),
+            summary: `${module.toUpperCase()} refusé`,
+          };
+        }
+        const valid = check.blocking.length === 0;
+        return {
+          content: stableStringify(
+            {
+              valid,
+              projectId,
+              module,
+              issues: check.issues,
+              blocking: check.blocking,
+              config: check.config,
+              saved: false,
+              next: valid
+                ? "Apply it with module_configure and confirm:true only after the user asks to save."
+                : "Nothing was saved. Fix every blocking issue; a non-blocking issue is advice, not a refusal.",
+            },
+            2
+          ),
+          summary: valid
+            ? `${module.toUpperCase()} valide · ${check.issues.length} avertissement(s)`
+            : `${module.toUpperCase()} bloqué (${check.blocking.length})`,
         };
       }
       case "module_run": {

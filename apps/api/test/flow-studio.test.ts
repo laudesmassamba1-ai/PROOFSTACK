@@ -96,10 +96,9 @@ describe("FLOW scenarios", () => {
     expect(body.scenario.steps[0]?.value).toBe("https://example.com/");
     expect(body.scenario.lastRunAt).toBeNull();
 
-    const list = await harness.request(
-      `/api/v1/flow/scenarios?workspaceId=${workspaceId}`,
-      { headers: { cookie } }
-    );
+    const list = await harness.request(`/api/v1/flow/scenarios?workspaceId=${workspaceId}`, {
+      headers: { cookie },
+    });
     expect(list.status).toBe(200);
     const body2 = (await list.json()) as { scenarios: ScenarioBody["scenario"][] };
     expect(body2.scenarios).toHaveLength(1);

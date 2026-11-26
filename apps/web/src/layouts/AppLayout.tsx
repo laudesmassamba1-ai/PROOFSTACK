@@ -395,11 +395,13 @@ export function AppLayout() {
             <NavLink
               to="/app"
               className="app-brand-lockup"
-              aria-label={locale === "fr" ? "PROOFCORE espace de travail" : "PROOFCORE workspace"}
+              aria-label={`${locale === "fr" ? "PROOFCORE espace de travail" : "PROOFCORE workspace"} ${t("ws.shell.beta")}`}
             >
               <Mark size={34} variant="onLight" />
               <span className="wordmark app-brand-word">PROOFCORE</span>
-              <span className="app-beta">{t("ws.shell.beta")}</span>
+              <span className="app-beta" aria-hidden="true">
+                {t("ws.shell.beta")}
+              </span>
             </NavLink>
             <div className="app-top-actions">
               <span className="app-offline-chip">
@@ -480,14 +482,12 @@ export function AppLayout() {
       <QuickDock />
       <div className="app-frame">
         <header className="app-topbar">
-          <NavLink
-            to="/app"
-            className="app-brand-lockup"
-            aria-label={locale === "fr" ? "PROOFCORE espace de travail" : "PROOFCORE workspace"}
-          >
+          <NavLink to="/app" className="app-brand-lockup">
             <Mark size={34} variant="onLight" />
             <span className="wordmark app-brand-word">PROOFCORE</span>
-            <span className="app-beta">{t("ws.shell.beta")}</span>
+            <span className="app-beta" aria-hidden="true">
+              {t("ws.shell.beta")}
+            </span>
           </NavLink>
 
           <div className="app-top-actions">
@@ -533,9 +533,9 @@ export function AppLayout() {
               type="button"
               className="app-command-trigger"
               onClick={() => setPaletteOpen(true)}
-              aria-label={t("ws.shell.command")}
+              aria-keyshortcuts="Meta+K Control+K"
             >
-              <Search size={14} />
+              <Search size={14} aria-hidden="true" />
               <span>{t("ws.shell.command")}</span>
               <kbd>⌘K</kbd>
             </button>
@@ -570,11 +570,12 @@ export function AppLayout() {
               <button
                 type="button"
                 className="app-account"
-                aria-label={t("ws.shell.account")}
+                aria-label={`${t("ws.shell.account")} ${initials || "PS"}`}
                 aria-expanded={accountOpen}
                 onClick={() => setAccountOpen((value) => !value)}
               >
-                {initials || "PS"}
+                {/* Initials are decoration; the accessible name is the label. */}
+                <span aria-hidden="true">{initials || "PS"}</span>
               </button>
               {accountOpen ? (
                 <div className="app-account-menu">

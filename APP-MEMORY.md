@@ -410,3 +410,23 @@ pnpm cloud:deploy --dry-run
 - Leçon de diagnostic : quand un échec CI ne se reproduit pas localement, vérifier **ce que contient le HEAD commité** vs l'arbre de travail (`git diff HEAD --stat`) — un correctif non commité est invisible pour la CI.
 - Reste phase 1 : npm 0.6.0→0.6.3 (secret `NPM_TOKEN`, action propriétaire), incohérences docs « WORLD/FLOW/EXIT » localisées (R17), publication CLI sans build core isolé.
 - **Mission longue : phases 2-9 (Analysis canonique, registre de capacités, Findings engine, Simple/Studio, orchestrateur IA, remédiation, UI, sécurité) — à planifier par lots de sessions.**
+
+## 2026-11-26 (suite) — FAIL et CLEAN deviennent des modules, contrats inchangés
+
+- **Déplacement** : `packages/modules/fail` (`src/checks.ts`, `failFindings`) et `packages/modules/clean` (`cleanFindings`) portent le code et les tests des deux familles HTTP. Aucun des deux ne dépend de `@proofcore/core` : `core` dépend d'eux, donc le build topologique reste acyclique (niveau 1 modules, niveau 2 core).
+- **Contrat préservé** : `scanPage` / `auditSite` / `@proofcore/core` exportent exactement les mêmes symboles ; identifiants de constats et ordre identiques (`http_status` toujours ajouté en tête par `scanPage`). Les lectures partagées avec WORLD (langue déclarée, champs de formulaire) restent dans `analyse()`.
+- **Preuves** : 16 nouveaux tests modules (9 FAIL, 7 CLEAN), 21 tests `page-scan` verts, suite complète 92 fichiers / 974 tests, `pnpm typecheck` et `pnpm build` verts, `biome check` 0 erreur.
+- **Reste** : `site-audit.ts` (crawl + score) reste dans `core` ; le registre des contrôles (`controls.ts`) reste partagé par les cinq modules, par conception.
+
+## 2026-11-26 (suite) — rotation du jeton courant au changement de mot de passe
+
+- **Trou fermé** : `POST /api/account/password` révoquait les autres sessions mais laissait vivre le jeton qui avait fait la demande. Un cookie volé survivait donc à l'action censée l'expulser.
+- **Correctif** : `AppStore.rotateSession` remplace `token_hash` et `expires_at` de la session courante ; la route émet un nouveau cookie `ps_sess_…` et renvoie `rotatedSession: true`. La session garde son identifiant, son `created_at` et son contexte (user-agent, IP).
+- **Preuves** : le test de changement de mot de passe vérifie que l'ancien cookie ne rend plus de session et que le nouveau en rend une ; un test séparé prouve que deux connexions émettent deux jetons distincts et restent valides en parallèle. `apps/api/test/account-selfservice.test.ts` : 7/7, `pnpm typecheck` vert.
+
+## 2026-11-26 (suite) — TTL glissant, deux outils IA, parcours navigateur
+
+- **TTL glissant plafonné** : une session utilisée gagne 7 jours, sans jamais dépasser 30 jours depuis sa création (`rolledSessionExpiry`). Le cookie porte le plafond absolu ; le serveur expire après 7 jours d'inactivité. Preuve : `apps/api/test/session-ttl.test.ts` (4 cas, dont le plafond à 29 jours).
+- **Outils IA** : `finding_details` (lecture) renvoie le constat complet, le contrôle du registre et la remédiation liée ; `verify_remediation` (écriture) réutilise `verifyRemediationWithAnalysis`, extrait de la route, et refuse sans `confirm`. Preuve : boucle d'outils réelle dans `apps/api/test/ai.test.ts` avec upstream simulé ; catalogue classé (28 outils).
+- **Navigateur** : `tests/e2e/session-rotation.spec.ts` change le mot de passe depuis `/app/settings`, vérifie que le cookie `ps_session` change, puis recharge et reste authentifié.
+- **Suite** : 93 fichiers, 980 tests, lint 0 erreur (5 avertissements), typecheck et build verts.

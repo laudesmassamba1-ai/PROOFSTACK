@@ -1,0 +1,24 @@
+{
+  "name": "@proofcore/module-fail",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MPL-2.0",
+  "description": "FAIL — the security posture a page exposes over HTTP: TLS, HSTS, CSP, frame and referrer policy, cookie flags, mixed content, leaked secrets and version banners. Passive checks only; no intrusion test.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

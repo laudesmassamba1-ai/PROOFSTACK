@@ -20,5 +20,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@proofcore/module-clean": "workspace:*",
+    "@proofcore/module-fail": "workspace:*"
   }
 }

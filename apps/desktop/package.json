@@ -28,5 +28,5 @@
     "electron": "31.7.7",
     "electron-builder": "25.1.8"
   },
-  "homepage": "https://proofcore-iota.vercel.app"
+  "homepage": "https://proofstack-iota.vercel.app"
 }

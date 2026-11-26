@@ -8,7 +8,6 @@ import {
   type RemediationStatus,
   type RemediationStep,
   seedRemediation,
-  verificationOutcome,
 } from "@proofcore/core";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -17,6 +16,7 @@ import { HttpError } from "../http/errors.js";
 import { readBody, requireWorkspace } from "../http/guards.js";
 import { pageBody, readPage } from "../http/pagination.js";
 import type { AppEnv, Services } from "../http/services.js";
+import { verifyRemediationWithAnalysis } from "../remediation-verify.js";
 import type { RemediationRecord } from "../store/app-store.js";
 
 /**
@@ -271,53 +271,14 @@ export function remediationRoutes(services: Services) {
     }
     const current = await services.store.getRemediation(workspace.id, c.req.param("remediationId"));
     if (!current) throw new HttpError(404, "remediation_not_found", "Remediation not found.");
-    if (current.analysisId === body.analysisId) {
-      throw new HttpError(
-        400,
-        "verification_requires_new_analysis",
-        "The analysis that produced the finding cannot verify it."
-      );
-    }
-    const analysis = await services.store.getAnalysis(workspace.id, body.analysisId);
-    if (!analysis) {
-      throw new HttpError(404, "analysis_not_found", "Verification analysis not found.");
-    }
-    const loaded = await findingsForAnalysis(services, analysis);
-    const finding = loaded.findings.find((item) => item.key === current.findingKey);
-    const verdict = verificationOutcome(finding);
-    const now = services.clock().toISOString();
-    const nextStatus =
-      verdict.outcome === "verified"
-        ? "verified"
-        : verdict.outcome === "still_failing"
-          ? "failed"
-          : current.status;
-    const updated = await services.store.updateRemediation({
+    const verdict = await verifyRemediationWithAnalysis({
+      services,
       workspaceId: workspace.id,
-      id: current.id,
-      patch: {
-        status: nextStatus,
-        verificationAnalysisId: body.analysisId,
-        verificationOutcome: verdict.outcome,
-        ...(verdict.outcome === "verified" ? { verifiedAt: now } : {}),
-      },
-      expected: [current.status],
+      remediationId: current.id,
+      analysisId: body.analysisId,
     });
-    if (!updated) {
-      throw new HttpError(
-        409,
-        "remediation_status_conflict",
-        "The remediation changed while verifying."
-      );
-    }
-    if (verdict.outcome === "inconclusive") {
-      throw new HttpError(409, "verification_inconclusive", verdict.reason, {
-        remediationId: updated.id,
-        verificationOutcome: verdict.outcome,
-      });
-    }
     return c.json({
-      remediation: remediationDto(updated),
+      remediation: remediationDto(verdict.remediation),
       outcome: verdict.outcome,
       reason: verdict.reason,
     });

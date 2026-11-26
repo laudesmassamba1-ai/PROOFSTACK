@@ -1,7 +1,9 @@
 import {
+  type ConfigValidationIssue,
   exitConfigSchema,
   flowConfigSchema,
   type ModuleId,
+  type ProofCoreConfig,
   proofcoreConfigSchema,
   worldConfigSchema,
 } from "@proofcore/contracts";
@@ -18,7 +20,7 @@ import {
   HttpProductUnderTest,
   PROFILES,
 } from "@proofcore/module-world";
-import type { z } from "zod";
+import { z } from "zod";
 import { HttpError } from "./http/errors.js";
 import type { Services } from "./http/services.js";
 import {
@@ -331,16 +333,33 @@ const PATCH_SCHEMAS: Partial<Record<CopilotModule, z.ZodType>> = {
   exit: exitConfigSchema.partial().strict(),
 };
 
-export async function configureModule(
+export type ModuleConfigurationCheck =
+  | {
+      ok: true;
+      project: ProjectRecord;
+      candidate: ProofCoreConfig;
+      config: unknown;
+      issues: ConfigValidationIssue[];
+      blocking: ConfigValidationIssue[];
+      runHere: string;
+    }
+  | { ok: false; error: string; issues?: unknown };
+
+/**
+ * What a save would accept, without saving it.
+ *
+ * `module_configure` and its read-only twin run this one function, so the assistant
+ * cannot get a green light here and a refusal there: same patch schema, same merge with
+ * the active configuration, same `validateConfig` blockers. The active configuration is
+ * still validated when the patch is empty.
+ */
+export async function validateModuleSettings(
   services: Services,
   workspaceId: string,
   projectId: string,
   module: CopilotModule,
   settings: unknown
-): Promise<
-  | { ok: true; config: unknown; issues: unknown; savedAt: string; runHere: string }
-  | { ok: false; error: string; issues?: unknown }
-> {
+): Promise<ModuleConfigurationCheck> {
   const patchSchema = PATCH_SCHEMAS[module];
   if (!patchSchema) {
     return {
@@ -364,21 +383,39 @@ export async function configureModule(
   const stored = readStoredProjectConfig(project.moduleConfig);
   const before = buildProjectConfig(project, stored);
   const patch = parsed.data as Record<string, unknown>;
-  const merged = (() => {
-    if (module === "world") {
-      return worldConfigSchema.parse({ ...before.modules.world, ...patch });
-    }
-    if (module === "flow") {
-      return flowConfigSchema.parse({ ...before.modules.flow, ...patch });
-    }
-    return exitConfigSchema.parse({ ...before.modules.exit, ...patch });
-  })();
+  let merged: unknown;
+  try {
+    merged = (() => {
+      if (module === "world") {
+        return worldConfigSchema.parse({ ...before.modules.world, ...patch });
+      }
+      if (module === "flow") {
+        return flowConfigSchema.parse({ ...before.modules.flow, ...patch });
+      }
+      return exitConfigSchema.parse({ ...before.modules.exit, ...patch });
+    })();
+  } catch (error) {
+    return {
+      ok: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "The change conflicts with the active configuration.",
+      issues:
+        error instanceof z.ZodError
+          ? error.issues.map((issue) => ({
+              path: issue.path.join("."),
+              message: issue.message,
+            }))
+          : undefined,
+    };
+  }
 
   const modules = {
     ...before.modules,
-    [module]: merged,
+    [module]: merged as never,
   };
-  let candidate: ReturnType<typeof buildProjectConfig>;
+  let candidate: ProofCoreConfig;
   try {
     candidate = proofcoreConfigSchema.parse({
       ...before,
@@ -395,14 +432,39 @@ export async function configureModule(
   }
 
   const issues = projectConfigIssues(candidate);
-  const blocking = blockingIssues(issues);
-  if (blocking.length > 0) {
+  return {
+    ok: true,
+    project,
+    candidate,
+    config: safeModuleConfig(candidate, module),
+    issues,
+    // Copies: a tool result carries both lists and stableStringify refuses a shared
+    // issue object; `configureModule` only reads `blocking.length`.
+    blocking: blockingIssues(issues).map((issue) => ({ ...issue })),
+    runHere: runHint(module, project, candidate, true),
+  };
+}
+
+export async function configureModule(
+  services: Services,
+  workspaceId: string,
+  projectId: string,
+  module: CopilotModule,
+  settings: unknown
+): Promise<
+  | { ok: true; config: unknown; issues: unknown; savedAt: string; runHere: string }
+  | { ok: false; error: string; issues?: unknown }
+> {
+  const check = await validateModuleSettings(services, workspaceId, projectId, module, settings);
+  if (!check.ok) return check;
+  if (check.blocking.length > 0) {
     return {
       ok: false,
       error: "This configuration cannot be run automatically. Nothing was saved.",
-      issues: blocking,
+      issues: check.blocking,
     };
   }
+  const { project, candidate } = check;
 
   const savedAt = new Date(services.clock()).toISOString();
   const written = {
@@ -425,10 +487,10 @@ export async function configureModule(
 
   return {
     ok: true,
-    config: safeModuleConfig(candidate, module),
-    issues,
+    config: check.config,
+    issues: check.issues,
     savedAt,
-    runHere: runHint(module, project, candidate, true),
+    runHere: check.runHere,
   };
 }
 

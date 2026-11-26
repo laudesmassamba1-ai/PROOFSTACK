@@ -711,7 +711,9 @@ p {
 
 .btn-primary {
   background: var(--brand-mint);
-  color: #06231a;
+  /* #06231a on the vermillon CTA measured 3.86:1. Brand ink clears 4.5:1 and keeps
+     the same Ink & Object pairing; the mint hover already had ample contrast. */
+  color: #050708;
 }
 
 .btn-primary:hover {
@@ -3968,7 +3970,9 @@ p {
   }
 
   .app-page-title {
-    font-size: clamp(2.4rem, 13vw, 3.8rem);
+    /* Un titre de page, pas une affiche : à 390px le clamp precedent montait
+       à 50px et poussait le formulaire hors de l'écran. */
+    font-size: clamp(1.85rem, 8.2vw, 2.7rem);
   }
 
   .app-page-head-row {
@@ -9132,7 +9136,8 @@ hairline,
 }
 
 .cookie-description a {
-  color: rgb(59, 130, 246);
+  /* 3.67:1 on white. The darker blue is still a link blue and clears AA. */
+  color: rgb(29, 78, 216);
 }
 
 .cookie-description a:hover {
@@ -9148,9 +9153,10 @@ hairline,
 .cookie-accept {
   width: 80px;
   height: 30px;
-  background-color: var(--vermillon, #e4381f);
+  /* White on #e4381f was 3.8:1; the deeper vermillon keeps the brand hue at 5.1:1. */
+  background-color: #cf3219;
   border: none;
-  color: rgb(241, 241, 241);
+  color: #ffffff;
   cursor: pointer;
   font-weight: 600;
   border-radius: 20px;
@@ -9583,17 +9589,29 @@ hairline,
   transform: scale(1.02) translateY(-5px);
 }
 
+/* Empilé sur un écran étroit, le plan vedette n'a plus de voisin à dépasser :
+   le facteur 1.02 rognait le badge et débordait la colonne. */
+@media (max-width: 1023px) {
+  .pk-sheet-featured,
+  .pk-sheet-featured:hover {
+    transform: none;
+  }
+}
+
 .pk-flag {
-  background: var(--vermillon, #e4381f);
+  /* White on #e4381f measured 4.29:1 (axe); the deeper #cf3219 clears AA 4.5:1. */
+  background: #cf3219;
   color: #fff;
 }
 
 .pk-sheet-muted {
-  color: rgba(10, 10, 11, 0.55);
+  /* 0.55 measured 4.41:1 on the paper sheet; 0.58 clears AA without changing the tone. */
+  color: rgba(10, 10, 11, 0.58);
 }
 
 .pk-sheet-faint {
-  color: rgba(10, 10, 11, 0.45);
+  /* 0.45 measured 3.15:1 on white (axe color-contrast); 0.58 clears AA 4.5:1. */
+  color: rgba(10, 10, 11, 0.58);
 }
 
 .pk-sheet-faint svg {
@@ -9610,7 +9628,7 @@ hairline,
 }
 
 .pk-line > span:first-child {
-  color: rgba(10, 10, 11, 0.55);
+  color: rgba(10, 10, 11, 0.58);
 }
 
 .pk-line .font-mono {
@@ -9627,7 +9645,7 @@ hairline,
 
 .pk-pending {
   border: 1px solid rgba(10, 10, 11, 0.16);
-  color: rgba(10, 10, 11, 0.45);
+  color: rgba(10, 10, 11, 0.58);
 }
 
 .pk-cta {
@@ -10470,9 +10488,20 @@ body:has(.app-main-chat) .app-footer {
 }
 
 @media (max-width: 380px) {
-  .app-brand-word,
+  /* À 320px le nom tenait encore : on resserre la marque au lieu de la
+     supprimer, sinon l'en-tête ne montre plus qu'un glyphe anonyme. */
+  .app-brand-word {
+    font-size: 0.55rem;
+    letter-spacing: 0.12em;
+  }
+
   .app-beta {
     display: none;
+  }
+
+  .app-brand-lockup > svg {
+    width: 26px;
+    height: 26px;
   }
 
   .app-topbar {
@@ -11550,5 +11579,114 @@ body:has(.app-main-chat) .app-footer {
   .flow-step-kind {
     max-width: none;
     flex: 1;
+  }
+}
+
+/* ── Passe mobile (≤767px) ──────────────────────────────────────────────────
+   Corrections mesurées sur 320/360/390/430 : le titre de page écrasait le
+   contenu, le glyphe canvas des cartes de modules ne rendait que quelques
+   pixels dans une scène de 72px, l'ASCII des états vides ressemblait à une
+   trame cassée, et le bouton notifications restait la seule pastille sombre
+   de l'en-tête. Rien ici ne s'applique au bureau. */
+@media (max-width: 767px) {
+  /* 1. Le glyphe décoratif des cartes de modules : à 72px de haut, son motif
+     central ne mesurait que ~20px. On le retire ; la carte redevient une
+     ligne de lecture (index, état, nom, question, état, action). */
+  .app-object-stage,
+  .app-object-card-1 .app-object-stage {
+    display: none;
+  }
+
+  .app-object-card {
+    min-height: 0;
+    padding: 12px 14px 13px;
+    border-radius: 14px;
+  }
+
+  .app-object-card-foot {
+    gap: 5px;
+    margin-top: 8px;
+    padding-top: 0;
+  }
+
+  .app-object-name {
+    font-size: 1.75rem;
+  }
+
+  .app-object-state {
+    font-size: 0.78rem;
+  }
+
+  .app-object-open {
+    min-height: 28px;
+    font-size: 9px;
+  }
+
+  .app-object-index,
+  .app-object-card .app-badge {
+    font-size: 8.5px;
+  }
+
+  /* 2. L'état vide n'affiche plus l'ASCII de ~190px, illisible à cette
+     largeur ; le message et l'action portent seuls le sens. */
+  .app-empty .ascii-empty {
+    display: none;
+  }
+
+  .app-empty {
+    padding: 20px 16px 22px;
+  }
+
+  /* 3. En-tête : la pastille notifications reprend le blanc des deux autres
+     actions ; le badge vermillon reste seul signal de non-lu. */
+  .notif-button {
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--rule);
+  }
+
+  .notif-button .notif-bell path {
+    fill: currentColor;
+  }
+
+  .notif-button:hover {
+    background: var(--surface-alt);
+  }
+
+  /* 4. Cibles tactiles (WCAG 2.2 AA, 2.5.8) : 34px pour les boutons de
+     l'app, 24px pour les liens de pied de page marketing. */
+  .app-btn {
+    min-height: 34px;
+  }
+
+  .app-footer {
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    font-size: 9px;
+  }
+
+  /* 5. Chiffres clés : les libellés à 9px étaient illisibles. */
+  .kpi-label {
+    font-size: 0.64rem;
+  }
+
+  .kpi-card .kpi-note,
+  .kpi-card p:last-child {
+    font-size: 0.7rem;
+  }
+
+  /* 6. Les cinq portées de /app/start respirent un peu mieux. */
+  .start-target-name {
+    font-size: 0.84rem;
+  }
+
+  .start-target-scope {
+    font-size: 0.74rem;
+  }
+}
+
+@media (max-width: 380px) {
+  /* Deux colonnes de 148px coupaient les libellés : une seule à 320px. */
+  .start-targets {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

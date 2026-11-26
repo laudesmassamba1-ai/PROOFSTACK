@@ -583,6 +583,20 @@ export class AppStore {
     return result.changes;
   }
 
+  /**
+   * Replace a session's token in place.
+   *
+   * Rotation keeps the session's identity and its dates but retires the secret. A token
+   * captured before a password change therefore stops working, while the browser that
+   * made the change stays signed in on the new one.
+   */
+  async rotateSession(sessionId: string, tokenHash: string, expiresAt: string): Promise<void> {
+    await this.db
+      .prepare("UPDATE sessions SET token_hash = ?, expires_at = ? WHERE id = ?")
+      .bind(tokenHash, expiresAt, sessionId)
+      .run();
+  }
+
   async markEmailVerified(userId: string): Promise<void> {
     await this.db
       .prepare("UPDATE users SET email_verified_at = ? WHERE id = ? AND email_verified_at IS NULL")
@@ -840,6 +854,14 @@ export class AppStore {
     await this.db
       .prepare("UPDATE sessions SET last_seen_at = ? WHERE id = ?")
       .bind(iso(this.clock()), id)
+      .run();
+  }
+
+  /** Mark a session as used and move its idle deadline, in one write. */
+  async extendSession(id: string, expiresAt: string): Promise<void> {
+    await this.db
+      .prepare("UPDATE sessions SET last_seen_at = ?, expires_at = ? WHERE id = ?")
+      .bind(iso(this.clock()), expiresAt, id)
       .run();
   }
 
@@ -1484,7 +1506,10 @@ export class AppStore {
       .run();
     const created = await this.getFlowScenario(input.workspaceId, input.id);
     if (!created) {
-      throw new ProofCoreError({ message: "flow scenario disappeared after insert", category: "INTERNAL" });
+      throw new ProofCoreError({
+        message: "flow scenario disappeared after insert",
+        category: "INTERNAL",
+      });
     }
     return created;
   }
@@ -1527,7 +1552,14 @@ export class AppStore {
       .prepare(
         "UPDATE flow_scenarios SET name = ?, target = ?, steps = ?, updated_at = ? WHERE workspace_id = ? AND id = ?"
       )
-      .bind(input.name, input.target, json(input.steps), iso(input.now), input.workspaceId, input.id)
+      .bind(
+        input.name,
+        input.target,
+        json(input.steps),
+        iso(input.now),
+        input.workspaceId,
+        input.id
+      )
       .run();
     if (result.changes === 0) return null;
     return this.getFlowScenario(input.workspaceId, input.id);

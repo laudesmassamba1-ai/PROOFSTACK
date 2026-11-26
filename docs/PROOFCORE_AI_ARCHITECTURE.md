@@ -42,17 +42,19 @@ mêmes filtres `workspace_id` que l'API, et les conversations sont liées à
 
 ## 4. Outils (19)
 
-| Outil                                                                                 | Nature                                                  |
-| ------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| `workspace_overview`, `list_projects`, `recent_runs`, `recent_findings`, `get_report` | lecture du workspace                                    |
-| `module_status`, `module_config`                                                      | état, configuration active et vocabulaire des 5 modules |
-| `project_code`                                                                        | lecture des fichiers importés (sourceId / path)         |
-| `fetch_web`, `browse_url`, `probe_url`                                                | lecture réseau avec garde d'URL                         |
-| `fail_scan`, `clean_audit`, `site_audit`                                              | contrôles HTTP mesurés                                  |
-| `read_repo`                                                                           | lecture d'un dépôt public avec garde                    |
-| `module_configure`                                                                    | écriture validée : les cinq familles (WORLD, FLOW, EXIT, FAIL, CLEAN) |
-| `module_run`, `analyze_run`                                                           | lancement réel + diagnostic d'un run stocké             |
-| `remember`                                                                            | écriture : un fait de mémoire borné                     |
+| Outil                                                                                 | Nature                                                                            |
+| ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `workspace_overview`, `list_projects`, `recent_runs`, `recent_findings`, `get_report` | lecture du workspace                                                              |
+| `module_status`, `module_config`                                                      | état, configuration active et vocabulaire des 5 modules                           |
+| `project_code`                                                                        | lecture des fichiers importés (sourceId / path)                                   |
+| `fetch_web`, `browse_url`, `probe_url`                                                | lecture réseau avec garde d'URL                                                   |
+| `fail_scan`, `clean_audit`, `site_audit`                                              | contrôles HTTP mesurés                                                            |
+| `read_repo`                                                                           | lecture d'un dépôt public avec garde                                              |
+| `module_configure`                                                                    | écriture validée : les cinq familles (WORLD, FLOW, EXIT, FAIL, CLEAN)             |
+| `module_run`, `analyze_run`                                                           | lancement réel + diagnostic d'un run stocké                                       |
+| `remember`                                                                            | écriture : un fait de mémoire borné                                               |
+| `finding_details`                                                                     | lecture : un constat complet (preuve, contrôle, remédiation liée)                 |
+| `verify_remediation`                                                                  | écriture : vérifie un correctif par une analyse postérieure, refuse l'inconclusif |
 
 Contrôles :
 

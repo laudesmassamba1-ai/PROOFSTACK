@@ -30,6 +30,14 @@ export const SESSION_COOKIE = "ps_session";
 // forcing a working session to re-authenticate every day; password change and reset
 // revoke every session immediately.
 export const SESSION_TTL_DAYS = 7;
+/**
+ * Hard ceiling from creation, however active the session is.
+ *
+ * A sliding session that can be renewed forever is a credential with no end: a stolen
+ * cookie stays useful as long as the attacker keeps using it. Seven days of inactivity
+ * is the idle limit, thirty days from creation is the absolute one.
+ */
+export const SESSION_ABSOLUTE_TTL_DAYS = 30;
 
 function subtle() {
   const crypto = globalThis.crypto;
@@ -124,6 +132,18 @@ export function sessionExpiry(now = new Date()): string {
   return new Date(now.getTime() + SESSION_TTL_DAYS * 86_400_000).toISOString();
 }
 
+/**
+ * The expiry a used session earns: seven more days, never past the absolute cap.
+ *
+ * Pure so the rule can be tested without a database: `createdAt` and `now` decide, and a
+ * session created 29 days ago gets one more day, not seven.
+ */
+export function rolledSessionExpiry(createdAt: string, now = new Date()): string {
+  const sliding = now.getTime() + SESSION_TTL_DAYS * 86_400_000;
+  const absolute = new Date(createdAt).getTime() + SESSION_ABSOLUTE_TTL_DAYS * 86_400_000;
+  return new Date(Math.min(sliding, absolute)).toISOString();
+}
+
 // ------------------------------------------------------------------- cookies
 
 export function readCookie(header: string | undefined, name: string): string | undefined {
@@ -144,7 +164,9 @@ export function serializeSessionCookie(
     "Path=/",
     "HttpOnly",
     "SameSite=Lax",
-    `Max-Age=${options.maxAgeSeconds ?? SESSION_TTL_DAYS * 86_400}`,
+    // The cookie lives as long as the absolute cap; the server still expires it after
+    // seven idle days, so a copied cookie is useless once the real user stops using it.
+    `Max-Age=${options.maxAgeSeconds ?? SESSION_ABSOLUTE_TTL_DAYS * 86_400}`,
   ];
   if (options.secure) parts.push("Secure");
   return parts.join("; ");

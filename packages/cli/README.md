@@ -58,7 +58,7 @@ proofcore ui --once --screen overview
 
 The console follows the language of its interface only where translated; module names,
 API states and report formats remain the technical identifiers. Sign-in uses
-`PROOFCORE_API_URL` (default `https://proofcore-iota.vercel.app`) or `--api`. For CI,
+`PROOFCORE_API_URL` (default `https://proofstack-iota.vercel.app`) or `--api`. For CI,
 set `PROOFCORE_SESSION_COOKIE` to the full cookie header
 `ps_session=<value>`; the bare session value is not enough.
 

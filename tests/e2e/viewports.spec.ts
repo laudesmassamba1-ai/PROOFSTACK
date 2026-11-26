@@ -67,9 +67,13 @@ test.beforeEach(async ({ page }) => {
  */
 async function settle(page: import("@playwright/test").Page): Promise<void> {
   await page
-    .waitForFunction(() => !/loading your workspace/i.test(document.body.innerText), undefined, {
-      timeout: 20_000,
-    })
+    .waitForFunction(
+      // innerText on purpose: only the text a person can see counts as "still loading".
+      // biome-ignore lint/performance/useDomNodeTextContent: visible text is what matters here
+      () => !/loading your workspace/i.test(document.body.innerText),
+      undefined,
+      { timeout: 20_000 }
+    )
     .catch(() => undefined);
   await page.evaluate(async () => {
     const step = Math.max(240, window.innerHeight * 0.75);

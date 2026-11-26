@@ -161,7 +161,7 @@ export function Nav() {
             type="button"
             onClick={() => setLocale(locale === "en" ? "fr" : "en")}
             className="flex items-center gap-1.5 rounded-full border border-white/12 px-2.5 py-1.5 text-[0.75rem] text-white/72 transition-colors hover:border-brand-mint/60 hover:text-white"
-            aria-label={t("nav.language")}
+            aria-label={`${t("nav.language")} — ${locale.toUpperCase()}`}
           >
             <Languages size={14} />
             {locale.toUpperCase()}

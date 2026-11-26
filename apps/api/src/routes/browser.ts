@@ -1,10 +1,10 @@
 import { ProofCoreError, shortId } from "@proofcore/core";
 import { Hono } from "hono";
 import { z } from "zod";
+import { executeBrowserScenario } from "../browser-scenario.js";
 import { clientAddress, HttpError, RateLimiter } from "../http/errors.js";
 import { readBody, requireWorkspace } from "../http/guards.js";
 import type { AppEnv, Services } from "../http/services.js";
-import { executeBrowserScenario } from "../browser-scenario.js";
 import { defaultScenario } from "../scenario.js";
 
 /**

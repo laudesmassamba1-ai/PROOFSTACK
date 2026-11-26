@@ -183,7 +183,7 @@ export function Auth({ mode }: { mode: Mode }) {
           <p className="-mt-1 text-right text-[0.8rem]">
             <Link
               to="/forgot-password"
-              className="text-white/56 underline-offset-2 hover:text-white hover:underline"
+              className="inline-block py-1 text-white/56 underline-offset-2 hover:text-white hover:underline"
             >
               {t("auth.forgot")}
             </Link>

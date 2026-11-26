@@ -29,31 +29,49 @@ export type OnboardingGoal = (typeof ONBOARDING_GOALS)[number];
 export const EXPERIENCE_LEVELS = ["beginner", "intermediate", "expert"] as const;
 export type ExperienceLevel = (typeof EXPERIENCE_LEVELS)[number];
 
-export const PROJECT_TYPE_LABELS: Record<ProjectType, { fr: string; en: string; hint: { fr: string; en: string } }> = {
+export const PROJECT_TYPE_LABELS: Record<
+  ProjectType,
+  { fr: string; en: string; hint: { fr: string; en: string } }
+> = {
   site: {
     fr: "Site vitrine ou institutionnel",
     en: "Marketing or institutional site",
-    hint: { fr: "Des pages publiques à lire, indexer et protéger.", en: "Public pages to read, index and protect." },
+    hint: {
+      fr: "Des pages publiques à lire, indexer et protéger.",
+      en: "Public pages to read, index and protect.",
+    },
   },
   shop: {
     fr: "Boutique en ligne",
     en: "Online shop",
-    hint: { fr: "Un parcours d'achat qui doit aboutir.", en: "A purchase journey that has to complete." },
+    hint: {
+      fr: "Un parcours d'achat qui doit aboutir.",
+      en: "A purchase journey that has to complete.",
+    },
   },
   saas: {
     fr: "Application SaaS",
     en: "SaaS application",
-    hint: { fr: "Des écrans derrière une connexion, des parcours à valider.", en: "Screens behind a login, journeys to validate." },
+    hint: {
+      fr: "Des écrans derrière une connexion, des parcours à valider.",
+      en: "Screens behind a login, journeys to validate.",
+    },
   },
   api: {
     fr: "API",
     en: "API",
-    hint: { fr: "Pas de page à scanner : des contrats et des réponses à contrôler.", en: "No page to scan: contracts and responses to check." },
+    hint: {
+      fr: "Pas de page à scanner : des contrats et des réponses à contrôler.",
+      en: "No page to scan: contracts and responses to check.",
+    },
   },
   local: {
     fr: "Projet local",
     en: "Local project",
-    hint: { fr: "Du code et des fichiers sur ta machine, pas un site public.", en: "Code and files on your machine, not a public site." },
+    hint: {
+      fr: "Du code et des fichiers sur ta machine, pas un site public.",
+      en: "Code and files on your machine, not a public site.",
+    },
   },
 };
 

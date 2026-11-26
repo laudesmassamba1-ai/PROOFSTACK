@@ -5,8 +5,9 @@ uses the Ink & Object direction; this file records what is true and what remains
 
 ## Implemented and checked
 
-- One engine, three fixture modules (WORLD, FLOW, EXIT) and two HTTP audit modules
-  (FAIL, CLEAN) that share the run, finding, report, insight and webhook pipeline.
+- One engine and five module packages: WORLD, FLOW and EXIT as fixture-driven test
+  modules, FAIL and CLEAN as HTTP audit modules (`packages/modules/{fail,clean}`), sharing
+  the run, finding, report, insight and webhook pipeline.
 - CLI commands: init, doctor, validate, test, world/flow/exit, modules, report,
   audit (fail|clean), sync, login/logout (session or device flow), ai, mcp, tools.
   Core modules and the module board run locally; they never open the website.
@@ -44,15 +45,15 @@ uses the Ink & Object direction; this file records what is true and what remains
 ## Verification
 
 - `pnpm typecheck`: passes across the workspace.
-- `pnpm test`: 811 tests pass (69 files), measured 25 November 2026.
-- `pnpm test:e2e`: 36 tests pass, 2 skipped (desktop Chrome + Pixel 7), including the
-  HttpOnly session surviving a reload, the mobile sign-up journey and no horizontal
-  overflow on any dashboard page.
+- `pnpm test`: 980 tests pass (93 files), measured 26 November 2026.
+- `pnpm test:e2e`: the mobile sign-up journey, no horizontal overflow on any dashboard
+  page, and the legacy-URL redirects (`/legal`, `/app/account`, `/app/local-agent`) were
+  rerun green on 26 November 2026 (desktop Chrome + Pixel 7).
 - `pnpm --filter @proofcore/web build`: passes; route-level chunks replace the previous
   single 554 kB bundle.
-- Visual QA: 42 route/viewport combinations from 1920×1080 to 375×812, zero horizontal
-  overflow; screenshots generated with no console/page errors.
-- `pnpm lint`: clean across 493 files (0 errors, 0 warnings).
+- Visual QA: 78 route/viewport combinations across 13 widths from 320×700 to 2560×1440,
+  zero horizontal overflow and zero console errors (26 November 2026).
+- `pnpm lint`: 0 errors across 550 files (5 non-blocking warnings).
 - Packaged desktop smoke (Linux): the built app starts its packaged sidecar, serves `resources/web`, redirects to `/app`, shows the site title, reads the account AI model without asking for a second provider setup, and re-reads it before each turn so a profile connected later takes effect without a restart. A Playwright Electron run also opens the Engine panel, enters the integrated IA route, receives a streamed model answer, and verifies that a simulated 503 shows the offline screen with no raw status code and still opens the local agent.
 
 ## Known gaps

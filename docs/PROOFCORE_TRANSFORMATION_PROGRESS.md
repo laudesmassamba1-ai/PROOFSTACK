@@ -117,10 +117,10 @@ Les statuts utilisés : **FAIT**, **PARTIEL**, **BLOQUÉ**, **NON COMMENCÉ**.
 | Compte/session/facturation | FAIT             | E2E `journey.spec.ts`                                        |
 | IA contextuelle            | PARTIEL          | tests API avec fournisseur simulé                            |
 | IA ↔ modules               | FAIT (hors prod) | config → run → historique → analyse, 5 tests                 |
-| WORLD/FLOW/EXIT            | PARTIEL          | tests modules ; parcours navigateur CLI non rejoué           |
+| WORLD/FLOW/EXIT/FAIL/CLEAN | PARTIEL          | tests des cinq familles ; parcours navigateur CLI non rejoué |
 | FAIL/CLEAN                 | FAIT             | tests page-scan + audits                                     |
 | Sécurité multi-comptes     | FAIT             | `tenant-isolation.test.ts`                                   |
-| Responsive                 | PARTIEL          | 2 viewports                                                  |
+| Responsive                 | FAIT             | 13 viewports (320→2560), 78 combinaisons, 0 débordement      |
 | Production readiness       | BLOQUÉ           | sauvegarde distante/Neon non exercées + credentials externes |
 
 ## Ce qui change le verdict

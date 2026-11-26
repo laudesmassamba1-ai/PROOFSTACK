@@ -26,6 +26,9 @@ export const AI_TOOL_PERMISSIONS: Record<string, PermissionClass> = {
   compare_analyses: "read",
   validate_scenario: "read",
   list_remediations: "read",
+  finding_details: "read",
+  suggest_analysis_profile: "read",
+  validate_configuration: "read",
 
   // Analysis: spends time, quota or someone else's network. Capped per turn.
   analyze_run: "analysis",
@@ -41,6 +44,7 @@ export const AI_TOOL_PERMISSIONS: Record<string, PermissionClass> = {
   module_configure: "write",
   remember: "write",
   open_remediation: "write",
+  verify_remediation: "write",
 };
 
 export function permissionOf(name: string): PermissionClass {

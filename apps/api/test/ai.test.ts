@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
+import { findingKey } from "@proofcore/core";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { migrate } from "../src/db/d1.js";
@@ -25,7 +26,7 @@ const ENV = {
 interface Harness {
   services: Services;
   request: (path: string, init?: RequestInit & { cookie?: string }) => Promise<Response>;
-  signUp: (email: string) => Promise<{ cookie: string; workspaceId: string }>;
+  signUp: (email: string) => Promise<{ cookie: string; workspaceId: string; userId: string }>;
 }
 
 async function bootstrap(env: Record<string, string | undefined> = ENV): Promise<Harness> {
@@ -45,8 +46,11 @@ async function bootstrap(env: Record<string, string | undefined> = ENV): Promise
     });
     expect(response.status).toBe(201);
     const cookie = (response.headers.get("set-cookie") ?? "").split(";")[0];
-    const body = (await response.json()) as { workspace: { id: string } };
-    return { cookie, workspaceId: body.workspace.id };
+    const body = (await response.json()) as {
+      workspace: { id: string };
+      user: { id: string };
+    };
+    return { cookie, workspaceId: body.workspace.id, userId: body.user.id };
   };
   return { services: built.services, request, signUp };
 }
@@ -647,6 +651,126 @@ describe("ai chat", () => {
     expect(((await list.json()) as { scenarios: unknown[] }).scenarios).toHaveLength(0);
   });
 
+  it("suggests a registered profile and preflights a config patch without saving it", async () => {
+    const { request, signUp } = harness;
+    const { cookie, workspaceId } = await signUp("ai-preflight@example.com");
+    const created = await request("/api/v1/projects", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({
+        workspaceId,
+        name: "Preflight",
+        baseUrl: "https://shop.example",
+        environment: "staging",
+      }),
+    });
+    expect(created.status).toBe(201);
+    const projectId = ((await created.json()) as { project: { id: string } }).project.id;
+
+    await request("/api/v1/ai/profile", {
+      method: "PUT",
+      cookie,
+      body: JSON.stringify({
+        providerId: "custom",
+        baseUrl: upstreamBase,
+        model: "test-model",
+        apiKey: "sk-preflight-key-123",
+      }),
+    });
+
+    upstreamState.respond = (attempt, body) => {
+      if (attempt === 1) {
+        return {
+          status: 200,
+          body: {
+            choices: [
+              {
+                message: {
+                  role: "assistant",
+                  content: null,
+                  tool_calls: [
+                    {
+                      id: "call_suggest",
+                      type: "function",
+                      function: {
+                        name: "suggest_analysis_profile",
+                        arguments: JSON.stringify({ goal: "Un client peut-il payer ?" }),
+                      },
+                    },
+                    {
+                      id: "call_validate",
+                      type: "function",
+                      function: {
+                        name: "validate_configuration",
+                        arguments: JSON.stringify({
+                          projectId,
+                          module: "flow",
+                          settings: { paymentMode: "live_charge" },
+                        }),
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        };
+      }
+      const parsed = body as { messages: { role: string; content: string }[] };
+      const results = parsed.messages
+        .filter((message) => message.role === "tool")
+        .map((message) => message.content);
+      const suggestion = results.find((content) => content.includes('"recommendation"'));
+      const validation = results.find((content) => content.includes('"blocking"'));
+      if (!suggestion?.includes('"conversion"') || !suggestion.includes('"payer"')) {
+        return { status: 500, body: {} };
+      }
+      if (!validation?.includes("live_charge") || !validation.includes('"saved": false')) {
+        return { status: 500, body: {} };
+      }
+      return {
+        status: 200,
+        body: {
+          choices: [
+            {
+              message: {
+                role: "assistant",
+                content: "Le profil conversion correspond, mais ce réglage live_charge est refusé.",
+              },
+            },
+          ],
+        },
+      };
+    };
+
+    const chat = await request("/api/v1/ai/chat", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({
+        workspaceId,
+        message: "Quel profil pour vérifier le paiement, et cette config passe-t-elle ?",
+        effort: "quick",
+      }),
+    });
+    expect(chat.status, await chat.clone().text()).toBe(200);
+    const body = (await chat.json()) as { trace: { tool: string; summary: string }[] };
+    expect(body.trace.map((entry) => entry.tool)).toEqual([
+      "suggest_analysis_profile",
+      "validate_configuration",
+    ]);
+    expect(body.trace[0]?.summary).toContain("conversion");
+    expect(body.trace[1]?.summary).toContain("bloqué");
+
+    // Preflight is a read: the project still has no saved configuration.
+    const config = await request(
+      `/api/v1/projects/${projectId}/config?workspaceId=${workspaceId}`,
+      { cookie }
+    );
+    const stored = (await config.json()) as { source: string; savedAt: string | null };
+    expect(stored.source).toBe("defaults");
+    expect(stored.savedAt).toBeNull();
+  });
+
   it("maps an upstream 401 to ai_invalid_key and never invents an answer", async () => {
     const { request, signUp } = harness;
     const { cookie, workspaceId } = await signUp("ai-401@example.com");
@@ -676,6 +800,148 @@ describe("ai chat", () => {
     const { cookie } = await signUp("ai-404@example.com");
     const response = await request("/api/v1/ai/conversations/aic_missing", { cookie });
     expect(response.status).toBe(404);
+  });
+
+  it("serves one finding in full and refuses to verify without confirmation", async () => {
+    const { request, signUp, services } = harness;
+    const { cookie, workspaceId, userId } = await signUp("ai-finding@example.com");
+    await request("/api/v1/ai/profile", {
+      method: "PUT",
+      cookie,
+      body: JSON.stringify({
+        providerId: "custom",
+        baseUrl: upstreamBase,
+        model: "test-model",
+        apiKey: "sk-finding-key-789",
+      }),
+    });
+
+    const now = new Date().toISOString();
+    const analysis = await services.store.createAnalysis({
+      id: "ana_finding_test",
+      workspaceId,
+      projectId: null,
+      createdBy: userId,
+      source: "WEB",
+      targetType: "PAGE",
+      target: "https://shop.example/",
+      scope: "PAGE",
+      requestedModules: ["fail"],
+      applicableModules: ["fail"],
+      engine: "scan",
+      engineVersion: "1",
+      environment: "server",
+      status: "completed",
+      coverage: {
+        requestedModules: ["fail"],
+        applicableModules: ["fail"],
+        measuredModules: ["fail"],
+        skipped: [],
+      },
+      startedAt: now,
+      correlationId: "corr_finding_test",
+    });
+    await services.store.updateAnalysis({
+      workspaceId,
+      id: analysis.id,
+      patch: {
+        status: "completed",
+        result: {
+          findings: [
+            {
+              module: "fail",
+              id: "hsts",
+              status: "FAIL",
+              observed: "absent",
+              why: "HSTS prevents a protocol downgrade.",
+            },
+          ],
+        },
+      },
+    });
+    const key = findingKey("fail", "hsts", "https://shop.example/");
+
+    upstreamState.respond = (attempt, body) => {
+      const parsed = body as { messages: { role: string; content: string }[] };
+      if (attempt === 1) {
+        return {
+          status: 200,
+          body: {
+            choices: [
+              {
+                message: {
+                  role: "assistant",
+                  content: null,
+                  tool_calls: [
+                    {
+                      id: "call_finding",
+                      type: "function",
+                      function: {
+                        name: "finding_details",
+                        arguments: JSON.stringify({ analysisId: analysis.id, findingKey: key }),
+                      },
+                    },
+                    {
+                      id: "call_verify",
+                      type: "function",
+                      function: {
+                        name: "verify_remediation",
+                        arguments: JSON.stringify({
+                          remediationId: "rem_missing",
+                          analysisId: analysis.id,
+                        }),
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        };
+      }
+      const toolMessages = parsed.messages.filter((message) => message.role === "tool");
+      const detail = toolMessages.find((message) => message.content.includes("hsts"));
+      const refusal = toolMessages.find((message) =>
+        message.content.includes("confirm must be true")
+      );
+      if (
+        !detail?.content.includes('"hsts"') ||
+        !detail.content.includes('"risk"') ||
+        !detail.content.includes("Strict-Transport-Security") ||
+        !refusal
+      ) {
+        return { status: 500, body: {} };
+      }
+      return {
+        status: 200,
+        body: {
+          choices: [
+            {
+              message: {
+                role: "assistant",
+                content: "HSTS is missing; applying the fix is yours to approve.",
+              },
+            },
+          ],
+        },
+      };
+    };
+
+    const chat = await request("/api/v1/ai/chat", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({
+        workspaceId,
+        message: "Explain the missing HSTS finding",
+        effort: "quick",
+      }),
+    });
+    expect(chat.status, await chat.clone().text()).toBe(200);
+    const body = (await chat.json()) as { trace: { tool: string }[] };
+    expect(body.trace.map((entry) => entry.tool)).toEqual([
+      "finding_details",
+      "verify_remediation",
+    ]);
   });
 
   it("reads uploaded project code through a tenant-scoped tool", async () => {
