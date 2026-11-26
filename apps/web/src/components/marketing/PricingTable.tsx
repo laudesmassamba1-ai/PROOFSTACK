@@ -289,7 +289,7 @@ function UsageCalculator({ period, currency }: { period: Period; currency: strin
       <span className="pk-calc-glow" aria-hidden />
       <div className="relative z-10 grid gap-10 md:grid-cols-2 md:items-center">
         <div>
-          <p className="app-eyebrow">{t("pricing.calc.eyebrow")}</p>
+          <p className="pk-calc-eyebrow">{t("pricing.calc.eyebrow")}</p>
           <div className="mt-3 flex items-baseline gap-3">
             {recommended && price ? (
               <span className="pk-calc-price tabular-nums">

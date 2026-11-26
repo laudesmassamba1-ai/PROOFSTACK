@@ -9771,7 +9771,8 @@ hairline,
   position: absolute;
   inset: 26px 0 auto;
   font-size: 0.62rem;
-  color: rgba(255, 255, 255, 0.38);
+  /* 0.38 white on the dark calculator measured 3.51:1 (axe, WCAG 2.2 AA). */
+  color: rgba(255, 255, 255, 0.62);
 }
 
 /* chaque graduation est posée à sa valeur réelle sur l'échelle log */
@@ -11689,4 +11690,17 @@ body:has(.app-main-chat) .app-footer {
   .start-targets {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* The pricing calculator is a dark marketing surface inside the app shell. It must
+   not inherit the dashboard's light-theme eyebrow token: that produced a 2.61:1
+   contrast on #0b0c0e (axe, WCAG 2.2 AA). Its own token is fixed to the dark surface. */
+.pk-calc-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.13em;
+  line-height: 1.4;
+  text-transform: uppercase;
+  color: #b8b3a8;
 }
