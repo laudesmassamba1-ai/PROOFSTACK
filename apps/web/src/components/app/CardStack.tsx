@@ -894,6 +894,10 @@ export function Stack({
             className="card-stack-card"
             data-top={isTop ? "" : undefined}
             aria-hidden={isTop || expanded ? undefined : true}
+            // A hidden card still contains real links. `aria-hidden` alone leaves them
+            // in the tab order, which axe reports as aria-hidden-focus (WCAG 2.2 AA).
+            // `inert` removes the whole subtree from focus and pointer interaction.
+            inert={isTop || expanded ? undefined : true}
             style={{
               x: values.x,
               y: values.y,
