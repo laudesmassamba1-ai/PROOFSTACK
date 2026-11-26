@@ -23,7 +23,6 @@ import { notificationRoutes } from "./routes/notifications.js";
 import { onboardingRoutes } from "./routes/onboarding.js";
 import { projectIntelligenceRoutes } from "./routes/project-intelligence.js";
 import { releaseRoutes } from "./routes/releases.js";
-import { onboardingRoutes } from "./routes/onboarding.js";
 import { remediationRoutes } from "./routes/remediations.js";
 import { webhookRoutes } from "./routes/webhooks.js";
 import { workspaceRoutes } from "./routes/workspace.js";

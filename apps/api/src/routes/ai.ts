@@ -1,4 +1,15 @@
-import { auditSite, ProofCoreError, scanPage, shortId, stableStringify } from "@proofcore/core";
+import {
+  ANALYSIS_PROFILES,
+  auditSite,
+  CAPABILITIES,
+  CAPABILITY_VERSION,
+  ProofCoreError,
+  scanPage,
+  seedRemediation,
+  shortId,
+  stableStringify,
+  summarizeFindings,
+} from "@proofcore/core";
 import { type Context, Hono } from "hono";
 import { z } from "zod";
 import { decryptApiKey, encryptApiKey, hasEncryptionSecret, keyFingerprint } from "../ai-crypto.js";
@@ -8,7 +19,9 @@ import {
   PROVIDERS,
   type ProviderDefinition,
 } from "../ai-providers.js";
+import { AnalysisBudget, MAX_ANALYSIS_CALLS_PER_TURN, permissionOf } from "../ai-tool-policy.js";
 import { browsePage, describeBrowsedPage } from "../browser-render.js";
+import { findingsForAnalysis } from "../findings.js";
 import { quotaErrorFromDecision } from "../http/entitlement-http.js";
 import { clientAddress, HttpError } from "../http/errors.js";
 import { readBody, requireWorkspace } from "../http/guards.js";
@@ -787,6 +800,67 @@ const TOOLS: { name: string; description: string; parameters: Record<string, unk
       additionalProperties: false,
     },
   },
+  {
+    name: "capabilities",
+    description:
+      "The registry: what PROOFCORE can do on a PAGE, SITE, WORKFLOW, API, REPOSITORY, LOCAL environment or verification, plus the named analysis profiles and what each one covers. Call this before claiming a capability or a profile does not exist.",
+    parameters: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "list_analyses",
+    description:
+      "The workspace's analyses, newest first: id, project, target, type, status and coverage. An analysis is the canonical record; a run is one execution of it.",
+    parameters: {
+      type: "object",
+      properties: {
+        status: {
+          type: "string",
+          enum: ["queued", "running", "completed", "partial", "failed", "cancelled"],
+        },
+        limit: { type: "number", minimum: 1, maximum: 20 },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "analysis_findings",
+    description:
+      "The structured findings of one analysis, with severity, priority, cause and the seven-level explanation. Use it instead of reading a raw report when the question is about what is wrong and why.",
+    parameters: {
+      type: "object",
+      properties: {
+        analysisId: { type: "string" },
+        status: { type: "string" },
+        severity: { type: "string" },
+      },
+      required: ["analysisId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "list_remediations",
+    description:
+      "The workspace's remediations with their state and next step. A remediation is verified by a later analysis, never by a status change.",
+    parameters: {
+      type: "object",
+      properties: { status: { type: "string" }, priority: { type: "string" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "open_remediation",
+    description:
+      "Open a remediation for one finding of one analysis. The fix and verification text come from the control registry. Only useful when the user asked to track a fix.",
+    parameters: {
+      type: "object",
+      properties: {
+        analysisId: { type: "string" },
+        findingKey: { type: "string" },
+      },
+      required: ["analysisId", "findingKey"],
+      additionalProperties: false,
+    },
+  },
 ];
 
 function systemPrompt(
@@ -864,6 +938,25 @@ function systemPrompt(
 
 export function aiRoutes(services: Services): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
+
+  /**
+   * The tool catalogue, with the authority of each tool.
+   *
+   * The classes are part of the contract: a client can show them to the user before a
+   * run, and the tests pin that every advertised tool has been classified on purpose.
+   */
+  app.get("/tools", (c) =>
+    c.json({
+      classes: ["read", "analysis", "write", "sensitive"],
+      maxAnalysisCallsPerTurn: MAX_ANALYSIS_CALLS_PER_TURN,
+      tools: TOOLS.map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        permission: permissionOf(tool.name),
+        parameters: tool.parameters,
+      })),
+    })
+  );
 
   /**
    * The local agent's model calls.
@@ -1313,6 +1406,9 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
     }
 
     const trace: { tool: string; summary: string; view?: unknown }[] = [];
+    // The scan budget belongs to the turn, not the tool: a loop has to stop wherever it
+    // is, not after each tool independently allowed itself one more call.
+    const scanBudget = new AnalysisBudget();
     let finalContent = "";
     const deadline = Date.now() + 25_000;
     for (let turn = 0; turn < tuning.maxTurns; turn += 1) {
@@ -1336,6 +1432,30 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
 
       messages.push(result.historyEntry as never);
       for (const call of result.toolCalls) {
+        const permission = permissionOf(call.name);
+        if (permission === "sensitive") {
+          // Unclassified is not "probably fine": a tool nobody vouched for is refused.
+          trace.push({ tool: call.name, summary: "refusé (permission non classée)" });
+          messages.push({
+            role: "tool",
+            tool_call_id: call.id,
+            content: stableStringify({ error: "tool_permission_denied", tool: call.name }),
+          });
+          continue;
+        }
+        if (permission === "analysis" && !scanBudget.consume()) {
+          trace.push({ tool: call.name, summary: "budget d'analyses épuisé" });
+          messages.push({
+            role: "tool",
+            tool_call_id: call.id,
+            content: stableStringify({
+              error: "analysis_budget_exhausted",
+              limit: MAX_ANALYSIS_CALLS_PER_TURN,
+              hint: "Answer with what you already measured; ask before running another scan.",
+            }),
+          });
+          continue;
+        }
         const outcome = await executeTool(
           services,
           workspace.id,
@@ -1761,6 +1881,220 @@ async function executeTool(
         return {
           content: stableStringify({ stored: saved.created, kind, text: saved.record.text }),
           summary: saved.created ? "mémorisé" : "déjà connu",
+        };
+      }
+      case "capabilities": {
+        return {
+          content: stableStringify(
+            {
+              version: CAPABILITY_VERSION,
+              profiles: ANALYSIS_PROFILES.map((profile) => ({
+                id: profile.id,
+                name: profile.en.name,
+                targetType: profile.targetType,
+                modules: profile.modules,
+                capabilities: profile.capabilities,
+              })),
+              capabilities: CAPABILITIES.map((capability) => ({
+                id: capability.id,
+                module: capability.module,
+                goal: capability.goal,
+                execution: capability.execution.mode,
+                permissions: capability.permissions,
+                targetTypes: capability.compatibility.targetTypes,
+                surfaces: capability.compatibility.surfaces,
+                limits: capability.limits,
+              })),
+            },
+            2
+          ),
+          summary: ANALYSIS_PROFILES.length + " profils, " + CAPABILITIES.length + " capacités",
+        };
+      }
+      case "list_analyses": {
+        const limit =
+          typeof args.limit === "number" && Number.isFinite(args.limit)
+            ? Math.min(20, Math.max(1, Math.trunc(args.limit)))
+            : 10;
+        const status = typeof args.status === "string" ? args.status : null;
+        const { rows, total } = await services.store.listAnalyses(workspaceId, {
+          limit,
+          offset: 0,
+          ...(status ? { status: status as never } : {}),
+        });
+        return {
+          content: stableStringify(
+            {
+              total,
+              analyses: rows.map((analysis) => ({
+                id: analysis.id,
+                projectId: analysis.projectId,
+                target: analysis.target,
+                targetType: analysis.targetType,
+                status: analysis.status,
+                source: analysis.source,
+                createdAt: analysis.createdAt,
+              })),
+            },
+            2
+          ),
+          summary: total + " analyse(s)",
+        };
+      }
+      case "analysis_findings": {
+        const analysisId = typeof args.analysisId === "string" ? args.analysisId : "";
+        if (!analysisId) {
+          return {
+            content: stableStringify({ error: "analysisId is required" }),
+            summary: "invalid request",
+          };
+        }
+        const analysis = await services.store.getAnalysis(workspaceId, analysisId);
+        if (!analysis) {
+          return {
+            content: stableStringify({
+              error: "analysis_not_found",
+              hint: "Call list_analyses to get a real id.",
+            }),
+            summary: "analyse introuvable",
+          };
+        }
+        const loaded = await findingsForAnalysis(services, analysis);
+        const status = typeof args.status === "string" ? args.status : null;
+        const severity = typeof args.severity === "string" ? args.severity : null;
+        const filtered = loaded.findings.filter(
+          (finding) =>
+            (!status || finding.status === status) && (!severity || finding.severity === severity)
+        );
+        return {
+          content: stableStringify(
+            {
+              analysisId,
+              loaded: loaded.loaded,
+              measuredModules: loaded.measuredModules,
+              counts: summarizeFindings(loaded.findings),
+              findings: filtered.slice(0, 40).map((finding) => ({
+                key: finding.key,
+                module: finding.module,
+                controlId: finding.controlId,
+                title: finding.title,
+                status: finding.status,
+                severity: finding.severity,
+                priority: finding.priority,
+                cause: finding.cause,
+                confidence: finding.confidence,
+                explanation: finding.explanation,
+                evidence: finding.evidence,
+              })),
+            },
+            2
+          ),
+          summary: filtered.length + " constat(s)",
+        };
+      }
+      case "list_remediations": {
+        const status = typeof args.status === "string" ? args.status : undefined;
+        const priority = typeof args.priority === "string" ? args.priority : undefined;
+        const { rows, total } = await services.store.listRemediations(workspaceId, {
+          limit: 10,
+          offset: 0,
+          ...(status ? { status } : {}),
+          ...(priority ? { priority } : {}),
+        });
+        return {
+          content: stableStringify(
+            {
+              total,
+              remediations: rows.map((record) => ({
+                id: record.id,
+                title: record.title,
+                module: record.module,
+                controlId: record.controlId,
+                status: record.status,
+                priority: record.priority,
+                verificationOutcome: record.verificationOutcome,
+                nextStep: record.steps.length,
+              })),
+            },
+            2
+          ),
+          summary: total + " remédiation(s)",
+        };
+      }
+      case "open_remediation": {
+        if (args.confirm !== true) {
+          return {
+            content: stableStringify({
+              error: "confirm must be true, and only when the user asked to track this fix",
+            }),
+            summary: "not confirmed",
+          };
+        }
+        const analysisId = typeof args.analysisId === "string" ? args.analysisId : "";
+        const findingKey = typeof args.findingKey === "string" ? args.findingKey : "";
+        const analysis = analysisId
+          ? await services.store.getAnalysis(workspaceId, analysisId)
+          : null;
+        if (!analysis) {
+          return {
+            content: stableStringify({ error: "analysis_not_found" }),
+            summary: "analyse introuvable",
+          };
+        }
+        const loaded = await findingsForAnalysis(services, analysis);
+        const finding = loaded.findings.find((item) => item.key === findingKey);
+        if (!finding) {
+          return {
+            content: stableStringify({
+              error: "finding_not_found",
+              hint: "Call analysis_findings to get a real key.",
+            }),
+            summary: "constat introuvable",
+          };
+        }
+        const existing = await services.store.findRemediationByFinding(
+          workspaceId,
+          analysisId,
+          findingKey
+        );
+        if (existing) {
+          return {
+            content: stableStringify({
+              error: "remediation_exists",
+              remediationId: existing.id,
+              status: existing.status,
+            }),
+            summary: "déjà ouverte",
+          };
+        }
+        const now = services.clock().toISOString();
+        const seed = seedRemediation(finding, now);
+        const record = await services.store.createRemediation({
+          id: "rem_" + crypto.randomUUID().replaceAll("-", "").slice(0, 20),
+          workspaceId,
+          projectId: analysis.projectId,
+          analysisId,
+          findingKey: seed.findingKey,
+          module: seed.module,
+          controlId: seed.controlId,
+          title: seed.title,
+          severity: seed.severity,
+          priority: seed.priority,
+          cause: seed.cause,
+          ownerId: null,
+          dueAt: null,
+          steps: seed.steps,
+          fix: seed.fix,
+          verification: seed.verification,
+          proof: seed.proof,
+          createdBy: "assistant",
+        });
+        return {
+          content: stableStringify(
+            { remediationId: record.id, status: record.status, nextStep: record.steps.at(-1) },
+            2
+          ),
+          summary: "remédiation ouverte",
         };
       }
       case "workspace_overview": {
