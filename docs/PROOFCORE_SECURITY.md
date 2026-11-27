@@ -26,12 +26,19 @@ exécuté. Une absence est nommée.
 
 - Cookie de session : `HttpOnly`, `SameSite=Lax`, `Secure` si l'origine est https ou si
   l'environnement est production. Pas de préfixe `__Host-`.
+- Double-submit CSRF : cookie `ps_csrf` lisible par l'application (jamais `HttpOnly`),
+  `SameSite=Lax`, `Secure` en production, émis avec la session et tourné avec elle au
+  changement de mot de passe. Les écritures de compte (`/api/account/*`) et la
+  déconnexion n'acceptent un cookie de session que si `x-csrf-token` répète ce cookie ;
+  sinon 403 `csrf_token_required` ou `csrf_token_invalid`.
+- La règle est déclenchée par la présence des deux cookies : un client natif (CLI,
+  machine) qui s'authentifie par `Authorization` n'est pas concerné, et une session
+  antérieure au déploiement reçoit `ps_csrf` à sa prochaine sonde
+  `/api/auth/session`. Les routes de scan et d'IA restent protégées par `Origin` +
+  `Sec-Fetch-Site` seuls ; leur migration est une étape séparée.
 - Écritures cookie : contrôle d'origine sur `/api/*` (hors `/api/webhooks/*`), monté sur
   toutes les méthodes non-GET/HEAD/OPTIONS. Une origine inconnue répond 403
   `cross_origin_denied`.
-- Pas de jeton CSRF explicite : la défense repose sur `SameSite=Lax` + allow-list
-  d'origines. Un navigateur qui n'envoie pas `Origin` sur une écriture n'est pas bloqué
-  par ce contrôle ; `SameSite` reste la barrière.
 - CORS : une seule liste d'origines, `Access-Control-Allow-Credentials: true`, méthodes
   et en-têtes énumérés.
 
