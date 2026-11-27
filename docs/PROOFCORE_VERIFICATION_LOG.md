@@ -197,13 +197,13 @@ partielle.
   320×700.
 - **Preuves** :
 
-| Commande | Résultat constaté |
-| --- | --- |
-| `npx vitest run apps/api/test/local-browser-agent.test.ts` | 1/1 : Chromium local réel, ouverture, clic, saisie, relecture, refus d'un autre propriétaire, fermeture. |
-| `npx vitest run apps/api/test/ai.test.ts apps/api/test/ai-tools.test.ts` | 39/39 : usage fournisseur sommé et persisté, boucle `browser_open → browser_act → browser_close` sur agent injecté, refus honnête `browser_unavailable`, catalogue classé. |
-| `npx tsc --noEmit -p apps/api` et `-p apps/web` | Sortie 0. |
-| `pnpm --filter @proofcore/web build` | Réussi. |
-| `npx playwright test ... tests/e2e/app-mobile.spec.ts --project=mobile -g "320px phone"` | 1/1 : assistant à 320×700, jauge visible, `browser_open`/`browser_act` dans le dialogue, zéro overflow. |
+| Commande                                                                                 | Résultat constaté                                                                                                                                                          |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npx vitest run apps/api/test/local-browser-agent.test.ts`                               | 1/1 : Chromium local réel, ouverture, clic, saisie, relecture, refus d'un autre propriétaire, fermeture.                                                                   |
+| `npx vitest run apps/api/test/ai.test.ts apps/api/test/ai-tools.test.ts`                 | 39/39 : usage fournisseur sommé et persisté, boucle `browser_open → browser_act → browser_close` sur agent injecté, refus honnête `browser_unavailable`, catalogue classé. |
+| `npx tsc --noEmit -p apps/api` et `-p apps/web`                                          | Sortie 0.                                                                                                                                                                  |
+| `pnpm --filter @proofcore/web build`                                                     | Réussi.                                                                                                                                                                    |
+| `npx playwright test ... tests/e2e/app-mobile.spec.ts --project=mobile -g "320px phone"` | 1/1 : assistant à 320×700, jauge visible, `browser_open`/`browser_act` dans le dialogue, zéro overflow.                                                                    |
 
 - **Passe visuelle et accessibilité (même arbre)** :
   `npx playwright test ... tests/e2e/viewports.spec.ts --project=desktop --timeout=600000`

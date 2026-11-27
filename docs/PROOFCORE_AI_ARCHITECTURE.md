@@ -56,7 +56,7 @@ produit pas de diff (`file_not_found`, `before_not_found`), et rien n'est écrit
 | `module_status`, `module_config`                                                      | état, configuration active et vocabulaire des 5 modules                           |
 | `project_code`                                                                        | lecture des fichiers importés (sourceId / path)                                   |
 | `fetch_web`, `browse_url`, `probe_url`                                                | lecture réseau avec garde d'URL                                                   |
-| `browser_open`, `browser_read`, `browser_act`, `browser_close`                        | session Chromium réelle : ouvrir, relire, cliquer/saisir/défiler, fermer           |
+| `browser_open`, `browser_read`, `browser_act`, `browser_close`                        | session Chromium réelle : ouvrir, relire, cliquer/saisir/défiler, fermer          |
 | `fail_scan`, `clean_audit`, `site_audit`                                              | contrôles HTTP mesurés                                                            |
 | `read_repo`                                                                           | lecture d'un dépôt public avec garde                                              |
 | `module_configure`                                                                    | écriture validée : les cinq familles (WORLD, FLOW, EXIT, FAIL, CLEAN)             |
