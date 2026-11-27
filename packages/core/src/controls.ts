@@ -211,6 +211,47 @@ const controls: Control[] = [
     ],
   },
   {
+    id: "coop",
+    module: "fail",
+    fr: {
+      title: "Cross-Origin-Opener-Policy",
+      objective: "Établit si la page isole son contexte de navigation d'un site qui l'ouvre.",
+      consequence:
+        "Sans isolation, un site qui ouvre votre page peut observer des détails de navigation et exploiter des fuites de données (XS-Leaks).",
+      fix: "Envoyer `Cross-Origin-Opener-Policy: same-origin`, ou `same-origin-allow-popups` si des fenêtres d'authentification doivent rester ouvertes.",
+      verify:
+        "`curl -sI https://votre-site` renvoie `cross-origin-opener-policy` avec une valeur `same-origin` ou `same-origin-allow-popups`.",
+    },
+    en: {
+      title: "Cross-Origin-Opener-Policy",
+      objective:
+        "Establishes whether the page isolates its browsing context from a site that opens it.",
+      consequence:
+        "Without isolation, a site that opens your page can observe navigation details and exploit data leaks (XS-Leaks).",
+      fix: "Send `Cross-Origin-Opener-Policy: same-origin`, or `same-origin-allow-popups` when sign-in popups must keep working.",
+      verify:
+        "`curl -sI https://your-site` returns `cross-origin-opener-policy` with `same-origin` or `same-origin-allow-popups`.",
+    },
+    complexity: "low",
+    risk: "low",
+    method: "En-tête `cross-origin-opener-policy` de la réponse.",
+    result: "Valeur de l'en-tête, ou « absent »",
+    fixes: [
+      {
+        stack: "Nginx",
+        code: 'add_header Cross-Origin-Opener-Policy "same-origin" always;',
+      },
+      {
+        stack: "Node.js (helmet)",
+        code: 'app.use(helmet.crossOriginOpenerPolicy({ policy: "same-origin" }));',
+      },
+      {
+        stack: "Cloudflare Workers",
+        code: 'response.headers.set("Cross-Origin-Opener-Policy", "same-origin");',
+      },
+    ],
+  },
+  {
     id: "referrer_policy",
     module: "fail",
     fr: {
@@ -417,6 +458,44 @@ const controls: Control[] = [
     ],
   },
   {
+    id: "sri",
+    module: "fail",
+    fr: {
+      title: "Intégrité des ressources tierces",
+      objective:
+        "Établit si les scripts et feuilles de style chargés depuis une autre origine portent un condensé d'intégrité.",
+      consequence:
+        "Sans `integrity`, un CDN compromis — ou une version remplacée — s'exécute dans vos pages sans que rien ne le signale.",
+      fix: "Ajouter `integrity` et `crossorigin` à chaque script ou feuille de style servi par une autre origine, ou héberger la ressource vous-même.",
+      verify:
+        "Chaque balise distante montre un attribut `integrity` dont le condensé correspond au fichier servi.",
+    },
+    en: {
+      title: "Third-party resource integrity",
+      objective:
+        "Establishes whether scripts and stylesheets loaded from another origin carry an integrity digest.",
+      consequence:
+        "Without `integrity`, a compromised CDN — or a swapped release — runs in your pages with nothing to signal it.",
+      fix: "Add `integrity` and `crossorigin` to every script or stylesheet served from another origin, or host the resource yourself.",
+      verify:
+        "Every remote tag shows an `integrity` attribute whose digest matches the file being served.",
+    },
+    complexity: "medium",
+    risk: "medium",
+    method: "Balises `script[src]` et `link[rel=stylesheet]` dont l'origine diffère de la page.",
+    result: "Ressources distantes sans `integrity`, ou « no cross-origin script or stylesheet »",
+    fixes: [
+      {
+        stack: "HTML",
+        code: '<script src="https://cdn.example/lib.js" integrity="sha384-…" crossorigin="anonymous"></script>',
+      },
+      {
+        stack: "Vite",
+        code: '// préférer une dépendance installée et servie depuis votre propre build\nimport { lib } from "lib";',
+      },
+    ],
+  },
+  {
     id: "secrets_in_html",
     module: "fail",
     fr: {
@@ -452,6 +531,43 @@ const controls: Control[] = [
       {
         stack: "WordPress",
         code: "// wp-config.php : ne jamais imprimer une clé dans un template\n// Utiliser wp_localize_script pour n'exposer qu'un nonce public",
+      },
+    ],
+  },
+  {
+    id: "password_form_action",
+    module: "fail",
+    fr: {
+      title: "Destination du mot de passe",
+      objective: "Établit où un formulaire contenant un mot de passe envoie les identifiants.",
+      consequence:
+        "Un mot de passe envoyé en http traverse le réseau en clair ; envoyé à une autre origine, il quitte le contrôle de votre domaine.",
+      fix: "Faire poster le formulaire vers votre propre origine en https, et n'accepter les identifiants que sur cette origine.",
+      verify:
+        "`curl -s https://votre-site/connexion` montre un `action` en https vers votre domaine, jamais en http.",
+    },
+    en: {
+      title: "Password destination",
+      objective: "Establishes where a form containing a password sends the credentials.",
+      consequence:
+        "A password sent over http crosses the network in clear text; sent to another origin, it leaves your domain's control.",
+      fix: "Post the form to your own origin over https, and accept credentials only on that origin.",
+      verify:
+        "`curl -s https://your-site/login` shows an https `action` on your own domain, never http.",
+    },
+    complexity: "low",
+    risk: "high",
+    method: "Attribut `action` des formulaires qui contiennent un champ `type=password`.",
+    result: "Origine de destination, ou « no password form »",
+    fixes: [
+      { stack: "HTML", code: '<form method="post" action="https://votre-site/connexion">' },
+      {
+        stack: "Rails",
+        code: "form_with url: session_path, method: :post, data: { turbo: false }",
+      },
+      {
+        stack: "Django",
+        code: '<form method="post" action="{% url \'login\' %}">{% csrf_token %}',
       },
     ],
   },
@@ -805,6 +921,69 @@ const controls: Control[] = [
     ],
   },
   {
+    id: "doctype",
+    module: "clean",
+    fr: {
+      title: "Doctype du document",
+      objective: "Établit si le document commence par un doctype HTML5.",
+      consequence:
+        "Sans doctype, le navigateur bascule en mode quirks : les largeurs, les marges et les formulaires ne suivent plus les règles modernes.",
+      fix: "Commencer chaque document par `<!doctype html>`.",
+      verify: "`curl -s https://votre-site | head -1` affiche `<!doctype html>`.",
+    },
+    en: {
+      title: "Document doctype",
+      objective: "Establishes whether the document starts with an HTML5 doctype.",
+      consequence:
+        "Without a doctype the browser switches to quirks mode: widths, margins and forms no longer follow modern rules.",
+      fix: "Start every document with `<!doctype html>`.",
+      verify: "`curl -s https://your-site | head -1` prints `<!doctype html>`.",
+    },
+    complexity: "low",
+    risk: "low",
+    method: "Première balise du document.",
+    result: "« html5 doctype » ou « missing »",
+    fixes: [
+      { stack: "HTML", code: '<!doctype html>\n<html lang="fr">' },
+      { stack: "Jinja / Django", code: '<!doctype html>\n<html lang="{{ LANGUAGE_CODE }}">' },
+      {
+        stack: "Next.js",
+        code: '// app/layout.tsx commence par <html lang="fr"> ; le doctype est émis par le framework',
+      },
+    ],
+  },
+  {
+    id: "heading_order",
+    module: "clean",
+    fr: {
+      title: "Ordre des titres",
+      objective: "Établit si la page saute un niveau de titre, par exemple de `h1` à `h4`.",
+      consequence:
+        "Un niveau sauté crée un trou dans le plan annoncé par le lecteur d’écran : l’utilisateur croit qu’une section manque.",
+      fix: "Descendre les niveaux un par un (`h1`, `h2`, `h3`) et garder la taille visuelle pour la feuille de style.",
+      verify: "Le scan ne signale plus de saut entre deux titres consécutifs.",
+    },
+    en: {
+      title: "Heading order",
+      objective: "Establishes whether the page skips a heading level, for example `h1` to `h4`.",
+      consequence:
+        "A skipped level leaves a hole in the outline the screen reader announces: the user believes a section is missing.",
+      fix: "Descend one level at a time (`h1`, `h2`, `h3`) and leave the visual size to the stylesheet.",
+      verify: "The scan no longer reports a jump between two consecutive headings.",
+    },
+    complexity: "low",
+    risk: "medium",
+    method: "Suite des niveaux `h1` à `h6` dans l’ordre du document.",
+    result: "Niveaux enjambés, ou « n heading(s) in order »",
+    fixes: [
+      { stack: "HTML", code: "<h2>Factures</h2>\n<h3>En attente</h3>" },
+      {
+        stack: "CSS",
+        code: ".section-title { font-size: 1.25rem; } /* garder h3, changer la taille */",
+      },
+    ],
+  },
+  {
     id: "html_weight",
     module: "clean",
     fr: {
@@ -899,6 +1078,100 @@ const controls: Control[] = [
         stack: "Laravel Blade",
         code: '<label for="email">{{ __("Email") }}</label>\n<input id="email" name="email" />',
       },
+    ],
+  },
+  {
+    id: "duplicate_ids",
+    module: "clean",
+    fr: {
+      title: "Identifiants dupliqués",
+      objective: "Établit si deux éléments portent le même attribut `id`.",
+      consequence:
+        "Le navigateur ne résout que le premier : le second champ perd son `<label for>`, son `aria-labelledby` ou sa cible d’ancre.",
+      fix: "Rendre chaque `id` unique, et générer un suffixe quand un composant est répété.",
+      verify: "Le scan ne trouve plus qu’un seul élément par `id`.",
+    },
+    en: {
+      title: "Duplicate ids",
+      objective: "Establishes whether two elements carry the same `id` attribute.",
+      consequence:
+        "The browser resolves only the first one: the second field loses its `<label for>`, its `aria-labelledby` or its anchor target.",
+      fix: "Make every `id` unique, and generate a suffix when a component is repeated.",
+      verify: "The scan finds only one element per `id`.",
+    },
+    complexity: "low",
+    risk: "medium",
+    method: "Comptage des attributs `id` et de leurs doublons.",
+    result: "Identifiants dupliqués, ou « no duplicate id »",
+    fixes: [
+      {
+        stack: "React",
+        code: "const id = useId();\n<label htmlFor={id}>E-mail</label>\n<input id={id} />",
+      },
+      { stack: "HTML", code: '<label for="email-1">E-mail</label>\n<input id="email-1" />' },
+    ],
+  },
+  {
+    id: "link_text",
+    module: "clean",
+    fr: {
+      title: "Nom des liens",
+      objective:
+        "Établit combien de liens n’ont aucun nom accessible, et combien portent un texte générique.",
+      consequence:
+        "Un lecteur d’écran peut lister les liens hors contexte : « ici » ou un lien vide ne dit pas où il mène.",
+      fix: "Donner à chaque lien un texte qui décrit sa destination ; à défaut, un `aria-label` explicite.",
+      verify: "Chaque lien a un nom compréhensible sans lire le paragraphe qui l’entoure.",
+    },
+    en: {
+      title: "Link names",
+      objective:
+        "Establishes how many links have no accessible name, and how many use generic text.",
+      consequence:
+        "A screen reader can list links out of context: “here”, or an empty link, does not say where it goes.",
+      fix: "Give every link text that describes its destination; failing that, an explicit `aria-label`.",
+      verify: "Every link has a name that makes sense without reading the surrounding paragraph.",
+    },
+    complexity: "low",
+    risk: "medium",
+    method:
+      "Texte, `aria-label`, `aria-labelledby`, `title` et texte alternatif des images de chaque lien exposé (hors `hidden`/`aria-hidden`).",
+    result: "Liens sans nom ou au texte générique, ou « no links »",
+    fixes: [
+      { stack: "HTML", code: '<a href="/factures/42">Facture 42 — mars 2026</a>' },
+      { stack: "React", code: '<a href={href} aria-label="Voir la facture 42">Voir</a>' },
+    ],
+  },
+  {
+    id: "iframe_title",
+    module: "clean",
+    fr: {
+      title: "Titre des iframes",
+      objective: "Établit si chaque `iframe` porte un attribut `title` qui la nomme.",
+      consequence:
+        "Une iframe sans titre est annoncée comme un cadre sans nom : l’utilisateur ne sait pas ce qu’elle contient avant d’y entrer.",
+      fix: "Ajouter un `title` court et descriptif à chaque iframe (vidéo, carte, formulaire intégré).",
+      verify: "Chaque iframe annonce un titre compréhensible dans la liste des cadres.",
+    },
+    en: {
+      title: "Iframe titles",
+      objective: "Establishes whether every `iframe` carries a `title` that names it.",
+      consequence:
+        "An untitled iframe is announced as an unnamed frame: the user cannot tell what it contains before entering it.",
+      fix: "Add a short, descriptive `title` to every iframe (video, map, embedded form).",
+      verify: "Every iframe announces a meaningful title in the frame list.",
+    },
+    complexity: "low",
+    risk: "medium",
+    method:
+      "Présence et contenu de l’attribut `title` des `iframe` exposées (hors `hidden`/`aria-hidden`).",
+    result: "« n sur m sans titre », ou « no exposed iframe »",
+    fixes: [
+      {
+        stack: "HTML",
+        code: '<iframe title="Carte de la boutique" src="https://maps.example/embed"></iframe>',
+      },
+      { stack: "React", code: '<iframe title="Vidéo de démonstration" src={src} />' },
     ],
   },
   {

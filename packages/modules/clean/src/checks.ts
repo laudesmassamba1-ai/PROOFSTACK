@@ -41,6 +41,11 @@ function attr(tag: string, name: string): string | null {
   return match ? (match[2] ?? match[3] ?? match[4] ?? "") : null;
 }
 
+/** A hidden element is not announced, so a missing name on it is not a defect. */
+function isHidden(tag: string): boolean {
+  return /(?:^|\s)hidden(?=\s|\/?>)/i.test(tag) || /\baria-hidden\s*=\s*["']?true/i.test(tag);
+}
+
 function finding(id: string, status: ScanStatus, observed: string, why: string): CleanFinding {
   return { module: "clean", id, status, observed, why };
 }
@@ -52,12 +57,26 @@ export function cleanFindings(input: CleanInput): CleanFinding[] {
   const shellOnly =
     text.length < 300 && /<script\b[^>]*\bsrc=/i.test(html) && !/<main\b/i.test(html);
   const shellObservation = "client-rendered shell; this requires a browser to measure";
+  // Without a doctype the browser renders in quirks mode, which silently changes box
+  // sizing and can break the layout on the very browsers the site supports.
+  const doctype = /^\s*<!doctype\s+html\b/i.test(html);
+  findings.push(
+    finding(
+      "doctype",
+      shellOnly ? "SKIPPED" : doctype ? "PASS" : "FAIL",
+      shellOnly ? shellObservation : doctype ? "html5 doctype" : "missing",
+      "Without it the browser renders in quirks mode and layout rules change."
+    )
+  );
   const lang = attrTags(html, "html")[0] ? attr(attrTags(html, "html")[0] as string, "lang") : null;
+  // `lang="english"` is not a language tag a screen reader can use; the value has to be
+  // a BCP 47 tag such as `fr`, `en-GB` or `pt-BR`.
+  const validLang = lang ? /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/i.test(lang.trim()) : false;
   findings.push(
     finding(
       "html_lang",
-      lang ? "PASS" : "FAIL",
-      lang ?? "no lang attribute",
+      !lang ? "FAIL" : validLang ? "PASS" : "WARN",
+      !lang ? "no lang attribute" : validLang ? lang : `invalid: ${lang}`,
       "Without it screen readers read your page with the wrong pronunciation rules."
     )
   );
@@ -65,7 +84,7 @@ export function cleanFindings(input: CleanInput): CleanFinding[] {
   findings.push(
     finding(
       "title",
-      title.length === 0 ? "FAIL" : title.length > 65 ? "WARN" : "PASS",
+      title.length === 0 ? "FAIL" : title.length < 10 || title.length > 65 ? "WARN" : "PASS",
       title.length === 0 ? "missing" : `${title.length} characters`,
       "The title is what a tab, a search result and a bookmark show."
     )
@@ -83,14 +102,26 @@ export function cleanFindings(input: CleanInput): CleanFinding[] {
       "Search engines and link previews use it to describe the page."
     )
   );
+  const viewport = attrTags(html, "meta").find(
+    (tag) => (attr(tag, "name") ?? "").toLowerCase() === "viewport"
+  );
+  const viewportContent = viewport ? (attr(viewport, "content") ?? "") : "";
+  const viewportWidth = /width\s*=\s*device-width/i.test(viewportContent);
+  const zoomBlocked = /user-scalable\s*=\s*no|maximum-scale\s*=\s*1(?:\.0)?\b/i.test(
+    viewportContent
+  );
   findings.push(
     finding(
       "viewport",
-      attrTags(html, "meta").some((tag) => (attr(tag, "name") ?? "").toLowerCase() === "viewport")
-        ? "PASS"
-        : "FAIL",
-      "meta viewport",
-      "Without it the page is rendered at desktop width on a phone."
+      !viewport ? "FAIL" : viewportWidth && !zoomBlocked ? "PASS" : "WARN",
+      !viewport
+        ? "meta viewport missing"
+        : zoomBlocked
+          ? "zoom disabled"
+          : viewportWidth
+            ? "width=device-width"
+            : "no width=device-width",
+      "Without it the page is rendered at desktop width on a phone; blocking zoom takes the choice away."
     )
   );
   const landmarks = ["main", "nav", "header", "footer"].filter((tag) =>
@@ -134,6 +165,22 @@ export function cleanFindings(input: CleanInput): CleanFinding[] {
       shellOnly ? "SKIPPED" : h1 === 0 ? "FAIL" : h1 > 1 ? "WARN" : "PASS",
       shellOnly ? shellObservation : `${h1} h1, ${headings.length} heading(s)`,
       "One h1 and an ordered outline is how the page is navigated without a mouse."
+    )
+  );
+  // Skipping a level (`h1` then `h4`) breaks the outline a screen reader announces.
+  const headingJump = headings.findIndex(
+    (level, index) => index > 0 && level - (headings[index - 1] as number) > 1
+  );
+  findings.push(
+    finding(
+      "heading_order",
+      shellOnly ? "SKIPPED" : headingJump > 0 ? "WARN" : "PASS",
+      shellOnly
+        ? shellObservation
+        : headingJump > 0
+          ? `h${headings[headingJump - 1]} then h${headings[headingJump]}`
+          : `${headings.length} heading(s) in order`,
+      "A skipped heading level is a gap in the page outline screen readers navigate by."
     )
   );
   const weightKb = Math.round(bytes / 1024);
@@ -195,6 +242,114 @@ export function cleanFindings(input: CleanInput): CleanFinding[] {
           ? "no form fields"
           : `${inputs.length - labelled} of ${inputs.length} unlabelled`,
       "A field without a label is unusable with a screen reader."
+    )
+  );
+  // A duplicate id is invalid HTML and breaks `label for`, `aria-labelledby` and anchors:
+  // the browser resolves the first one, so the second control silently loses its name.
+  const ids = [...html.matchAll(/\sid\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/gi)].map(
+    (match) => match[2] ?? match[3] ?? match[4] ?? ""
+  );
+  const duplicateIds = [...new Set(ids.filter((id, index) => ids.indexOf(id) !== index))];
+  findings.push(
+    finding(
+      "duplicate_ids",
+      shellOnly ? "SKIPPED" : duplicateIds.length > 0 ? "WARN" : "PASS",
+      shellOnly
+        ? shellObservation
+        : duplicateIds.length > 0
+          ? `${duplicateIds.length} duplicated: ${duplicateIds.slice(0, 3).join(", ")}`
+          : "no duplicate id",
+      "A duplicate id makes the browser resolve the wrong label or anchor target."
+    )
+  );
+  // A link whose name is empty, or is "click here", is unusable when a screen reader
+  // lists links out of context — which is exactly how they are navigated.
+  const GENERIC_LINK_TEXT = new Set([
+    "click here",
+    "here",
+    "read more",
+    "learn more",
+    "more",
+    "en savoir plus",
+    "cliquez ici",
+    "ici",
+    "lire la suite",
+    "plus",
+  ]);
+  const anchors = [...html.matchAll(/<a\b[^>]*>[\s\S]*?<\/a>/gi)]
+    .map((match) => match[0])
+    .filter((tag) => {
+      const open = tag.slice(0, tag.indexOf(">") + 1);
+      return attr(open, "href") !== null && !isHidden(open);
+    });
+  let unnamedLinks = 0;
+  let genericLinks = 0;
+  for (const tag of anchors) {
+    const open = tag.slice(0, tag.indexOf(">") + 1);
+    const inner = tag.slice(tag.indexOf(">") + 1, tag.lastIndexOf("</a>"));
+    const visible = inner
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&[a-z0-9#]+;/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const imageAlt = [...inner.matchAll(/<img\b[^>]*>/gi)]
+      .map((match) => attr(match[0], "alt") ?? "")
+      .join(" ")
+      .trim();
+    const referenced = (attr(open, "aria-labelledby") ?? "").trim();
+    const name =
+      referenced ||
+      (attr(open, "aria-label") ?? "").trim() ||
+      (attr(open, "title") ?? "").trim() ||
+      visible ||
+      imageAlt;
+    if (!name) unnamedLinks += 1;
+    // A reference names the link with another element's text, so the visible word
+    // here is not what a screen reader announces and must not be judged as generic.
+    else if (!referenced && GENERIC_LINK_TEXT.has(name.toLowerCase())) genericLinks += 1;
+  }
+  findings.push(
+    finding(
+      "link_text",
+      shellOnly
+        ? "SKIPPED"
+        : anchors.length === 0
+          ? "SKIPPED"
+          : unnamedLinks > 0
+            ? "FAIL"
+            : genericLinks > 0
+              ? "WARN"
+              : "PASS",
+      shellOnly
+        ? shellObservation
+        : anchors.length === 0
+          ? "no links"
+          : unnamedLinks > 0
+            ? `${unnamedLinks} of ${anchors.length} with no accessible name`
+            : genericLinks > 0
+              ? `${genericLinks} generic link text`
+              : `${anchors.length} named link(s)`,
+      "A link read out of context must say where it goes; the name is all a screen reader has."
+    )
+  );
+  const iframes = attrTags(html, "iframe").filter((tag) => !isHidden(tag));
+  const untitledIframes = iframes.filter((tag) => (attr(tag, "title") ?? "").trim().length === 0);
+  findings.push(
+    finding(
+      "iframe_title",
+      shellOnly
+        ? "SKIPPED"
+        : iframes.length === 0
+          ? "SKIPPED"
+          : untitledIframes.length > 0
+            ? "FAIL"
+            : "PASS",
+      shellOnly
+        ? shellObservation
+        : iframes.length === 0
+          ? "no exposed iframe"
+          : `${untitledIframes.length} of ${iframes.length} without a title`,
+      "An iframe without a title is announced as an unnamed frame, with no hint of its content."
     )
   );
   findings.push(

@@ -474,6 +474,29 @@ function flowCase(scenario: FlowScenario, options: FlowCheckOptions): TestCaseDe
               severity: "HIGH",
             }
           );
+          // A refund returns money, it does not rewrite the sale. The captured amount
+          // is part of the customer's record and must survive the refund unchanged.
+          if (order.amount !== undefined) {
+            ctx.check(order.amount === amount, {
+              description: "the refund does not change the recorded amount",
+              expected: amount,
+              actual: order.amount,
+              code: "refund_amount_changed",
+              severity: "CRITICAL",
+            });
+          }
+          // Read it once more: a status that settles then flips on the next read means
+          // the refund is not durable, even though the first response looked right.
+          const stable = await readback(orderReference);
+          if (stable) {
+            ctx.check(stable.status.toLowerCase() === order.status.toLowerCase(), {
+              description: "the refunded status is stable when read again",
+              expected: order.status,
+              actual: stable.status,
+              code: "refund_state_unstable",
+              severity: "HIGH",
+            });
+          }
           return;
         }
 

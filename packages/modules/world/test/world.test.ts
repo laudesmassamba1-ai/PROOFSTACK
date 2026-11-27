@@ -97,7 +97,7 @@ describe("fixtures", () => {
     const fixtures = buildFixtures(fr_BJ);
     const categories = new Set(fixtures.map((fixture) => fixture.category));
     expect(categories).toEqual(
-      new Set(["identity", "phone", "address", "currency", "datetime", "collation"])
+      new Set(["identity", "phone", "email", "address", "currency", "datetime", "collation"])
     );
     const ids = fixtures.map((fixture) => fixture.id);
     expect(new Set(ids).size).toBe(ids.length);
@@ -112,6 +112,13 @@ describe("fixtures", () => {
     const only = buildFixtures(fr_BJ, { categories: ["phone"], maxPerCategory: 3 });
     expect(only.every((fixture) => fixture.category === "phone")).toBe(true);
     expect(only.length).toBeLessThanOrEqual(3);
+  });
+
+  it("covers valid addresses a narrow pattern refuses, and invalid ones", () => {
+    const emails = buildFixtures(fr_BJ).filter((fixture) => fixture.category === "email");
+    expect(emails.some((fixture) => fixture.value === "lucie+facture@example.com")).toBe(true);
+    expect(emails.some((fixture) => fixture.value === "用户@例子.广告")).toBe(true);
+    expect(emails.some((fixture) => fixture.expectation === "reject")).toBe(true);
   });
 
   it("keeps identity fixtures that break naive normalisation", () => {

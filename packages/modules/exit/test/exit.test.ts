@@ -260,6 +260,60 @@ describe("EXIT against a healthy export", () => {
   });
 });
 
+describe("EXIT cross-checks a zip manifest", () => {
+  function zipRun(
+    entries: { name: string; bytes: number; sha256: string }[],
+    manifestFiles: unknown[]
+  ) {
+    const artifact: ExportArtifact = {
+      format: "zip",
+      fileName: "export.zip",
+      bytes: new TextEncoder().encode("PK"),
+      sha256: "a".repeat(64),
+      records: [],
+      entries,
+      manifest: { files: manifestFiles },
+    };
+    const source: ExportSource = {
+      kind: "file",
+      description: "zip fixture",
+      async fetch(format: ExportFormat) {
+        if (format !== "zip") throw new Error(`no fixture for ${format}`);
+        return artifact;
+      },
+    };
+    return runExit({ exit: { formats: ["zip"] }, source, formats: ["zip"] });
+  }
+
+  it("passes when every declared size and digest matches", async () => {
+    const entries = [{ name: "a.csv", bytes: 12, sha256: "b".repeat(64) }];
+    const run = await zipRun(entries, [{ name: "a.csv", bytes: 12, sha256: "b".repeat(64) }]);
+    expect(caseFor(run, "exit/manifest").status).toBe("PASSED");
+  });
+
+  it("fails when a declared digest does not match the archived file", async () => {
+    const entries = [{ name: "a.csv", bytes: 12, sha256: "b".repeat(64) }];
+    const run = await zipRun(entries, [{ name: "a.csv", bytes: 12, sha256: "c".repeat(64) }]);
+    const testCase = caseFor(run, "exit/manifest");
+    expect(testCase.status).toBe("FAILED");
+    expect(testCase.failure?.code).toBe("zip_manifest_digest_mismatch");
+  });
+
+  it("fails duplicate entries and paths that escape the extraction folder", async () => {
+    const duplicate = await zipRun(
+      [
+        { name: "a.csv", bytes: 1, sha256: "b" },
+        { name: "a.csv", bytes: 1, sha256: "b" },
+      ],
+      ["a.csv"]
+    );
+    expect(caseFor(duplicate, "exit/manifest").failure?.code).toBe("zip_duplicate_entry");
+
+    const traversal = await zipRun([{ name: "../a.csv", bytes: 1, sha256: "b" }], ["../a.csv"]);
+    expect(caseFor(traversal, "exit/manifest").failure?.code).toBe("zip_path_traversal");
+  });
+});
+
 describe("EXIT catches real portability defects", () => {
   it("fails when a declared field is missing from the export", async () => {
     const run = await runExit({

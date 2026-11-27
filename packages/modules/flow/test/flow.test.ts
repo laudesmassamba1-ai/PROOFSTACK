@@ -57,6 +57,10 @@ interface FakeProductOptions {
   regressOnStale?: boolean;
   /** Delete the order on refund. */
   deleteOnRefund?: boolean;
+  /** Rewrite the captured amount when refunding. */
+  corruptRefundAmount?: boolean;
+  /** Return the refunded status once, then flip back to pending. */
+  flapOnRefund?: boolean;
 }
 
 /** A product that behaves correctly unless told otherwise. */
@@ -65,6 +69,7 @@ function fakeProduct(options: FakeProductOptions = {}): PaymentUnderTest {
   const payments = new Map<string, string>();
   const seenWebhooks = new Set<string>();
   let orderSeq = 0;
+  let refundedReads = 0;
 
   const target: PaymentUnderTest = {
     name: "fake-product",
@@ -109,6 +114,10 @@ function fakeProduct(options: FakeProductOptions = {}): PaymentUnderTest {
     async readOrder(reference: string): Promise<OrderState | undefined> {
       const order = orders.get(reference);
       if (!order) return undefined;
+      if (options.flapOnRefund && order.status === "refunded") {
+        refundedReads += 1;
+        if (refundedReads > 1) order.status = "pending";
+      }
       return {
         orderId: order.id,
         status: order.status,
@@ -167,6 +176,7 @@ function fakeProduct(options: FakeProductOptions = {}): PaymentUnderTest {
             return { accepted: true, state: "refunded" };
           }
           order.status = "refunded";
+          if (options.corruptRefundAmount) order.amount = "0";
           return { accepted: true, state: "refunded" };
         }
       }
@@ -459,6 +469,14 @@ describe("FLOW catches real defects", () => {
     const testCase = caseFor(run, "flow/inconsistent_state");
     expect(testCase.status).toBe("FAILED");
     expect(testCase.failure?.code).toBe("inconsistent_payment_state");
+  });
+
+  it("fails when a refund rewrites the amount or the status flaps", async () => {
+    const amount = await runFlow(fakeProduct({ corruptRefundAmount: true }), ["refund_flow"]);
+    expect(caseFor(amount, "flow/refund_flow").failure?.code).toBe("refund_amount_changed");
+
+    const flap = await runFlow(fakeProduct({ flapOnRefund: true }), ["refund_flow"]);
+    expect(caseFor(flap, "flow/refund_flow").failure?.code).toBe("refund_state_unstable");
   });
 
   it("fails when a refund deletes the order instead of marking it", async () => {

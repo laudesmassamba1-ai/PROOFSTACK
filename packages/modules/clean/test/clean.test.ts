@@ -90,6 +90,58 @@ describe("CLEAN", () => {
     expect(statusOf(findings, "html_weight")).toBe("FAIL");
   });
 
+  it("fails a document with no doctype and warns on a heading gap", () => {
+    const html = `<html lang="fr"><head><title>Boutique en ligne</title></head><body><main><h1>one</h1><h4>deep</h4></main></body></html>`;
+    const findings = run(html);
+    expect(statusOf(findings, "doctype")).toBe("FAIL");
+    expect(statusOf(findings, "heading_order")).toBe("WARN");
+  });
+
+  it("warns on a duplicated id and on a generic link name", () => {
+    const html = `${PAGE}<a href="/a" id="x">Produit</a><a href="/b" id="x">Cliquez ici</a>`;
+    const findings = run(html);
+    expect(statusOf(findings, "duplicate_ids")).toBe("WARN");
+    expect(statusOf(findings, "link_text")).toBe("WARN");
+  });
+
+  it("fails a link with no accessible name", () => {
+    const html = `${PAGE}<a href="/a"><span></span></a>`;
+    const finding = run(html).find((item) => item.id === "link_text");
+    expect(finding?.status).toBe("FAIL");
+    expect(finding?.observed).toContain("no accessible name");
+  });
+
+  it("honours an aria-labelledby name and ignores hidden links", () => {
+    expect(statusOf(run(`${PAGE}<a href="/a" aria-labelledby="nav-a">→</a>`), "link_text")).toBe(
+      "PASS"
+    );
+    expect(statusOf(run(`${PAGE}<a href="/a" hidden>→</a>`), "link_text")).toBe("SKIPPED");
+  });
+
+  it("does not demand a title on a hidden iframe", () => {
+    const hidden = `${PAGE}<iframe hidden src="https://video.example/embed"></iframe>`;
+    expect(statusOf(run(hidden), "iframe_title")).toBe("SKIPPED");
+    const announced = `${PAGE}<iframe aria-hidden="true" src="https://video.example/embed"></iframe>`;
+    expect(statusOf(run(announced), "iframe_title")).toBe("SKIPPED");
+  });
+
+  it("judges the title of an iframe, and skips when there is none", () => {
+    expect(statusOf(run(PAGE), "iframe_title")).toBe("SKIPPED");
+    const untitled = run(`${PAGE}<iframe src="https://video.example/embed"></iframe>`);
+    expect(statusOf(untitled, "iframe_title")).toBe("FAIL");
+    const titled = run(
+      `${PAGE}<iframe title="Vidéo de démonstration" src="https://video.example/embed"></iframe>`
+    );
+    expect(statusOf(titled, "iframe_title")).toBe("PASS");
+  });
+
+  it("warns on a non-BCP-47 language and on blocked zoom", () => {
+    const html = `<html lang="english"><head><title>Boutique en ligne</title><meta name="viewport" content="width=device-width, maximum-scale=1"></head><body><main><h1>x</h1></main></body></html>`;
+    const findings = run(html);
+    expect(statusOf(findings, "html_lang")).toBe("WARN");
+    expect(statusOf(findings, "viewport")).toBe("WARN");
+  });
+
   it("only ever emits findings attributed to clean", () => {
     expect(new Set(run(PAGE).map((item) => item.module))).toEqual(new Set(["clean"]));
   });

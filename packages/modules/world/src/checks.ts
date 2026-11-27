@@ -368,6 +368,7 @@ function severityFor(fixture: Fixture): "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" |
     return fixture.expectation === "reject" ? "HIGH" : "CRITICAL";
   if (fixture.category === "identity") return fixture.expectation === "accept" ? "HIGH" : "MEDIUM";
   if (fixture.category === "phone") return "HIGH";
+  if (fixture.category === "email") return "HIGH";
   if (fixture.category === "datetime") return "HIGH";
   if (fixture.category === "address") return "MEDIUM";
   return "LOW";

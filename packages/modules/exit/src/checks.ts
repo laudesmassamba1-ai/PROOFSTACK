@@ -82,6 +82,24 @@ export function buildExitSuites(options: ExitCheckOptions): TestSuiteDef[] {
           severity: "CRITICAL",
         });
 
+        // A download that arrives as `export.csv.zip` or loses its extension opens in the
+        // wrong tool, and a path separator in the name is how an archive learns to escape
+        // the folder it is extracted into.
+        ctx.check(first.fileName.toLowerCase().endsWith(`.${format}`), {
+          description: `the ${format.toUpperCase()} download keeps its extension`,
+          expected: `*.${format}`,
+          actual: first.fileName,
+          code: "export_wrong_extension",
+          severity: "MEDIUM",
+        });
+        ctx.check(!/[\\/]/.test(first.fileName), {
+          description: "the download name contains no path separator",
+          expected: "a bare file name",
+          actual: first.fileName,
+          code: "export_unsafe_filename",
+          severity: "HIGH",
+        });
+
         // Two fetches of the same export should agree. A digest that changes every
         // time means the export is not reproducible, which makes every other
         // comparison in this suite meaningless.
@@ -395,6 +413,7 @@ export function buildExitSuites(options: ExitCheckOptions): TestSuiteDef[] {
       }
 
       const names = new Set(artifact.entries.map((e) => e.name));
+      const byName = new Map(artifact.entries.map((e) => [e.name, e]));
       ctx.check(names.size > 0, {
         description: "the zip contains at least one entry",
         expected: ">= 1 entry",
@@ -430,6 +449,83 @@ export function buildExitSuites(options: ExitCheckOptions): TestSuiteDef[] {
             : `${missing.length} missing: ${missing.slice(0, 5).join(", ")}`,
         code: "zip_manifest_missing_files",
         severity: "CRITICAL",
+      });
+
+      // Two entries with the same name overwrite each other on extraction, so the
+      // archive the customer downloads is not the archive the customer can restore.
+      ctx.check(artifact.entries.length === names.size, {
+        description: "the zip has no duplicate entry names",
+        expected: `${artifact.entries.length} entries with unique names`,
+        actual: `${names.size} unique name(s)`,
+        code: "zip_duplicate_entry",
+        severity: "HIGH",
+      });
+      const unsafeEntries = artifact.entries.filter(
+        (entry) =>
+          entry.name.startsWith("/") ||
+          entry.name.startsWith("\\\\") ||
+          entry.name.split(/[\\/]/).includes("..") ||
+          /^[A-Za-z]:/.test(entry.name)
+      );
+      ctx.check(unsafeEntries.length === 0, {
+        description: "no zip entry points outside the extraction folder",
+        expected: "relative paths with no `..`",
+        actual:
+          unsafeEntries.length === 0
+            ? "all relative"
+            : `${unsafeEntries.length} unsafe: ${unsafeEntries
+                .slice(0, 3)
+                .map((e) => e.name)
+                .join(", ")}`,
+        code: "zip_path_traversal",
+        severity: "CRITICAL",
+      });
+
+      const declaredNames = new Set(
+        declared
+          .map((entry) =>
+            typeof entry === "string" ? entry : String((entry as { name?: string }).name ?? "")
+          )
+          .filter(Boolean)
+      );
+      const extra = [...names].filter((name) => !declaredNames.has(name));
+      if (extra.length > 0) {
+        ctx.warn({
+          title: "the zip carries files the manifest does not declare",
+          detail: `${extra.length} undeclared: ${extra.slice(0, 5).join(", ")}`,
+          severity: "MEDIUM",
+          code: "zip_manifest_extra_files",
+        });
+      }
+      const declaredObjects = declared.filter(
+        (entry): entry is { name?: string; bytes?: number; sha256?: string } =>
+          typeof entry === "object" && entry !== null
+      );
+      const described = declaredObjects.filter(
+        (entry) => typeof entry.bytes === "number" || typeof entry.sha256 === "string"
+      );
+      if (described.length === 0) {
+        ctx.notApplicable("the manifest declares no size or digest to cross-check");
+        return;
+      }
+      const mismatched = described.filter((entry) => {
+        const actual = byName.get(String(entry.name ?? ""));
+        if (!actual) return false;
+        if (typeof entry.bytes === "number" && actual.bytes !== entry.bytes) return true;
+        return typeof entry.sha256 === "string" && actual.sha256 !== entry.sha256;
+      });
+      ctx.check(mismatched.length === 0, {
+        description: "declared sizes and digests match the archived entries",
+        expected: `${described.length} matching entr(ies)`,
+        actual:
+          mismatched.length === 0
+            ? "all match"
+            : `${mismatched.length} differ: ${mismatched
+                .slice(0, 3)
+                .map((e) => e.name)
+                .join(", ")}`,
+        code: "zip_manifest_digest_mismatch",
+        severity: "HIGH",
       });
     },
   });

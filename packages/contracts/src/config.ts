@@ -29,6 +29,7 @@ export const worldConfigSchema = z
         z.enum([
           "identity",
           "phone",
+          "email",
           "address",
           "currency",
           "datetime",
@@ -37,7 +38,7 @@ export const worldConfigSchema = z
           "collation",
         ])
       )
-      .default(["identity", "phone", "address", "currency", "datetime"]),
+      .default(["identity", "phone", "email", "address", "currency", "datetime"]),
     /** Form descriptors the engine fills in and submits. */
     forms: z
       .array(

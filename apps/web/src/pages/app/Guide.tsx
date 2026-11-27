@@ -148,8 +148,8 @@ const CHECKS: {
       en: "Does international data survive?",
     },
     what: {
-      fr: "Identité, téléphone, adresse, devise, dates, formulaires, tri et collation sur plusieurs profils de pays.",
-      en: "Identity, phone, address, currency, dates, forms, sorting and collation across country profiles.",
+      fr: "Identité, téléphone, e-mail, adresse, devise, dates, formulaires, tri et collation sur plusieurs profils de pays.",
+      en: "Identity, phone, email, address, currency, dates, forms, sorting and collation across country profiles.",
     },
     limit: {
       fr: "Sans cible ni jeux de données, les cas sont ignorés. Ignoré ne veut pas dire réussi.",

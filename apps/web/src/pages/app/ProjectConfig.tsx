@@ -132,6 +132,7 @@ interface ConfigValidation {
 const CATEGORIES = [
   "identity",
   "phone",
+  "email",
   "address",
   "currency",
   "datetime",

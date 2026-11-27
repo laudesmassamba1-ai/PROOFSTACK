@@ -15,6 +15,7 @@ import { parseJapaneseDate, parseWithAnyPattern, toAsciiDigits } from "./datefor
 export const FIXTURE_CATEGORIES = [
   "identity",
   "phone",
+  "email",
   "address",
   "currency",
   "datetime",
@@ -97,6 +98,7 @@ export function buildFixtures(profile: LocaleProfileData, options: BuildOptions 
 
   if (categories.has("identity")) identityFixtures(profile, push);
   if (categories.has("phone")) phoneFixtures(profile, push);
+  if (categories.has("email")) emailFixtures(profile, push);
   if (categories.has("address")) addressFixtures(profile, push);
   if (categories.has("currency")) currencyFixtures(profile, push);
   if (categories.has("datetime")) datetimeFixtures(profile, push);
@@ -163,6 +165,93 @@ function identityFixtures(profile: LocaleProfileData, push: Push): void {
       profile: profile.id,
       category: "identity",
       field: "full_name",
+      value,
+      expectation: "reject",
+      tolerance: "exact",
+      strictness: "hard",
+      note,
+    });
+  }
+}
+
+/**
+ * Email is the identity field every signup form has, and the one most often narrowed
+ * by a regex written for ASCII. The hard cases are valid addresses a naive pattern
+ * refuses: a plus tag, an apostrophe, a long TLD, a quoted local part and SMTPUTF8.
+ * Rejection of the soft cases is a warning, not a failure, because browser and SMTP
+ * support varies; rejection of the plain cases is a defect.
+ */
+function emailFixtures(profile: LocaleProfileData, push: Push): void {
+  const valid = [
+    "avery.smith@example.com",
+    "lucie+facture@example.com",
+    "o'brien@example.com",
+    "x@example.photography",
+  ];
+  for (const value of valid) {
+    push({
+      id: fixtureId(profile.id, "email", value),
+      profile: profile.id,
+      category: "email",
+      field: "email",
+      value,
+      expectation: "accept",
+      expected: value,
+      tolerance: "nfc",
+      strictness: "hard",
+      note: "a valid address a narrow ASCII pattern often refuses",
+    });
+  }
+
+  const soft = [
+    {
+      value: "用户@例子.广告",
+      note: "SMTPUTF8 address; rejection is a documented limitation, not silent corruption",
+    },
+    {
+      value: '"quoted name"@example.com',
+      note: "quoted local part is valid RFC 5321; normalising it away must not lose the address",
+    },
+  ];
+  for (const item of soft) {
+    push({
+      id: fixtureId(profile.id, "email", item.value),
+      profile: profile.id,
+      category: "email",
+      field: "email",
+      value: item.value,
+      expectation: "accept",
+      tolerance: "nfc",
+      strictness: "soft",
+      note: item.note,
+    });
+  }
+
+  const nul = String.fromCharCode(0);
+  const tooLongLocal = `${"a".repeat(65)}@example.com`;
+  const tooLongLabel = `a@${"b".repeat(64)}.com`;
+  const tooLong = `${"a".repeat(64)}@${"b".repeat(190)}.com`;
+  const invalid: Array<[string, string]> = [
+    ["plainaddress", "no @, so it cannot be routed"],
+    ["a@b", "a domain with no dot is not a public mailbox"],
+    [".a@example.com", "the local part cannot start with a dot"],
+    ["a..b@example.com", "two consecutive dots are not a valid local part"],
+    ["a@-example.com", "a domain label cannot start with a hyphen"],
+    ["a@example..com", "an empty domain label is invalid"],
+    [tooLongLocal, "the local part exceeds 64 octets"],
+    [tooLongLabel, "a domain label exceeds 63 octets"],
+    [tooLong, "the whole address exceeds 254 octets"],
+    ["a@@example.com", "two @ signs cannot be parsed"],
+    ["a@example.com\nBcc: x@example.com", "a newline injects a second header"],
+    [`a${nul}b@example.com`, "a NUL byte must never be stored in an address"],
+    ["a\u202eb@example.com", "a bidi override inside an address must be rejected or sanitised"],
+  ];
+  for (const [value, note] of invalid) {
+    push({
+      id: fixtureId(profile.id, "email", value),
+      profile: profile.id,
+      category: "email",
+      field: "email",
       value,
       expectation: "reject",
       tolerance: "exact",
