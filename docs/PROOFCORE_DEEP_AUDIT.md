@@ -104,16 +104,22 @@ Hypothèse éliminée : un état du poste (config, session, `.git`) — le clone
 - Décalage `git clone …/PROOFSTACK.git` / `cd PROOFCORE` cité par l'audit historique :
   **plus aucune occurrence** dans le dépôt (README, docs, CLI) — réglé.
 
-### 5.5 Nouvelles incohérences documentaires localisées (complète la section 3)
+### 5.5 Incohérences documentaires localisées — corrigées
 
-- `README.md:38` : « Overview, Projects, WORLD/FLOW/EXIT » — il y a cinq modules.
-- `docs/CLI_EXPERIENCE.md:26` : « Run the enabled modules (WORLD/FLOW/EXIT) ».
-- `docs/PROOFCORE_2_0_DELIVERY_REPORT.md:261` : ligne de tableau WORLD/FLOW/EXIT.
-- `docs/PROOFCORE_AI_ARCHITECTURE.md:53` : `module_configure` « WORLD/FLOW/EXIT ».
-- `docs/PROOFCORE_TRANSFORMATION_PROGRESS.md:120` : « WORLD/FLOW/EXIT PARTIEL ».
+- `README.md` nomme les cinq familles (« WORLD, FLOW, EXIT, FAIL, CLEAN ») et l'installation
+  globale avertit que le nom npm `proofcore` publié est en 0.6.0, pas la version du dépôt.
+- `docs/CLI_EXPERIENCE.md` : `proofcore test` documente les cinq familles et `world | flow | exit`
+  reste la commande des trois moteurs locaux, ce qui est exact.
+- `docs/PROOFCORE_2_0_DELIVERY_REPORT.md` : les lignes `WORLD/FLOW/EXIT` et `FAIL/CLEAN` sont
+  deux lignes distinctes du même tableau, pas une omission.
+- `docs/PROOFCORE_AI_ARCHITECTURE.md` : `module_configure` décrit « les cinq familles
+  (WORLD, FLOW, EXIT, FAIL, CLEAN) ».
+- `docs/PROOFCORE_TRANSFORMATION_PROGRESS.md` : la ligne est « WORLD/FLOW/EXIT/FAIL/CLEAN ».
 - Les cinq modules fonctionnent (walk ci-dessus : `/app/modules/{world,flow,exit,fail,clean}`
   rendent tous) et l'assistant IA outillé les couvre (`apps/api/src/routes/ai.ts`, 19 outils,
   dont `fail_scan` et `clean_audit`).
+- Vérification du 27 novembre 2026 : `grep -rn 'WORLD/FLOW/EXIT'` ne laisse que des
+  formulations exactes (trois moteurs locaux, ou tableau scindé). Risque R17 clos.
 
 ## 6. Mise à jour du 26 novembre 2026 (soir) — historique (périmé pour l'état du dépôt)
 
