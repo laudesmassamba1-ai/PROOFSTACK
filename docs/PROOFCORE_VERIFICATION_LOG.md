@@ -175,8 +175,8 @@ partielle.
 | Fonction                                 | Code présent | Test exécuté              | Test réussi   | Parcours vérifié                                                  | Production vérifiée |
 | ---------------------------------------- | ------------ | ------------------------- | ------------- | ----------------------------------------------------------------- | ------------------- |
 | Menu mobile / parcours guide             | oui          | Playwright mobile, ciblé  | oui           | VÉRIFIÉ sur stack local uniquement                                | NON VÉRIFIÉ         |
-| Layout responsive, 13 tailles × 6 routes | oui          | Playwright Chromium       | oui           | VÉRIFIÉ sur stack local; les captures sont des artefacts de test  | NON VÉRIFIÉ         |
-| Axe-core WCAG 2.2 AA                     | oui          | Playwright + axe          | oui, 7 routes | PARTIEL : audit automatisé, clavier/lecteur d'écran non certifiés | NON VÉRIFIÉ         |
+| Layout responsive, 13 tailles × 7 routes (dont l'assistant) | oui          | Playwright Chromium       | oui           | VÉRIFIÉ sur stack local; les captures sont des artefacts de test  | NON VÉRIFIÉ         |
+| Axe-core WCAG 2.2 AA                     | oui          | Playwright + axe          | oui, 8 routes | PARTIEL : audit automatisé, clavier/lecteur d'écran non certifiés | NON VÉRIFIÉ         |
 | Contrôle cross-site des mutations        | oui          | 16 tests unitaires ciblés | oui           | PARTIEL : harnais API, pas un navigateur réel                     | NON VÉRIFIÉ         |
 
 ## Assistant : navigateur piloté, jetons réels et mobile 320 px — 2026-11-27
@@ -207,7 +207,8 @@ partielle.
 
 - **Passe visuelle et accessibilité (même arbre)** :
   `npx playwright test ... tests/e2e/viewports.spec.ts --project=desktop --timeout=600000`
-  → 1/1, 13 tailles × 6 routes, 5,0 min, zéro overflow et zéro erreur console ;
+  → 1/1, 13 tailles × 7 routes (dont `/app/ai`), 6,0 min, zéro overflow et zéro
+  erreur console ;
   `npx playwright test ... tests/e2e/a11y.spec.ts --project=desktop` → 1/1, 8 pages
   (dont `/app/ai`), aucune violation WCAG 2.2 AA après remontée du contraste des
   compteurs `/ 32k` et `0 tok` à `--ink-soft`.

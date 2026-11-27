@@ -37,6 +37,7 @@ const PAGES = [
   { path: "/app/analyses", name: "analyses" },
   { path: "/app/flow", name: "flow" },
   { path: "/app/modules", name: "modules" },
+  { path: "/app/ai", name: "assistant" },
 ] as const;
 
 const PASSWORD = "correct-horse-battery-staple";
@@ -102,7 +103,10 @@ async function signUp(page: import("@playwright/test").Page, email: string): Pro
 test("every supported viewport renders without horizontal overflow or console errors", async ({
   page,
 }) => {
-  test.setTimeout(300_000);
+  // 13 widths × 7 routes: five minutes is not enough once the assistant joins the
+  // sweep (it lazy-loads the chat chunk per viewport). Ten minutes stays below the CI
+  // job budget and above the measured 5–6 minutes.
+  test.setTimeout(600_000);
   const outDir = "test-results/viewports";
   await mkdir(outDir, { recursive: true });
   const report: {
