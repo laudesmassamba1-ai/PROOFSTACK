@@ -135,7 +135,10 @@ export function accountRoutes(services: Services): Hono<AppEnv> {
   const maxForgotPerAddress = Number(process.env.FORGOT_MAX_PER_ADDRESS ?? 10);
   const maxForgotPerEmail = Number(process.env.FORGOT_MAX_PER_EMAIL ?? 4);
   const forgotWindowMs = Number(process.env.FORGOT_WINDOW_MS ?? 60 * 60_000);
-  const supportLimiter = new RateLimiter(5, 60 * 60_000);
+  // Same reason as sign-up: a message costs an operator's attention, and an isolate
+  // must not be able to forget the budget by recycling.
+  const supportLimit = Number(process.env.SUPPORT_RATE_LIMIT ?? 5);
+  const supportWindowMs = Number(process.env.SUPPORT_RATE_WINDOW_MS ?? 60 * 60_000);
   const webOrigin = services.config.webOrigin;
 
   const emailConfigured = (): boolean => services.email.configured;
@@ -337,10 +340,21 @@ export function accountRoutes(services: Services): Hono<AppEnv> {
 
   app.post("/support", async (c) => {
     const address = clientAddress({ get: (name) => c.req.header(name) });
-    const limit = supportLimiter.check(address);
-    if (!limit.allowed) {
-      c.header("Retry-After", String(limit.retryAfterSeconds));
-      throw new HttpError(429, "too_many_attempts", "Trop de messages. Réessaie plus tard.");
+    if (supportLimit > 0) {
+      const now = services.clock();
+      const { count, resetAt } = await services.store.hitRateLimit({
+        scope: "support:address",
+        key: address,
+        windowMs: supportWindowMs,
+        now,
+      });
+      if (count > supportLimit) {
+        c.header(
+          "Retry-After",
+          String(Math.max(1, Math.ceil((Date.parse(resetAt) - now.getTime()) / 1000)))
+        );
+        throw new HttpError(429, "too_many_attempts", "Trop de messages. Réessaie plus tard.");
+      }
     }
     const body = await readBody(c, supportSchema);
     const id = `sup_${uuid().replaceAll("-", "").slice(0, 20)}`;
