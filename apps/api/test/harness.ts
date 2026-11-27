@@ -28,9 +28,9 @@ interface Harness {
   ) => Promise<{ cookie: string; workspaceId: string; userId: string }>;
 }
 
-export function harness(): Harness {
+export function harness(overrides: Record<string, string> = {}): Harness {
   const db = NodeSqliteDatabase.open(":memory:");
-  const built = createApp({ db, env: ENV });
+  const built = createApp({ db, env: { ...ENV, ...overrides } });
   const request: Harness["request"] = async (path, init = {}) => {
     const headers = new Headers(init.headers);
     if (init.cookie) headers.set("cookie", init.cookie);
@@ -58,8 +58,8 @@ export function harness(): Harness {
   return { services: built.services, request, signUp };
 }
 
-export async function bootstrap(): Promise<Harness> {
-  const h = harness();
+export async function bootstrap(overrides: Record<string, string> = {}): Promise<Harness> {
+  const h = harness(overrides);
   await migrate(h.services.db, migrationFiles());
   return h;
 }

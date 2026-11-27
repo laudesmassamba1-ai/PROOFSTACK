@@ -27,30 +27,37 @@ import { defaultScenario } from "../scenario.js";
 const VIEWPORT = { width: 1280, height: 800 };
 const ACTION_TIMEOUT_MS = 25_000;
 const KEEP_ALIVE_MS = 120_000;
+const MAX_SCREENSHOT_BYTES = 180_000;
+const MAX_LOG_ENTRIES = 25;
 
-const startSchema = z.object({
-  url: z.string().min(1).max(2048).optional(),
-  workspaceId: z.string().min(1).max(64),
-});
+const startSchema = z
+  .object({
+    url: z.string().min(1).max(2048).optional(),
+    workspaceId: z.string().min(1).max(64),
+  })
+  .strict();
 
-const actionSchema = z.object({
-  sessionId: z.string().min(1).max(120),
-  action: z.discriminatedUnion("kind", [
-    z.object({ kind: z.literal("navigate"), url: z.string().min(1).max(2048) }),
-    z.object({
-      kind: z.literal("click"),
-      x: z.number().min(0).max(VIEWPORT.width),
-      y: z.number().min(0).max(VIEWPORT.height),
-    }),
-    z.object({ kind: z.literal("type"), text: z.string().max(2000) }),
-    z.object({ kind: z.literal("key"), key: z.string().min(1).max(20) }),
-    z.object({ kind: z.literal("scroll"), dy: z.number().min(-5000).max(5000) }),
-    z.object({ kind: z.literal("back") }),
-    z.object({ kind: z.literal("reload") }),
-  ]),
-});
+const actionSchema = z
+  .object({
+    sessionId: z.string().min(1).max(120),
+    action: z.discriminatedUnion("kind", [
+      z.object({ kind: z.literal("navigate"), url: z.string().min(1).max(2048) }),
+      z.object({
+        kind: z.literal("click"),
+        x: z.number().min(0).max(VIEWPORT.width),
+        y: z.number().min(0).max(VIEWPORT.height),
+      }),
+      z.object({ kind: z.literal("type"), text: z.string().max(2000) }),
+      z.object({ kind: z.literal("key"), key: z.string().min(1).max(20) }),
+      z.object({ kind: z.literal("scroll"), dy: z.number().min(-5000).max(5000) }),
+      z.object({ kind: z.literal("back") }).strict(),
+      z.object({ kind: z.literal("forward") }).strict(),
+      z.object({ kind: z.literal("reload") }).strict(),
+    ]),
+  })
+  .strict();
 
-const closeSchema = z.object({ sessionId: z.string().min(1).max(120) });
+const closeSchema = z.object({ sessionId: z.string().min(1).max(120) }).strict();
 
 interface BrowserState {
   url: string;
@@ -75,6 +82,7 @@ interface PageLike {
   };
   keyboard: { press: (key: string) => Promise<void>; type: (text: string) => Promise<void> };
   goBack: (options?: Record<string, unknown>) => Promise<unknown>;
+  goForward: (options?: Record<string, unknown>) => Promise<unknown>;
   reload: (options?: Record<string, unknown>) => Promise<unknown>;
   setViewport: (viewport: { width: number; height: number }) => Promise<void>;
   evaluate?: (expression: string) => Promise<unknown>;
@@ -171,13 +179,14 @@ async function capture(
   page: PageLike,
   logs: { type: string; text: string }[]
 ): Promise<BrowserState> {
-  const shot = await page.screenshot({ type: "jpeg", quality: 70, encoding: "base64" });
+  const shot = await page.screenshot({ type: "jpeg", quality: 60, encoding: "base64" });
+  const bytes = typeof shot === "string" ? Buffer.byteLength(shot, "base64") : shot.byteLength;
   const base64 = typeof shot === "string" ? shot : Buffer.from(shot).toString("base64");
   return {
     url: page.url(),
-    title: await page.title().catch(() => ""),
-    screenshot: `data:image/jpeg;base64,${base64}`,
-    console: logs.slice(-25),
+    title: (await page.title().catch(() => "")).slice(0, 300),
+    ...(bytes <= MAX_SCREENSHOT_BYTES ? { screenshot: `data:image/jpeg;base64,${base64}` } : {}),
+    console: logs.slice(-MAX_LOG_ENTRIES),
     viewport: VIEWPORT,
   };
 }
@@ -365,6 +374,9 @@ export function browserRoutes(services: Services): Hono<AppEnv> {
           break;
         case "back":
           await page.goBack({ timeout: ACTION_TIMEOUT_MS }).catch(() => undefined);
+          break;
+        case "forward":
+          await page.goForward({ timeout: ACTION_TIMEOUT_MS }).catch(() => undefined);
           break;
         case "reload":
           await page

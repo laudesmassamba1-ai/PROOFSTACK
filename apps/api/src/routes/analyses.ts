@@ -4,6 +4,7 @@ import {
   ANALYSIS_TARGET_TYPES,
   type AnalysisCoverage,
   type AnalysisStatus,
+  advanceRemediation,
   analysisDurationMs,
   canTransitionAnalysis,
   compareFindingsForDisplay,
@@ -12,18 +13,23 @@ import {
   FINDING_STATUS_LABELS,
   FINDING_STATUSES,
   groupByCause,
+  nextRemediationStep,
   outcomeStatus,
   planAnalysis,
   profileById,
+  REMEDIATION_STEPS,
+  seedRemediation,
   summarizeFindings,
 } from "@proofcore/core";
 import { Hono } from "hono";
 import { z } from "zod";
 import { compareAnalysisPair, findingsForAnalysis } from "../findings.js";
-import { HttpError } from "../http/errors.js";
+import { quotaErrorFromDecision, quotaErrorFromMeter } from "../http/entitlement-http.js";
+import { HttpError, RateLimiter } from "../http/errors.js";
 import { readBody, requireWorkspace } from "../http/guards.js";
 import { pageBody, readPage } from "../http/pagination.js";
 import type { AppEnv, Services } from "../http/services.js";
+import { verifyRemediationWithAnalysis } from "../remediation-verify.js";
 import type { AnalysisRecord } from "../store/app-store.js";
 
 /**
@@ -98,6 +104,15 @@ const createSchema = z
   })
   .strict();
 
+const verifyPatchSchema = z
+  .object({
+    workspaceId: z.string().min(1),
+    findingKey: z.string().min(1).max(400),
+    /** The person confirmed they applied the diff themselves. PROOFCORE writes no file. */
+    applied: z.boolean().default(false),
+  })
+  .strict();
+
 const patchSchema = z
   .object({
     status: z.enum(ANALYSIS_STATUSES).optional(),
@@ -138,8 +153,30 @@ function mergeCoverage(
   return merged;
 }
 
+const REPORT_STATUSES = [
+  "PASSED",
+  "FAILED",
+  "WARNING",
+  "SKIPPED",
+  "BLOCKED",
+  "ERROR",
+  "NOT_APPLICABLE",
+  "NOT_CONFIGURED",
+] as const;
+
+function escapeReportHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export function analysisRoutes(services: Services): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
+  // A verification re-reads the customer's site: it is a scan, not a free button.
+  const verifier = new RateLimiter(10, 60 * 60_000);
 
   app.post("/analyses", async (c) => {
     const user = c.get("user");
@@ -212,6 +249,479 @@ export function analysisRoutes(services: Services): Hono<AppEnv> {
     return c.json({ analysis: analysisDto(analysis) }, replayed ? 200 : 201);
   });
 
+  /**
+   * Verify a prepared patch by launching the later analysis itself.
+   *
+   * The remediation chain says only a later analysis can verify a fix. Asking a person to
+   * scan again, find the new analysis, then select it from a dropdown was the gap between
+   * that rule and the button next to the diff. This route closes it without weakening the
+   * rule: it really reads the target again, records a canonical analysis with its own
+   * page audit, then hands that analysis to `verifyRemediationWithAnalysis`.
+   *
+   * Each target type is re-measured with the engine that produced it: a PAGE with the
+   * page scanner, a SITE with the site crawler, a WORKFLOW with the FLOW module. A target
+   * type the product cannot re-read is refused with the reason, never scanned into a false
+   * negative. Scans are metered as an AI audit; a FLOW re-run spends a test run through
+   * the module runner. An inconclusive reading is returned as `verified: false`.
+   */
+  app.post("/analyses/:analysisId/verify-patch", async (c) => {
+    const user = c.get("user");
+    const limited = verifier.check(user.id);
+    if (!limited.allowed) {
+      c.header("Retry-After", String(limited.retryAfterSeconds));
+      const minutes = Math.max(1, Math.ceil(limited.retryAfterSeconds / 60));
+      throw new HttpError(
+        429,
+        "scan_rate_limited",
+        `Trop de vérifications sur cette heure. Réessaie dans ${minutes} min.`,
+        { retryAfterSeconds: limited.retryAfterSeconds }
+      );
+    }
+
+    const body = await readBody(c, verifyPatchSchema);
+    const { workspace, role } = await requireWorkspace(c, services, body.workspaceId);
+    if (role === "viewer") {
+      throw new HttpError(
+        403,
+        "insufficient_role",
+        "Viewers cannot verify a patch. Ask for member rights."
+      );
+    }
+    const analysis = await services.store.getAnalysis(workspace.id, c.req.param("analysisId"));
+    if (!analysis) throw new HttpError(404, "analysis_not_found", "Analysis not found.");
+    const loaded = await findingsForAnalysis(services, analysis);
+    const finding = loaded.findings.find((item) => item.key === body.findingKey);
+    if (!finding) {
+      throw new HttpError(
+        404,
+        "finding_not_found",
+        "No finding with this key in that analysis. Re-read the findings first."
+      );
+    }
+    if (finding.status !== "FAILED" && finding.status !== "WARNING") {
+      throw new HttpError(
+        409,
+        "nothing_to_verify",
+        `${finding.controlId} is ${finding.status}: there is no defect to re-check.`
+      );
+    }
+    const parseTarget = (): URL => {
+      let target: URL;
+      try {
+        target = new URL(analysis.target);
+      } catch {
+        throw new HttpError(
+          409,
+          "target_not_scannable",
+          `This analysis recorded an unusable target (${analysis.target.slice(0, 120)}).`
+        );
+      }
+      if (target.protocol !== "http:" && target.protocol !== "https:") {
+        throw new HttpError(409, "target_not_scannable", "The target must be an http(s) URL.");
+      }
+      return target;
+    };
+    const meterScan = async (): Promise<string> => {
+      const verificationId = `ver_${crypto.randomUUID().replaceAll("-", "").slice(0, 20)}`;
+      const gate = await services.meter.authorize({
+        workspaceId: workspace.id,
+        check: { key: "monthly_ai_audits", requested: 1 },
+        subjectId: verificationId,
+        quantity: 0,
+      });
+      if (!gate.allowed) throw quotaErrorFromDecision(gate.decision, "AI-audit");
+      return verificationId;
+    };
+    const commitScan = async (verificationId: string): Promise<void> => {
+      const metered = await services.meter.meter({
+        workspaceId: workspace.id,
+        kind: "ai_audit",
+        subjectId: verificationId,
+        quantity: 1,
+        at: services.clock(),
+      });
+      if (metered.reason === "quota_exhausted") {
+        throw quotaErrorFromMeter(metered, "AI-audit");
+      }
+    };
+
+    let verificationAnalysisId: string;
+
+    if (analysis.targetType === "PAGE") {
+      if (!["fail", "clean", "flow", "world", "exit"].includes(finding.module)) {
+        throw new HttpError(
+          409,
+          "verification_not_supported",
+          `${finding.module} is not measured by a page scan. Run the module again and verify the new analysis manually.`
+        );
+      }
+      const target = parseTarget();
+      const verificationId = await meterScan();
+      const scanStartedAt = services.clock().toISOString();
+      let result: Awaited<ReturnType<typeof services.scan>>;
+      try {
+        result = await services.scan(target.toString(), {
+          allowPrivate: false,
+          maxBytes: 1_500_000,
+          timeoutMs: 15_000,
+          ownershipHint: "remote",
+        });
+      } catch (error) {
+        throw new HttpError(
+          502,
+          "scan_failed",
+          `Could not reach ${target.hostname}: ${error instanceof Error ? error.message : "unknown error"}`
+        );
+      }
+      await commitScan(verificationId);
+
+      const failed = result.findings.filter((item) => item.status === "FAIL").length;
+      const warnings = result.findings.filter((item) => item.status === "WARN").length;
+      const auditId = `aud_${crypto.randomUUID().replaceAll("-", "").slice(0, 20)}`;
+      await services.store.createPageAudit({
+        id: auditId,
+        workspaceId: workspace.id,
+        createdBy: user.id,
+        url: result.url,
+        finalUrl: result.finalUrl,
+        status: result.status,
+        durationMs: result.durationMs,
+        worstVerdict: failed > 0 ? "fail" : warnings > 0 ? "warnings" : "pass",
+        failed,
+        warnings,
+        payload: JSON.stringify(result),
+        ownership: result.ownership,
+        redacted: result.redacted,
+        projectId: analysis.projectId,
+        freePreview: false,
+      });
+      verificationAnalysisId = await recordScanAnalysis(services, {
+        auditId,
+        workspaceId: workspace.id,
+        projectId: analysis.projectId,
+        createdBy: user.id,
+        url: result.url,
+        source: "WEB",
+        startedAt: scanStartedAt,
+        endedAt: services.clock().toISOString(),
+        modules: result.findings.map((item) => String(item.module)),
+        environment: "production",
+        result: {
+          failed,
+          warnings,
+          passed: result.findings.filter((item) => item.status === "PASS").length,
+          httpStatus: result.status,
+        },
+        freePreview: false,
+      });
+    } else if (analysis.targetType === "SITE") {
+      const target = parseTarget();
+      const verificationId = await meterScan();
+      const scanStartedAt = services.clock().toISOString();
+      let site: Awaited<ReturnType<typeof services.siteAudit>>;
+      try {
+        site = await services.siteAudit({
+          url: target.toString(),
+          allowPrivate: false,
+          timeoutMs: 15_000,
+          crawl: { maxPages: 10, maxDepth: 2 },
+          maxMeasuredPages: 10,
+        });
+      } catch (error) {
+        throw new HttpError(
+          502,
+          "scan_failed",
+          `Could not crawl ${target.hostname}: ${error instanceof Error ? error.message : "unknown error"}`
+        );
+      }
+      await commitScan(verificationId);
+
+      const findings = site.scan.findings;
+      const failed = findings.filter((item) => item.status === "FAIL").length;
+      const warnings = findings.filter((item) => item.status === "WARN").length;
+      const auditId = `aud_${crypto.randomUUID().replaceAll("-", "").slice(0, 20)}`;
+      await services.store.createPageAudit({
+        id: auditId,
+        workspaceId: workspace.id,
+        createdBy: user.id,
+        url: site.scan.url,
+        finalUrl: site.scan.finalUrl,
+        status: site.scan.status,
+        durationMs: site.scan.durationMs,
+        worstVerdict: failed > 0 ? "fail" : warnings > 0 ? "warnings" : "pass",
+        failed,
+        warnings,
+        payload: JSON.stringify({
+          ...site.scan,
+          site: site.site,
+          scores: site.scores,
+          score: site.score,
+          login: site.login,
+        }),
+        ownership: site.scan.ownership,
+        redacted: site.scan.redacted,
+        projectId: analysis.projectId,
+        freePreview: false,
+      });
+      verificationAnalysisId = await recordScanAnalysis(services, {
+        auditId,
+        workspaceId: workspace.id,
+        projectId: analysis.projectId,
+        createdBy: user.id,
+        url: site.scan.url,
+        source: "WEB",
+        startedAt: scanStartedAt,
+        endedAt: services.clock().toISOString(),
+        modules: findings.map((item) => String(item.module)),
+        pages: {
+          discovered: site.site.pages.length + site.site.skipped.length,
+          scanned: site.site.pages.filter((page) => page.measured).length,
+        },
+        environment: "production",
+        result: {
+          failed,
+          warnings,
+          passed: findings.filter((item) => item.status === "PASS").length,
+          httpStatus: site.scan.status,
+        },
+        freePreview: false,
+      });
+    } else if (analysis.targetType === "WORKFLOW" && finding.module === "flow") {
+      if (!analysis.projectId) {
+        throw new HttpError(
+          409,
+          "verification_requires_project",
+          "This FLOW analysis is not attached to a project, so its module cannot be re-run."
+        );
+      }
+      if (!services.runFlow) {
+        throw new HttpError(
+          503,
+          "flow_unavailable",
+          "This deployment cannot re-run FLOW. Run the module again and verify the new analysis manually."
+        );
+      }
+      let run: Awaited<ReturnType<NonNullable<typeof services.runFlow>>>;
+      try {
+        run = await services.runFlow({
+          workspaceId: workspace.id,
+          projectId: analysis.projectId,
+        });
+      } catch (error) {
+        throw new HttpError(
+          502,
+          "flow_run_failed",
+          `FLOW could not run: ${error instanceof Error ? error.message : "unknown error"}`
+        );
+      }
+      if (!run.runId) {
+        throw new HttpError(
+          409,
+          "flow_not_runnable",
+          run.note ?? "FLOW produced no run, so there is nothing to verify."
+        );
+      }
+
+      const now = services.clock().toISOString();
+      const status =
+        run.status === "COMPLETED"
+          ? ("completed" as const)
+          : run.status === "CANCELLED"
+            ? ("cancelled" as const)
+            : ("failed" as const);
+      const coverage = {
+        requestedModules: ["flow"],
+        applicableModules: ["flow"],
+        measuredModules: ["flow"],
+        skipped: [],
+      };
+      const mapped = run.cases.flatMap((testCase) => {
+        const verdict =
+          testCase.status === "PASSED"
+            ? ("PASS" as const)
+            : testCase.status === "FAILED"
+              ? ("FAIL" as const)
+              : testCase.status === "WARNING"
+                ? ("WARN" as const)
+                : testCase.status === "SKIPPED"
+                  ? ("SKIPPED" as const)
+                  : null;
+        if (!verdict) return [];
+        const why =
+          testCase.failure?.message ??
+          `FLOW case ${testCase.id} was re-measured as ${testCase.status}.`;
+        const observed = testCase.failure?.code ?? testCase.status;
+        const ids = [testCase.id];
+        if (testCase.failure?.code && testCase.failure.code !== testCase.id) {
+          ids.push(testCase.failure.code);
+        }
+        // A WORKFLOW finding is identified by its case id, not by a page URL: the
+        // engine reports cases, and the analysis target is the journey, not a page.
+        return ids.map((id) => ({ module: "flow", id, status: verdict, observed, why }));
+      });
+      const id = `ana_${crypto.randomUUID().replaceAll("-", "").slice(0, 20)}`;
+      await services.store.createAnalysis({
+        id,
+        workspaceId: workspace.id,
+        projectId: analysis.projectId,
+        createdBy: user.id,
+        source: "WEB",
+        targetType: "WORKFLOW",
+        target: analysis.target,
+        scope: analysis.scope,
+        requestedModules: ["flow"],
+        applicableModules: ["flow"],
+        engine: "proofcore",
+        engineVersion: "unreported",
+        environment: "server",
+        status: "running",
+        coverage: { ...coverage, measuredModules: [] },
+        startedAt: now,
+        metadata: { runId: run.runId, reportId: run.reportId, verification: true },
+        correlationId: id,
+      });
+      await services.store.updateAnalysis({
+        workspaceId: workspace.id,
+        id,
+        patch: {
+          status,
+          endedAt: now,
+          durationMs: 0,
+          coverage,
+          result: { findings: mapped },
+          runId: run.runId,
+          reportId: run.reportId,
+        },
+        expected: ["running"],
+      });
+      verificationAnalysisId = id;
+    } else {
+      throw new HttpError(
+        409,
+        "verification_not_supported",
+        `A ${analysis.targetType} analysis of ${finding.module} cannot be re-measured automatically. Run the module again and verify the new analysis manually.`
+      );
+    }
+    const fresh = await services.store.getAnalysis(workspace.id, verificationAnalysisId);
+
+    // A remediation is the record the verdict belongs to. Opening it here is part of the
+    // same action, not a hidden second decision: the person asked to verify this finding.
+    // It is opened only after a real reading, so a failed scan leaves no phantom record.
+    const now = services.clock().toISOString();
+    let record = await services.store.findRemediationByFinding(
+      workspace.id,
+      analysis.id,
+      body.findingKey
+    );
+    if (!record) {
+      const seed = seedRemediation(finding, now);
+      record = await services.store.createRemediation({
+        id: `rem_${crypto.randomUUID().replaceAll("-", "").slice(0, 20)}`,
+        workspaceId: workspace.id,
+        projectId: analysis.projectId,
+        analysisId: analysis.id,
+        findingKey: seed.findingKey,
+        module: seed.module,
+        controlId: seed.controlId,
+        title: seed.title,
+        severity: seed.severity,
+        priority: seed.priority,
+        cause: seed.cause,
+        ownerId: null,
+        dueAt: null,
+        steps: seed.steps,
+        fix: seed.fix,
+        verification: seed.verification,
+        proof: seed.proof,
+        createdBy: user.id,
+      });
+    }
+
+    // "Apply, then verify" is one action, but the application is the person's: this
+    // route cannot write their site. A confirmed application is recorded on the chain
+    // (up to the `apply` step) before the second measurement, so the history says who
+    // asserted it and what proved it.
+    if (
+      body.applied &&
+      record.status !== "verified" &&
+      record.status !== "failed" &&
+      record.status !== "dismissed"
+    ) {
+      const appliedAt = services.clock().toISOString();
+      let steps = record.steps;
+      const done = new Set(steps.map((entry) => entry.step));
+      try {
+        for (const step of REMEDIATION_STEPS) {
+          if (done.has(step)) continue;
+          steps = advanceRemediation(steps, step, {
+            at: appliedAt,
+            by: user.id,
+            ...(step === "apply" ? { evidence: "Diff confirmed applied by the user." } : {}),
+          });
+          done.add(step);
+          if (step === "apply") break;
+        }
+      } catch (error) {
+        throw new HttpError(
+          409,
+          "remediation_step_conflict",
+          error instanceof Error ? error.message : "The remediation chain cannot be advanced."
+        );
+      }
+      const updated = await services.store.updateRemediation({
+        workspaceId: workspace.id,
+        id: record.id,
+        patch: { steps, status: "applied", appliedAt },
+        expected: [record.status],
+      });
+      if (!updated) {
+        throw new HttpError(
+          409,
+          "remediation_status_conflict",
+          "The remediation changed while applying the patch. Reload and retry."
+        );
+      }
+      record = updated;
+    }
+
+    try {
+      const verdict = await verifyRemediationWithAnalysis({
+        services,
+        workspaceId: workspace.id,
+        remediationId: record.id,
+        analysisId: verificationAnalysisId,
+      });
+      return c.json({
+        analysisId: verificationAnalysisId,
+        analysis: fresh ? analysisDto(fresh) : null,
+        remediation: {
+          ...verdict.remediation,
+          nextStep: nextRemediationStep(verdict.remediation.steps),
+        },
+        outcome: verdict.outcome,
+        reason: verdict.reason,
+        verified: verdict.outcome === "verified",
+      });
+    } catch (error) {
+      // An inconclusive reading is a real answer: the scan happened, but it did not
+      // re-measure this control. Return the recorded state and say it is not a fix.
+      if (error instanceof HttpError && error.code === "verification_inconclusive") {
+        const current = await services.store.getRemediation(workspace.id, record.id);
+        return c.json({
+          analysisId: verificationAnalysisId,
+          analysis: fresh ? analysisDto(fresh) : null,
+          remediation: current
+            ? { ...current, nextStep: nextRemediationStep(current.steps) }
+            : null,
+          outcome: "inconclusive",
+          reason: error.message,
+          verified: false,
+        });
+      }
+      throw error;
+    }
+  });
+
   app.get("/analyses", async (c) => {
     const user = c.get("user");
     const workspaceId = c.req.query("workspaceId");
@@ -234,6 +744,133 @@ export function analysisRoutes(services: Services): Hono<AppEnv> {
       query: c.req.query("q") ?? null,
     });
     return c.json(pageBody(rows.map(analysisDto), total, page));
+  });
+
+  /**
+   * Export the canonical analysis and its findings as printable HTML or structured JSON.
+   * The workspace check and every nested read are tenant-scoped; no report content is
+   * composed from browser-supplied result data.
+   */
+  app.get("/analyses/:analysisId/report", async (c) => {
+    const { workspace } = await requireWorkspace(c, services, c.req.query("workspaceId"));
+    const analysis = await services.store.getAnalysis(workspace.id, c.req.param("analysisId"));
+    if (!analysis) throw new HttpError(404, "analysis_not_found", "Analysis not found.");
+    const loaded = await findingsForAnalysis(services, analysis);
+    const findings = loaded.findings.map((finding) => ({
+      key: finding.key,
+      module: finding.module,
+      controlId: finding.controlId,
+      title: finding.title,
+      status: finding.status,
+      severity: finding.severity,
+      priority: finding.priority,
+      cause: finding.cause,
+      confidence: finding.confidence,
+      url: finding.url,
+      explanation: finding.explanation,
+      evidence: finding.evidence,
+    }));
+    const statusCounts = Object.fromEntries(
+      REPORT_STATUSES.map((status) => [
+        status,
+        findings.filter((finding) => finding.status === status).length,
+      ])
+    ) as Record<(typeof REPORT_STATUSES)[number], number>;
+    const findingCount = findings.length;
+    const report = {
+      product: "PROOFCORE",
+      generatedAt: services.clock().toISOString(),
+      analysis: analysisDto(analysis),
+      findings,
+      statusCounts,
+      findingCount,
+      coverage: analysis.coverage,
+    };
+    const format = c.req.query("format") ?? "html";
+    if (format === "json") {
+      c.header("content-type", "application/json; charset=utf-8");
+      c.header(
+        "content-disposition",
+        `attachment; filename="proofcore-analysis-${analysis.id}.json"`
+      );
+      c.header("cache-control", "private, no-store");
+      return c.body(JSON.stringify(report, null, 2));
+    }
+    if (format === "pdf") {
+      throw new HttpError(
+        501,
+        "pdf_renderer_unavailable",
+        "Télécharge le rapport HTML puis utilise Imprimer → Enregistrer en PDF."
+      );
+    }
+    if (format !== "html") {
+      throw new HttpError(400, "unsupported_format", "Formats disponibles : html, json.");
+    }
+    const coverageItems = [
+      ...analysis.coverage.measuredModules.map((module) => ({ module, status: "MESURÉ" })),
+      ...analysis.coverage.skipped.map(({ module, reason }) => ({
+        module,
+        status: `NON MESURÉ — ${reason}`,
+      })),
+      ...analysis.coverage.applicableModules
+        .filter(
+          (module) =>
+            !analysis.coverage.measuredModules.includes(module) &&
+            !analysis.coverage.skipped.some((entry) => entry.module === module)
+        )
+        .map((module) => ({ module, status: "NON MESURÉ" })),
+    ];
+    const colors: Record<(typeof REPORT_STATUSES)[number], string> = {
+      PASSED: "#28705a",
+      FAILED: "#b64231",
+      WARNING: "#94620c",
+      SKIPPED: "#77766f",
+      BLOCKED: "#94620c",
+      ERROR: "#b64231",
+      NOT_APPLICABLE: "#77766f",
+      NOT_CONFIGURED: "#77766f",
+    };
+    const bars = REPORT_STATUSES.filter((status) => (statusCounts[status] ?? 0) > 0)
+      .map((status) => {
+        const width = findingCount > 0 ? ((statusCounts[status] ?? 0) / findingCount) * 100 : 0;
+        return `<div class="status-line"><span>${status}</span><strong>${statusCounts[status]}</strong><div class="track"><i style="width:${Math.round(width)}%;background:${colors[status]}"></i></div></div>`;
+      })
+      .join("");
+    const modules = [...new Set(findings.map((finding) => finding.module))];
+    const moduleRows = modules
+      .map((module) => {
+        const count = findings.filter((finding) => finding.module === module).length;
+        const failed = findings.filter(
+          (finding) => finding.module === module && ["FAILED", "ERROR"].includes(finding.status)
+        ).length;
+        return `<tr><td>${escapeReportHtml(module)}</td><td>${count}</td><td>${failed}</td></tr>`;
+      })
+      .join("");
+    const coverageRows = coverageItems
+      .map(
+        ({ module, status }) =>
+          `<tr><td>${escapeReportHtml(module)}</td><td>${escapeReportHtml(status)}</td></tr>`
+      )
+      .join("");
+    const findingRows = findings
+      .map(
+        (finding) =>
+          `<article class="finding"><div class="finding-kicker"><span>${escapeReportHtml(finding.status)}</span><span>${escapeReportHtml(finding.severity)} · priorité ${escapeReportHtml(finding.priority)}</span></div><h3>${escapeReportHtml(finding.title)}</h3><p>${escapeReportHtml(finding.explanation.fact)}</p><dl><dt>Impact</dt><dd>${escapeReportHtml(finding.explanation.impact)}</dd><dt>Preuve (${escapeReportHtml(finding.evidence.method)})</dt><dd>${escapeReportHtml(finding.evidence.observed)}${finding.evidence.expected ? ` — attendu : ${escapeReportHtml(finding.evidence.expected)}` : ""}</dd><dt>Correction</dt><dd>${escapeReportHtml(finding.explanation.fix)}</dd><dt>Vérification</dt><dd>${escapeReportHtml(finding.explanation.verification)}</dd></dl>${finding.url ? `<p class="url">${escapeReportHtml(finding.url)}</p>` : ""}</article>`
+      )
+      .join("");
+    const target = escapeReportHtml(analysis.target);
+    const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rapport PROOFCORE — ${escapeReportHtml(analysis.id)}</title><style>
+:root{color-scheme:light;--paper:#f3f0e8;--ink:#171715;--muted:#68665f;--rule:#d8d4c9}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}main{max-width:1050px;margin:auto;padding:clamp(20px,5vw,64px)}header{border-bottom:2px solid var(--ink);padding-bottom:22px;margin-bottom:26px}.brand{font:700 12px ui-monospace,monospace;letter-spacing:.2em}.eyebrow{font:11px ui-monospace,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}h1{font-size:clamp(32px,6vw,60px);line-height:.98;letter-spacing:-.05em;margin:14px 0}.meta,.muted{color:var(--muted);font-size:13px;overflow-wrap:anywhere}.actions{display:flex;justify-content:flex-end;margin:18px 0}button{border:0;border-radius:999px;background:var(--ink);color:white;padding:10px 16px;font:inherit;cursor:pointer}button:focus-visible{outline:3px solid #0b8379;outline-offset:3px}.overview{display:grid;grid-template-columns:1.2fr 1fr;gap:16px}.panel{border:1px solid var(--rule);background:#faf8f3;padding:18px;margin:12px 0}.panel h2{font-size:18px;margin:0 0 12px}.status-line{display:grid;grid-template-columns:140px 34px 1fr;gap:10px;align-items:center;margin:8px 0;font-size:12px}.track{height:8px;background:#e7e3d9}.track i{display:block;height:100%}.table-wrap{overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:400px}td,th{text-align:left;padding:9px;border-bottom:1px solid var(--rule);font-size:13px;vertical-align:top}th{font:11px ui-monospace,monospace;text-transform:uppercase;color:var(--muted)}.finding{border-top:1px solid var(--rule);padding:17px 0;break-inside:avoid}.finding h3{font-size:18px;margin:8px 0}.finding-kicker{display:flex;gap:14px;font:11px ui-monospace,monospace;text-transform:uppercase;color:var(--muted)}dl{display:grid;grid-template-columns:minmax(100px,160px) 1fr;gap:5px 12px;font-size:13px}dt{font-weight:650}dd{margin:0}.url{font:12px ui-monospace,monospace;overflow-wrap:anywhere;color:var(--muted)}footer{margin-top:28px;border-top:1px solid var(--rule);padding-top:12px;color:var(--muted);font-size:12px}@media(max-width:680px){.overview{grid-template-columns:1fr}.status-line{grid-template-columns:100px 28px 1fr}dl{grid-template-columns:1fr;gap:2px}.finding dd{margin-bottom:8px}}@media print{body{background:white}main{max-width:none;padding:0}.actions{display:none}.panel{break-inside:avoid}.overview{grid-template-columns:1.2fr 1fr}.table-wrap{overflow:visible}}
+</style></head><body><main><header><div class="brand">PROOFCORE</div><p class="eyebrow">Rapport d'analyse · ${escapeReportHtml(analysis.status)} · couverture ${Math.round(coverageRatio(analysis.coverage) * 100)}%</p><h1>Résultats du diagnostic</h1><p class="meta">${target}<br>ID ${escapeReportHtml(analysis.id)} · ${escapeReportHtml(analysis.source)} · ${escapeReportHtml(analysis.targetType)} · ${escapeReportHtml(analysis.engine)} ${escapeReportHtml(analysis.engineVersion)}<br>Démarré ${escapeReportHtml(analysis.startedAt)}${analysis.durationMs === null ? "" : ` · ${Math.round(analysis.durationMs / 1000)} s`} · Généré ${escapeReportHtml(report.generatedAt)}</p></header><div class="actions"><button type="button" onclick="window.print()">Imprimer / enregistrer en PDF</button></div>
+<div class="overview"><section class="panel"><h2>Répartition des constats · ${findingCount} total</h2>${bars || "<p class='muted'>Aucun constat enregistré pour cette analyse.</p>"}</section><section class="panel"><h2>Constats par module</h2><div class="table-wrap"><table><thead><tr><th>Module</th><th>Constats</th><th>Échecs / erreurs</th></tr></thead><tbody>${moduleRows || "<tr><td colspan='3'>Aucun constat</td></tr>"}</tbody></table></div></section></div>
+<section class="panel"><h2>Périmètre et couverture</h2><p class="muted">Demandés : ${analysis.coverage.requestedModules.map(escapeReportHtml).join(", ") || "aucun"} · Applicables : ${analysis.coverage.applicableModules.map(escapeReportHtml).join(", ") || "aucun"} · Mesurés : ${analysis.coverage.measuredModules.map(escapeReportHtml).join(", ") || "aucun"}</p>${analysis.coverage.pages ? `<p class="muted">Pages découvertes : ${analysis.coverage.pages.discovered} · pages analysées : ${analysis.coverage.pages.scanned}</p>` : ""}<div class="table-wrap"><table><thead><tr><th>Module</th><th>État observé</th></tr></thead><tbody>${coverageRows || "<tr><td colspan='2'>Pas de détail de couverture</td></tr>"}</tbody></table></div></section>
+<section class="panel"><h2>Constats et actions</h2>${findingRows || "<p class='muted'>Aucun constat n'a été enregistré. Cela ne signifie pas que des contrôles non exécutés ont réussi.</p>"}</section><footer>Document généré à partir des données persistées de cette analyse. Les éléments non mesurés ne sont pas présentés comme réussis.</footer></main></body></html>`;
+    c.header(
+      "content-disposition",
+      `attachment; filename="proofcore-analysis-${analysis.id}.html"`
+    );
+    c.header("cache-control", "private, no-store");
+    return c.html(html);
   });
 
   /**

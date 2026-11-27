@@ -31,7 +31,12 @@ async function bootstrap(): Promise<Harness> {
     request: (path, init = {}) =>
       built.app.request(`http://localhost${path}`, {
         ...init,
-        headers: { "content-type": "application/json", origin: config.webOrigin, ...init.headers },
+        headers: {
+          "content-type": "application/json",
+          origin: config.webOrigin,
+          ...(init.method && init.method !== "GET" ? { "sec-fetch-site": "same-origin" } : {}),
+          ...init.headers,
+        },
       }),
     close: async () => db.close(),
     store: built.services.store,
@@ -42,6 +47,7 @@ async function bootstrap(): Promise<Harness> {
 async function signUp(harness: Harness, email: string): Promise<string> {
   const response = await harness.request("/api/auth/sign-up/email", {
     method: "POST",
+    headers: { "sec-fetch-site": "same-origin" },
     body: JSON.stringify({ email, password: PASSWORD, name: "Owner" }),
   });
   expect(response.status).toBe(201);
@@ -90,7 +96,7 @@ describe("pagination contract", () => {
     ).json()) as { workspaceId: string };
     const project = await harness.request("/api/v1/projects", {
       method: "POST",
-      headers: { cookie },
+      headers: { cookie, "sec-fetch-site": "same-origin" },
       body: JSON.stringify({
         workspaceId: session.workspaceId,
         name: "Paged",
@@ -154,15 +160,44 @@ describe("origin guard coverage", () => {
     const cookie = await signUp(harness, "csrf@example.com");
     const response = await harness.request("/api/account/password", {
       method: "POST",
-      headers: { cookie, origin: "https://attacker.example" },
+      headers: {
+        cookie,
+        origin: "https://attacker.example",
+        "sec-fetch-site": "cross-site",
+      },
       body: JSON.stringify({ currentPassword: PASSWORD, newPassword: "another correct horse" }),
     });
     expect(response.status).toBe(403);
     const body = (await response.json()) as { error: { code: string } };
     expect(body.error.code).toBe("cross_origin_denied");
+    const crossSiteAllowedOrigin = await harness.request("/api/account/password", {
+      method: "POST",
+      headers: {
+        cookie,
+        origin: "http://localhost:5173",
+        "sec-fetch-site": "cross-site",
+      },
+      body: JSON.stringify({ currentPassword: PASSWORD, newPassword: "another correct horse" }),
+    });
+    expect(crossSiteAllowedOrigin.status).toBe(403);
+    const crossSiteBody = (await crossSiteAllowedOrigin.json()) as { error: { code: string } };
+    expect(crossSiteBody.error.code).toBe("cross_site_write");
+    const originOnly = await harness.request("/api/account/password", {
+      method: "POST",
+      headers: {
+        cookie,
+        origin: "https://attacker.example",
+        "sec-fetch-site": "same-origin",
+      },
+      body: JSON.stringify({ currentPassword: PASSWORD, newPassword: "another correct horse" }),
+    });
+    expect(originOnly.status).toBe(403);
+    const originOnlyBody = (await originOnly.json()) as { error: { code: string } };
+    expect(originOnlyBody.error.code).toBe("cross_origin_denied");
     // The password is untouched: the guard runs before the handler.
     const signIn = await harness.request("/api/auth/sign-in/email", {
       method: "POST",
+      headers: { origin: "http://localhost:5173", "sec-fetch-site": "same-origin" },
       body: JSON.stringify({ email: "csrf@example.com", password: PASSWORD }),
     });
     expect(signIn.status).toBe(200);
@@ -171,7 +206,7 @@ describe("origin guard coverage", () => {
   it("still accepts a caller with no Origin (CLI, native client)", async () => {
     const cookie = await signUp(harness, "cli@example.com");
     const response = await harness.request("/api/account/sessions", {
-      headers: { cookie, origin: "" },
+      headers: { cookie, origin: "", "sec-fetch-site": "same-origin" },
     });
     expect(response.status).toBe(200);
   });
@@ -183,14 +218,14 @@ describe("password budget on account endpoints", () => {
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const wrong = await harness.request("/api/account/password", {
         method: "POST",
-        headers: { cookie },
+        headers: { cookie, origin: "http://localhost:5173", "sec-fetch-site": "same-origin" },
         body: JSON.stringify({ currentPassword: "wrong", newPassword: "another correct horse" }),
       });
       expect(wrong.status).toBe(403);
     }
     const blocked = await harness.request("/api/account/password", {
       method: "POST",
-      headers: { cookie },
+      headers: { cookie, origin: "http://localhost:5173", "sec-fetch-site": "same-origin" },
       body: JSON.stringify({ currentPassword: PASSWORD, newPassword: "another correct horse" }),
     });
     expect(blocked.status).toBe(429);
@@ -203,13 +238,13 @@ describe("password budget on account endpoints", () => {
     for (let attempt = 0; attempt < 5; attempt += 1) {
       await harness.request("/api/account", {
         method: "DELETE",
-        headers: { cookie },
+        headers: { cookie, origin: "http://localhost:5173", "sec-fetch-site": "same-origin" },
         body: JSON.stringify({ password: "wrong", confirm: "DELETE" }),
       });
     }
     const blockedDelete = await harness.request("/api/account", {
       method: "DELETE",
-      headers: { cookie },
+      headers: { cookie, origin: "http://localhost:5173", "sec-fetch-site": "same-origin" },
       body: JSON.stringify({ password: PASSWORD, confirm: "DELETE" }),
     });
     expect(blockedDelete.status).toBe(429);
@@ -217,7 +252,7 @@ describe("password budget on account endpoints", () => {
     // The password form still works with the right password: one budget per action.
     const passwordChange = await harness.request("/api/account/password", {
       method: "POST",
-      headers: { cookie },
+      headers: { cookie, origin: "http://localhost:5173", "sec-fetch-site": "same-origin" },
       body: JSON.stringify({ currentPassword: PASSWORD, newPassword: "another correct horse" }),
     });
     expect(passwordChange.status).toBe(200);
@@ -228,13 +263,13 @@ describe("password budget on account endpoints", () => {
     for (let attempt = 0; attempt < 4; attempt += 1) {
       await harness.request("/api/account/password", {
         method: "POST",
-        headers: { cookie },
+        headers: { cookie, origin: "http://localhost:5173", "sec-fetch-site": "same-origin" },
         body: JSON.stringify({ currentPassword: "wrong", newPassword: "another correct horse" }),
       });
     }
     const ok = await harness.request("/api/account/password", {
       method: "POST",
-      headers: { cookie },
+      headers: { cookie, origin: "http://localhost:5173", "sec-fetch-site": "same-origin" },
       body: JSON.stringify({ currentPassword: PASSWORD, newPassword: "another correct horse" }),
     });
     expect(ok.status).toBe(200);

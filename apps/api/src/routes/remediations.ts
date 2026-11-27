@@ -20,6 +20,22 @@ import { verifyRemediationWithAnalysis } from "../remediation-verify.js";
 import type { RemediationRecord } from "../store/app-store.js";
 
 /**
+ * An owner must be a member of the same workspace. Without this check a remediation could
+ * name a user from another tenant, and the id would be echoed back in every listing.
+ */
+async function requireMember(
+  services: Services,
+  workspaceId: string,
+  ownerId: string | null | undefined
+): Promise<void> {
+  if (!ownerId) return;
+  const role = await services.store.workspaceRole(workspaceId, ownerId);
+  if (!role) {
+    throw new HttpError(400, "owner_not_member", "The owner must be a member of this workspace.");
+  }
+}
+
+/**
  * Remediations.
  *
  * A remediation is born from one finding of one analysis, and it can only be closed by a
@@ -106,6 +122,7 @@ export function remediationRoutes(services: Services) {
     if (role === "viewer") {
       throw new HttpError(403, "insufficient_role", "Viewers cannot open a remediation.");
     }
+    await requireMember(services, workspace.id, body.ownerId);
     const analysis = await services.store.getAnalysis(workspace.id, body.analysisId);
     if (!analysis) throw new HttpError(404, "analysis_not_found", "Analysis not found.");
     const loaded = await findingsForAnalysis(services, analysis);
@@ -235,7 +252,10 @@ export function remediationRoutes(services: Services) {
       patch.status = body.status;
       if (body.status === "applied") patch.appliedAt = now;
     }
-    if (body.ownerId !== undefined) patch.ownerId = body.ownerId;
+    if (body.ownerId !== undefined) {
+      await requireMember(services, workspace.id, body.ownerId);
+      patch.ownerId = body.ownerId;
+    }
     if (body.dueAt !== undefined) patch.dueAt = body.dueAt;
     if (Object.keys(patch).length === 0) {
       return c.json({ remediation: remediationDto(current) });

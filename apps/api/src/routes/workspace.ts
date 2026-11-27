@@ -1,4 +1,5 @@
 import { checkEntitlement, resolveEntitlements } from "@proofcore/billing";
+
 import type { ModuleId } from "@proofcore/contracts";
 import { moduleIdSchema } from "@proofcore/contracts";
 import { Hono } from "hono";
@@ -440,6 +441,29 @@ export function workspaceRoutes(services: Services): Hono<AppEnv> {
     });
   });
 
+  /**
+   * Preflight the editor's save.
+   *
+   * Same schema and same `validateConfig` blockers as the PUT, but nothing is written.
+   * The form calls this first, so a refused configuration keeps the typed values and
+   * shows the blocking issues instead of discovering them after a failed save. A
+   * validation endpoint answers 200 with `valid:false`: a blocker is information, not a
+   * transport error.
+   */
+  app.post("/projects/:projectId/config/validate", async (c) => {
+    const { workspace } = await requireWorkspace(c, services, c.req.query("workspaceId"));
+    const body = await readBody(c, projectConfigInputSchema);
+    const project = await services.store.getProject(workspace.id, c.req.param("projectId"));
+    if (!project) throw new HttpError(404, "project_not_found", "Project not found.");
+    const config = buildProjectConfig(project, {
+      ...body,
+      savedAt: new Date(services.clock()).toISOString(),
+    });
+    const issues = projectConfigIssues(config);
+    const blocking = blockingIssues(issues);
+    return c.json({ valid: blocking.length === 0, config, issues, blocking, saved: false });
+  });
+
   app.put("/projects/:projectId/config", async (c) => {
     const { workspace } = await requireWorkspace(c, services, c.req.query("workspaceId"), [
       "owner",
@@ -585,14 +609,55 @@ export function workspaceRoutes(services: Services): Hono<AppEnv> {
 
     const format = c.req.query("format") ?? "json";
     if (format === "json") return c.json(payload);
+    const totals = payload.moduleRuns.reduce(
+      (summary, moduleRun) => {
+        summary.total += moduleRun.totals.total;
+        summary.passed += moduleRun.totals.passed;
+        summary.failed += moduleRun.totals.failed;
+        summary.warnings += moduleRun.totals.warnings;
+        summary.errors += moduleRun.totals.errors;
+        summary.skipped += moduleRun.totals.skipped;
+        return summary;
+      },
+      { total: 0, passed: 0, failed: 0, warnings: 0, errors: 0, skipped: 0 }
+    );
+    if (format === "download") {
+      const report = {
+        product: "PROOFCORE",
+        generatedAt: services.clock().toISOString(),
+        reportId: payload.id,
+        status: payload.status,
+        startedAt: payload.startedAt,
+        endedAt: payload.endedAt,
+        durationMs: payload.durationMs,
+        modules: payload.moduleRuns.map((moduleRun) => ({
+          module: moduleRun.module,
+          status: moduleRun.status,
+          totals: moduleRun.totals,
+          cases: moduleRun.cases,
+        })),
+        totals,
+      };
+      c.header("content-type", "application/json; charset=utf-8");
+      c.header("content-disposition", `attachment; filename="proofcore-report-${payload.id}.json"`);
+      c.header("cache-control", "private, no-store");
+      return c.body(JSON.stringify(report, null, 2));
+    }
     if (format !== "html") {
       throw new HttpError(
         400,
         "unsupported_format",
-        "Only json and html are available from the API; use the CLI for JUnit XML."
+        "Only json, html and download are available from the API; use the CLI for JUnit XML."
       );
     }
     // A self-contained download: the same report data, no external assets.
+    const modules = payload.moduleRuns
+      .map((moduleRun) => {
+        const counts = moduleRun.totals;
+        const width = counts.total > 0 ? (counts.passed / counts.total) * 100 : 0;
+        return `<section class="module"><div class="module-head"><h2>${escapeHtml(moduleRun.module)}</h2><span>${escapeHtml(moduleRun.status)}</span></div><p>${counts.passed} passed · ${counts.failed} failed · ${counts.warnings} warnings · ${counts.errors} errors · ${counts.skipped} skipped</p><div class="bar" role="img" aria-label="${Math.round(width)}% passed"><span style="width:${Math.round(width)}%"></span></div></section>`;
+      })
+      .join("");
     const rows = payload.moduleRuns
       .flatMap((moduleRun) =>
         moduleRun.cases.map((testCase) => ({ module: moduleRun.module, testCase }))
@@ -602,12 +667,21 @@ export function workspaceRoutes(services: Services): Hono<AppEnv> {
           `<tr><td>${escapeHtml(module)}</td><td>${escapeHtml(testCase.name)}</td><td>${escapeHtml(testCase.status)}</td><td><code>${escapeHtml(testCase.id)}</code></td></tr>`
       )
       .join("");
-    const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>PROOFCORE report ${escapeHtml(payload.id)}</title>
-<style>body{font-family:system-ui,sans-serif;margin:2rem;color:#142033}table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #e4e9f0;padding:.5rem;text-align:left;font-size:.85rem}code{font-family:ui-monospace,monospace}</style>
-</head><body><h1>PROOFCORE report</h1>
-<p><strong>Run ${escapeHtml(payload.id)}</strong> — ${escapeHtml(payload.status)} — ${payload.moduleRuns.reduce((sum, m) => sum + m.totals.total, 0)} cases</p>
-<table><thead><tr><th>Module</th><th>Case</th><th>Status</th><th>Id</th></tr></thead><tbody>${rows}</tbody></table>
-<p style="color:#68778a;font-size:.8rem">Generated from the stored report payload. Reproduce with the CLI: <code>proofcore test</code>.</p></body></html>`;
+    const reportTitle = `PROOFCORE report ${payload.id}`;
+    const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(reportTitle)}</title>
+<style>
+:root{color-scheme:light;--paper:#f3f0e8;--ink:#171715;--muted:#68665f;--rule:#d8d4c9;--pass:#28705a;--fail:#b64231;--warn:#94620c;--skip:#77766f}
+*{box-sizing:border-box}body{font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;margin:0;background:var(--paper);color:var(--ink)}main{max-width:1100px;margin:auto;padding:clamp(20px,5vw,64px)}header{border-bottom:2px solid var(--ink);padding-bottom:22px;margin-bottom:30px}.brand{font:700 12px ui-monospace,monospace;letter-spacing:.2em}.eyebrow{font:11px ui-monospace,monospace;text-transform:uppercase;letter-spacing:.13em;color:var(--muted)}h1{font-size:clamp(32px,6vw,64px);line-height:.98;letter-spacing:-.05em;margin:18px 0}h2{font-size:20px;margin:0}.meta{color:var(--muted);font-size:13px;overflow-wrap:anywhere}.summary{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin:26px 0}.metric{border-top:1px solid var(--rule);padding:12px 8px}.metric strong{display:block;font-size:clamp(20px,3vw,32px);font-variant-numeric:tabular-nums}.metric span{color:var(--muted);font-size:12px}.modules{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px}.module{border:1px solid var(--rule);padding:18px;background:#faf8f3}.module-head{display:flex;justify-content:space-between;gap:10px;align-items:center}.module-head span{font:11px ui-monospace,monospace;text-transform:uppercase;color:var(--muted)}.module p{font-size:12px;color:var(--muted)}.bar{height:7px;background:#e7e3d9;overflow:hidden}.bar span{display:block;height:100%;background:var(--pass)}.table-wrap{overflow-x:auto;margin-top:30px}table{border-collapse:collapse;width:100%;min-width:600px}td,th{border-bottom:1px solid var(--rule);padding:10px;text-align:left;font-size:.85rem;vertical-align:top}th{font:11px ui-monospace,monospace;text-transform:uppercase;color:var(--muted)}code{font-family:ui-monospace,monospace;overflow-wrap:anywhere}.actions{display:flex;justify-content:flex-end;margin-bottom:12px}button{border:1px solid var(--ink);border-radius:999px;background:var(--ink);color:white;padding:10px 16px;font:inherit;cursor:pointer}button:focus-visible{outline:3px solid #0b8379;outline-offset:3px}footer{margin-top:36px;padding-top:12px;border-top:1px solid var(--rule);font-size:12px;color:var(--muted)}
+@media(max-width:700px){.summary{grid-template-columns:repeat(3,minmax(0,1fr))}.module{padding:14px}}
+@media print{body{background:white}.actions{display:none}main{max-width:none;padding:0}.module{break-inside:avoid}.table-wrap{overflow:visible}table{min-width:0;font-size:9pt}td,th{padding:6px}header{margin-bottom:18px}}
+</style></head><body><main><header><div class="brand">PROOFCORE</div><p class="eyebrow">${escapeHtml(payload.status)} · ${payload.moduleRuns.length} modules</p><h1>Software test report</h1><p class="meta">Run ${escapeHtml(payload.id)} · ${escapeHtml(payload.startedAt)}${payload.durationMs === null ? "" : ` · ${Math.round(payload.durationMs / 1000)} s`}</p></header>
+<div class="actions"><button type="button" onclick="window.print()">Print / save as PDF</button></div>
+<section class="summary" aria-label="Summary"><div class="metric"><strong>${totals.total}</strong><span>Cases</span></div><div class="metric"><strong>${totals.passed}</strong><span>Passed</span></div><div class="metric"><strong>${totals.failed}</strong><span>Failed</span></div><div class="metric"><strong>${totals.warnings}</strong><span>Warnings</span></div><div class="metric"><strong>${totals.errors}</strong><span>Errors</span></div><div class="metric"><strong>${totals.skipped}</strong><span>Skipped</span></div></section>
+<section class="modules" aria-label="Module summaries">${modules}</section>
+<div class="table-wrap"><table><thead><tr><th>Module</th><th>Case</th><th>Status</th><th>Id</th></tr></thead><tbody>${rows}</tbody></table></div>
+<footer>Generated from the stored PROOFCORE report payload. No unmeasured case is counted as passed. Reproduce with the CLI: <code>proofcore test</code>.</footer></main></body></html>`;
+    c.header("content-disposition", `attachment; filename="proofcore-report-${payload.id}.html"`);
+    c.header("cache-control", "private, no-store");
     return c.html(html);
   });
 

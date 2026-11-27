@@ -74,6 +74,10 @@ export interface AppConfig {
    * where only a runaway client can reach it.
    */
   aiRateLimitPerHour: number;
+  /** Requests per minute allowed to one machine API key (`/v1/*`). */
+  machineRateLimitPerMinute: number;
+  /** Failed `psk_` authentications per minute allowed from one client address. */
+  machineAuthFailuresPerMinute: number;
   /**
    * The deployment's own AI provider, used when a person has not connected one.
    *
@@ -166,6 +170,8 @@ export function readConfig(env: Env): AppConfig {
     supportEmail: env.SUPPORT_EMAIL ?? "support@proofcore.dev",
     cfAccountId: env.CF_ACCOUNT_ID?.trim() || undefined,
     aiRateLimitPerHour: positiveInt(env.AI_RATE_LIMIT_PER_HOUR, 5000),
+    machineRateLimitPerMinute: positiveInt(env.MACHINE_RATE_LIMIT_PER_MINUTE, 120),
+    machineAuthFailuresPerMinute: positiveInt(env.MACHINE_AUTH_FAILURES_PER_MINUTE, 20),
     managedAi: readManagedAi(env),
     cfBrowserToken: env.CF_BROWSER_TOKEN?.trim() || undefined,
     githubToken: env.GITHUB_TOKEN?.trim() || undefined,

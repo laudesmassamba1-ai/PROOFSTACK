@@ -1,8 +1,9 @@
 import { runUploadRequestSchema } from "@proofcore/contracts";
 import { type Context, Hono } from "hono";
 import { hashToken } from "../auth.js";
-import { HttpError } from "../http/errors.js";
+import { clientAddress, HttpError } from "../http/errors.js";
 import { readBody } from "../http/guards.js";
+import { checkDistributedRateLimit } from "../http/rate-limit.js";
 import type { AppEnv, Services } from "../http/services.js";
 import { notifyAudit } from "../notifications.js";
 import { deliverWorkspaceEvent } from "../outbound.js";
@@ -248,19 +249,56 @@ export function machineRoutes(services: Services): Hono<AppEnv> {
   return app;
 }
 
+/**
+ * Only failed attempts spend the address budget, so a valid key is never refused because
+ * somebody else guessed. A valid key that exceeds its own per-minute budget gets 429.
+ */
 async function authenticate(c: Context<AppEnv>, services: Services): Promise<ApiKeyRecord> {
+  const address = clientAddress({ get: (name) => c.req.header(name) });
   const header = c.req.header("authorization") ?? "";
   const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
-  if (!token.startsWith("psk_")) {
+  const key = token.startsWith("psk_")
+    ? await services.store.findApiKeyByTokenHash(await hashToken(token))
+    : null;
+
+  if (!key) {
+    const failures = await checkDistributedRateLimit(services, {
+      scope: "machine:auth-failure",
+      key: address,
+      limit: services.config.machineAuthFailuresPerMinute,
+      windowMs: 60_000,
+    });
+    if (!failures.allowed) {
+      c.header("Retry-After", String(failures.retryAfterSeconds));
+      throw new HttpError(
+        429,
+        "rate_limited",
+        "Too many failed API authentications from this address. Wait before retrying."
+      );
+    }
     throw new HttpError(
       401,
       "invalid_api_key",
-      "Send a project token as `Authorization: Bearer psk_...`."
+      token.startsWith("psk_")
+        ? "This API key is unknown, revoked or expired."
+        : "Send a project token as `Authorization: Bearer psk_...`."
     );
   }
-  const key = await services.store.findApiKeyByTokenHash(await hashToken(token));
-  if (!key)
-    throw new HttpError(401, "invalid_api_key", "This API key is unknown, revoked or expired.");
+
+  const budget = await checkDistributedRateLimit(services, {
+    scope: "machine:key",
+    key: key.id,
+    limit: services.config.machineRateLimitPerMinute,
+    windowMs: 60_000,
+  });
+  if (!budget.allowed) {
+    c.header("Retry-After", String(budget.retryAfterSeconds));
+    throw new HttpError(
+      429,
+      "rate_limited",
+      "This API key has used its per-minute budget. Wait before retrying."
+    );
+  }
   await services.store.touchApiKey(key.id);
   return key;
 }

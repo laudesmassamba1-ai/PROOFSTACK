@@ -87,7 +87,10 @@ describe("cross-origin write guard", () => {
     const harness = await bootstrap();
     const response = await harness.request("/api/auth/sign-up/email", {
       method: "POST",
-      headers: { origin: "https://proofstack-01z.pages.dev" },
+      headers: {
+        origin: "https://proofstack-01z.pages.dev",
+        "sec-fetch-site": "same-site",
+      },
       body: JSON.stringify({
         email: "pages@example.com",
         password: "correct horse battery",
@@ -107,7 +110,10 @@ describe("cross-origin write guard", () => {
     // routing, so an unauthenticated call is enough to prove the refusal.
     const response = await harness.request("/api/v1/workspaces", {
       method: "POST",
-      headers: { origin: "https://proofstack-01z.pages.dev.attacker.com" },
+      headers: {
+        origin: "https://proofstack-01z.pages.dev.attacker.com",
+        "sec-fetch-site": "same-site",
+      },
       body: JSON.stringify({ name: "Evil workspace" }),
     });
     expect(response.status).toBe(403);
@@ -117,7 +123,10 @@ describe("cross-origin write guard", () => {
     // And the allowlisted origin reaches the handler instead of the guard.
     const allowed = await harness.request("/api/v1/workspaces", {
       method: "POST",
-      headers: { origin: "https://proofstack-01z.pages.dev" },
+      headers: {
+        origin: "https://proofstack-01z.pages.dev",
+        "sec-fetch-site": "same-site",
+      },
       body: JSON.stringify({ name: "Allowed workspace" }),
     });
     expect(allowed.status).not.toBe(403);

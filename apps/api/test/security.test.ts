@@ -26,7 +26,12 @@ async function bootstrap(extra: Record<string, string> = {}) {
     request: (path: string, init: RequestInit = {}) =>
       built.app.request(`http://localhost${path}`, {
         ...init,
-        headers: { "content-type": "application/json", origin: config.webOrigin, ...init.headers },
+        headers: {
+          "content-type": "application/json",
+          origin: config.webOrigin,
+          ...(init.method && init.method !== "GET" ? { "sec-fetch-site": "same-origin" } : {}),
+          ...init.headers,
+        },
       }),
     services: built.services,
     close: async () => db.close(),
@@ -50,6 +55,7 @@ async function signUp(
 ): Promise<{ cookie: string; workspaceId: string }> {
   const response = await auth.request("/api/auth/sign-up/email", {
     method: "POST",
+    headers: { origin: "http://localhost:5173", "sec-fetch-site": "same-origin" },
     body: JSON.stringify({ email, password: PASSWORD, name: "Tester" }),
   });
   expect(response.status).toBe(201);
@@ -125,7 +131,11 @@ describe("distributed rate limiting", () => {
     const call = () =>
       harness.request("/api/v1/ai/chat", {
         method: "POST",
-        headers: { cookie: auth.cookie },
+        headers: {
+          cookie: auth.cookie,
+          origin: "http://localhost:5173",
+          "sec-fetch-site": "same-origin",
+        },
         body: JSON.stringify({}),
       });
     const first = await call();
@@ -143,9 +153,14 @@ describe("distributed rate limiting", () => {
 describe("cross-site writes", () => {
   it("refuses a cookie-authenticated write announced as cross-site", async () => {
     const auth = await signUp(harness, "csrf@example.com");
-    const response = await harness.request("/api/auth/sign-out", {
+    const response = await harness.request("/api/account/password", {
       method: "POST",
-      headers: { cookie: auth.cookie, "sec-fetch-site": "cross-site" },
+      headers: {
+        cookie: auth.cookie,
+        origin: "http://localhost:5173",
+        "sec-fetch-site": "cross-site",
+      },
+      body: JSON.stringify({ currentPassword: PASSWORD, newPassword: "another correct horse" }),
     });
     expect(response.status).toBe(403);
     const body = (await response.json()) as { error?: { code?: string } };
@@ -154,11 +169,33 @@ describe("cross-site writes", () => {
 
   it("lets a same-origin write through", async () => {
     const auth = await signUp(harness, "same@example.com");
-    const response = await harness.request("/api/auth/sign-out", {
-      method: "POST",
-      headers: { cookie: auth.cookie, "sec-fetch-site": "same-origin" },
+    const response = await harness.request("/api/account/sessions", {
+      method: "GET",
+      headers: {
+        cookie: auth.cookie,
+        origin: "http://localhost:5173",
+        "sec-fetch-site": "same-origin",
+      },
     });
     expect(response.status).toBe(200);
+  });
+
+  it("allows native cookie clients without browser metadata when Origin is absent", async () => {
+    const auth = await signUp(harness, "native-client@example.com");
+    const response = await harness.request("/api/account/sessions", {
+      headers: { cookie: auth.cookie, origin: "" },
+    });
+    expect(response.status).toBe(200);
+  });
+
+  it("does not block authenticated service endpoints outside the browser-only guard", async () => {
+    const auth = await signUp(harness, "service-endpoint@example.com");
+    const response = await harness.request("/api/v1/ai/chat", {
+      method: "POST",
+      headers: { cookie: auth.cookie },
+      body: JSON.stringify({}),
+    });
+    expect([400, 422]).toContain(response.status);
   });
 
   it("does not apply to reads", async () => {

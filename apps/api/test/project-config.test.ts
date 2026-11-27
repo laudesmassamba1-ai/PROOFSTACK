@@ -212,6 +212,74 @@ describe("project module configuration", () => {
     expect(response.status).toBeLessThan(500);
   });
 
+  it("preflights the editor's save without writing and reports a blocker as information", async () => {
+    const owner = await signUp("config-preflight@example.com");
+    const project = await projectFor(owner.workspaceId);
+    const validate = (modules: unknown) =>
+      harness.request(
+        `/api/v1/projects/${project.id}/config/validate?workspaceId=${owner.workspaceId}`,
+        {
+          method: "POST",
+          headers: { cookie: owner.cookie },
+          body: JSON.stringify({ modules, allowDestructiveProduction: false }),
+        }
+      );
+
+    const accepted = await validate(validModules);
+    expect(accepted.status).toBe(200);
+    const acceptedBody = (await accepted.json()) as {
+      valid: boolean;
+      issues: unknown[];
+      blocking: unknown[];
+      saved: boolean;
+    };
+    expect(acceptedBody.valid).toBe(true);
+    expect(acceptedBody.blocking).toEqual([]);
+    expect(acceptedBody.saved).toBe(false);
+
+    const refused = await validate({
+      ...validModules,
+      flow: { ...validModules.flow, paymentMode: "live_charge" },
+    });
+    expect(refused.status).toBe(200);
+    const refusedBody = (await refused.json()) as {
+      valid: boolean;
+      blocking: { path: string; message: string }[];
+      saved: boolean;
+    };
+    expect(refusedBody.valid).toBe(false);
+    expect(refusedBody.blocking.length).toBeGreaterThan(0);
+    expect(JSON.stringify(refusedBody.blocking)).toContain("live_charge");
+    expect(refusedBody.saved).toBe(false);
+
+    // Preflight is a read: neither answer stored a configuration.
+    const stored = await harness.store.getProject(owner.workspaceId, project.id);
+    expect(stored?.moduleConfig).toBeNull();
+  });
+
+  it("rejects a malformed preflight payload with 400, not 500", async () => {
+    const owner = await signUp("config-preflight-bad@example.com");
+    const project = await projectFor(owner.workspaceId);
+    const response = await harness.request(
+      `/api/v1/projects/${project.id}/config/validate?workspaceId=${owner.workspaceId}`,
+      {
+        method: "POST",
+        headers: { cookie: owner.cookie },
+        body: JSON.stringify({
+          modules: {
+            ...validModules,
+            world: {
+              ...validModules.world,
+              target: { ...validModules.world.target, submitUrl: "not-a-url" },
+            },
+          },
+        }),
+      }
+    );
+    expect(response.status).toBeGreaterThanOrEqual(400);
+    expect(response.status).toBeLessThan(500);
+  });
+
   it("answers 404 for a project outside the workspace", async () => {
     const owner = await signUp("config-404@example.com");
     const response = await harness.request(

@@ -1,11 +1,12 @@
 import type { PaymentProvider } from "@proofcore/adapter-payments";
 import { API_VERSION } from "@proofcore/contracts";
-import { iso, type scanPage, uuid } from "@proofcore/core";
+import { type auditSite, iso, type scanPage, uuid } from "@proofcore/core";
 import { Hono } from "hono";
 import type { Database } from "./db/types.js";
 import { type Env, originAllowed, readConfig } from "./env.js";
 import { HttpError, toErrorResponse } from "./http/errors.js";
 import { type AppEnv, createServices, type Services } from "./http/services.js";
+import { runModule } from "./module-copilot.js";
 import { createPaymentProvider } from "./providers.js";
 import { accountRoutes } from "./routes/account.js";
 import { adminRoutes } from "./routes/admin.js";
@@ -35,6 +36,10 @@ export interface CreateAppOptions {
   clock?: () => Date;
   /** Injected scanner: production uses the real one, a test passes a stub. */
   scan?: typeof scanPage;
+  /** Injected site crawler, for the same reason. */
+  siteAudit?: typeof auditSite;
+  /** Injected FLOW re-run, so a verification test does not need the engine. */
+  runFlow?: Services["runFlow"];
 }
 
 /**
@@ -54,7 +59,10 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
     provider,
     ...(options.clock ? { clock: options.clock } : {}),
     ...(options.scan ? { scan: options.scan } : {}),
+    ...(options.siteAudit ? { siteAudit: options.siteAudit } : {}),
   });
+  services.runFlow =
+    options.runFlow ?? ((input) => runModule(services, input.workspaceId, input.projectId, "flow"));
 
   const app = new Hono<AppEnv>();
 
@@ -122,17 +130,7 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
       return;
     }
     if (c.req.method !== "GET" && c.req.method !== "HEAD" && c.req.method !== "OPTIONS") {
-      // Fetch metadata is the second line of CSRF defence: a browser states where the
-      // request came from even when an old one sends no Origin (a plain form post, for
-      // instance). A cookie-authenticated write from another site is refused outright.
       const fetchSite = c.req.header("sec-fetch-site");
-      if (fetchSite === "cross-site") {
-        throw new HttpError(
-          403,
-          "cross_site_write",
-          "A write from another site is refused. Reload the app and retry from it."
-        );
-      }
       const origin = c.req.header("origin");
       if (origin && !originAllowed(config.webOrigins, origin)) {
         // The origin is echoed in `details` on purpose: without it the message reads like
@@ -142,6 +140,13 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
           "cross_origin_denied",
           `This origin is not allowed to call the API: ${origin}. Add it to WEB_ORIGIN to allow it.`,
           { origin }
+        );
+      }
+      if (fetchSite === "cross-site" && c.req.header("cookie")) {
+        throw new HttpError(
+          403,
+          "cross_site_write",
+          "A write from another site is refused. Reload the app and retry from it."
         );
       }
     }

@@ -173,6 +173,38 @@ describe("remediations", () => {
     expect(response.status).toBe(404);
   });
 
+  it("refuses an owner who is not a member of the workspace", async () => {
+    const auth = await signUp("owner-a@example.com");
+    const outsider = await signUp("owner-b@example.com");
+    const outsiderId = (
+      (await (
+        await harness.request("/api/auth/session", { headers: { cookie: outsider.cookie } })
+      ).json()) as { user: { id: string } }
+    ).user.id;
+    const analysisId = await analysisWith(auth, SCAN);
+    const key = "fail:hsts@https://shop.example/checkout";
+    const refused = await harness.request("/api/v1/remediations", {
+      method: "POST",
+      headers: { cookie: auth.cookie },
+      body: JSON.stringify({
+        workspaceId: auth.workspaceId,
+        analysisId,
+        findingKey: key,
+        ownerId: outsiderId,
+      }),
+    });
+    expect(refused.status).toBe(400);
+    expect(((await refused.json()) as { error?: { code?: string } }).error?.code).toBe(
+      "owner_not_member"
+    );
+    const opened = await openRemediation(auth, analysisId, key);
+    const reassign = await patch(auth, opened.id, { ownerId: outsiderId });
+    expect(reassign.status).toBe(400);
+    expect(((await reassign.json()) as { error?: { code?: string } }).error?.code).toBe(
+      "owner_not_member"
+    );
+  });
+
   it("does not open two remediations for one finding", async () => {
     const auth = await signUp("twice@example.com");
     const analysisId = await analysisWith(auth, SCAN);

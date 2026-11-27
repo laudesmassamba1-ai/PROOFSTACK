@@ -155,14 +155,21 @@ export async function findingsForAnalysis(
     const payload = typeof row.payload === "string" ? safeParse(row.payload) : row.payload;
     return pack(findingsFromPayload(payload, analysis, targetUrl(analysis)), analysis);
   }
+  // An analysis created through the API or the CLI carries its result on the row itself.
+  // Prefer it when it holds findings: a FLOW re-run writes canonical findings to the row
+  // while still pointing at its stored report, and the report's engine findings use a
+  // different shape (`detail`, no `observed`) that this reader would skip.
+  if (analysis.result) {
+    const packed = pack(
+      findingsFromPayload(analysis.result, analysis, targetUrl(analysis)),
+      analysis
+    );
+    if (packed.findings.length > 0) return packed;
+  }
   if (analysis.runId) {
     const report = await services.store.getReportByRunId(analysis.workspaceId, analysis.runId);
     if (!report) return { findings: [], measuredModules: [], loaded: false };
     return pack(findingsFromPayload(report, analysis, targetUrl(analysis)), analysis);
-  }
-  // An analysis created through the API or the CLI carries its result on the row itself.
-  if (analysis.result) {
-    return pack(findingsFromPayload(analysis.result, analysis, targetUrl(analysis)), analysis);
   }
   return { findings: [], measuredModules: [], loaded: false };
 }
