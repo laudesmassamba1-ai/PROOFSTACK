@@ -8,6 +8,7 @@ import {
   FileText,
   FolderGit2,
   FolderKanban,
+  Gauge,
   Globe,
   History,
   LayoutDashboard,
@@ -33,7 +34,7 @@ import {
   X,
 } from "lucide-react";
 import type React from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BrowserPanel } from "../../components/app/BrowserPanel.js";
 import {
   ChatMarkdown,
@@ -73,10 +74,27 @@ interface ConversationSummary {
   updatedAt: string;
 }
 
+interface UsageContext {
+  used: number;
+  budget: number;
+  remaining: number;
+  trimmed: number;
+}
+
+/** Real provider counts for one assistant turn, plus the input budget enforced. */
+interface TurnUsage {
+  input: number;
+  output: number;
+  total?: number;
+  context?: UsageContext;
+  outputBudget?: number;
+}
+
 interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
+  usage?: TurnUsage;
   trace?: AgentTraceStep[];
   /** Reviewer notes as the server reported them, failures included. */
   reviews?: { id: string; label: string; ok: boolean; note: string }[];
@@ -171,6 +189,8 @@ interface AgentTraceStep {
     status?: number | null;
     screenshot?: string;
     note?: string;
+    openInBrowser?: boolean;
+    sessionId?: string;
   };
 }
 
@@ -513,6 +533,61 @@ function ReviewPanel({
   );
 }
 
+function compactTokens(value: number): string {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 10_000) return `${Math.round(value / 1_000)}k`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
+  return String(Math.max(0, Math.round(value)));
+}
+
+/**
+ * What this conversation has spent, and how much room the next question still has.
+ *
+ * The number comes from the provider's own `usage`, not from a character estimate: an
+ * estimate shown as a bill would be a lie. The bar tracks the enforced input budget the
+ * server trims history to, so it can go down when a turn is short.
+ */
+function TokenMeter({
+  input,
+  output,
+  contextUsed,
+  budget,
+  fr,
+}: {
+  input: number;
+  output: number;
+  contextUsed: number;
+  budget: number;
+  fr: boolean;
+}): React.ReactElement {
+  const pct = budget > 0 ? Math.min(100, Math.round((contextUsed / budget) * 100)) : 0;
+  const tone = pct >= 90 ? "is-hot" : pct >= 75 ? "is-warm" : "";
+  const label = fr
+    ? `Contexte : ${compactTokens(contextUsed)} sur ${compactTokens(budget)} jetons. ${compactTokens(input)} entrée et ${compactTokens(output)} sortie consommés dans cette conversation.`
+    : `Context: ${compactTokens(contextUsed)} of ${compactTokens(budget)} tokens. ${compactTokens(input)} input and ${compactTokens(output)} output spent in this conversation.`;
+  return (
+    <div className={`chat-tokens ${tone}`} title={label}>
+      <Gauge size={12} aria-hidden />
+      <span className="chat-tokens-label">
+        <span>{fr ? "Contexte" : "Context"}</span>
+        <strong>{compactTokens(contextUsed)}</strong>
+        <span className="chat-tokens-of">/ {compactTokens(budget)}</span>
+      </span>
+      <span
+        className="chat-tokens-track"
+        role="progressbar"
+        aria-label={fr ? "Contexte utilisé" : "Context used"}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={pct}
+      >
+        <span style={{ width: `${pct}%` }} />
+      </span>
+      <span className="chat-tokens-cum">{compactTokens(input + output)} tok</span>
+    </div>
+  );
+}
+
 function Composer({
   draft,
   setDraft,
@@ -528,6 +603,8 @@ function Composer({
   extracting,
   notice,
   onTools,
+  tokens,
+  toolCount,
 }: {
   draft: string;
   setDraft: (value: string) => void;
@@ -543,6 +620,8 @@ function Composer({
   extracting: boolean;
   notice: { title: string; detail: string } | null;
   onTools: () => void;
+  tokens: { input: number; output: number; contextUsed: number; budget: number };
+  toolCount: number;
 }): React.ReactElement {
   const inputRef = useRef<HTMLInputElement>(null);
   return (
@@ -608,14 +687,21 @@ function Composer({
       <div className="chat-composer-bar">
         <div className="chat-composer-tools">
           <EffortPicker effort={effort} onSelect={onEffort} fr={fr} />
+          <TokenMeter
+            input={tokens.input}
+            output={tokens.output}
+            contextUsed={tokens.contextUsed}
+            budget={tokens.budget}
+            fr={fr}
+          />
           <button
             type="button"
             className="chat-attach-btn"
             aria-label={fr ? "Outils de l'assistant" : "Assistant tools"}
             title={
               fr
-                ? "Les 14 outils : audits, navigateur, code, mémoire"
-                : "The 14 tools: audits, browser, code, memory"
+                ? `Les ${toolCount} outils : audits, navigateur, code, mémoire`
+                : `The ${toolCount} tools: audits, browser, code, memory`
             }
             onClick={onTools}
           >
@@ -668,7 +754,7 @@ function Composer({
   );
 }
 
-/* ---------- les outils de l'assistant (les 14 vrais outils du serveur) ---------- */
+/* ---------- les outils de l'assistant (le catalogue du serveur) ---------- */
 
 type ChatTool = {
   name: string;
@@ -676,6 +762,8 @@ type ChatTool = {
   fr: string;
   en: string;
   starter: { fr: string; en: string };
+  /** From GET /api/v1/ai/tools: read, analysis, write or sensitive. */
+  permission?: string;
 };
 
 /** Miroir des TOOLS de l'API (apps/api/src/routes/ai.ts) : le serveur exécute,
@@ -813,6 +901,46 @@ const CHAT_TOOLS: ChatTool[] = [
     },
   },
   {
+    name: "browser_open",
+    icon: <Globe />,
+    fr: "Ouvrir une page réelle et garder la session pour agir dedans.",
+    en: "Open a real page and keep the session to act in it.",
+    starter: {
+      fr: "Ouvre cette page et dis-moi ce qu'il y a à faire : https://",
+      en: "Open this page and tell me what can be done there: https://",
+    },
+  },
+  {
+    name: "browser_act",
+    icon: <ArrowUpRight />,
+    fr: "Cliquer, saisir, défiler dans la page ouverte.",
+    en: "Click, type or scroll in the open page.",
+    starter: {
+      fr: "Dans la page ouverte, clique sur ",
+      en: "In the open page, click ",
+    },
+  },
+  {
+    name: "browser_read",
+    icon: <ScanSearch />,
+    fr: "Relire l'état de la page ouverte (texte, éléments, capture).",
+    en: "Read the open page again (text, elements, screenshot).",
+    starter: {
+      fr: "Relis la page ouverte et montre-moi les éléments interactifs.",
+      en: "Read the open page again and show me the interactive elements.",
+    },
+  },
+  {
+    name: "browser_close",
+    icon: <X />,
+    fr: "Fermer la session navigateur et libérer l'onglet.",
+    en: "Close the browser session and release its tab.",
+    starter: {
+      fr: "Ferme la session navigateur.",
+      en: "Close the browser session.",
+    },
+  },
+  {
     name: "remember",
     icon: <Brain />,
     fr: "Retenir durablement un fait sur le projet.",
@@ -831,11 +959,13 @@ function ChatToolsPanel({
   onClose,
   onPick,
   fr,
+  tools,
 }: {
   open: boolean;
   onClose: () => void;
   onPick: (tool: ChatTool) => void;
   fr: boolean;
+  tools: ChatTool[];
 }): React.ReactElement | null {
   if (!open) return null;
   return (
@@ -864,7 +994,7 @@ function ChatToolsPanel({
             : "The server executes, the assistant decides when to use them — and every call is traced in the conversation. Click to pre-fill."}
         </p>
         <ul className="chat-tools-list">
-          {CHAT_TOOLS.map((tool, index) => (
+          {tools.map((tool, index) => (
             <li key={tool.name} style={{ "--i": index } as React.CSSProperties}>
               <button type="button" onClick={() => onPick(tool)}>
                 <span className="chat-tools-icon">{tool.icon}</span>
@@ -872,6 +1002,19 @@ function ChatToolsPanel({
                   <code>{tool.name}</code>
                   <span>{fr ? tool.fr : tool.en}</span>
                 </span>
+                {tool.permission ? (
+                  <span className={`chat-tools-perm is-${tool.permission}`}>
+                    {fr
+                      ? ({
+                          read: "lecture",
+                          analysis: "analyse",
+                          write: "écriture",
+                          sensitive: "sensible",
+                        }[tool.permission as "read" | "analysis" | "write" | "sensitive"] ??
+                        tool.permission)
+                      : tool.permission}
+                  </span>
+                ) : null}
                 <ArrowUpRight size={13} className="chat-tools-go" aria-hidden />
               </button>
             </li>
@@ -919,6 +1062,10 @@ export function AiChatPage(): React.ReactElement {
   // panel, not a message.
   const [browserOpen, setBrowserOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
+  // The server owns the catalogue; the curated list only supplies icons and phrasing.
+  // A tool added on the API appears here without a second edit, and its permission class
+  // is shown before it can be used.
+  const [catalogue, setCatalogue] = useState<ChatTool[]>(CHAT_TOOLS);
   const [immersive, setImmersive] = useState(false);
   const [browserUrl, setBrowserUrl] = useState<string | undefined>(undefined);
   // On a phone the history is an overlay, not a column: opening it by default would
@@ -1170,6 +1317,7 @@ export function AiChatPage(): React.ReactElement {
         role: message.role,
         content: message.content,
         trace: message.trace,
+        usage: (message as { usage?: TurnUsage }).usage,
       }))
     );
     // A freshly opened conversation reads newest-first: pin to the bottom.
@@ -1415,6 +1563,65 @@ export function AiChatPage(): React.ReactElement {
     }
   }, [activePreset, baseUrlDraft, modelDraft, keyDraft, fr]);
 
+  /**
+   * Conversation cost. The server stores real `usage` on each assistant message, so a
+   * reload shows the same numbers; older messages without usage contribute nothing.
+   */
+  const tokenStats = useMemo(() => {
+    let input = 0;
+    let output = 0;
+    let contextUsed = 0;
+    let budget = 32_000;
+    let lastInput = 0;
+    for (const message of messages) {
+      if (!message.usage) continue;
+      input += message.usage.input;
+      output += message.usage.output;
+      lastInput = message.usage.input;
+      if (message.usage.context) {
+        contextUsed = message.usage.context.used;
+        budget = message.usage.context.budget;
+      }
+    }
+    // Conversations persisted before context accounting existed have no `context`:
+    // the last call's input is the honest floor for what is in the window.
+    if (contextUsed === 0) contextUsed = Math.min(budget, lastInput);
+    return { input, output, contextUsed, budget };
+  }, [messages]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/v1/ai/tools", { credentials: "include" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then(
+        (data: { tools?: { name: string; description: string; permission: string }[] } | null) => {
+          if (cancelled || !data?.tools?.length) return;
+          setCatalogue(
+            data.tools.map((tool) => {
+              const curated = CHAT_TOOLS.find((item) => item.name === tool.name);
+              return curated
+                ? { ...curated, permission: tool.permission }
+                : {
+                    name: tool.name,
+                    icon: <Wrench size={13} />,
+                    fr: tool.description,
+                    en: tool.description,
+                    starter: {
+                      fr: `Utilise l'outil ${tool.name} sur mon espace de travail.`,
+                      en: `Use the ${tool.name} tool on my workspace.`,
+                    },
+                    permission: tool.permission,
+                  };
+            })
+          );
+        }
+      )
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const send = useCallback(async () => {
     const text = draft.trim();
     if ((!text && attachments.length === 0) || busy || !activeWorkspaceId) return;
@@ -1471,6 +1678,7 @@ export function AiChatPage(): React.ReactElement {
           facts: number;
           added?: { kind: string; text: string; created: boolean }[];
         };
+        usage?: TurnUsage;
         error?: { code?: string; message?: string; details?: Record<string, unknown> };
       } = {};
       try {
@@ -1496,6 +1704,7 @@ export function AiChatPage(): React.ReactElement {
                 content: data.message ?? "",
                 trace: data.trace,
                 reviews: data.subagents,
+                usage: data.usage,
               }
             : item
         )
@@ -1882,6 +2091,8 @@ export function AiChatPage(): React.ReactElement {
                     onTools={() => setToolsOpen(true)}
                     extracting={extracting}
                     notice={attachNotice}
+                    tokens={tokenStats}
+                    toolCount={catalogue.length}
                   />
                   <p className="chat-disclaimer">
                     {fr
@@ -1930,10 +2141,14 @@ export function AiChatPage(): React.ReactElement {
                                   key={`view:${step.view?.url}:${step.summary}`}
                                   view={step.view as NonNullable<AgentTraceStep["view"]>}
                                   fr={fr}
-                                  onOpen={(url) => {
-                                    setBrowserUrl(url);
-                                    setBrowserOpen(true);
-                                  }}
+                                  onOpen={
+                                    step.view?.openInBrowser
+                                      ? (url) => {
+                                          setBrowserUrl(url);
+                                          setBrowserOpen(true);
+                                        }
+                                      : undefined
+                                  }
                                 />
                               ))}
                             {message.reviews && message.reviews.length > 0 && (
@@ -1945,6 +2160,17 @@ export function AiChatPage(): React.ReactElement {
                               <>
                                 <ChatMarkdown text={message.content} />
                                 <MessageActions text={message.content} fr={fr} />
+                                {message.usage ? (
+                                  <p className="chat-msg-usage">
+                                    <span>
+                                      ↑ {compactTokens(message.usage.input)} {fr ? "entrée" : "in"}
+                                    </span>
+                                    <span>
+                                      ↓ {compactTokens(message.usage.output)}{" "}
+                                      {fr ? "sortie" : "out"}
+                                    </span>
+                                  </p>
+                                ) : null}
                               </>
                             ) : busy ? (
                               <div className="chat-thinking" aria-live="polite">
@@ -1993,6 +2219,8 @@ export function AiChatPage(): React.ReactElement {
                     onTools={() => setToolsOpen(true)}
                     extracting={extracting}
                     notice={attachNotice}
+                    tokens={tokenStats}
+                    toolCount={catalogue.length}
                   />
                   <p className="chat-disclaimer">
                     {fr
@@ -2407,6 +2635,7 @@ export function AiChatPage(): React.ReactElement {
           }, 60);
         }}
         fr={fr}
+        tools={catalogue}
       />
     </div>
   );

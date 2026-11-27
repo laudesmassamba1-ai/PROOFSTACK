@@ -122,6 +122,13 @@ interface ConfigResponse {
   source: "saved" | "defaults";
 }
 
+interface ConfigValidation {
+  valid: boolean;
+  issues: Issue[];
+  blocking: Issue[];
+  saved: false;
+}
+
 const CATEGORIES = [
   "identity",
   "phone",
@@ -234,6 +241,8 @@ export function ProjectConfigPage(): React.ReactElement {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<ApiError | Error | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
+  // A blocked preflight is not a saved configuration: the issues card must say so.
+  const [blocked, setBlocked] = useState(false);
 
   const load = useCallback(async () => {
     if (!session.workspaceId || !projectId) return;
@@ -250,6 +259,7 @@ export function ProjectConfigPage(): React.ReactElement {
       setIssues(body.issues);
       setSavedAt(body.savedAt);
       setSource(body.source);
+      setBlocked(false);
     } catch (caught) {
       setError(caught as ApiError);
     } finally {
@@ -266,6 +276,7 @@ export function ProjectConfigPage(): React.ReactElement {
     setSaving(true);
     setError(null);
     setSavedFlash(false);
+    setBlocked(false);
     try {
       // An empty optional URL is the absence of a value, not an invalid one: the
       // schema validates `startUrl` as a URL when present.
@@ -282,6 +293,24 @@ export function ProjectConfigPage(): React.ReactElement {
           },
         },
       };
+      // Preflight with the save's own rules before writing anything. The endpoint runs
+      // the same schema and the same validateConfig blockers as the PUT below.
+      const preflight = await apiFetch<ConfigValidation>(
+        `/api/v1/projects/${projectId}/config/validate?workspaceId=${session.workspaceId}`,
+        { method: "POST", body: payload }
+      );
+      if (!preflight.valid) {
+        setIssues(preflight.blocking.length > 0 ? preflight.blocking : preflight.issues);
+        setBlocked(true);
+        setError(
+          new Error(
+            fr
+              ? "Rien n'a été enregistré : corrigez les points bloquants ci-dessous, puis enregistrez à nouveau."
+              : "Nothing was saved: fix the blocking issues below, then save again."
+          )
+        );
+        return;
+      }
       const body = await apiFetch<ConfigResponse>(
         `/api/v1/projects/${projectId}/config?workspaceId=${session.workspaceId}`,
         { method: "PUT", body: payload }
@@ -293,6 +322,7 @@ export function ProjectConfigPage(): React.ReactElement {
       setIssues(body.issues);
       setSavedAt(body.savedAt);
       setSource(body.source);
+      setBlocked(false);
       setSavedFlash(true);
     } catch (caught) {
       const apiError = caught as ApiError;
@@ -444,11 +474,23 @@ export function ProjectConfigPage(): React.ReactElement {
 
       {issues.length > 0 ? (
         <Card
-          title={fr ? "À vérifier avant d'exécuter" : "Check before running"}
+          title={
+            blocked
+              ? fr
+                ? "À corriger avant d'enregistrer"
+                : "Fix before saving"
+              : fr
+                ? "À vérifier avant d'exécuter"
+                : "Check before running"
+          }
           description={
-            fr
-              ? "Ces points sont enregistrés, mais le moteur produira des cas ignorés ou bloqués tant qu'ils ne sont pas réglés."
-              : "These settings are saved, but the engine will produce skipped or blocked cases until they are fixed."
+            blocked
+              ? fr
+                ? "Ces points bloquent l'enregistrement ; rien n'a été écrit."
+                : "These points block the save; nothing was written."
+              : fr
+                ? "Ces points sont enregistrés, mais le moteur produira des cas ignorés ou bloqués tant qu'ils ne sont pas réglés."
+                : "These settings are saved, but the engine will produce skipped or blocked cases until they are fixed."
           }
           className="mb-4"
         >

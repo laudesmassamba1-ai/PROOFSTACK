@@ -10,6 +10,7 @@ import { useI18n } from "../../i18n/index.js";
 import { type ApiError, apiFetch } from "../../lib/api.js";
 import { errorText } from "../../lib/errorText.js";
 import { REMEDIATION_OUTCOME_LABEL, REMEDIATION_STATUS_LABEL } from "../../lib/remediationText.js";
+import { FindingPatch } from "./FindingPatch.js";
 
 /**
  * The remediation chain, on the finding itself.
@@ -120,29 +121,41 @@ export function FindingRemediation({
 
   if (!existing) {
     return (
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          className="app-btn app-btn-sm"
-          disabled={busy !== null}
-          onClick={() =>
-            void call("create", async () => {
-              const body = await apiFetch<{ remediation: Remediation }>("/api/v1/remediations", {
-                method: "POST",
-                body: { workspaceId, analysisId, findingKey },
-              });
-              return body.remediation;
-            })
-          }
-        >
-          {busy === "create" ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
-          {fr ? "Ouvrir une remédiation" : "Open a remediation"}
-        </button>
-        {error ? (
-          <span role="alert" className="text-xs text-danger">
-            {errorText(error, fr)}
-          </span>
-        ) : null}
+      <div className="mt-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="app-btn app-btn-sm"
+            disabled={busy !== null}
+            onClick={() =>
+              void call("create", async () => {
+                const body = await apiFetch<{ remediation: Remediation }>("/api/v1/remediations", {
+                  method: "POST",
+                  body: { workspaceId, analysisId, findingKey },
+                });
+                return body.remediation;
+              })
+            }
+          >
+            {busy === "create" ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <Plus size={13} />
+            )}
+            {fr ? "Ouvrir une remédiation" : "Open a remediation"}
+          </button>
+          {error ? (
+            <span role="alert" className="text-xs text-danger">
+              {errorText(error, fr)}
+            </span>
+          ) : null}
+        </div>
+        <FindingPatch
+          workspaceId={workspaceId}
+          analysisId={analysisId}
+          findingKey={findingKey}
+          onVerified={onChange}
+        />
       </div>
     );
   }
@@ -153,144 +166,152 @@ export function FindingRemediation({
   );
 
   return (
-    <div className="mt-2 rounded-[var(--radius)] bg-surface-alt px-3 py-2">
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className={`font-medium ${STATUS_TONE[existing.status] ?? "text-muted"}`}>
-          {REMEDIATION_STATUS_LABEL[existing.status]?.[fr ? "fr" : "en"] ?? existing.status}
-        </span>
-        <span className="text-muted">
-          {existing.steps.length}/{Object.keys(REMEDIATION_STEP_LABELS).length}{" "}
-          {fr ? "étapes" : "steps"}
-        </span>
-        {existing.nextStep ? (
-          <span className="text-muted">
-            · {fr ? "prochaine" : "next"}: {stepLabel(existing.nextStep, fr)}
+    <div className="mt-2">
+      <div className="rounded-[var(--radius)] bg-surface-alt px-3 py-2">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className={`font-medium ${STATUS_TONE[existing.status] ?? "text-muted"}`}>
+            {REMEDIATION_STATUS_LABEL[existing.status]?.[fr ? "fr" : "en"] ?? existing.status}
           </span>
-        ) : null}
-        {existing.verificationOutcome ? (
           <span className="text-muted">
-            ·{" "}
-            {REMEDIATION_OUTCOME_LABEL[existing.verificationOutcome]?.[fr ? "fr" : "en"] ??
-              existing.verificationOutcome}
+            {existing.steps.length}/{Object.keys(REMEDIATION_STEP_LABELS).length}{" "}
+            {fr ? "étapes" : "steps"}
           </span>
-        ) : null}
-      </div>
-
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        {existing.nextStep && !terminal ? (
-          <button
-            type="button"
-            className="app-btn app-btn-sm"
-            disabled={busy !== null}
-            onClick={() =>
-              void call("step", async () => {
-                const body = await apiFetch<{ remediation: Remediation }>(
-                  `/api/v1/remediations/${encodeURIComponent(existing.id)}?workspaceId=${encodeURIComponent(workspaceId)}`,
-                  {
-                    method: "PATCH",
-                    body: { advance: { step: existing.nextStep } },
-                  }
-                );
-                return body.remediation;
-              })
-            }
-          >
-            {busy === "step" ? (
-              <Loader2 size={13} className="animate-spin" />
-            ) : (
-              <CheckCircle2 size={13} />
-            )}
-            {fr ? "Fait : " : "Done: "}
-            {stepLabel(existing.nextStep, fr)}
-          </button>
-        ) : null}
-
-        {!terminal
-          ? moves.map((status) => (
-              <button
-                key={status}
-                type="button"
-                className="app-btn app-btn-sm"
-                disabled={busy !== null}
-                onClick={() =>
-                  void call(`status:${status}`, async () => {
-                    const body = await apiFetch<{ remediation: Remediation }>(
-                      `/api/v1/remediations/${encodeURIComponent(existing.id)}?workspaceId=${encodeURIComponent(workspaceId)}`,
-                      { method: "PATCH", body: { status } }
-                    );
-                    return body.remediation;
-                  })
-                }
-              >
-                {REMEDIATION_STATUS_LABEL[status]?.[fr ? "fr" : "en"] ?? status}
-              </button>
-            ))
-          : null}
-      </div>
-
-      {existing.status === "applied" || existing.status === "failed" ? (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <label className="sr-only" htmlFor={`verify-${existing.id}`}>
-            {fr ? "Analyse de vérification" : "Verification analysis"}
-          </label>
-          <select
-            id={`verify-${existing.id}`}
-            className="app-shell-pill app-shell-select"
-            value={verifyWith}
-            onChange={(event) => setVerifyWith(event.target.value)}
-          >
-            <option value="">
-              {fr ? "Analyse qui a re-mesuré…" : "Analysis that re-measured…"}
-            </option>
-            {candidates.map((candidate) => (
-              <option key={candidate.id} value={candidate.id}>
-                {candidate.label}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            className="app-btn app-btn-sm"
-            disabled={busy !== null || !verifyWith}
-            onClick={() =>
-              void call("verify", async () => {
-                const body = await apiFetch<{ remediation: Remediation }>(
-                  `/api/v1/remediations/${encodeURIComponent(existing.id)}/verify`,
-                  {
-                    method: "POST",
-                    body: { workspaceId, analysisId: verifyWith },
-                  }
-                );
-                return body.remediation;
-              })
-            }
-          >
-            {busy === "verify" ? (
-              <Loader2 size={13} className="animate-spin" />
-            ) : (
-              <CheckCircle2 size={13} />
-            )}
-            {fr ? "Vérifier par mesure" : "Verify by measurement"}
-          </button>
+          {existing.nextStep ? (
+            <span className="text-muted">
+              · {fr ? "prochaine" : "next"}: {stepLabel(existing.nextStep, fr)}
+            </span>
+          ) : null}
+          {existing.verificationOutcome ? (
+            <span className="text-muted">
+              ·{" "}
+              {REMEDIATION_OUTCOME_LABEL[existing.verificationOutcome]?.[fr ? "fr" : "en"] ??
+                existing.verificationOutcome}
+            </span>
+          ) : null}
         </div>
-      ) : null}
 
-      <p className="mt-2 text-[0.68rem] leading-relaxed text-muted">
-        {fr ? "Vérification : " : "Verification: "}
-        {existing.verification}
-      </p>
-      {inconclusive ? (
-        <p role="status" className="mt-1 text-[0.68rem] text-warning">
-          {fr ? "Non concluant : " : "Inconclusive: "}
-          {inconclusive}
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {existing.nextStep && !terminal ? (
+            <button
+              type="button"
+              className="app-btn app-btn-sm"
+              disabled={busy !== null}
+              onClick={() =>
+                void call("step", async () => {
+                  const body = await apiFetch<{ remediation: Remediation }>(
+                    `/api/v1/remediations/${encodeURIComponent(existing.id)}?workspaceId=${encodeURIComponent(workspaceId)}`,
+                    {
+                      method: "PATCH",
+                      body: { advance: { step: existing.nextStep } },
+                    }
+                  );
+                  return body.remediation;
+                })
+              }
+            >
+              {busy === "step" ? (
+                <Loader2 size={13} className="animate-spin" />
+              ) : (
+                <CheckCircle2 size={13} />
+              )}
+              {fr ? "Fait : " : "Done: "}
+              {stepLabel(existing.nextStep, fr)}
+            </button>
+          ) : null}
+
+          {!terminal
+            ? moves.map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  className="app-btn app-btn-sm"
+                  disabled={busy !== null}
+                  onClick={() =>
+                    void call(`status:${status}`, async () => {
+                      const body = await apiFetch<{ remediation: Remediation }>(
+                        `/api/v1/remediations/${encodeURIComponent(existing.id)}?workspaceId=${encodeURIComponent(workspaceId)}`,
+                        { method: "PATCH", body: { status } }
+                      );
+                      return body.remediation;
+                    })
+                  }
+                >
+                  {REMEDIATION_STATUS_LABEL[status]?.[fr ? "fr" : "en"] ?? status}
+                </button>
+              ))
+            : null}
+        </div>
+
+        {existing.status === "applied" || existing.status === "failed" ? (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <label className="sr-only" htmlFor={`verify-${existing.id}`}>
+              {fr ? "Analyse de vérification" : "Verification analysis"}
+            </label>
+            <select
+              id={`verify-${existing.id}`}
+              className="app-shell-pill app-shell-select"
+              value={verifyWith}
+              onChange={(event) => setVerifyWith(event.target.value)}
+            >
+              <option value="">
+                {fr ? "Analyse qui a re-mesuré…" : "Analysis that re-measured…"}
+              </option>
+              {candidates.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="app-btn app-btn-sm"
+              disabled={busy !== null || !verifyWith}
+              onClick={() =>
+                void call("verify", async () => {
+                  const body = await apiFetch<{ remediation: Remediation }>(
+                    `/api/v1/remediations/${encodeURIComponent(existing.id)}/verify`,
+                    {
+                      method: "POST",
+                      body: { workspaceId, analysisId: verifyWith },
+                    }
+                  );
+                  return body.remediation;
+                })
+              }
+            >
+              {busy === "verify" ? (
+                <Loader2 size={13} className="animate-spin" />
+              ) : (
+                <CheckCircle2 size={13} />
+              )}
+              {fr ? "Vérifier par mesure" : "Verify by measurement"}
+            </button>
+          </div>
+        ) : null}
+
+        <p className="mt-2 text-[0.68rem] leading-relaxed text-muted">
+          {fr ? "Vérification : " : "Verification: "}
+          {existing.verification}
         </p>
-      ) : null}
-      {error ? (
-        <p role="alert" className="mt-1 text-[0.68rem] text-danger">
-          {errorText(error, fr)}
-        </p>
-      ) : null}
-      <p className="mt-1 text-[0.6rem] text-muted">{existing.id}</p>
+        {inconclusive ? (
+          <p role="status" className="mt-1 text-[0.68rem] text-warning">
+            {fr ? "Non concluant : " : "Inconclusive: "}
+            {inconclusive}
+          </p>
+        ) : null}
+        {error ? (
+          <p role="alert" className="mt-1 text-[0.68rem] text-danger">
+            {errorText(error, fr)}
+          </p>
+        ) : null}
+        <p className="mt-1 text-[0.6rem] text-muted">{existing.id}</p>
+      </div>
+      <FindingPatch
+        workspaceId={workspaceId}
+        analysisId={analysisId}
+        findingKey={findingKey}
+        onVerified={onChange}
+      />
     </div>
   );
 }

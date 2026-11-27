@@ -1,4 +1,4 @@
-import { Activity, GitCompare, RefreshCw } from "lucide-react";
+import { Activity, Download, GitCompare, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import { FindingRemediation, type Remediation } from "../../components/app/FindingRemediation.js";
@@ -39,6 +39,7 @@ interface Coverage {
 
 interface Analysis {
   id: string;
+  reportId?: string | null;
   source: string;
   targetType: string;
   target: string;
@@ -245,6 +246,42 @@ export function AnalysesPage() {
     () => list?.find((item) => item.id === selected) ?? null,
     [list, selected]
   );
+  const downloadReport = useCallback(
+    async (format: "html" | "json") => {
+      if (!session.workspaceId || !selected) return;
+      setBusy(true);
+      setCompareError(null);
+      try {
+        const response = await fetch(
+          `/api/v1/analyses/${encodeURIComponent(selected)}/report?workspaceId=${encodeURIComponent(session.workspaceId)}&format=${format}`,
+          { credentials: "include" }
+        );
+        if (!response.ok) {
+          const body = (await response.json().catch(() => null)) as {
+            error?: { message?: string };
+          } | null;
+          throw new Error(body?.error?.message ?? `Export failed (${response.status})`);
+        }
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `proofcore-analysis-${selected}.${format}`;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+      } catch (caught) {
+        setCompareError({
+          code: "report_export_failed",
+          message: caught instanceof Error ? caught.message : String(caught),
+        } as ApiError);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [selected, session.workspaceId]
+  );
   const others = useMemo(
     () => (list ?? []).filter((item) => item.id !== selected),
     [list, selected]
@@ -351,9 +388,30 @@ export function AnalysesPage() {
                           : ""}
                       </p>
                     </div>
-                    <div className="text-right">
+                    <div className="flex flex-wrap items-center justify-end gap-2">
                       <StatusPill status={current.status} />
-                      <p className="mt-1 text-[0.68rem] text-muted">{current.id}</p>
+                      <button
+                        type="button"
+                        className="app-btn"
+                        onClick={() => void downloadReport("html")}
+                        disabled={busy}
+                        aria-label={
+                          fr
+                            ? "Télécharger le rapport HTML imprimable"
+                            : "Download the printable HTML report"
+                        }
+                      >
+                        <Download size={14} /> {fr ? "Rapport HTML" : "HTML report"}
+                      </button>
+                      <button
+                        type="button"
+                        className="app-btn"
+                        onClick={() => void downloadReport("json")}
+                        disabled={busy}
+                      >
+                        JSON
+                      </button>
+                      <p className="w-full text-right text-[0.68rem] text-muted">{current.id}</p>
                     </div>
                   </div>
                   <CoverageLine coverage={current.coverage} fr={fr} />

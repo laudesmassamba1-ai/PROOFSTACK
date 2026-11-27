@@ -5018,12 +5018,124 @@ p {
   padding: 7px 9px 9px;
 }
 
+/* Context and spend, beside the effort picker. Compact by design: it is a gauge,
+   not a dashboard, and it must leave room for the send button on a 320px phone. */
+.chat-tokens {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.chat-tokens svg {
+  flex: none;
+  opacity: 0.7;
+}
+
+.chat-tokens-label {
+  display: inline-flex;
+  gap: 3px;
+  align-items: baseline;
+}
+
+.chat-tokens-label strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.chat-tokens-of {
+  color: var(--ink-soft);
+}
+
+.chat-tokens-track {
+  display: inline-block;
+  width: 40px;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
+}
+
+.chat-tokens-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ink-soft);
+  transition: width 260ms var(--ease-standard);
+}
+
+.chat-tokens.is-warm .chat-tokens-track > span {
+  background: #b45309;
+}
+
+.chat-tokens.is-hot .chat-tokens-track > span {
+  background: var(--vermillon);
+}
+
+.chat-tokens-cum {
+  color: var(--ink-soft);
+}
+
+.chat-msg-usage {
+  display: flex;
+  gap: 10px;
+  margin: 6px 0 0;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+@media (max-width: 560px) {
+  /* At 320px the effort burn text, the meter labels and the send button competed for
+     the same row: the send button ended up over the attach buttons. Drop the burn
+     (the menu still explains it) and tighten the gaps, so every control keeps its
+     own tap target. */
+  .chat-composer-bar {
+    gap: 5px;
+  }
+
+  .chat-composer-tools {
+    gap: 4px;
+  }
+
+  .chat-effort-trigger {
+    padding: 6px;
+    gap: 3px;
+  }
+
+  .chat-effort-trigger .chat-effort-burn {
+    display: none;
+  }
+
+  .chat-tokens {
+    gap: 4px;
+    padding: 3px 6px;
+  }
+
+  .chat-tokens-label > span:first-child,
+  .chat-tokens-cum {
+    display: none;
+  }
+
+  .chat-tokens-track {
+    width: 28px;
+  }
+}
+
 .chat-effort {
   position: relative;
 }
 
 .chat-effort-trigger {
   display: inline-flex;
+  white-space: nowrap;
   align-items: center;
   gap: 6px;
   border: 0;
@@ -8903,6 +9015,11 @@ hairline,
   color: var(--fiche-mid);
 }
 .tp-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
   color: var(--fiche-mid);
   transition: color 0.15s ease;
 }
@@ -10275,6 +10392,30 @@ body:has(.app-main-chat) .app-footer {
   background: color-mix(in srgb, var(--vermillon, #e4381f) 5%, transparent);
 }
 
+.chat-tools-perm {
+  flex: none;
+  margin-left: auto;
+  padding: 2px 5px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.chat-tools-perm.is-analysis {
+  color: #8a5a00;
+  border-color: color-mix(in srgb, #8a5a00 35%, var(--rule));
+}
+
+.chat-tools-perm.is-write,
+.chat-tools-perm.is-sensitive {
+  color: #a3271a;
+  border-color: color-mix(in srgb, #a3271a 35%, var(--rule));
+}
+
 .chat-tools-icon {
   display: grid;
   width: 30px;
@@ -10567,8 +10708,19 @@ body:has(.app-main-chat) .app-footer {
     min-width: 0;
   }
 
+  /* Masqué visuellement, mais conservé dans l'arbre d'accessibilité : un
+     lecteur d'écran garde l'association colonne/valeur que le libellé visuel
+     (td::before) ne porte pas sémantiquement. */
   .app-table-stack thead {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
   }
 
   .app-table-stack tbody,
@@ -11625,7 +11777,7 @@ body:has(.app-main-chat) .app-footer {
 
   .app-object-index,
   .app-object-card .app-badge {
-    font-size: 8.5px;
+    font-size: 9.5px;
   }
 
   /* 2. L'état vide n'affiche plus l'ASCII de ~190px, illisible à cette
@@ -11663,6 +11815,21 @@ body:has(.app-main-chat) .app-footer {
   .app-footer {
     padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
     font-size: 9px;
+  }
+
+  /* Les liens d'action isolés ("Comprendre l'app", "Tous les projets") sont
+     des cibles autonomes : 24px de haut, comme les boutons. */
+  .app-text-link {
+    min-height: 24px;
+    padding-bottom: 4px;
+  }
+
+  .app-stamp-note {
+    font-size: 0.68rem;
+  }
+
+  .app-badge {
+    font-size: 9.5px;
   }
 
   /* 5. Chiffres clés : les libellés à 9px étaient illisibles. */

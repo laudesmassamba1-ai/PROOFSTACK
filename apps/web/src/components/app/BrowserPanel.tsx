@@ -483,6 +483,8 @@ interface RemoteBrowserState {
   console: { type: string; text: string }[];
 }
 
+const MAX_ADDRESS_LENGTH = 2048;
+
 /**
  * The server-rendered preview, for a plain web tab.
  *
@@ -507,9 +509,27 @@ function RemoteBrowser({
   const [error, setError] = useState<string | null>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const startedRef = useRef(false);
+  const initialUrlRef = useRef(initialUrl);
+  initialUrlRef.current = initialUrl;
+  const mountedRef = useRef(true);
+  const sessionIdRef = useRef<string | null>(null);
+  const actionSequenceRef = useRef(0);
+  const pendingRef = useRef(false);
+  const statusRef = useRef(status);
+  statusRef.current = status;
 
   const start = useCallback(
     async (url: string) => {
+      if (!mountedRef.current) return;
+      const generation = ++actionSequenceRef.current;
+      pendingRef.current = true;
+      const previousSession = sessionIdRef.current;
+      sessionIdRef.current = null;
+      if (previousSession) {
+        void postJson("/api/v1/browser/close", { sessionId: previousSession }).catch(
+          () => undefined
+        );
+      }
       setStatus("loading");
       setError(null);
       try {
@@ -518,58 +538,73 @@ function RemoteBrowser({
           { workspaceId, url },
           START_TIMEOUT_MS
         );
+        if (!mountedRef.current || generation !== actionSequenceRef.current) {
+          void postJson("/api/v1/browser/close", { sessionId: result.sessionId }).catch(
+            () => undefined
+          );
+          return;
+        }
+        sessionIdRef.current = result.sessionId;
         setState(result);
         setAddress(result.url);
         setStatus("idle");
       } catch (cause) {
+        if (generation !== actionSequenceRef.current) return;
         setStatus("error");
         setError(cause instanceof Error ? cause.message : String(cause));
+      } finally {
+        if (generation === actionSequenceRef.current) pendingRef.current = false;
       }
     },
     [workspaceId]
   );
 
-  const act = useCallback(
-    async (action: Record<string, unknown>) => {
-      if (!state) return;
-      setStatus("loading");
-      setError(null);
-      try {
-        const result = await postJson<RemoteBrowserState>(
-          "/api/v1/browser/action",
-          { sessionId: state.sessionId, action },
-          ACTION_TIMEOUT_MS
-        );
-        setState(result);
-        setAddress(result.url);
-        setStatus("idle");
-      } catch (cause) {
-        setStatus("error");
-        setError(cause instanceof Error ? cause.message : String(cause));
-      }
-    },
-    [state]
-  );
+  const act = useCallback(async (action: Record<string, unknown>) => {
+    const activeSessionId = sessionIdRef.current;
+    if (!mountedRef.current || !activeSessionId || pendingRef.current) return;
+    pendingRef.current = true;
+    const sequence = ++actionSequenceRef.current;
+    setStatus("loading");
+    setError(null);
+    try {
+      const result = await postJson<RemoteBrowserState>(
+        "/api/v1/browser/action",
+        { sessionId: activeSessionId, action },
+        ACTION_TIMEOUT_MS
+      );
+      if (sequence !== actionSequenceRef.current) return;
+      setState(result);
+      setAddress(result.url);
+      setStatus("idle");
+    } catch (cause) {
+      if (sequence !== actionSequenceRef.current) return;
+      setStatus("error");
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      if (sequence === actionSequenceRef.current) pendingRef.current = false;
+    }
+  }, []);
 
   useEffect(() => {
+    mountedRef.current = true;
     if (startedRef.current) return;
     startedRef.current = true;
-    void start(initialUrl ?? "https://example.com");
-  }, [initialUrl, start]);
-
-  useEffect(() => {
+    void start(initialUrlRef.current ?? "https://example.com");
     return () => {
-      if (state?.sessionId) {
-        void postJson("/api/v1/browser/close", { sessionId: state.sessionId }).catch(
-          () => undefined
-        );
+      mountedRef.current = false;
+      pendingRef.current = false;
+      actionSequenceRef.current += 1;
+      const sessionId = sessionIdRef.current;
+      sessionIdRef.current = null;
+      if (sessionId) {
+        void postJson("/api/v1/browser/close", { sessionId }).catch(() => undefined);
       }
     };
-  }, [state?.sessionId]);
+  }, [start]);
 
   const clickAt = (event: React.MouseEvent<HTMLImageElement>) => {
     const image = imageRef.current;
-    if (!image || !state || status === "loading") return;
+    if (!image || !sessionIdRef.current || status === "loading") return;
     const rect = image.getBoundingClientRect();
     const scale = Math.min(
       rect.width / SERVER_VIEWPORT.width,
@@ -593,16 +628,25 @@ function RemoteBrowser({
           className="pc-browser-icon"
           aria-label={fr ? "Précédent" : "Back"}
           onClick={() => void act({ kind: "back" })}
-          disabled={!state || status === "loading"}
+          disabled={!sessionIdRef.current || statusRef.current === "loading"}
         >
           <ArrowLeft size={14} />
         </button>
         <button
           type="button"
           className="pc-browser-icon"
+          aria-label={fr ? "Suivant" : "Forward"}
+          onClick={() => void act({ kind: "forward" })}
+          disabled={!sessionIdRef.current || status === "loading"}
+        >
+          <ArrowRight size={13} />
+        </button>
+        <button
+          type="button"
+          className="pc-browser-icon"
           aria-label={fr ? "Recharger" : "Reload"}
           onClick={() => void act({ kind: "reload" })}
-          disabled={!state || status === "loading"}
+          disabled={!sessionIdRef.current || status === "loading"}
         >
           <RotateCw size={13} />
         </button>
@@ -611,14 +655,15 @@ function RemoteBrowser({
           onSubmit={(event) => {
             event.preventDefault();
             const next = address.trim();
-            if (!next) return;
-            if (state) void act({ kind: "navigate", url: next });
+            if (!next || next.length > MAX_ADDRESS_LENGTH || pendingRef.current) return;
+            if (sessionIdRef.current) void act({ kind: "navigate", url: next });
             else void start(next);
           }}
         >
           <input
             value={address}
-            onChange={(event) => setAddress(event.target.value)}
+            onChange={(event) => setAddress(event.target.value.slice(0, MAX_ADDRESS_LENGTH))}
+            maxLength={MAX_ADDRESS_LENGTH}
             placeholder="https://…"
             spellCheck={false}
             aria-label={fr ? "Adresse" : "Address"}
@@ -630,9 +675,9 @@ function RemoteBrowser({
         </form>
         <span
           className="pc-browser-live"
-          title={fr ? "Rendu par le serveur" : "Rendered by the server"}
+          title={fr ? "Chromium distant interactif" : "Interactive remote Chromium"}
         >
-          <Monitor size={11} /> {fr ? "aperçu" : "preview"}
+          <Monitor size={11} /> {fr ? "navigateur" : "browser"}
         </span>
         <button
           type="button"
