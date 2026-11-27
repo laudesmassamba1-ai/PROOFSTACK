@@ -110,7 +110,9 @@
   --background: #0a0a0b;
   --surface: #141412;
   --surface-alt: #1d1d1a;
-  --text-primary: var(--paper);
+  /* Primary text follows the ink, not the (dark) paper: `text-ink` was rendering
+     #0a0a0b on #141412 in dark mode, i.e. invisible. */
+  --text-primary: var(--ink);
   --text-secondary: #b8b3a8;
   --border: rgba(243, 240, 232, 0.14);
   --primary: var(--paper);
