@@ -19,6 +19,8 @@
   --brand-black: #050708;
   /* le rouge de la DA : accent unique de la marque */
   --vermillon: #e4381f;
+  /* The final CTA panel needs a deeper red: paper text on #e4381f measures 3.62:1. */
+  --vermillon-deep: #c0301b;
   --vermillon-dark: #f04b31;
   --galerie-paper: #f2ebdc;
   --galerie-ink: #16130f;
@@ -8564,7 +8566,7 @@ hairline,
 /* Le panneau final: un seul aplat vermillon, texte papier, boutons papier. */
 
 .peint-final {
-  background: var(--vermillon);
+  background: var(--vermillon-deep);
   border-radius: 24px;
 }
 
@@ -8576,7 +8578,8 @@ hairline,
 }
 
 .peint-final .eyebrow {
-  color: rgba(242, 235, 220, 0.9);
+  /* 90% paper drops the ratio to 4.4:1 on the deeper panel; the label is small text. */
+  color: var(--galerie-paper);
 }
 
 .peint-final .btn-primary {

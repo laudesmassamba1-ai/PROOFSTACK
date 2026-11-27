@@ -37,6 +37,12 @@ test.beforeEach(async ({ page }) => {
       window.sessionStorage.setItem("e2e.localePinned", "1");
     }
   });
+  // Audit the settled rendering. The app fades blocks in with an opacity animation, and
+  // axe samples whatever frame it lands on: a section caught mid-fade fails 1.4.3 at
+  // 4.34:1 even though its final text is above 7:1. The stylesheet already removes those
+  // animations under prefers-reduced-motion, so the audit asks for that preference and
+  // measures the colours a reader actually reads.
+  await page.emulateMedia({ reducedMotion: "reduce" });
 });
 
 async function signUp(page: import("@playwright/test").Page, email: string): Promise<void> {
