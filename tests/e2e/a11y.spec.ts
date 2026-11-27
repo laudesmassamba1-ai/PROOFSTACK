@@ -22,6 +22,7 @@ const PAGES = [
   { path: "/app/start", name: "start" },
   { path: "/app/analyses", name: "analyses" },
   { path: "/app/flow", name: "flow" },
+  { path: "/app/settings", name: "settings" },
   { path: "/app/ai", name: "assistant" },
 ] as const;
 
