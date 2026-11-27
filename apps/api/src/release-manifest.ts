@@ -2,7 +2,7 @@
 // Do not edit by hand: this is the last release verified from the public source, used
 // only when the live GitHub call is rate-limited. Regenerate with `pnpm releases:sync`.
 export const RELEASE_MANIFEST = {
-  fetchedAt: "2026-11-25T10:58:23.953Z",
+  fetchedAt: "2026-11-27T12:55:41.516Z",
   release: {
     tag: "v0.6.3",
     name: "v0.6.3",

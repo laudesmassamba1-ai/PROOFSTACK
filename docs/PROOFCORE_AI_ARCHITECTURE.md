@@ -124,7 +124,8 @@ caractères :
   trimmed }, outputBudget }` ;
 - le message assistant conserve `usage: { input, output }`, donc un rechargement de la
   conversation montre le même coût ;
-- l'interface affiche un compteur de contexte (utilisé / budget, avec jauge) et, par
+- l'interface affiche un compteur de contexte (utilisé / budget, jauge et « reste
+  N ») et, par
   message, les jetons d'entrée et de sortie. Le compteur du composeur est masqué sous
   560 px pour laisser la place au bouton d'envoi ; la ligne par message reste lisible.
 

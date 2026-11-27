@@ -478,7 +478,7 @@ pnpm cloud:deploy --dry-run
 
 - **Sessions navigateur** : `browser_open`, `browser_read`, `browser_act` et `browser_close` sont des outils réels. En Worker, Cloudflare Browser Rendering ouvre la session et D1 enregistre le propriétaire ; en Node, `createLocalBrowserAgent` pilote le Chromium de la machine via l'adaptateur. Les deux rendent le même `AgentView` (URL, titre, texte, éléments avec sélecteurs stables, capture). `browser_act` est classé `write`, `browser_open` `analysis`, les deux autres `read`.
 - **Jetons** : `callUpstream` additionne l'`usage` réel de chaque appel (réponse, lentilles, synthèse, curateur). `/chat` renvoie entrée/sortie/total, `context {used,budget,remaining,trimmed}` et `outputBudget`, et persiste `usage` sur le message. Budgets de contexte : quick 16 k, balanced 32 k, deep 64 k, ultra 96 k.
-- **Interface** : `TokenMeter` (jauge `role="progressbar"`) + coût par message ; catalogue chargé depuis `/api/v1/ai/tools` (36 outils) avec badge de permission ; à ≤560 px le burn de l'effort est masqué pour que le bouton d'envoi ne chevauche plus les pièces jointes.
+- **Interface** : `TokenMeter` (jauge `role="progressbar"`, « reste N » visible et `aria-valuetext` « N restants ») + coût par message ; catalogue chargé depuis `/api/v1/ai/tools` (36 outils) avec badge de permission ; à ≤560 px le burn de l'effort est masqué pour que le bouton d'envoi ne chevauche plus les pièces jointes.
 - **Preuves** : `local-browser-agent.test.ts` (1, vrai Chromium), `ai.test.ts` + `ai-tools.test.ts` (39), Playwright mobile assistant 320×700 (1), `tsc` API/Web et build Web verts.
 
 ## 2026-11-27 (suite) — finitions de la même passe
