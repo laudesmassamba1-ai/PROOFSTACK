@@ -5079,6 +5079,7 @@ p {
   background: var(--vermillon);
 }
 
+.chat-tokens-left,
 .chat-tokens-cum {
   color: var(--ink-soft);
 }
@@ -5119,7 +5120,7 @@ p {
     padding: 3px 6px;
   }
 
-  .chat-tokens-label > span:first-child,
+  .chat-tokens-label,
   .chat-tokens-cum {
     display: none;
   }

@@ -562,9 +562,10 @@ function TokenMeter({
 }): React.ReactElement {
   const pct = budget > 0 ? Math.min(100, Math.round((contextUsed / budget) * 100)) : 0;
   const tone = pct >= 90 ? "is-hot" : pct >= 75 ? "is-warm" : "";
+  const remaining = Math.max(0, budget - contextUsed);
   const label = fr
-    ? `Contexte : ${compactTokens(contextUsed)} sur ${compactTokens(budget)} jetons. ${compactTokens(input)} entrée et ${compactTokens(output)} sortie consommés dans cette conversation.`
-    : `Context: ${compactTokens(contextUsed)} of ${compactTokens(budget)} tokens. ${compactTokens(input)} input and ${compactTokens(output)} output spent in this conversation.`;
+    ? `Contexte : ${compactTokens(contextUsed)} sur ${compactTokens(budget)} jetons, ${compactTokens(remaining)} restants. ${compactTokens(input)} entrée et ${compactTokens(output)} sortie consommés dans cette conversation.`
+    : `Context: ${compactTokens(contextUsed)} of ${compactTokens(budget)} tokens, ${compactTokens(remaining)} left. ${compactTokens(input)} input and ${compactTokens(output)} output spent in this conversation.`;
   return (
     <div className={`chat-tokens ${tone}`} title={label}>
       <Gauge size={12} aria-hidden />
@@ -580,8 +581,16 @@ function TokenMeter({
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={pct}
+        aria-valuetext={
+          fr
+            ? `${compactTokens(contextUsed)} utilisés sur ${compactTokens(budget)}, ${compactTokens(remaining)} restants`
+            : `${compactTokens(contextUsed)} used of ${compactTokens(budget)}, ${compactTokens(remaining)} left`
+        }
       >
         <span style={{ width: `${pct}%` }} />
+      </span>
+      <span className="chat-tokens-left">
+        {fr ? "reste" : "left"} {compactTokens(remaining)}
       </span>
       <span className="chat-tokens-cum">{compactTokens(input + output)} tok</span>
     </div>
