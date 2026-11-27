@@ -11,6 +11,37 @@ import { readRepo } from "../src/routes/ai.js";
 
 const offline = Boolean(process.env.PROOFSTACK_OFFLINE);
 
+/**
+ * The live calls share the runner address with every other job on it.
+ *
+ * Unauthenticated GitHub allows 60 core calls per hour per IP; once exhausted it answers
+ * 403 and a tree read looks like an empty repository. That is an external quota, not a
+ * regression of this code, so the live tests are skipped with the measured reason instead
+ * of failing the build — a skip is reported as a skip, never as a pass.
+ */
+async function githubQuotaExhausted(): Promise<boolean> {
+  if (offline) return false;
+  try {
+    const response = await fetch("https://api.github.com/rate_limit", {
+      headers: { accept: "application/json", "user-agent": "PROOFCORE-tests" },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) return false;
+    const body = (await response.json()) as {
+      resources?: { core?: { remaining?: number } };
+    };
+    return body.resources?.core?.remaining === 0;
+  } catch {
+    return false;
+  }
+}
+
+const liveSkip = offline
+  ? "network disabled"
+  : (await githubQuotaExhausted())
+    ? "GitHub API quota exhausted"
+    : false;
+
 describe("read_repo", () => {
   it("refuses a host it does not know how to read", async () => {
     const result = await readRepo({ url: "https://bitbucket.org/owner/repo" });
@@ -35,7 +66,7 @@ describe("read_repo", () => {
   });
 
   it("reads a real public repository tree and file", {
-    skip: offline ? "network disabled" : false,
+    skip: liveSkip,
     timeout: 30_000,
   }, async () => {
     const tree = await readRepo({ url: "https://github.com/sindresorhus/is-plain-obj" });
@@ -60,9 +91,9 @@ describe("read_repo", () => {
   });
 
   it("reports a private or missing repository as not found, without pretending", {
+    skip: liveSkip,
     timeout: 20_000,
   }, async () => {
-    if (offline) return;
     const result = await readRepo({ url: "https://github.com/proofcore/this-repo-does-not-exist" });
     const body = JSON.parse(result.content) as { error?: string; note?: string };
     expect(body.error).toMatch(/not found, or private/);
