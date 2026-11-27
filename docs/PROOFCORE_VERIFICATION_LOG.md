@@ -172,12 +172,12 @@ quand l'en-tête est présent et sur `Sec-Fetch-Site: cross-site` pour les mutat
 cookie. La couverture des appels directs et des clients sans Fetch Metadata reste
 partielle.
 
-| Fonction                                 | Code présent | Test exécuté              | Test réussi   | Parcours vérifié                                                  | Production vérifiée |
-| ---------------------------------------- | ------------ | ------------------------- | ------------- | ----------------------------------------------------------------- | ------------------- |
-| Menu mobile / parcours guide             | oui          | Playwright mobile, ciblé  | oui           | VÉRIFIÉ sur stack local uniquement                                | NON VÉRIFIÉ         |
+| Fonction                                                    | Code présent | Test exécuté              | Test réussi   | Parcours vérifié                                                  | Production vérifiée |
+| ----------------------------------------------------------- | ------------ | ------------------------- | ------------- | ----------------------------------------------------------------- | ------------------- |
+| Menu mobile / parcours guide                                | oui          | Playwright mobile, ciblé  | oui           | VÉRIFIÉ sur stack local uniquement                                | NON VÉRIFIÉ         |
 | Layout responsive, 13 tailles × 7 routes (dont l'assistant) | oui          | Playwright Chromium       | oui           | VÉRIFIÉ sur stack local; les captures sont des artefacts de test  | NON VÉRIFIÉ         |
-| Axe-core WCAG 2.2 AA                     | oui          | Playwright + axe          | oui, 8 routes | PARTIEL : audit automatisé, clavier/lecteur d'écran non certifiés | NON VÉRIFIÉ         |
-| Contrôle cross-site des mutations        | oui          | 16 tests unitaires ciblés | oui           | PARTIEL : harnais API, pas un navigateur réel                     | NON VÉRIFIÉ         |
+| Axe-core WCAG 2.2 AA                                        | oui          | Playwright + axe          | oui, 8 routes | PARTIEL : audit automatisé, clavier/lecteur d'écran non certifiés | NON VÉRIFIÉ         |
+| Contrôle cross-site des mutations                           | oui          | 16 tests unitaires ciblés | oui           | PARTIEL : harnais API, pas un navigateur réel                     | NON VÉRIFIÉ         |
 
 ## Assistant : navigateur piloté, jetons réels et mobile 320 px — 2026-11-27
 
