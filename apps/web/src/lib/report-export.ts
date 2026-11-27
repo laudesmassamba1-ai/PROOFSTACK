@@ -327,6 +327,11 @@ export function buildReportMarkdown(
   }
   out.push(`## ${findIndex}. ${fr ? "Constats par module" : "Findings by module"}`);
   out.push("");
+  for (const m of result.modules) {
+    const note = MODULE_NOTES[m.module]?.[fr ? "fr" : "en"];
+    if (note) out.push(`> **${t(m.module)}** — ${note}`);
+  }
+  out.push("");
   for (const [module, findings] of groups) {
     out.push(`### ${t(module)}`);
     out.push("");
@@ -439,6 +444,192 @@ function fr0(s: string): string {
   return s;
 }
 
+/* ------------------------------------------------------------------ */
+/* Glossary and module explanations                                    */
+/* ------------------------------------------------------------------ */
+
+/** Technical terms the report may use, explained in one sentence. Only the
+ * terms that actually appear in this report are printed. */
+const GLOSSARY: { term: string; fr: string; en: string }[] = [
+  {
+    term: "CSP",
+    fr: "Content-Security-Policy — un en-tête HTTP qui liste ce qu'une page a le droit de charger (scripts, images, iframes) ; il bloque les scripts injectés.",
+    en: "Content-Security-Policy — an HTTP header listing what a page may load (scripts, images, frames); it blocks injected scripts.",
+  },
+  {
+    term: "HSTS",
+    fr: "Strict-Transport-Security — l'en-tête qui force le navigateur à n'utiliser que HTTPS pour ce domaine, même sur une simple frappe d'URL.",
+    en: "Strict-Transport-Security — the header that forces the browser to use HTTPS only for this domain, even on a typed URL.",
+  },
+  {
+    term: "X-Frame-Options",
+    fr: "L'en-tête qui interdit d'embarquer la page dans une iframe d'un autre site — la base de la défense contre le clickjacking.",
+    en: "The header that forbids embedding the page in another site's iframe — the base of clickjacking defense.",
+  },
+  {
+    term: "clickjacking",
+    fr: "Une attaque où la vraie page est cachée sous un calque : le visiteur croit cliquer ailleurs. Les en-têtes frame_* la bloquent.",
+    en: "An attack where the real page is hidden under a layer: the visitor believes they click elsewhere. The frame_* headers block it.",
+  },
+  {
+    term: "cache-control",
+    fr: "L'en-tête qui décide combien de temps une réponse peut être conservée ; mal réglé, il sert des données privées au mauvais visiteur.",
+    en: "The header deciding how long a response may be kept; misconfigured, it serves private data to the wrong visitor.",
+  },
+  {
+    term: "permissions-policy",
+    fr: "L'en-tête qui retire à la page des capacités du navigateur (caméra, micro, géolocalisation) quand elle n'en a pas besoin.",
+    en: "The header that removes browser capabilities (camera, microphone, geolocation) the page does not need.",
+  },
+  {
+    term: "TLS",
+    fr: "Le chiffrement de la connexion HTTPS. Un certificat expiré, une version ancienne ou un renouvellement manqué fait échouer tout le site.",
+    en: "The encryption behind HTTPS. An expired certificate, an old version or a missed renewal fails the whole site.",
+  },
+  {
+    term: "cookie flags",
+    fr: "Secure, HttpOnly et SameSite : trois attributs d'un cookie qui l'empêchent de circuler en clair, d'être lu en JS ou d'être envoyé par un site tiers.",
+    en: "Secure, HttpOnly and SameSite: three cookie attributes keeping it off clear text, JS reads and cross-site sends.",
+  },
+  {
+    term: "locale",
+    fr: "Le couple langue + région d'un visiteur (fr-FR, en-US). Elle change dates, monnaies, tri du texte et sens de lecture.",
+    en: "A visitor's language + region pair (fr-FR, en-US). It changes dates, currencies, text sorting and reading direction.",
+  },
+  {
+    term: "RTL",
+    fr: "Right-To-Left — les écritures qui se lisent de droite à gauche (arabe, hébreu) ; l'interface entière doit se retourner avec elles.",
+    en: "Right-To-Left — scripts read right to left (Arabic, Hebrew); the whole interface must flip with them.",
+  },
+  {
+    term: "i18n / l10n",
+    fr: "Internationalisation (rendre le code capable d'autres langues) et localisation (le faire pour une langue précise).",
+    en: "Internationalization (making the code able to hold other languages) and localization (doing it for one language).",
+  },
+  {
+    term: "idempotence",
+    fr: "Rejouer la même requête ne change rien une seconde fois : la propriété qui rend un paiement ou une création de compte sûr quand le réseau répète l'envoi.",
+    en: "Replaying the same request changes nothing the second time: the property that makes a payment or signup safe when the network resends.",
+  },
+  {
+    term: "retry / backoff",
+    fr: "Réessayer une requête en échec, en espaçant les tentatives ; sans limite ni espacement, le client déborde le serveur au lieu de l'aider.",
+    en: "Retrying a failed request with growing spacing; without limits, the client floods the server instead of helping.",
+  },
+  {
+    term: "timeout",
+    fr: "La durée après laquelle on abandonne une requête ; sans lui, une page reste bloquée indéfiniment sur un service en panne.",
+    en: "How long a request may run before giving up; without it, a page hangs forever on a dead service.",
+  },
+  {
+    term: "checksum",
+    fr: "Une empreinte calculée sur un fichier pour prouver qu'il n'a pas été altéré entre l'export et la lecture.",
+    en: "A fingerprint computed over a file proving it was not altered between export and read.",
+  },
+  {
+    term: "sitemap",
+    fr: "Le fichier XML qui liste les pages d'un site pour les moteurs de recherche ; son absence ralentit l'indexation.",
+    en: "The XML file listing a site's pages for search engines; without it indexing is slower.",
+  },
+  {
+    term: "robots.txt",
+    fr: "Le fichier qui dit aux robots ce qu'ils peuvent explorer ; son absence n'interdit pas le crawl mais laisse la politique implicite.",
+    en: "The file telling robots what they may crawl; absent, the implicit policy applies.",
+  },
+  {
+    term: "client-rendered",
+    fr: "Une page dont le contenu est construit par JavaScript dans le navigateur ; un scan qui ne lit que le HTML n'en voit qu'une coquille vide.",
+    en: "A page whose content is built by JavaScript in the browser; a scan reading only the HTML sees an empty shell.",
+  },
+  {
+    term: "viewport",
+    fr: "La balise qui adapte la page à l'écran du téléphone ; sans elle, le mobile zoome sur une version bureautique.",
+    en: "The tag that adapts the page to a phone screen; without it, mobile zooms into a desktop layout.",
+  },
+  {
+    term: "alt-text",
+    fr: "Le texte alternatif d'une image, lu par les lecteurs d'écran et affiché si l'image ne charge pas.",
+    en: "An image's alternative text, read by screen readers and shown if the image fails.",
+  },
+  {
+    term: "heading structure",
+    fr: "La hiérarchie h1→h2→h3 : le plan du document, lu à voix haute par les aides techniques et utilisé par le référencement.",
+    en: "The h1→h2→h3 hierarchy: the document's outline, read aloud by assistive tech and used by SEO.",
+  },
+  {
+    term: "secrets in HTML",
+    fr: "Une clé API, un token ou un mot de passe laissé dans le code source de la page — visible par quiconque ouvre « voir la source ».",
+    en: "An API key, token or password left in the page's source — visible to anyone opening view-source.",
+  },
+];
+
+/** What each module measures, and the failures it looks for. */
+const MODULE_NOTES: Record<string, { fr: string; en: string }> = {
+  world: {
+    fr: "WORLD lit la page comme un visiteur d'un autre pays : balise de langue, gestion de l'écriture de droite à gauche, formats de dates et de monnaies, détection des textes non traduits. Les échecs typiques : un site en anglais servi à un visiteur français, une interface qui casse en arabe, un montant affiché sans devise.",
+    en: "WORLD reads the page as a visitor from another country: language tag, right-to-left handling, date and currency formats, untranslated strings. Typical failures: an English-only site served to a French visitor, an interface breaking in Arabic, an amount printed without a currency.",
+  },
+  flow: {
+    fr: "FLOW rejoue les parcours critiques — inscription, connexion, paiement, remboursement — et vérifie qu'ils survivent aux accidents du réseau : timeout, retry, webhook. Les échecs typiques : un panier perdu au rechargement, un paiement rejoué deux fois, un formulaire qui ne dit jamais qu'il a échoué.",
+    en: "FLOW replays the critical journeys — signup, login, payment, refund — and checks they survive network accidents: timeouts, retries, webhooks. Typical failures: a cart lost on reload, a payment charged twice, a form that never says it failed.",
+  },
+  exit: {
+    fr: "EXIT vérifie que vos données sont portables : exports réels, données structurées (JSON-LD), métadonnées de partage, surface d'API documentée, styles d'impression. Les échecs typiques : un export qui ne sort que le HTML de la page, un aperçu de partage sans image, des données coincées dans un format propriétaire.",
+    en: "EXIT verifies your data is portable: real exports, structured data (JSON-LD), share metadata, a documented API surface, print styles. Typical failures: an export that only yields page HTML, a share preview with no image, data stuck in a proprietary format.",
+  },
+  fail: {
+    fr: "FAIL audite la sécurité et les défauts : en-têtes CSP et HSTS, protection contre le clickjacking, secrets dans le HTML, cookies mal protégés, contenu mixte, révocation de secrets. Les échecs typiques : une clé API dans le code source, un cookie de session sans SameSite, un site en HTTP derrière un formulaire.",
+    en: "FAIL audits security and defects: CSP and HSTS headers, clickjacking protection, secrets in HTML, unprotected cookies, mixed content, secret revocation. Typical failures: an API key in the source, a session cookie without SameSite, a form posting over HTTP.",
+  },
+  clean: {
+    fr: "CLEAN note la qualité de l'interface : hiérarchie des titres, textes alternatifs, étiquettes de champs, adaptation au viewport, poids du HTML. Les échecs typiques : trois h1 sur une page, une image sans description, un champ sans étiquette lu à voix haute comme « zone éditable ».",
+    en: "CLEAN grades interface quality: heading hierarchy, alternative texts, field labels, viewport fit, HTML weight. Typical failures: three h1 on a page, an image with no description, a field read aloud as an unnamed edit box.",
+  },
+};
+
+/** Glossary filtered to the terms this report actually uses. */
+function glossaryFor(result: ScanResultLike, fr: boolean): string {
+  const haystack = JSON.stringify({
+    findings: result.findings,
+    modules: result.modules,
+    site: result.site,
+  }).toLowerCase();
+  const items = GLOSSARY.filter((g) => haystack.includes(g.term.toLowerCase()));
+  if (items.length === 0) return "";
+  return `<h2>${fr ? "6. Glossaire" : "6. Glossary"}</h2><div class="glossary">${items
+    .map((g) => `<p><b>${escapeHtml(g.term)}</b> — ${escapeHtml(fr ? g.fr : g.en)}</p>`)
+    .join("")}</div>`;
+}
+
+function moduleNotesFor(result: ScanResultLike, fr: boolean): string {
+  const title = (m: string): string => MODULE_TITLES[m]?.[fr ? "fr" : "en"] ?? m;
+  return result.modules
+    .map((m) => {
+      const note = MODULE_NOTES[m.module]?.[fr ? "fr" : "en"];
+      if (!note) return "";
+      const copy = controlsOfModule(m.module);
+      const typical = copy.length
+        ? `<p class="f-tag">${fr ? "Contrôles de ce module dans ce rapport" : "Controls of this module in this report"} : ${escapeHtml(copy.join(" · "))}</p>`
+        : "";
+      return `<div class="module-note"><b>${escapeHtml(title(m.module))}</b>${escapeHtml(note)}${typical}</div>`;
+    })
+    .join("");
+}
+
+function controlsOfModule(module: string): string[] {
+  return moduleControlIds.get(module) ?? [];
+}
+
+const moduleControlIds = new Map<string, string[]>();
+function indexModuleControls(result: ScanResultLike): void {
+  moduleControlIds.clear();
+  for (const f of result.findings) {
+    const list = moduleControlIds.get(f.module) ?? [];
+    if (!list.includes(f.id)) list.push(f.id);
+    moduleControlIds.set(f.module, list);
+  }
+}
+
 export function buildReportHtml(
   result: ScanResultLike,
   controls: Record<string, ControlCopy>,
@@ -510,13 +701,34 @@ export function buildReportHtml(
         .map((f) => {
           const copy = controls[f.id];
           const title = copy?.title ? escapeHtml(copy.title) : escapeHtml(f.id);
-          const fix = copy?.fix
-            ? `<div class="fix">${escapeHtml(copy.fix.slice(0, 220))}</div>`
-            : "";
-          return `<tr><td class="mono">${escapeHtml(f.id)}</td><td>${title}${fix}</td><td>${statusChip(f.status, fr)}</td><td>${escapeHtml(f.observed.slice(0, 140))}</td></tr>`;
+          const lines = [
+            `<p class="f-head"><span class="mono">${escapeHtml(f.id)}</span> ${title} ${statusChip(f.status, fr)}</p>`,
+            `<p class="f-row"><b>${fr ? "Observé" : "Seen"}</b> ${escapeHtml(f.observed.slice(0, 220))}</p>`,
+            copy?.objective
+              ? `<p class="f-row"><b>${fr ? "Ce que ça veut dire" : "What it means"}</b> ${escapeHtml(copy.objective.slice(0, 260))}</p>`
+              : f.why
+                ? `<p class="f-row"><b>${fr ? "Ce que ça veut dire" : "What it means"}</b> ${escapeHtml(f.why.slice(0, 260))}</p>`
+                : "",
+            copy?.consequence
+              ? `<p class="f-row"><b>${fr ? "Conséquence" : "Consequence"}</b> ${escapeHtml(copy.consequence.slice(0, 260))}</p>`
+              : "",
+            copy?.fix
+              ? `<p class="f-row f-fix"><b>${fr ? "✎ Solution" : "✎ Fix"}</b> ${escapeHtml(copy.fix.slice(0, 400))}</p>`
+              : "",
+            copy?.fixes && copy.fixes.length > 0 && copy.fixes[0]
+              ? `<p class="f-row"><b>${fr ? "Exemple de code" : "Code example"}</b></p><pre class="f-code">${escapeHtml((copy.fixes[0].code ?? "").slice(0, 300))}</pre><p class="f-tag">${escapeHtml(copy.fixes[0].stack ?? "")}</p>`
+              : "",
+            copy?.verify
+              ? `<p class="f-row"><b>${fr ? "Comment vérifier" : "How to verify"}</b> ${escapeHtml(copy.verify.slice(0, 220))}</p>`
+              : "",
+            copy
+              ? `<p class="f-tag">${fr ? "Complexité" : "Complexity"} ${escapeHtml(String(copy.complexity ?? ""))} · ${fr ? "Risque" : "Risk"} ${escapeHtml(String(copy.risk ?? ""))}</p>`
+              : "",
+          ];
+          return `<div class="finding ${f.status}">${lines.filter(Boolean).join("")}</div>`;
         })
         .join("");
-      return `<h3>${escapeHtml(t(module))} <span class="count">${findings.length}</span></h3><table><thead><tr><th>${fr ? "Contrôle" : "Control"}</th><th>${fr ? "Objet" : "Subject"}</th><th>${fr ? "Statut" : "Status"}</th><th>${fr ? "Observé" : "Observed"}</th></tr></thead><tbody>${rows}</tbody></table>`;
+      return `<h3>${escapeHtml(t(module))} <span class="count">${findings.length}</span></h3>${rows}`;
     })
     .join("");
 
@@ -596,6 +808,24 @@ export function buildReportHtml(
   .mono { font-family: ui-monospace, Menlo, monospace; font-size: 10.5px; }
   .chip { display: inline-block; padding: 1px 8px; border: 1px solid; border-radius: 999px; font: 600 10px/1.5 -apple-system, sans-serif; }
   .fix { color: #5b6470; font-size: 10.5px; margin-top: 3px; }
+  .finding { border: 1px solid #e3e6e4; border-left: 3px solid #cbd2d0; border-radius: 8px; padding: 10px 12px; margin: 8px 0; background: #fff; page-break-inside: avoid; }
+  .finding.FAIL, .finding.fail { border-left-color: #dc2626; background: #fdf7f6; }
+  .finding.WARN, .finding.warn { border-left-color: #b45309; background: #fdfbf5; }
+  .finding.PASS, .finding.pass { border-left-color: #0d9f6e; background: #f7fcfa; }
+  .finding.SKIPPED, .finding.skipped, .finding.pending, .finding.PENDING { border-left-color: #9ca3af; background: #fafafa; }
+  .f-head { margin: 0 0 6px; font-weight: 650; }
+  .f-head .mono { color: #6b7280; font-weight: 500; margin-right: 6px; }
+  .f-row { margin: 3px 0; font-size: 11.5px; }
+  .f-row b { display: inline-block; min-width: 118px; color: #5b6470; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .f-fix { background: rgba(13, 159, 110, 0.08); border-radius: 6px; padding: 6px 8px; }
+  .f-fix b { color: #0d9f6e; }
+  .f-code { margin: 4px 0 2px; padding: 7px 9px; background: #f4f6f5; border: 1px solid #e3e6e4; border-radius: 6px; font: 10px/1.5 ui-monospace, Menlo, monospace; white-space: pre-wrap; }
+  .f-tag { margin: 3px 0 0; font: 500 9.5px ui-monospace, monospace; color: #8a9299; text-transform: uppercase; letter-spacing: 0.07em; }
+  .glossary { columns: 2; column-gap: 24px; font-size: 10.5px; }
+  .glossary p { break-inside: avoid; margin: 0 0 6px; }
+  .glossary b { color: #17161a; }
+  .module-note { border: 1px solid #e3e6e4; border-radius: 8px; background: #fafbfa; padding: 10px 12px; margin: 8px 0; font-size: 11.5px; }
+  .module-note b { display: block; margin-bottom: 3px; }
   .bar-row { display: flex; align-items: center; gap: 10px; margin: 5px 0; }
   .bar-label { flex: 0 0 210px; font-size: 11px; }
   .bar-svg { flex: 1; height: 10px; }
@@ -632,8 +862,12 @@ export function buildReportHtml(
 
   ${siteSection}
 
-  <h2>${fr ? "4. Constats par module" : "4. Findings by module"}</h2>
+  <h2>${fr ? "4. Ce que mesure chaque module" : "4. What each module measures"}</h2>
+  ${moduleNotesFor(result, fr)}
+
+  <h2>${fr ? "5. Constats par module" : "5. Findings by module"}</h2>
   ${findingsTables || `<p class="note">${fr ? "Aucun constat enregistré." : "No findings recorded."}</p>`}
+  ${glossaryFor(result, fr)}
 
   <footer>
     ${fr ? "Méthode — cinq lectures indépendantes sur un seul moteur : WORLD (locales, RTL, formats), FLOW (parcours critiques), EXIT (exports), FAIL (en-têtes de sécurité), CLEAN (qualité de l'interface). Exécution locale ; les contrôles ignorés sont nommés ; un contrôle non exécuté n'est jamais présenté comme réussi." : "Method — five independent readings on one engine: WORLD, FLOW, EXIT, FAIL, CLEAN. Local execution; skipped controls are named; a control that did not run is never presented as passed."}
