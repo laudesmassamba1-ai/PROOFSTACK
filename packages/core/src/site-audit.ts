@@ -53,6 +53,11 @@ export interface SiteAuditOptions {
   allowPrivate?: boolean;
   timeoutMs?: number;
   /**
+   * The token the site owner published. Forwarded to the page scans so a verified owner
+   * gets the exact observations, not the redacted shapes.
+   */
+  ownershipToken?: string;
+  /**
    * Progress, in order, for a streamed UI. Never contains a secret.
    *
    * `step` and the counts are the contract; `message` is an English fallback for library
@@ -165,6 +170,9 @@ export async function auditSite(options: SiteAuditOptions): Promise<SiteAuditRes
   const scanOptions: ScanOptions = {
     fetchImpl: doFetch,
     allowPrivate: options.allowPrivate,
+    // A local target is the caller's machine; a remote one is proven by its token.
+    ownershipHint: options.allowPrivate ? "local" : "remote",
+    ...(options.ownershipToken === undefined ? {} : { ownershipToken: options.ownershipToken }),
     headers: headersFor(start.toString()),
     ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
   };
@@ -200,11 +208,20 @@ export async function auditSite(options: SiteAuditOptions): Promise<SiteAuditRes
   // ------------------------------------------------------- measure the rest
   const others: CrawlPage[] = crawl.pages.filter(
     (page) =>
-      page.error === null &&
+      // A page that never answered has no document to measure; it stays in the report as
+      // an error with the network reason. Every page that did answer is measured — a 404
+      // is still a response, with headers and a body, and it is part of the surface.
+      page.status !== 0 &&
       normalize(page.finalUrl) !== normalize(scan.finalUrl) &&
       normalize(page.url) !== normalize(start.toString())
   );
-  const budget = Math.max(0, Math.min(options.maxMeasuredPages ?? 9, others.length));
+  // Measure every crawled page by default. The crawl already paid for the document, so a
+  // measurement is analysis, not another request; leaving half the site unmeasured would
+  // make the structure report describe a site nobody scanned. The caller may still cap it.
+  const budget =
+    options.maxMeasuredPages === undefined
+      ? others.length
+      : Math.max(0, Math.min(options.maxMeasuredPages, others.length));
   const toMeasure = others.slice(0, budget);
 
   options.onProgress?.({
@@ -229,51 +246,75 @@ export async function auditSite(options: SiteAuditOptions): Promise<SiteAuditRes
     },
   ];
 
-  for (const [index, page] of toMeasure.entries()) {
-    try {
-      const pageScan = await scanPage(page.finalUrl, {
-        fetchImpl: doFetch,
-        allowPrivate: options.allowPrivate,
-        // One request per page: the crawl already paid for the site-level facts.
-        light: true,
-        headers: headersFor(page.finalUrl),
-        ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
-      });
-      measured.push({
-        url: page.url,
-        finalUrl: page.finalUrl,
+  // Bounded parallelism: five light measurements at a time — a crawl of twenty
+  // pages finishes in about the duration of four, not twenty. Results land in
+  // crawl order regardless of completion order.
+  const CONCURRENCY = 5;
+  const results: MeasuredPage[] = new Array(toMeasure.length);
+  let cursor = 0;
+  let completed = 0;
+  const worker = async (): Promise<void> => {
+    while (cursor < toMeasure.length) {
+      const index = cursor;
+      cursor += 1;
+      const page = toMeasure[index];
+      if (!page) break;
+      try {
+        const pageScan = await scanPage(page.finalUrl, {
+          fetchImpl: doFetch,
+          allowPrivate: options.allowPrivate,
+          ownershipHint: options.allowPrivate ? "local" : "remote",
+          // One request per page: the crawl already read this document and its headers.
+          light: true,
+          document: {
+            html: page.html,
+            headers: new Headers(page.headers ?? {}),
+            url: page.finalUrl,
+            status: page.status,
+            bytes: page.bytes,
+            durationMs: page.durationMs,
+            contentType: page.contentType,
+          },
+        });
+        results[index] = {
+          url: page.url,
+          finalUrl: page.finalUrl,
+          status: page.status,
+          title: page.title,
+          bytes: page.bytes,
+          durationMs: page.durationMs,
+          depth: page.depth,
+          findings: pageScan.findings,
+          measured: true,
+          error: null,
+        };
+      } catch (error) {
+        results[index] = {
+          url: page.url,
+          finalUrl: page.finalUrl,
+          status: page.status,
+          title: page.title,
+          bytes: page.bytes,
+          durationMs: page.durationMs,
+          depth: page.depth,
+          findings: [],
+          measured: false,
+          error: error instanceof Error ? error.message : "could not be measured",
+        };
+      }
+      completed += 1;
+      options.onProgress?.({
+        step: "measure",
+        message: `measured ${new URL(page.url).pathname}`,
+        page: page.url,
+        done: completed,
+        total: toMeasure.length,
         status: page.status,
-        title: page.title,
-        bytes: page.bytes,
-        durationMs: page.durationMs,
-        depth: page.depth,
-        findings: pageScan.findings,
-        measured: true,
-        error: null,
-      });
-    } catch (error) {
-      measured.push({
-        url: page.url,
-        finalUrl: page.finalUrl,
-        status: page.status,
-        title: page.title,
-        bytes: page.bytes,
-        durationMs: page.durationMs,
-        depth: page.depth,
-        findings: [],
-        measured: false,
-        error: error instanceof Error ? error.message : "could not be measured",
       });
     }
-    options.onProgress?.({
-      step: "measure",
-      message: `measured ${new URL(page.url).pathname}`,
-      page: page.url,
-      done: index + 1,
-      total: toMeasure.length,
-      status: page.status,
-    });
-  }
+  };
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, toMeasure.length) }, worker));
+  measured.push(...results.filter((entry): entry is MeasuredPage => entry !== undefined));
 
   // Pages that were crawled but not measured stay in the report, marked as such.
   for (const page of crawl.pages) {
@@ -289,7 +330,12 @@ export async function auditSite(options: SiteAuditOptions): Promise<SiteAuditRes
       depth: page.depth,
       findings: [],
       measured: false,
-      error: page.error ?? "not measured: the measurement budget was reached",
+      // Name the real reason. "Budget reached" on a page that was never in the budget hides
+      // whether the fix is a bigger crawl or a bigger measurement cap.
+      error:
+        page.status === 0
+          ? (page.error ?? "unreachable")
+          : `not measured: the measurement budget covered ${budget} of ${others.length} pages`,
     });
   }
 

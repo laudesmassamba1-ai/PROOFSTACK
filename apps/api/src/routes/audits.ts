@@ -186,6 +186,7 @@ async function runScan(
     url: target.toString(),
     allowPrivate: false,
     timeoutMs: 15_000,
+    ...(body.ownershipToken === undefined ? {} : { ownershipToken: body.ownershipToken }),
     ...(body.login
       ? {
           login: {
@@ -208,6 +209,7 @@ async function runScan(
       // Without an explicit crawl request the engine still reads the site's own declarations
       // (robots, sitemap) but does not roam: one page, no depth.
       maxPages: body.crawl?.maxPages ?? (body.crawl ? 25 : 1),
+      // every page the crawl reaches gets measured with the control set
       maxDepth: body.crawl?.maxDepth ?? (body.crawl ? 2 : 0),
       ...(body.crawl?.pathPrefix === undefined ? {} : { pathPrefix: body.crawl.pathPrefix }),
       ...(body.crawl?.allowExternal === undefined

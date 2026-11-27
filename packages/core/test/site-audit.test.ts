@@ -13,6 +13,7 @@ import { auditSite } from "../src/site-audit.js";
 
 let server: Server | null = null;
 let port = 0;
+let hits: Record<string, number> = {};
 
 const LOGIN_FORM = `<!doctype html><html><head><title>Sign in</title></head><body>
   <form method="post" action="/login">
@@ -30,7 +31,10 @@ const app = (body: string, title = "Settings") =>
    <a href="/logout">Log out</a></main></body></html>`;
 
 async function serve(): Promise<string> {
+  hits = {};
   server = createServer((request, response) => {
+    const requested = new URL(request.url ?? "/", "http://127.0.0.1").pathname;
+    hits[requested] = (hits[requested] ?? 0) + 1;
     const chunks: Buffer[] = [];
     request.on("data", (chunk: Buffer) => chunks.push(chunk));
     request.on("end", () => {
@@ -177,6 +181,38 @@ describe("auditing a site behind a login", () => {
     expect(result.scan.findings.length).toBeGreaterThan(5);
     // And it must not claim the private area was seen.
     expect(result.site.pages.every((page) => !page.url.endsWith("/settings"))).toBe(true);
+  });
+
+  it("measures every answered page — including a 404 — from the crawl document", async () => {
+    const base = await serve();
+    const result = await auditSite({
+      url: `${base}/dashboard`,
+      allowPrivate: true,
+      crawl: { maxPages: 10, maxDepth: 2 },
+      login: {
+        loginPageUrl: `${base}/login`,
+        verifyUrl: `${base}/dashboard`,
+        email: "qa@example.com",
+        password: "correct horse",
+      },
+    });
+
+    // Every discovered page that answered was measured. The 404 is a real observation,
+    // not a page silently dropped from the audit.
+    expect(result.site.pages.length).toBeGreaterThan(2);
+    expect(result.site.pages.every((page) => page.measured)).toBe(true);
+    const missing = result.site.pages.find((page) => new URL(page.url).pathname === "/missing");
+    expect(missing?.status).toBe(404);
+    expect(missing?.measured).toBe(true);
+
+    // The measurement reused the crawl document: subpages are fetched once, not twice.
+    // The start page is the exception: it is read once for the named scan and once by the
+    // crawl, and the login check fetches its verify URL on purpose.
+    for (const page of result.site.pages) {
+      const path = new URL(page.url).pathname;
+      if (path === "/dashboard") continue;
+      expect(hits[path], `${path} was fetched ${hits[path]} times`).toBe(1);
+    }
   });
 
   it("mirrors the production shape: no sitemap is a finding, not a crash", async () => {

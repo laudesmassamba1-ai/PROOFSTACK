@@ -47,7 +47,10 @@ async function serveSite(): Promise<string> {
     }
     const html = SITE[url.pathname];
     if (html) {
-      response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      response.writeHead(200, {
+        "content-type": "text/html; charset=utf-8",
+        "set-cookie": "sid=secret-value; Path=/; HttpOnly; Secure; SameSite=Lax",
+      });
       response.end(html);
       return;
     }
@@ -169,6 +172,16 @@ describe("crawling a real site", () => {
     });
     // robots.txt and the sitemap are public; every page request carries the session.
     expect(seen.some((header) => header.includes("sid=abc"))).toBe(true);
+  });
+
+  it("keeps response headers but reduces a session cookie to its flags", async () => {
+    const base = await serveSite();
+    const result = await crawlSite(base, { maxDepth: 0, maxPages: 1 });
+    const page = result.pages[0];
+    expect(page?.headers?.["content-type"]).toContain("text/html");
+    // The session value is never copied into a report-visible document.
+    expect(page?.headers?.["set-cookie"]).toBe("cookie issued; httponly; secure; samesite=lax");
+    expect(JSON.stringify(page?.headers)).not.toContain("secret-value");
   });
 
   it("counts every request it makes, so the cost is visible", async () => {

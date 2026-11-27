@@ -27,6 +27,11 @@ export interface CrawlPage {
   durationMs: number;
   depth: number;
   html: string;
+  /**
+   * Response headers, kept so the page can be measured without a second request.
+   * `set-cookie` is reduced to its flags: a cookie value is a session, not evidence.
+   */
+  headers?: Record<string, string>;
   title: string | null;
   /** Same-origin links found in the page, absolute. */
   links: string[];
@@ -176,6 +181,7 @@ export async function crawlSite(
           durationMs: Date.now() - began,
           depth,
           html: "",
+          headers: {},
           title: null,
           links: [],
           externalLinks: [],
@@ -198,6 +204,7 @@ export async function crawlSite(
       durationMs: Date.now() - began,
       depth,
       html: isHtml ? text : "",
+      headers: responseHeaders(response.headers),
       title: isHtml ? readTitle(text) : null,
       links: [],
       externalLinks: [],
@@ -473,6 +480,28 @@ function attributeOf(html: string, name: string): string | null {
   const match = pattern.exec(html);
   if (!match) return null;
   return match[1] ?? match[2] ?? match[3] ?? null;
+}
+
+/**
+ * Copies the response headers a measurement needs, without the secret in `set-cookie`.
+ *
+ * The cookie checks only read the flags (Secure, HttpOnly, SameSite), so the attributes are
+ * kept and the value — a live session for a signed-in crawl — never leaves the fetch.
+ */
+function responseHeaders(headers: Headers): Record<string, string> {
+  const kept: Record<string, string> = {};
+  headers.forEach((value, key) => {
+    if (key.toLowerCase() !== "set-cookie") kept[key] = value;
+  });
+  const cookies = headers.get("set-cookie");
+  if (cookies) {
+    const flags = new Set<string>();
+    for (const match of cookies.matchAll(/;\s*(secure|httponly|samesite=[^;,\s]+)/gi)) {
+      if (match[1]) flags.add(match[1].toLowerCase());
+    }
+    kept["set-cookie"] = `cookie issued${[...flags].map((flag) => `; ${flag}`).join("")}`;
+  }
+  return kept;
 }
 
 async function readCapped(

@@ -129,6 +129,20 @@ export interface ScanOptions {
    * CLI against localhost — and needs no proof of ownership.
    */
   ownershipHint?: "local" | "remote";
+  /**
+   * A response the crawler already read: measure this document instead of fetching it again.
+   * This is what makes a site audit cost one request per page instead of two.
+   */
+  document?: {
+    html: string;
+    headers: Headers;
+    /** Final URL after redirects; the URL the findings are about. */
+    url: string;
+    status: number;
+    bytes: number;
+    durationMs: number;
+    contentType?: string;
+  };
 }
 
 const USER_AGENT = "PROOFCORE-Scan/1.0 (+page-level checks; respects robots intent)";
@@ -806,28 +820,56 @@ export async function scanPage(rawUrl: string, options: ScanOptions = {}): Promi
   const url = assertScannableUrl(rawUrl, { allowPrivate: options.allowPrivate });
   const started = Date.now();
 
-  // A local target is the caller's own machine, and a login is optional: without a cookie,
-  // the scan simply sees what an anonymous visitor sees, and says so.
-  const loginAttempt = options.login ? await performLogin(options.login, options) : null;
-  const headers: Record<string, string> = { ...options.headers };
-  if (loginAttempt?.cookie) {
-    headers.cookie = headers.cookie
-      ? `${headers.cookie}; ${loginAttempt.cookie}`
-      : loginAttempt.cookie;
+  let loginAttempt: Awaited<ReturnType<typeof performLogin>> | null = null;
+  let finalUrl: URL;
+  let status: number;
+  let contentType: string;
+  let html: string;
+  let bytes: number;
+  let durationMs: number;
+  let responseHeaders: Headers;
+  let withLogin: ScanOptions = options;
+
+  if (options.document) {
+    // The crawler already holds this response. Re-fetching it would double the traffic and
+    // the latency of every site audit for exactly the same bytes.
+    const document = options.document;
+    finalUrl = assertScannableUrl(document.url, { allowPrivate: options.allowPrivate });
+    status = document.status;
+    contentType = document.contentType ?? document.headers.get("content-type") ?? "";
+    html = document.html;
+    bytes = document.bytes;
+    durationMs = document.durationMs;
+    responseHeaders = document.headers;
+  } else {
+    // A local target is the caller's own machine, and a login is optional: without a cookie,
+    // the scan simply sees what an anonymous visitor sees, and says so.
+    loginAttempt = options.login ? await performLogin(options.login, options) : null;
+    const headers: Record<string, string> = { ...options.headers };
+    if (loginAttempt?.cookie) {
+      headers.cookie = headers.cookie
+        ? `${headers.cookie}; ${loginAttempt.cookie}`
+        : loginAttempt.cookie;
+    }
+    withLogin = { ...options, headers };
+    const fetched = await fetchFollowing(url, withLogin);
+    const response = fetched.response;
+    finalUrl = fetched.url;
+    const body = await readBody(response, options.maxBytes ?? DEFAULT_MAX_BYTES);
+    bytes = body.bytes;
+    contentType = response.headers.get("content-type") ?? "";
+    html = /html|xml/i.test(contentType) || /^\s*</.test(body.text) ? body.text : "";
+    durationMs = Date.now() - started;
+    status = response.status;
+    responseHeaders = response.headers;
   }
-  const withLogin: ScanOptions = { ...options, headers };
-  const { response, url: finalUrl } = await fetchFollowing(url, withLogin);
-  const { text, bytes } = await readBody(response, options.maxBytes ?? DEFAULT_MAX_BYTES);
-  const contentType = response.headers.get("content-type") ?? "";
-  const html = /html|xml/i.test(contentType) || /^\s*</.test(text) ? text : "";
-  const durationMs = Date.now() - started;
 
   const analysis = html
     ? analyse({
         html,
-        headers: response.headers,
+        headers: responseHeaders,
         url: finalUrl,
-        status: response.status,
+        status,
         bytes,
         durationMs,
         probes: [],
@@ -890,13 +932,13 @@ export async function scanPage(rawUrl: string, options: ScanOptions = {}): Promi
     );
   }
 
-  if (response.status >= 400) {
+  if (status >= 400) {
     findings.unshift(
       finding(
         "fail",
         "http_status",
         "FAIL",
-        `HTTP ${response.status}`,
+        `HTTP ${status}`,
         "The address itself does not answer successfully."
       )
     );
@@ -923,7 +965,7 @@ export async function scanPage(rawUrl: string, options: ScanOptions = {}): Promi
   return {
     url: url.toString(),
     finalUrl: finalUrl.toString(),
-    status: response.status,
+    status,
     contentType,
     bytes,
     durationMs,
