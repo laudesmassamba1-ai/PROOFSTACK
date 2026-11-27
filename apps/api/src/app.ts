@@ -2,6 +2,7 @@ import type { PaymentProvider } from "@proofcore/adapter-payments";
 import { API_VERSION } from "@proofcore/contracts";
 import { type auditSite, iso, type scanPage, uuid } from "@proofcore/core";
 import { Hono } from "hono";
+import { CSRF_COOKIE, hashToken, readCookie, SESSION_COOKIE, timingSafeEqualHex } from "./auth.js";
 import type { Database } from "./db/types.js";
 import { type Env, originAllowed, readConfig } from "./env.js";
 import { HttpError, toErrorResponse } from "./http/errors.js";
@@ -109,7 +110,7 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
       );
       c.header(
         "Access-Control-Allow-Headers",
-        "content-type, authorization, idempotency-key, x-request-id"
+        "content-type, authorization, idempotency-key, x-request-id, x-csrf-token"
       );
       c.header("Access-Control-Max-Age", "600");
       return c.body(null, 204);
@@ -148,6 +149,46 @@ export function createApp(options: CreateAppOptions): { app: Hono<AppEnv>; servi
           "cross_site_write",
           "A write from another site is refused. Reload the app and retry from it."
         );
+      }
+
+      // Double-submit CSRF check for the writes that change an account or end a
+      // session. The web app echoes `ps_csrf` in `x-csrf-token`; a forged cross-site
+      // request carries the cookie but cannot read it, so it arrives without the
+      // header. Scoped on purpose: the scan and AI routes are called by the same web
+      // client and native clients, and migrating those is a separate, visible step.
+      // The rule is presence-triggered: a request that never received `ps_csrf`
+      // (CLI, machine, a session created before this shipped) is still covered by the
+      // origin guard above and is not locked out.
+      const path = c.req.path;
+      const csrfScoped =
+        path === "/api/auth/sign-out" ||
+        path === "/api/account" ||
+        path.startsWith("/api/account/");
+      if (csrfScoped) {
+        const cookieHeader = c.req.header("cookie");
+        const hasSession = Boolean(readCookie(cookieHeader, SESSION_COOKIE));
+        const csrfCookie = readCookie(cookieHeader, CSRF_COOKIE);
+        if (hasSession && csrfCookie) {
+          const supplied = c.req.header("x-csrf-token");
+          if (!supplied) {
+            throw new HttpError(
+              403,
+              "csrf_token_required",
+              "This write needs the CSRF token the app sends with its session. Reload the page and retry."
+            );
+          }
+          const [cookieHash, suppliedHash] = await Promise.all([
+            hashToken(csrfCookie),
+            hashToken(supplied),
+          ]);
+          if (!timingSafeEqualHex(cookieHash, suppliedHash)) {
+            throw new HttpError(
+              403,
+              "csrf_token_invalid",
+              "The CSRF token does not match this session. Reload the page and retry."
+            );
+          }
+        }
       }
     }
     await next();

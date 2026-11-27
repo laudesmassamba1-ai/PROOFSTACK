@@ -65,6 +65,22 @@ export function clearApiCache(): void {
   }
 }
 
+/**
+ * The CSRF token is the one session cookie JavaScript may read.
+ *
+ * The server issues it at sign-in and the account routes reject a cookie-authenticated
+ * write that does not echo it in `x-csrf-token`. Reading it here keeps the HttpOnly
+ * session cookie opaque to scripts.
+ */
+function csrfToken(): string | undefined {
+  if (typeof document === "undefined") return undefined;
+  for (const part of document.cookie.split(";")) {
+    const [key, ...rest] = part.trim().split("=");
+    if (key === "ps_csrf") return decodeURIComponent(rest.join("="));
+  }
+  return undefined;
+}
+
 export type Probe = { status: "checking" | "reachable" | "unreachable"; detail?: string };
 
 export async function probeApi(base = API_BASE, timeoutMs = 1500): Promise<Probe> {
@@ -104,15 +120,18 @@ export async function apiFetch<T>(
   path: string,
   init: { method?: string; body?: unknown; timeoutMs?: number } = {}
 ): Promise<T> {
+  const method = init.method ?? "GET";
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), init.timeoutMs ?? 10_000);
+  const token = method === "GET" || method === "HEAD" ? undefined : csrfToken();
   try {
     const response = await fetch(`${API_BASE}${path}`, {
-      method: init.method ?? "GET",
-      headers:
-        init.body === undefined
-          ? { accept: "application/json" }
-          : { accept: "application/json", "content-type": "application/json" },
+      method,
+      headers: {
+        accept: "application/json",
+        ...(init.body === undefined ? {} : { "content-type": "application/json" }),
+        ...(token ? { "x-csrf-token": token } : {}),
+      },
       ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
       signal: controller.signal,
       credentials: "include",

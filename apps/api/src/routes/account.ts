@@ -3,12 +3,15 @@ import { uuid } from "@proofcore/core";
 import { Hono } from "hono";
 import { z } from "zod";
 import {
+  clearCsrfCookie,
   clearSessionCookie,
+  createCsrfToken,
   createSessionToken,
   hashPassword,
   hashToken,
   readCookie,
   SESSION_COOKIE,
+  serializeCsrfCookie,
   serializeSessionCookie,
   sessionExpiry,
   verifyPassword,
@@ -258,6 +261,11 @@ export function accountRoutes(services: Services): Hono<AppEnv> {
     c.header(
       "Set-Cookie",
       serializeSessionCookie(token, { secure: services.config.secureCookies })
+    );
+    c.header(
+      "Set-Cookie",
+      serializeCsrfCookie(createCsrfToken(), { secure: services.config.secureCookies }),
+      { append: true }
     );
 
     const workspaces = await services.store.listWorkspaces(user.id);
@@ -556,6 +564,13 @@ export function accountRoutes(services: Services): Hono<AppEnv> {
       "Set-Cookie",
       serializeSessionCookie(rotated.token, { secure: services.config.secureCookies })
     );
+    // The CSRF token is part of the session credential: rotate it with the cookie so a
+    // token captured before the password change cannot outlive the session it guarded.
+    c.header(
+      "Set-Cookie",
+      serializeCsrfCookie(createCsrfToken(), { secure: services.config.secureCookies }),
+      { append: true }
+    );
     return c.json({ ok: true, revokedSessions: revoked, rotatedSession: true });
   });
 
@@ -601,6 +616,7 @@ export function accountRoutes(services: Services): Hono<AppEnv> {
     await services.store.deleteUserAccount(user.id);
 
     c.header("Set-Cookie", clearSessionCookie(services.config.secureCookies));
+    c.header("Set-Cookie", clearCsrfCookie(services.config.secureCookies), { append: true });
     return c.json({ ok: true });
   });
 

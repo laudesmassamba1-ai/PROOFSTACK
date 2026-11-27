@@ -176,6 +176,40 @@ export function clearSessionCookie(secure: boolean): string {
   return serializeSessionCookie("", { secure, maxAgeSeconds: 0 });
 }
 
+/**
+ * CSRF token for the double-submit check.
+ *
+ * The session cookie stays HttpOnly; this one is deliberately readable by the web app
+ * so it can echo the value in `x-csrf-token`. An attacker on another site can neither
+ * read it nor stop the browser from sending the cookie, so a forged write arrives
+ * without a matching header. The check only applies to the sensitive account writes
+ * (and sign-out) that no native client uses; CLI and machine calls authenticate with
+ * `Authorization`, never with this cookie.
+ */
+export const CSRF_COOKIE = "ps_csrf";
+
+export function createCsrfToken(): string {
+  return base64url(randomBytes(32));
+}
+
+export function serializeCsrfCookie(
+  token: string,
+  options: { secure: boolean; maxAgeSeconds?: number }
+): string {
+  const parts = [
+    `${CSRF_COOKIE}=${encodeURIComponent(token)}`,
+    "Path=/",
+    "SameSite=Lax",
+    `Max-Age=${options.maxAgeSeconds ?? SESSION_ABSOLUTE_TTL_DAYS * 86_400}`,
+  ];
+  if (options.secure) parts.push("Secure");
+  return parts.join("; ");
+}
+
+export function clearCsrfCookie(secure: boolean): string {
+  return serializeCsrfCookie("", { secure, maxAgeSeconds: 0 });
+}
+
 /** Constant-time signature comparison helper kept here for route code symmetry. */
 export async function signPayload(secret: string, payload: string): Promise<string> {
   return hmacSha256Hex(secret, payload);

@@ -3,12 +3,16 @@ import { ProofCoreError, uuid } from "@proofcore/core";
 import { Hono } from "hono";
 import { z } from "zod";
 import {
+  CSRF_COOKIE,
+  clearCsrfCookie,
   clearSessionCookie,
+  createCsrfToken,
   createSessionToken,
   hashPassword,
   hashToken,
   readCookie,
   SESSION_COOKIE,
+  serializeCsrfCookie,
   serializeSessionCookie,
   sessionExpiry,
   verifyPassword,
@@ -113,6 +117,11 @@ export function authRoutes(services: Services): Hono<AppEnv> {
       "Set-Cookie",
       serializeSessionCookie(token, { secure: services.config.secureCookies })
     );
+    c.header(
+      "Set-Cookie",
+      serializeCsrfCookie(createCsrfToken(), { secure: services.config.secureCookies }),
+      { append: true }
+    );
     return c.json(
       {
         user: publicUser(user),
@@ -191,6 +200,11 @@ export function authRoutes(services: Services): Hono<AppEnv> {
       "Set-Cookie",
       serializeSessionCookie(token, { secure: services.config.secureCookies })
     );
+    c.header(
+      "Set-Cookie",
+      serializeCsrfCookie(createCsrfToken(), { secure: services.config.secureCookies }),
+      { append: true }
+    );
     return c.json({ user: publicUser(user), workspaces, session: { expiresAt } });
   });
 
@@ -201,6 +215,7 @@ export function authRoutes(services: Services): Hono<AppEnv> {
       if (found) await services.store.deleteSession(found.session.id);
     }
     c.header("Set-Cookie", clearSessionCookie(services.config.secureCookies));
+    c.header("Set-Cookie", clearCsrfCookie(services.config.secureCookies), { append: true });
     return c.json({ ok: true });
   });
 
@@ -213,6 +228,15 @@ export function authRoutes(services: Services): Hono<AppEnv> {
       if (!found || found.session.expiresAt <= new Date(services.clock()).toISOString()) {
         c.header("Set-Cookie", clearSessionCookie(services.config.secureCookies));
         return c.json({ user: null, workspaces: [] });
+      }
+      // A session created before the CSRF cookie shipped gets one on its next probe:
+      // the account writes stay protected without forcing a re-login.
+      if (!readCookie(c.req.header("cookie"), CSRF_COOKIE)) {
+        c.header(
+          "Set-Cookie",
+          serializeCsrfCookie(createCsrfToken(), { secure: services.config.secureCookies }),
+          { append: true }
+        );
       }
       const workspaces = await services.store.listWorkspaces(found.user.id);
       return c.json({
