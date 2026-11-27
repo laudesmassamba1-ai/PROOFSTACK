@@ -42,6 +42,10 @@ type ScanStatus = "PASS" | "WARN" | "FAIL" | "SKIPPED";
  * value and its one-line reason, and no text is invented to fill the gap.
  */
 export interface ControlCopy {
+  /** Registry id, present on the catalogue response; kept so the report can key it. */
+  id?: string;
+  /** Module the control belongs to; the report groups and names controls by it. */
+  module?: string;
   title: string;
   objective: string;
   consequence: string;
@@ -50,6 +54,9 @@ export interface ControlCopy {
   fixes: { stack: string; code: string }[];
   complexity: "low" | "medium" | "high";
   risk: "low" | "medium" | "high";
+  /** What the scan reads to decide, and the shape it returns. */
+  method?: string;
+  result?: string;
   aliasOf?: string;
 }
 
@@ -554,8 +561,9 @@ export function ScanPage(): React.ReactElement {
         if (cancelled) return;
         const index: Record<string, ControlCopy> = {};
         for (const item of body.items) {
-          const { module, ...copy } = item;
-          index[`${module}:${item.id}`] = copy as ControlCopy;
+          // Keep the module and id on the copy: the report keys by `module:id` and must
+          // still explain a finding when the keys are read back from storage.
+          index[`${item.module}:${item.id}`] = item as ControlCopy;
         }
         setControls(index);
       })

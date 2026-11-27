@@ -116,7 +116,11 @@ export function ReportExport({
         type="button"
         className="app-btn app-btn-ghost"
         onClick={() => {
-          downloadText(`${stem}.json`, buildReportJson(scan), "application/json;charset=utf-8");
+          downloadText(
+            `${stem}.json`,
+            buildReportJson(scan, controls),
+            "application/json;charset=utf-8"
+          );
           flash("json");
         }}
       >
