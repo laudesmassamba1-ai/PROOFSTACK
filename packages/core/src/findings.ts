@@ -266,8 +266,23 @@ const CONTROL_CAUSE: Record<string, CauseId> = {
   crawl_coverage: "crawl",
 };
 
+const MODULE_CAUSE: Record<string, CauseId> = {
+  world: "transport",
+  flow: "journey",
+  exit: "journey",
+  fail: "headers",
+  clean: "content",
+};
+
+/**
+ * The cause a finding belongs to.
+ *
+ * A control the registry knows wins. Otherwise the module gives a valid fallback: a
+ * payload written before a control existed still lands in a real group instead of an
+ * impossible `CauseId` ("fail", "flow") that has no label and no owner.
+ */
 export function causeOf(module: string, controlId: string): CauseId {
-  return CONTROL_CAUSE[controlId] ?? (module === "clean" ? "content" : (module as CauseId));
+  return CONTROL_CAUSE[controlId] ?? MODULE_CAUSE[module] ?? "content";
 }
 
 export type Confidence = "measured" | "inferred" | "declared";

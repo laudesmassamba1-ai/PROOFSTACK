@@ -16,6 +16,7 @@ import { Card, ErrorState } from "../../components/app/ui.js";
 import { useI18n } from "../../i18n/index.js";
 import { PageHeader } from "../../layouts/AppLayout.js";
 import { API_BASE, ApiError, apiFetch } from "../../lib/api.js";
+import { groupCorrections } from "../../lib/correctionGroups.js";
 import { useSession } from "../../lib/session.js";
 
 /**
@@ -795,6 +796,9 @@ export function ScanPage(): React.ReactElement {
           : ""
       }`;
 
+  // The board is read by cause: two rows that share a cause are one task to do.
+  const correctionGroups = groupCorrections(corrections?.items ?? []);
+
   return (
     <div className="app-page">
       <PageHeader
@@ -1515,92 +1519,118 @@ export function ScanPage(): React.ReactElement {
               ) : null}
 
               {corrections && corrections.items.length > 0 ? (
-                <ul className="mt-3 divide-y divide-border">
-                  {corrections.items.map((item) => (
-                    <li
-                      key={item.key}
-                      className="flex flex-wrap items-center gap-3 px-5 py-2.5 text-sm"
-                    >
-                      <span
-                        className={`scan-finding-status ${STATUS_STYLE[item.status as ScanStatus] ?? ""}`}
-                      >
-                        {statusIcon(item.status as ScanStatus)}
-                        {SCAN_STATUS_LABELS[item.status as ScanStatus]?.[fr ? "fr" : "en"] ??
-                          item.status}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="app-mono text-xs">
-                          {item.id}
-                          {controls[`${item.module}:${item.id}`] ? (
-                            <span className="scan-finding-title">
-                              {controls[`${item.module}:${item.id}`]?.title}
-                            </span>
-                          ) : null}
-                        </p>
-                        <p className="truncate text-xs text-muted">{item.observed}</p>
-                        {!item.present ? (
-                          <p className="text-xs text-success">
-                            {fr
-                              ? "Absent du dernier scan — confirmez s'il est réellement corrigé."
-                              : "Absent from the latest scan — confirm it is actually fixed."}
-                          </p>
-                        ) : null}
-                        {item.verification?.verdict ? (
-                          <p className={`text-xs ${VERDICT_COPY[item.verification.verdict].tone}`}>
-                            {VERDICT_COPY[item.verification.verdict][fr ? "fr" : "en"]}
-                            {item.verification.observed ? ` · ${item.verification.observed}` : ""}
-                            <span className="text-muted">
-                              {" "}
-                              {new Date(item.verification.at).toLocaleString(
-                                fr ? "fr-FR" : "en-GB",
-                                { dateStyle: "short", timeStyle: "short" }
-                              )}
-                            </span>
-                          </p>
-                        ) : null}
-                      </div>
-                      {item.status === "FAIL" || item.status === "WARN" ? (
-                        <button
-                          type="button"
-                          className="app-button app-button-ghost text-xs"
-                          disabled={verifyingCorrection !== null}
-                          onClick={() => void verifyCorrection(item.key)}
-                          title={
-                            fr
-                              ? "Relit cette page maintenant et compare ce contrôle à ce qu'il était."
-                              : "Reads this page again now and compares this control to what it was."
-                          }
-                        >
-                          {verifyingCorrection === item.key ? (
-                            <Loader2 size={13} className="animate-spin" aria-hidden />
-                          ) : (
-                            <RefreshCw size={13} aria-hidden />
-                          )}
-                          {fr ? "Vérifier" : "Verify"}
-                        </button>
-                      ) : null}
-                      <label className="text-xs text-muted">
-                        <span className="sr-only">
-                          {fr ? `État de ${item.id}` : `State of ${item.id}`}
+                <div className="mt-3">
+                  {correctionGroups.map((group) => (
+                    <section key={group.cause} className="scan-correction-group">
+                      <h4 className="scan-correction-group-title">
+                        <span>{group.label[fr ? "fr" : "en"]}</span>
+                        <span>
+                          {group.open} {fr ? "à traiter" : "open"}
+                          {group.fixed > 0
+                            ? ` · ${group.fixed} ${
+                                fr ? (group.fixed === 1 ? "corrigé" : "corrigés") : "fixed"
+                              }`
+                            : ""}
                         </span>
-                        <select
-                          className="app-input"
-                          value={item.state}
-                          disabled={savingCorrection === item.key}
-                          onChange={(event) =>
-                            void setCorrection(item.key, event.target.value as CorrectionState)
-                          }
-                        >
-                          {(Object.keys(CORRECTION_LABELS) as CorrectionState[]).map((state) => (
-                            <option key={state} value={state}>
-                              {CORRECTION_LABELS[state][fr ? "fr" : "en"]}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </li>
+                      </h4>
+                      <ul className="divide-y divide-border">
+                        {group.items.map((item) => (
+                          <li
+                            key={item.key}
+                            className="flex flex-wrap items-center gap-3 px-5 py-2.5 text-sm"
+                          >
+                            <span
+                              className={`scan-finding-status ${STATUS_STYLE[item.status as ScanStatus] ?? ""}`}
+                            >
+                              {statusIcon(item.status as ScanStatus)}
+                              {SCAN_STATUS_LABELS[item.status as ScanStatus]?.[fr ? "fr" : "en"] ??
+                                item.status}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <p className="app-mono text-xs">
+                                {item.id}
+                                {controls[`${item.module}:${item.id}`] ? (
+                                  <span className="scan-finding-title">
+                                    {controls[`${item.module}:${item.id}`]?.title}
+                                  </span>
+                                ) : null}
+                              </p>
+                              <p className="truncate text-xs text-muted">{item.observed}</p>
+                              {!item.present ? (
+                                <p className="text-xs text-success">
+                                  {fr
+                                    ? "Absent du dernier scan — confirmez s'il est réellement corrigé."
+                                    : "Absent from the latest scan — confirm it is actually fixed."}
+                                </p>
+                              ) : null}
+                              {item.verification?.verdict ? (
+                                <p
+                                  className={`text-xs ${VERDICT_COPY[item.verification.verdict].tone}`}
+                                >
+                                  {VERDICT_COPY[item.verification.verdict][fr ? "fr" : "en"]}
+                                  {item.verification.observed
+                                    ? ` · ${item.verification.observed}`
+                                    : ""}
+                                  <span className="text-muted">
+                                    {" "}
+                                    {new Date(item.verification.at).toLocaleString(
+                                      fr ? "fr-FR" : "en-GB",
+                                      { dateStyle: "short", timeStyle: "short" }
+                                    )}
+                                  </span>
+                                </p>
+                              ) : null}
+                            </div>
+                            {item.status === "FAIL" || item.status === "WARN" ? (
+                              <button
+                                type="button"
+                                className="app-button app-button-ghost text-xs"
+                                disabled={verifyingCorrection !== null}
+                                onClick={() => void verifyCorrection(item.key)}
+                                title={
+                                  fr
+                                    ? "Relit cette page maintenant et compare ce contrôle à ce qu'il était."
+                                    : "Reads this page again now and compares this control to what it was."
+                                }
+                              >
+                                {verifyingCorrection === item.key ? (
+                                  <Loader2 size={13} className="animate-spin" aria-hidden />
+                                ) : (
+                                  <RefreshCw size={13} aria-hidden />
+                                )}
+                                {fr ? "Vérifier" : "Verify"}
+                              </button>
+                            ) : null}
+                            <label className="text-xs text-muted">
+                              <span className="sr-only">
+                                {fr ? `État de ${item.id}` : `State of ${item.id}`}
+                              </span>
+                              <select
+                                className="app-input"
+                                value={item.state}
+                                disabled={savingCorrection === item.key}
+                                onChange={(event) =>
+                                  void setCorrection(
+                                    item.key,
+                                    event.target.value as CorrectionState
+                                  )
+                                }
+                              >
+                                {(Object.keys(CORRECTION_LABELS) as CorrectionState[]).map(
+                                  (state) => (
+                                    <option key={state} value={state}>
+                                      {CORRECTION_LABELS[state][fr ? "fr" : "en"]}
+                                    </option>
+                                  )
+                                )}
+                              </select>
+                            </label>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
                   ))}
-                </ul>
+                </div>
               ) : (
                 <p className="px-5 py-3 text-xs text-muted">
                   {fr

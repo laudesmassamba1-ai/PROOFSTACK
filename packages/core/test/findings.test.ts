@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildFinding,
+  causeOf,
   compareFindings,
   groupByCause,
   isInconclusive,
@@ -127,6 +128,17 @@ describe("cause grouping", () => {
     expect(byCause.exposure?.worstSeverity).toBe("critical");
     // The critical exposure sorts first: it is what a person must read first.
     expect(groups[0]?.cause).toBe("exposure");
+  });
+});
+
+describe("causeOf", () => {
+  it("maps a known control and falls back to a valid cause per module", () => {
+    expect(causeOf("fail", "hsts")).toBe("transport");
+    expect(causeOf("fail", "legacy_check")).toBe("headers");
+    expect(causeOf("flow", "legacy_check")).toBe("journey");
+    expect(causeOf("clean", "legacy_check")).toBe("content");
+    // A stored payload from a module we no longer ship still has a label.
+    expect(causeOf("unknown", "legacy_check")).toBe("content");
   });
 });
 

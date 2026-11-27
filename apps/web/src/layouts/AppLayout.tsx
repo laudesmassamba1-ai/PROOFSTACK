@@ -534,6 +534,7 @@ export function AppLayout() {
               className="app-command-trigger"
               onClick={() => setPaletteOpen(true)}
               aria-keyshortcuts="Meta+K Control+K"
+              aria-label={`${t("ws.shell.command")} ⌘K`}
             >
               <Search size={14} aria-hidden="true" />
               <span>{t("ws.shell.command")}</span>

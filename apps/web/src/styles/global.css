@@ -7355,6 +7355,32 @@ p {
   color: var(--muted-foreground);
 }
 
+/* The correction board reads by cause: a hairline separates one task from the next. */
+.scan-correction-group + .scan-correction-group {
+  border-top: 1px solid var(--rule);
+}
+
+.scan-correction-group-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 11px 20px 7px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 500;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.scan-correction-group-title span:last-child {
+  color: var(--muted-foreground);
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+
 .scan-finding-id {
   font-family: var(--font-mono);
   font-size: 0.64rem;
