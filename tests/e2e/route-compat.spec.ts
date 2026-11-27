@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { dismissConsent } from "./consent";
 
 /**
  * Legacy URLs must not dead-end.
@@ -20,14 +21,7 @@ async function signUp(page: Page): Promise<void> {
   await page.locator("#auth-password").fill(PASSWORD);
   await page.locator('form button[type="submit"]').click();
   await page.waitForURL(/\/app(\/|$)/, { timeout: 20_000 });
-  const consent = page.getByRole("dialog", { name: /cookies/i });
-  const opened = await consent
-    .waitFor({ state: "visible", timeout: 3_000 })
-    .then(() => true)
-    .catch(() => false);
-  if (opened) {
-    await consent.getByRole("button", { name: /autoriser|allow/i }).click();
-  }
+  await dismissConsent(page);
 }
 
 test("legacy URLs redirect to the real screens", async ({ page }) => {

@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { dismissConsent } from "./consent";
 
 /**
  * The customer journey, end to end.
@@ -61,17 +62,7 @@ async function signUp(page: Page, email: string): Promise<void> {
   await page.locator("#auth-password").fill(PASSWORD);
   await page.locator('form button[type="submit"]').click();
   await page.waitForURL(/\/app(\/|$)/, { timeout: 20_000 });
-  // A first visit opens the consent card over the page. Dismiss it as a person
-  // must before using the workspace, otherwise it intercepts later clicks.
-  const consent = page.getByRole("dialog", { name: /cookies/i });
-  // The card mounts after the app shell, so a bare isVisible() races it.
-  const opened = await consent
-    .waitFor({ state: "visible", timeout: 3_000 })
-    .then(() => true)
-    .catch(() => false);
-  if (opened) {
-    await consent.getByRole("button", { name: /allow|autoriser/i }).click();
-  }
+  await dismissConsent(page);
 }
 
 test.describe("marketing site", () => {

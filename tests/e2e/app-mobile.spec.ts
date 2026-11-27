@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { dismissConsent } from "./consent";
 
 /**
  * The simple mobile shell.
@@ -28,15 +29,7 @@ async function signUp(page: Page): Promise<void> {
   await page.locator("#auth-password").fill(PASSWORD);
   await page.locator('form button[type="submit"]').click();
   await page.waitForURL(/\/app(\/|$)/, { timeout: 20_000 });
-  // A first visit opens the consent card over the page. Dismiss it as a person
-  // must before using the workspace, otherwise it intercepts later clicks.
-  // The card mounts with the lazy app shell, which on a phone can land several
-  // seconds after the URL changes, so wait for it instead of probing once.
-  const consent = page.getByRole("dialog", { name: /cookies/i });
-  await consent.waitFor({ state: "visible", timeout: 20_000 });
-  await consent.getByRole("button", { name: /autoriser|allow/i }).click();
-  // The card fades out over 240 ms; wait for it to be gone, not just clicked.
-  await consent.waitFor({ state: "detached" });
+  await dismissConsent(page);
 }
 
 test("mobile menu opens the guide in French and exposes expert mode", async ({
@@ -81,6 +74,42 @@ test("mobile menu opens the guide in French and exposes expert mode", async ({
   await expect(reopened.getByRole("button", { name: "Revenir au mode simple" })).toBeVisible();
 });
 
+test("the assistant fits a 320px phone and shows the real catalogue", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!isMobile, "phone layout only");
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 320, height: 700 });
+  await signUp(page);
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await page.goto("/app/ai");
+  await expect(page.locator(".chat-composer-input")).toBeVisible({ timeout: 20_000 });
+
+  // The context gauge is visible, and it is a gauge, not a sentence the reader has to
+  // parse: the progressbar carries the value for assistive technology.
+  const meter = page.getByRole("progressbar", { name: "Contexte utilisé" });
+  await expect(meter).toBeVisible();
+  const used = Number(await meter.getAttribute("aria-valuenow"));
+  expect(used).toBeGreaterThanOrEqual(0);
+  expect(used).toBeLessThanOrEqual(100);
+
+  // The catalogue comes from the server: a tool added there must be visible on a phone.
+  await page.getByRole("button", { name: "Outils de l'assistant" }).click();
+  const dialog = page.getByRole("dialog", { name: "Outils" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText("browser_open", { exact: true })).toBeVisible();
+  await expect(dialog.getByText("browser_act", { exact: true })).toBeVisible();
+  await expect(dialog.getByText("analyse", { exact: true }).first()).toBeVisible();
+  await dialog.getByRole("button", { name: "Fermer", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+  );
+  expect(overflow, `assistant overflows by ${overflow}px`).toBeLessThanOrEqual(2);
+});
+
 test("a non-technical phone user follows the guide and analyses a site in French", async ({
   page,
   isMobile,
@@ -106,6 +135,12 @@ test("a non-technical phone user follows the guide and analyses a site in French
   await page.getByRole("link", { name: "Analyser une adresse", exact: true }).first().click();
   await expect(page).toHaveURL(/\/app\/start$/);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("UNE ADRESSE");
+  // The page title used to climb to ~50px at this width and push the URL field
+  // off the first screen. It must stay a heading, not a poster.
+  const titleSize = await page
+    .getByRole("heading", { level: 1 })
+    .evaluate((el) => Number.parseFloat(getComputedStyle(el).fontSize));
+  expect(titleSize, `page title is ${titleSize}px`).toBeLessThanOrEqual(36);
 
   await page.locator("#start-url").fill("https://example.com");
   await page.getByRole("button", { name: "Voir le résultat" }).click();
@@ -122,4 +157,23 @@ test("a non-technical phone user follows the guide and analyses a site in French
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth
   );
   expect(overflow, `scan result overflows by ${overflow}px`).toBeLessThanOrEqual(2);
+
+  // Billing and settings are the pages a customer opens on a phone. The member
+  // table has to become a stacked list (label above value) instead of a 460px
+  // table the reader has to drag sideways.
+  await page.goto("/app/settings");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  const members = page.locator("table.app-table-stack").first();
+  await expect(members).toBeVisible();
+  expect(await members.evaluate((el) => getComputedStyle(el).display)).toBe("block");
+  const cellLabel = await members
+    .locator("td")
+    .first()
+    .evaluate((el) => getComputedStyle(el, "::before").content);
+  expect(cellLabel).toContain("Membre");
+
+  const settingsOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+  );
+  expect(settingsOverflow, `settings overflows by ${settingsOverflow}px`).toBeLessThanOrEqual(2);
 });

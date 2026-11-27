@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { dismissConsent } from "./consent";
 
 /**
  * Password change in a real browser.
@@ -30,12 +31,7 @@ async function signUp(page: Page): Promise<void> {
   await page.locator("#auth-password").fill(PASSWORD);
   await page.locator('form button[type="submit"]').click();
   await page.waitForURL(/\/app(\/|$)/, { timeout: 20_000 });
-  // The card mounts with the lazy app shell, which can land several seconds after
-  // the URL changes; wait for it rather than probing once, or it covers the form.
-  const consent = page.getByRole("dialog", { name: /cookies/i });
-  await consent.waitFor({ state: "visible", timeout: 20_000 });
-  await consent.getByRole("button", { name: /autoriser|allow/i }).click();
-  await consent.waitFor({ state: "detached" });
+  await dismissConsent(page);
 }
 
 const sessionToken = async (page: Page): Promise<string | undefined> =>

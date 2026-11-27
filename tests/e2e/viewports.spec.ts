@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
+import { dismissConsent } from "./consent";
 
 /**
  * The thirteen-viewport sweep.
@@ -95,12 +96,7 @@ async function signUp(page: import("@playwright/test").Page, email: string): Pro
   await page.locator("#auth-password").fill(PASSWORD);
   await page.locator('form button[type="submit"]').click();
   await page.waitForURL(/\/app(\/|$)/, { timeout: 20_000 });
-  const consent = page.getByRole("dialog", { name: /cookies/i });
-  const opened = await consent
-    .waitFor({ state: "visible", timeout: 3_000 })
-    .then(() => true)
-    .catch(() => false);
-  if (opened) await consent.getByRole("button", { name: /allow|autoriser/i }).click();
+  await dismissConsent(page);
 }
 
 test("every supported viewport renders without horizontal overflow or console errors", async ({

@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { expect, test } from "@playwright/test";
+import { dismissConsent } from "./consent";
 
 /**
  * WCAG 2.2 AA audit, run by axe-core inside a real Chromium.
@@ -21,6 +22,7 @@ const PAGES = [
   { path: "/app/start", name: "start" },
   { path: "/app/analyses", name: "analyses" },
   { path: "/app/flow", name: "flow" },
+  { path: "/app/ai", name: "assistant" },
 ] as const;
 
 const PASSWORD = "correct-horse-battery-staple";
@@ -45,12 +47,7 @@ async function signUp(page: import("@playwright/test").Page, email: string): Pro
   await page.locator("#auth-password").fill(PASSWORD);
   await page.locator('form button[type="submit"]').click();
   await page.waitForURL(/\/app(\/|$)/, { timeout: 20_000 });
-  const consent = page.getByRole("dialog", { name: /cookies/i });
-  const opened = await consent
-    .waitFor({ state: "visible", timeout: 3_000 })
-    .then(() => true)
-    .catch(() => false);
-  if (opened) await consent.getByRole("button", { name: /allow|autoriser/i }).click();
+  await dismissConsent(page);
 }
 
 test("the public and workspace pages have no WCAG 2.2 AA violation", async ({ page }) => {
