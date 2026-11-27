@@ -485,3 +485,10 @@ pnpm cloud:deploy --dry-run
 
 - **Sécurité** : une session navigateur est liée à `userId` ; un identifiant d'un autre compte est refusé (`browser_session_not_found`). Les URL passent par `assertPublicUrl`, les sélecteurs sont bornés, les touches filtrées.
 - **Limite** : le chemin Cloudflare n'a pas été lancé localement (pas de binding) ; il est couvert par typage mais reste NON VÉRIFIÉ en production.
+## 2026-11-27 (suite) — jeton CSRF double-submit et limites durables
+
+- **CSRF** : `ps_csrf` est un cookie lisible (SameSite=Lax, 30 jours) ; toute écriture sous `/api/account/*` et `/api/auth/sign-out` exige `x-csrf-token` identique quand les deux cookies sont présents. Une session héritée sans jeton reste acceptée, et `/api/auth/session` émet le jeton manquant — pas de déconnexion forcée. Le contrôle d'origine reste la première barrière ; le jeton est la seconde. Les routes de scan et d'IA restent protégées par l'origine seule (migration séparée, fichier IA en cours de réécriture).
+- **Client** : `apiFetch` lit `ps_csrf` et ajoute l'en-tête sur toute méthode non GET/HEAD ; la déconnexion et les révocations de session passent par lui.
+- **Limites durables** : l'inscription et le formulaire de support quittent la `Map` par isolate pour `hitRateLimit` (`signup:address`, `support:address`) ; la connexion et le mot de passe oublié avaient déjà leurs compteurs en base. R2 est clos : chaque limite auth-adjacente a un point de décision durable.
+- **Preuves** : `apps/api/test/csrf.test.ts` 6/6, `tests/e2e/csrf.spec.ts` 2/2 (desktop + mobile, révocation réelle puis 403 forgé), `signup-rate-limit.test.ts` 3/3, `support-rate-limit.test.ts` 1/1 ; suite complète 1057/1057, E2E complet 49 verts + 5 ignorés, `pnpm typecheck` vert.
+- **Limites** : la couverture CSRF s'arrête aux routes compte/déconnexion ; le chemin navigateur de production (R13) et la publication npm (R16) restent hors de portée locale.
