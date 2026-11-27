@@ -12,6 +12,7 @@ import {
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
+import { ReportExport } from "../../components/app/ReportExport.js";
 import { Card, ErrorState } from "../../components/app/ui.js";
 import { useI18n } from "../../i18n/index.js";
 import { PageHeader } from "../../layouts/AppLayout.js";
@@ -40,7 +41,7 @@ type ScanStatus = "PASS" | "WARN" | "FAIL" | "SKIPPED";
  * here is generated: when the catalogue cannot be reached, the finding keeps its observed
  * value and its one-line reason, and no text is invented to fill the gap.
  */
-interface ControlCopy {
+export interface ControlCopy {
   title: string;
   objective: string;
   consequence: string;
@@ -60,7 +61,7 @@ interface ScanFinding {
   why: string;
 }
 
-interface ScanModuleSummary {
+export interface ScanModuleSummary {
   module: "fail" | "clean" | "flow" | "world" | "exit";
   passed: number;
   warnings: number;
@@ -197,6 +198,34 @@ const CORRECTION_LABELS: Record<CorrectionState, { fr: string; en: string }> = {
   fixed: { fr: "Corrigé", en: "Fixed" },
   verify: { fr: "À vérifier", en: "To verify" },
 };
+
+/** Older stored scans carry no module summaries: derive them from the findings
+ * so an opened audit never crashes on a missing array. */
+function moduleSummaries(scan: ScanResult): ScanModuleSummary[] {
+  if (scan.modules?.length) return scan.modules;
+  const order = ["world", "flow", "exit", "fail", "clean"] as const;
+  return order
+    .map((module) => {
+      const items = scan.findings.filter((f) => f.module === module);
+      if (items.length === 0) return null;
+      const st = (f: ScanFinding): string => f.status.toLowerCase();
+      const passed = items.filter((f) => st(f) === "pass").length;
+      const warnings = items.filter((f) => st(f) === "warn").length;
+      const failed = items.filter((f) => st(f) === "fail").length;
+      const skipped = items.filter((f) => ["skipped", "pending"].includes(st(f))).length;
+      const score = Math.round((passed / items.length) * 100);
+      const verdict: ScanModuleSummary["verdict"] =
+        failed > 0
+          ? "fail"
+          : warnings > 0
+            ? "warnings"
+            : skipped === items.length
+              ? "not_measured"
+              : "pass";
+      return { module, passed, warnings, failed, skipped, score, verdict };
+    })
+    .filter((m): m is ScanModuleSummary => m !== null);
+}
 
 interface ScanStep {
   id: string;
@@ -683,11 +712,12 @@ export function ScanPage(): React.ReactElement {
   /** The report the model reads: facts, counts, and what could not be measured. */
   const reportForModel = useCallback((): string => {
     if (!scan) return "";
+    const moduleSummary = moduleSummaries(scan);
     const lines = [
       `Scan de ${scan.finalUrl} (HTTP ${scan.status}, ${Math.round(scan.bytes / 1024)} kB, ${scan.durationMs} ms).`,
       "",
       "Résumé par famille :",
-      ...scan.modules.map(
+      ...moduleSummary.map(
         (item) =>
           `- ${item.module.toUpperCase()}: ${item.verdict} — ${item.passed} pass, ${item.warnings} warn, ${item.failed} fail, ${item.skipped} skipped (score ${item.score}/100)`
       ),
@@ -1155,6 +1185,8 @@ export function ScanPage(): React.ReactElement {
             </button>
           </div>
 
+          <ReportExport scan={scan} controls={controls} fr={fr} />
+
           {scan.login?.attempted && !scan.login.ok ? (
             <p className="scan-notice">
               <AlertTriangle size={13} aria-hidden />
@@ -1242,7 +1274,7 @@ export function ScanPage(): React.ReactElement {
           ) : null}
 
           <div className="scan-modules">
-            {scan.modules.map((item) => (
+            {moduleSummaries(scan).map((item) => (
               <div key={item.module} className={`scan-module is-${item.verdict}`}>
                 <span className="scan-module-name">{item.module.toUpperCase()}</span>
                 <span className="scan-module-label">
