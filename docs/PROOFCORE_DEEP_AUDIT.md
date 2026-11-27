@@ -1,55 +1,64 @@
 # PROOFCORE — Audit profond (phase 0, cartographie)
 
-Base : commit `85e27a2` (branche `master`), dépôt de travail avec modifications non commitées
-(`apps/web/src/pages/app/{AiChat,Billing,ModulePage,Settings}.tsx`, `AppLayout.tsx`,
-`global.css`, `packages/cli/src/index.ts`, `packages/cli/test/cli.test.ts`) et trois fichiers
-de débogage non suivis à la racine (`mobile-*.tmp.mjs`, `visual-audit.tmp.mjs` est suivi).
+Base observée le 2026-11-27 : commit `41ee5a3` (branche `master`), avec des modifications
+locales préexistantes non commitées. Cette session les a préservées ; voir
+`docs/PROOFCORE_VERIFICATION_LOG.md` pour les fichiers observés et les résultats exécutés.
 
 Statuts utilisés dans ce document : **VÉRIFIÉ** (artefact observé), **PARTIEL**,
 **ABSENT**, **NON VÉRIFIÉ** (non exécuté ou non inspecté).
 
 ## 1. Ce qui a été vérifié
 
-| Point                                 | Statut  | Preuve                                                                                                                                                                                                                                                                                                                                |
-| ------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Lint du dépôt suivi par Git           | PARTIEL | `pnpm lint` échoue uniquement à cause de trois fichiers `*.tmp.mjs` non suivis à la racine (erreurs `useDomNodeTextContent`, format). Le code produit n'est pas en cause ; la CI repart d'un checkout et ne les voit pas.                                                                                                             |
-| Fichiers cités par l'audit historique | PARTIEL | `apps/web/src/pages/app/Start.tsx` (389 l.), `ProjectConfig.tsx` (1067 l.), `apps/api/src/routes/audits.ts` (1172 l.), `apps/api/src/routes/ai.ts` (2685 l.), `packages/cli/src/audit.ts` (495 l.) existent. **`packages/engine/src/contracts/statuses.ts` est absent** : les statuts sont dans `packages/contracts/src/statuses.ts`. |
-| Statuts de test                       | VÉRIFIÉ | `packages/contracts/src/statuses.ts` : PENDING, RUNNING, PASSED, FAILED, WARNING, SKIPPED, ERROR, BLOCKED, NOT_APPLICABLE, NOT_CONFIGURED. Statuts de run : PENDING, RUNNING, COMPLETED, PARTIAL, FAILED, ERROR, CANCELLED, NOTHING_VERIFIED.                                                                                         |
-| Modules                               | VÉRIFIÉ | `packages/modules/` contient `world`, `flow`, `exit` uniquement. FAIL et CLEAN sont dans `packages/core/src/page-scan.ts` (`ScanModule = "fail" \| "clean" \| "flow" \| "world" \| "exit"`) et `packages/cli/src/audit.ts` (`kind: "fail"` / `"clean"`).                                                                              |
-| Protection CSRF                       | ABSENT  | Aucune occurrence de `csrf` dans `apps/api/src`.                                                                                                                                                                                                                                                                                      |
-| Rate limiting                         | PARTIEL | `RateLimiter` (`apps/api/src/http/errors.ts:133`) : compteur en `Map` mémoire, par processus/isolat. Non distribué. Utilisé par `auth.ts` (connexion 10 / 5 min, inscription configurable).                                                                                                                                           |
-| Révocation de session                 | PARTIEL | Révocation présente dans `auth.ts`, `device.ts`, `account.ts`, `machine.ts`, `billing.ts`, `workspace.ts`, `store/app-store.ts`. Rotation : NON VÉRIFIÉ.                                                                                                                                                                              |
-| Tests                                 | VÉRIFIÉ | 69 fichiers `*.test.*` / `*.spec.*` hors `node_modules` et `dist`.                                                                                                                                                                                                                                                                    |
-| Espace disque                         | VÉRIFIÉ | 5,2 Go libres sur 232 Go (98 % utilisé). Les builds et installations lourdes sont à risque.                                                                                                                                                                                                                                           |
+| Point                                 | Statut      | Preuve                                                                                                                                                                                                                                                                               |
+| ------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Lint du dépôt                         | VÉRIFIÉ     | Session 2026-11-27 : après reformatage de deux tableaux Markdown dans `docs/PROOFCORE_RISK_REGISTER.md` et `docs/PROOFCORE_VERIFICATION_LOG.md`, `pnpm lint` → `Checked 579 files in 2s. No fixes applied.`                                                                          |
+| Fichiers cités par l'audit historique | VÉRIFIÉ     | Les entrées Start, ProjectConfig, audits, AI et CLI se trouvent dans les chemins `apps/web/src/pages/app/`, `apps/api/src/routes/` et `packages/cli/src/`. **`packages/engine/src/contracts/statuses.ts` est absent** ; le fichier courant est `packages/contracts/src/statuses.ts`. |
+| Statuts de test                       | VÉRIFIÉ     | `packages/contracts/src/statuses.ts` : vocabulaire de contrôles et de runs partagé. Les chaînes et leur usage précis doivent rester conformes au contrat courant.                                                                                                                    |
+| Modules                               | VÉRIFIÉ     | `packages/modules/` contient désormais les cinq packages `world`, `flow`, `exit`, `fail`, `clean`. `packages/core/src/page-scan.ts` compose notamment FAIL et CLEAN pour le scan de page.                                                                                            |
+| Protection CSRF                       | PARTIEL     | `apps/api/src/app.ts` applique une vérification d'origine et de `Sec-Fetch-Site`; aucun jeton CSRF distinct. Tests E2E/API de cette protection non lancés dans cette session.                                                                                                        |
+| Rate limiting                         | PARTIEL     | Rate limiting distribué présent avec stockage/fallback (migrations et guard); la limite machine a des tests ciblés. Connexion/production non testées ici.                                                                                                                            |
+| Révocation de session                 | PARTIEL     | Révocation et rotation possèdent du code/tests dans `auth.ts`, `account.ts` et store; parcours navigateur E2E non lancé aujourd'hui.                                                                                                                                                 |
+| Tests                                 | PARTIEL     | Le dépôt contient des tests automatisés. 88 tests API ciblés passent; suite API complète bloquée par deux tests GitHub réseau; voir journal daté.                                                                                                                                    |
+| Espace disque                         | NON VÉRIFIÉ | Mesure non réalisée pendant cette session.                                                                                                                                                                                                                                           |
 
 ## 2. Ce qui n'a pas été vérifié (à compléter)
 
-- **Exécution réelle des tests** : `pnpm test`, `pnpm typecheck`, `pnpm build`, E2E — NON VÉRIFIÉ dans cette session (disque presque plein ; lancer après libération d'espace).
-- **État réel de la CI** sur GitHub (exécution #105 citée) : NON VÉRIFIÉ, aucun accès aux journaux distants n'a été tenté.
-- **Pages rendues dans un navigateur** (phase 0.3) : NON VÉRIFIÉ.
-- **Cartographie complète des routes et des appels web → API** : tentée via sous-agent, interrompue par la limite d'étapes. À refaire par lots (voir `PROOFCORE_ARCHITECTURE_MAP.md`, section « à compléter »).
-- **Schéma de persistance d'analyse commune** : NON VÉRIFIÉ ; les tables D1 et le schéma Neon (`apps/api/neon/schema.sql`) doivent être lus avant toute migration.
+- **État distant de la CI**, y compris l'exécution #105 : NON VÉRIFIÉ dans cette session ; absence d'accès aux journaux GitHub.
+- **Interface de production et capture navigateur** : NON VÉRIFIÉ dans cette session ; aucune navigation ni capture distante n'a été effectuée.
+- **Parcours autorisé vers un site réel** : NON VÉRIFIÉ ; aucun test intrusif ou crawl externe n'a été lancé.
+- **État npm actuel et propriétaires du paquet** : NON VÉRIFIÉ dans cette session ; aucun appel réseau au registre.
+- **Graphe complet de chaque écran vers les services et magasins** : PARTIEL ; les routes principales sont recensées dans `PROOFCORE_ARCHITECTURE_MAP.md`, mais le suivi exhaustif des appels UI → API reste à faire.
 
 ## 3. Incohérences documentaires relevées
 
-- `package.json` racine : `"name": "proofcore"`, `"description"` décrit trois moteurs (WORLD, FLOW, EXIT) alors que le produit en documente cinq. Le README et le statut en parlent aussi différemment.
-- Version racine `0.1.0` ; version CLI `@proofcore/cli` `0.6.3`. Pas de règle de versionnement documentée (à vérifier dans `README.md` et `docs/`).
-- `APP-MEMORY.md` indique « Dernière mise à jour : 2026-11-21 » et des chantiers « en cours » qui peuvent être dépassés.
-- Le sous-agent a signalé des chemins de documentation contradictoires ; à réconcilier dans la phase 1.4.
+- Le dépôt comprend plusieurs documents datés du 26 novembre et des notes antérieures qui ne décrivent pas le même état ; les historiques doivent être lus avec leur date, pas comme une description actuelle.
+- Le paquet racine privé est versionné `0.1.0` tandis que le CLI a un cycle distinct ; aucune politique de versionnement unifiée n'a été confirmée.
+- Le README local contient une note historique sur npm (`proofcore` 0.6.0 observé antérieurement), mais le registre n'a pas été interrogé dans cette session : statut courant NON VÉRIFIÉ.
+- `docs/PROOFCORE_ARCHITECTURE_MAP.md` et `docs/PROOFCORE_CAPABILITY_MATRIX.md` contenaient des chiffres et statuts périmés ; leurs entrées concernant Analysis et les outils IA ont été actualisées à partir du code local.
 
-## 4. Décision de cette session
+## 4. État consolidé de la session du 27 novembre
 
-La phase 0 complète (cartographie de toutes les routes, pages et composants, tests navigateur)
-dépasse une seule session. Les trois autres documents (`CAPABILITY_MATRIX`, `ARCHITECTURE_MAP`,
-`RISK_REGISTER`) ne contiennent que ce qui est vérifié ci-dessus. Les lignes marquées NON VÉRIFIÉ
-ne doivent pas être lues comme des fonctions opérationnelles.
+La ressource Analysis canonique existe déjà dans `apps/api/migrations/0021_analyses.sql` et
+`apps/api/src/routes/analyses.ts`, avec liens vers `page_audits` et `test_runs`, cycle de vie,
+idempotence, pagination, recherche, annulation, constats et comparaison. La session a exécuté
+les tests ciblés correspondants (voir le journal) ; cela ne valide pas le déploiement.
+
+Le registre de capacités est dans `packages/core/src/capabilities.ts` et est exposé par
+`apps/api/src/routes/capabilities.ts`. FLOW Studio a CRUD et exécution navigateur dans
+`apps/api/src/routes/flow-studio.ts`; le code renvoie explicitement une erreur si le navigateur
+n'est pas disponible. L'orchestration IA appelle les services via `apps/api/src/routes/ai.ts`.
+
+La phase 0.3 de cette session reste NON VÉRIFIÉE : aucun navigateur n'a été lancé. Les pages et
+captures précédemment consignées dans les sections datées restent des preuves historiques et
+ne sont pas réinterprétées comme un test effectué aujourd'hui. La carte d'architecture et la
+matrice indiquent séparément les limites persistantes.
 
 ## 5. Vérification en direct — 26 novembre 2026 (phase 0.3 exécutée)
 
 Session du 26 novembre, dépôt à `e5b5e63` (master), l'agent « chat IA mobile » travaillait
 en parallèle dans le même arbre. Cette section ne décrit que ce qui a été exécuté ce jour.
 
-### 5.1 Suite de tests exécutée (comble la section 2.1 ci-dessus)
+### 5.1 Notes de vérification historiques — ne décrivent pas la session du 27 novembre
 
 - `pnpm test` : **69 fichiers, 818 tests, 0 échec** (Vitest, local).
 - `pnpm typecheck` : 0 erreur (`apps/web`, exécuté à chaque passe du jour).
@@ -106,7 +115,7 @@ Hypothèse éliminée : un état du poste (config, session, `.git`) — le clone
   rendent tous) et l'assistant IA outillé les couvre (`apps/api/src/routes/ai.ts`, 19 outils,
   dont `fail_scan` et `clean_audit`).
 
-## 6. Mise à jour du 26 novembre 2026 (soir) — ce que l'audit ci-dessus ne savait pas encore
+## 6. Mise à jour du 26 novembre 2026 (soir) — historique (périmé pour l'état du dépôt)
 
 Base : `f130d2f`. Les sections 1 à 5 sont conservées telles quelles pour l'historique ;
 leurs lignes **CSRF**, **rate limiting**, **Analysis canonique**, **remédiation** et
@@ -131,7 +140,11 @@ leurs lignes **CSRF**, **rate limiting**, **Analysis canonique**, **remédiation
 Toujours périmées et à corriger (aucune ne doit être lue comme un état actuel) : les
 mentions « trois modules » de `docs/PROOFCORE_2_0_DELIVERY_REPORT.md` (document daté).
 
-## 7. Mise à jour du 26 novembre 2026 (nuit) — corrections et preuves de cette session
+## 7. Mise à jour du 26 novembre 2026 (nuit) — historique
+
+Les observations et preuves ci-dessous se rapportent exclusivement à leur date et ne remplacent pas le relevé du 27 novembre dans `docs/PROOFCORE_VERIFICATION_LOG.md`.
+
+## 8. Vérifications complémentaires du 27 novembre 2026
 
 Chaque ligne a été exécutée dans cet arbre de travail ; aucune n'est une déduction.
 

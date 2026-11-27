@@ -99,15 +99,14 @@ pnpm proofcore -- audit fail https://site.example --sync
 
 ## Install the CLI globally
 
-The CLI is published on npm as the unscoped package `proofcore` — a self-contained
-bundle with **no runtime npm dependencies**:
+The CLI source builds into a self-contained bundle with **no runtime npm dependencies**.
+Registry status, checked with `npm view` (see `docs/PROOFCORE_VERIFICATION_LOG.md`): the
+unscoped name `proofcore` exists on npm at **0.6.0**, while this repository is at 0.6.3
+and that version is **not** published. The `@proofcore/*` scope is not on the registry.
+Do not run `npm install -g proofcore` expecting this repository's CLI until the owner of
+that npm name has been confirmed and the release has been published.
 
-```bash
-npm install -g proofcore
-proofcore --version
-```
-
-To build the tarball locally instead (same bytes, no registry needed):
+To build the tarball locally (same bytes, no registry needed):
 
 ```bash
 pnpm cli:package
@@ -142,8 +141,8 @@ proofcore test --module world,flow,exit
 `init` writes the config in the current directory; it does not create the directory.
 `--cwd /path/to/your/app` is also supported, but the path must already exist.
 
-The package is not yet on the npm registry. Once npm authentication and ownership of
-the `@proofcore` scope are configured, the generated release is publishable:
+The 0.6.3 release is not on the npm registry yet. Once npm authentication and ownership
+of the package name are confirmed, the generated release is publishable:
 
 ```bash
 npm publish ./packages/cli/release --access public

@@ -40,7 +40,15 @@ Aucune donnée d'un autre compte n'entre dans le prompt : les lectures passent p
 mêmes filtres `workspace_id` que l'API, et les conversations sont liées à
 `(user_id, workspace_id)`.
 
-## 4. Outils (19)
+La route `POST /patch` suit les mêmes contrôles (session, adhésion, quota géré, gate
+`monthly_ai_audits`) mais reste **one-shot** : aucun message client n'entre dans le
+prompt, aucun outil n'est exposé au modèle, et aucune conversation n'est créée. Elle
+localise d'abord les fichiers avec `prepare_code_patch`, demande au modèle un JSON strict
+(`path`, `before`, `after`, `rationale`) ou un refus, puis fait vérifier le bloc `before`
+par le même outil avant de rendre le diff. Un chemin inventé ou une ligne absente ne
+produit pas de diff (`file_not_found`, `before_not_found`), et rien n'est écrit.
+
+## 4. Outils (36)
 
 | Outil                                                                                 | Nature                                                                            |
 | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
@@ -48,12 +56,17 @@ mêmes filtres `workspace_id` que l'API, et les conversations sont liées à
 | `module_status`, `module_config`                                                      | état, configuration active et vocabulaire des 5 modules                           |
 | `project_code`                                                                        | lecture des fichiers importés (sourceId / path)                                   |
 | `fetch_web`, `browse_url`, `probe_url`                                                | lecture réseau avec garde d'URL                                                   |
+| `browser_open`, `browser_read`, `browser_act`, `browser_close`                        | session Chromium réelle : ouvrir, relire, cliquer/saisir/défiler, fermer           |
 | `fail_scan`, `clean_audit`, `site_audit`                                              | contrôles HTTP mesurés                                                            |
 | `read_repo`                                                                           | lecture d'un dépôt public avec garde                                              |
 | `module_configure`                                                                    | écriture validée : les cinq familles (WORLD, FLOW, EXIT, FAIL, CLEAN)             |
+| `validate_configuration`                                                              | lecture : un patch de module validé comme une sauvegarde, sans rien écrire        |
+| `suggest_analysis_profile`                                                            | lecture : un profil du registre, avec les mots qui l'ont justifié                 |
 | `module_run`, `analyze_run`                                                           | lancement réel + diagnostic d'un run stocké                                       |
 | `remember`                                                                            | écriture : un fait de mémoire borné                                               |
 | `finding_details`                                                                     | lecture : un constat complet (preuve, contrôle, remédiation liée)                 |
+| `prepare_code_patch`                                                                  | lecture : localise le fichier et rend un diff unifié, sans écrire ni exécuter     |
+| `generate_remediation`                                                                | lecture : plan complet (correctif, vérification, exemples, extraits) sans écrire  |
 | `verify_remediation`                                                                  | écriture : vérifie un correctif par une analyse postérieure, refuse l'inconclusif |
 
 Contrôles :
@@ -62,6 +75,23 @@ Contrôles :
 - `module_configure` exige `confirm: true`, passe le patch par le schéma Zod réel, le
   fusionne avec la configuration active, refuse les blocages de `validateConfig` et
   écrit un audit `project.config_updated` avec `source: "assistant"` ;
+- `validate_configuration` et `module_configure` passent par la même fonction de
+  validation : un patch accepté ici est accepté là-bas, et rien n'est écrit avant
+  `confirm: true` ; `suggest_analysis_profile` ne propose qu'un profil du registre et
+  renvoie `recommendation: null` plutôt qu'un profil inventé ;
+- `generate_remediation` assemble un plan depuis le constat et le registre : titre,
+  gravité, cause, correctif et vérification documentés, dix étapes (les trois premières
+  déjà prouvées), exemples prêts à l'emploi et extraits de code classés par
+  `prepare_code_patch`. Il refuse un constat `PASSED`/`SKIPPED`
+  (`finding_not_actionable`), nomme ce qui manque au lieu de l'inventer, et n'ouvre ni ne
+  vérifie aucune remédiation : `open_remediation` reste l'écriture, une analyse
+  postérieure reste la seule preuve ;
+- `prepare_code_patch` alimente la route `POST /api/v1/ai/patch` et le panneau
+  `FindingPatch` (constat → diff proposé → « Copier le diff ») ; le modèle propose, l'outil
+  vérifie. Il ne modifie aucun fichier : il classe les fichiers importés par
+  les termes du constat, exige un `before` exact sur des lignes entières, et refuse un
+  bloc absent ou ambigu plutôt que de deviner ; le diff reste une proposition, vérifiée
+  par une analyse postérieure ;
 - `module_run` exige `confirm: true`, vérifie le quota `monthly_test_runs` avant de
   lancer, n'accepte pour FAIL/CLEAN qu'un hôte du projet, et enregistre le run comme un
   upload CLI (même compteur, même historique) ;
@@ -69,7 +99,37 @@ Contrôles :
 - aucun outil n'écrit un fichier, n'exécute une commande ou ne franchit le tenant ;
 - les URLs sortantes passent par `assertPublicUrl` (http(s), hôte public, ports
   autorisés, redirections revalidées) ;
-- le nombre de pas est borné par le niveau d'effort (`maxSteps` 10/18/28).
+- le nombre de pas est borné par le niveau d'effort (`maxSteps` 10/18/28) ;
+- une session navigateur appartient à l'utilisateur qui l'a ouverte : le Worker stocke
+  le propriétaire en D1 à côté de l'identifiant de session Cloudflare, et l'agent local
+  vérifie le même propriétaire en mémoire. Un identifiant volé ne pilote pas le
+  navigateur d'un autre compte ; `browser_act` est classé `write`, `browser_open` est
+  une analyse (budget de 3 par tour), `browser_read` et `browser_close` sont des lectures.
+
+### Jetons, contexte et coût
+
+Le contexte est budgété par effort : 16 k (quick), 32 k (balanced), 64 k (deep) et
+96 k (ultra) jetons d'entrée. L'historique est conservé du plus récent au plus ancien,
+par messages entiers ; un message qui ne tient pas n'est pas tronqué, il est exclu, et
+la réponse expose `context.trimmed`. Le prompt système et la mémoire comptent dans le
+budget.
+
+Les nombres affichés viennent de l'`usage` du fournisseur, jamais d'une estimation de
+caractères :
+
+- chaque appel (réponse, lentilles de revue, synthèse, curateur) additionne ses
+  `input_tokens`/`output_tokens` (Anthropic) ou `prompt_tokens`/`completion_tokens`
+  (OpenAI) ;
+- `/chat` renvoie `usage: { input, output, total, context: { used, budget, remaining,
+  trimmed }, outputBudget }` ;
+- le message assistant conserve `usage: { input, output }`, donc un rechargement de la
+  conversation montre le même coût ;
+- l'interface affiche un compteur de contexte (utilisé / budget, avec jauge) et, par
+  message, les jetons d'entrée et de sortie. Le compteur du composeur est masqué sous
+  560 px pour laisser la place au bouton d'envoi ; la ligne par message reste lisible.
+
+Une valeur `remaining` est un budget appliqué par PROOFCORE, pas une promesse sur la
+limite du fournisseur.
 
 Limites de runtime, dites au modèle : EXIT avec une source fichier/commande et les
 journeys FLOW navigateur ne s'exécutent pas dans le Worker. `module_status` renvoie
