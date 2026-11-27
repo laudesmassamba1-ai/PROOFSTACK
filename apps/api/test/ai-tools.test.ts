@@ -83,6 +83,12 @@ describe("assistant tool catalogue", () => {
     expect(names).toContain("validate_scenario");
     expect(names).toContain("suggest_analysis_profile");
     expect(names).toContain("validate_configuration");
+    expect(names).toContain("prepare_code_patch");
+    expect(names).toContain("generate_remediation");
+    expect(names).toContain("browser_open");
+    expect(names).toContain("browser_act");
+    expect(names).toContain("browser_read");
+    expect(names).toContain("browser_close");
     for (const tool of body.tools) {
       expect(body.classes).toContain(tool.permission);
       expect(tool.description.length).toBeGreaterThan(10);
@@ -107,7 +113,13 @@ describe("assistant tool catalogue", () => {
     expect(permissionOf("validate_scenario")).toBe("read");
     expect(permissionOf("suggest_analysis_profile")).toBe("read");
     expect(permissionOf("validate_configuration")).toBe("read");
+    expect(permissionOf("prepare_code_patch")).toBe("read");
+    expect(permissionOf("generate_remediation")).toBe("read");
     expect(permissionOf("open_remediation")).toBe("write");
+    expect(permissionOf("browser_open")).toBe("analysis");
+    expect(permissionOf("browser_read")).toBe("read");
+    expect(permissionOf("browser_act")).toBe("write");
+    expect(permissionOf("browser_close")).toBe("read");
   });
 
   it("reads the analysis findings through a read tool, not an analysis one", () => {

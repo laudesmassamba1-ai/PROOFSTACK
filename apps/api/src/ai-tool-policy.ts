@@ -29,6 +29,8 @@ export const AI_TOOL_PERMISSIONS: Record<string, PermissionClass> = {
   finding_details: "read",
   suggest_analysis_profile: "read",
   validate_configuration: "read",
+  prepare_code_patch: "read",
+  generate_remediation: "read",
 
   // Analysis: spends time, quota or someone else's network. Capped per turn.
   analyze_run: "analysis",
@@ -39,9 +41,13 @@ export const AI_TOOL_PERMISSIONS: Record<string, PermissionClass> = {
   fetch_web: "analysis",
   browse_url: "analysis",
   probe_url: "analysis",
+  browser_open: "analysis",
+  browser_read: "read",
 
   // Writes: changes the tenant. Each tool still requires its own confirm flag.
   module_configure: "write",
+  browser_act: "write",
+  browser_close: "read",
   remember: "write",
   open_remediation: "write",
   verify_remediation: "write",

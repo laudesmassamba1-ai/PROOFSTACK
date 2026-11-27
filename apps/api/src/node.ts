@@ -5,6 +5,7 @@ import { createApp } from "./app.js";
 import { migrate } from "./db/d1.js";
 import { migrationFiles, NodeSqliteDatabase } from "./db/node-sqlite.js";
 import { runLocalScenario } from "./local-browser.js";
+import { createLocalBrowserAgent } from "./local-browser-agent.js";
 
 /**
  * Local development server.
@@ -29,6 +30,7 @@ async function main(): Promise<void> {
   // The Worker has Cloudflare's BROWSER binding; this server has the machine's Chromium.
   // Injecting the CLI's own engine keeps one execution path and avoids a paid service.
   services.localScenario = runLocalScenario;
+  services.browserAgent = createLocalBrowserAgent();
   const port = Number(process.env.PORT ?? 8787);
   const capabilities = services.provider.getCapabilities();
 

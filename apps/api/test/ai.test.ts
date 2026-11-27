@@ -771,6 +771,216 @@ describe("ai chat", () => {
     expect(stored.savedAt).toBeNull();
   });
 
+  it("locates the file and returns a real diff for a finding, without writing it", async () => {
+    const { request, signUp, services } = harness;
+    const { cookie, workspaceId, userId } = await signUp("ai-patch@example.com");
+    const created = await request("/api/v1/projects", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({
+        workspaceId,
+        name: "Patch project",
+        baseUrl: "https://shop.example",
+        environment: "staging",
+      }),
+    });
+    expect(created.status).toBe(201);
+    const project = ((await created.json()) as { project: { id: string } }).project;
+
+    const now = new Date().toISOString();
+    const analysis = await services.store.createAnalysis({
+      id: "ana_patch_test",
+      workspaceId,
+      projectId: project.id,
+      createdBy: userId,
+      source: "WEB",
+      targetType: "PAGE",
+      target: "https://shop.example/",
+      scope: "PAGE",
+      requestedModules: ["fail"],
+      applicableModules: ["fail"],
+      engine: "scan",
+      engineVersion: "1",
+      environment: "server",
+      status: "completed",
+      coverage: {
+        requestedModules: ["fail"],
+        applicableModules: ["fail"],
+        measuredModules: ["fail"],
+        skipped: [],
+      },
+      startedAt: now,
+      correlationId: "corr_patch_test",
+    });
+    await services.store.updateAnalysis({
+      workspaceId,
+      id: analysis.id,
+      patch: {
+        status: "completed",
+        result: {
+          findings: [
+            {
+              module: "fail",
+              id: "hsts",
+              status: "FAIL",
+              observed: "absent",
+              why: "HSTS prevents a protocol downgrade.",
+            },
+          ],
+        },
+      },
+    });
+    const key = findingKey("fail", "hsts", "https://shop.example/");
+
+    const source = [
+      'import express from "express";',
+      "const app = express();",
+      "// Missing Strict-Transport-Security header.",
+      "app.listen(3000);",
+    ].join("\n");
+    services.projectKnowledge = {
+      listSources: async () => [
+        {
+          id: "src_patch",
+          workspaceId,
+          projectId: project.id,
+          name: "uploaded-repo",
+          kind: "folder" as const,
+          ref: null,
+          fileCount: 1,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+      listFiles: async () => [
+        {
+          id: "fil_patch",
+          path: "src/server.ts",
+          language: "typescript",
+          size: source.length,
+          sha256: "b".repeat(64),
+        },
+      ],
+      readFile: async () => ({ path: "src/server.ts", content: source }),
+      metrics: async () => ({
+        sources: 1,
+        files: 1,
+        audits: 0,
+        averageScore: null,
+        findingsBySeverity: [],
+        scoreTrend: [],
+      }),
+      listAudits: async () => [],
+    } as unknown as ProjectKnowledge;
+
+    await request("/api/v1/ai/profile", {
+      method: "PUT",
+      cookie,
+      body: JSON.stringify({
+        providerId: "custom",
+        baseUrl: upstreamBase,
+        model: "test-model",
+        apiKey: "sk-patch-key-1234",
+      }),
+    });
+
+    const replacement =
+      "const app = express();\napp.use((_req, res, next) => { res.setHeader('Strict-Transport-Security', 'max-age=31536000'); next(); });";
+    upstreamState.respond = (attempt, body) => {
+      if (attempt === 1) {
+        return {
+          status: 200,
+          body: {
+            choices: [
+              {
+                message: {
+                  role: "assistant",
+                  content: null,
+                  tool_calls: [
+                    {
+                      id: "call_locate",
+                      type: "function",
+                      function: {
+                        name: "prepare_code_patch",
+                        arguments: JSON.stringify({ analysisId: analysis.id, findingKey: key }),
+                      },
+                    },
+                    {
+                      id: "call_diff",
+                      type: "function",
+                      function: {
+                        name: "prepare_code_patch",
+                        arguments: JSON.stringify({
+                          analysisId: analysis.id,
+                          findingKey: key,
+                          path: "src/server.ts",
+                          before: "const app = express();",
+                          after: replacement,
+                        }),
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        };
+      }
+      const parsed = body as { messages: { role: string; content: string }[] };
+      const results = parsed.messages
+        .filter((message) => message.role === "tool")
+        .map((message) => message.content);
+      const locate = results.find((content) => content.includes('"mode": "locate"'));
+      const diff = results.find((content) => content.includes('"mode": "diff"'));
+      if (
+        !locate?.includes('"path": "src/server.ts"') ||
+        !locate.includes('"line": 3') ||
+        !locate.includes('"applied": false')
+      ) {
+        return { status: 500, body: {} };
+      }
+      if (
+        !diff?.includes('"diff": "--- a/src/server.ts') ||
+        !diff.includes("+app.use") ||
+        !diff.includes('"saved": false') ||
+        !diff.includes('"applied": false')
+      ) {
+        return { status: 500, body: {} };
+      }
+      return {
+        status: 200,
+        body: {
+          choices: [
+            {
+              message: {
+                role: "assistant",
+                content: "Le diff ajoute l'en-tête HSTS dans src/server.ts ; à toi de l'appliquer.",
+              },
+            },
+          ],
+        },
+      };
+    };
+
+    const chat = await request("/api/v1/ai/chat", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({
+        workspaceId,
+        message: "Prépare le correctif du constat HSTS.",
+        effort: "quick",
+      }),
+    });
+    expect(chat.status, await chat.clone().text()).toBe(200);
+    const body = (await chat.json()) as { trace: { tool: string; summary: string }[] };
+    expect(body.trace.map((entry) => entry.tool)).toEqual([
+      "prepare_code_patch",
+      "prepare_code_patch",
+    ]);
+    expect(body.trace[0]?.summary).toContain("candidat");
+    expect(body.trace[1]?.summary).toContain("patch proposé");
+  });
+
   it("maps an upstream 401 to ai_invalid_key and never invents an answer", async () => {
     const { request, signUp } = harness;
     const { cookie, workspaceId } = await signUp("ai-401@example.com");
@@ -1070,6 +1280,294 @@ describe("ai chat", () => {
     const body = (await chat.json()) as { message: string; trace: { tool: string }[] };
     expect(body.message, JSON.stringify(body.trace)).toContain("src/index.ts");
     expect(body.trace.some((item) => item.tool === "project_code")).toBe(true);
+  });
+});
+
+describe("token accounting and browser tools", () => {
+  it("reports the provider's real usage and persists it on the message", async () => {
+    const { request, signUp } = harness;
+    const { cookie, workspaceId } = await signUp("ai-usage@example.com");
+    await request("/api/v1/ai/profile", {
+      method: "PUT",
+      cookie,
+      body: JSON.stringify({
+        providerId: "custom",
+        baseUrl: upstreamBase,
+        model: "test-model",
+        apiKey: "sk-usage-key",
+      }),
+    });
+    upstreamState.respond = () => ({
+      status: 200,
+      body: {
+        choices: [{ message: { role: "assistant", content: "Measured answer." } }],
+        usage: { prompt_tokens: 1000, completion_tokens: 250 },
+      },
+    });
+
+    const chat = await request("/api/v1/ai/chat", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({ workspaceId, message: "Count this.", effort: "balanced" }),
+    });
+    expect(chat.status, await chat.clone().text()).toBe(200);
+    const body = (await chat.json()) as {
+      conversationId: string;
+      usage: {
+        input: number;
+        output: number;
+        total: number;
+        outputBudget: number;
+        context: { used: number; budget: number; remaining: number; trimmed: number };
+      };
+    };
+    // A balanced turn runs the answer, the reviewer lenses and the synthesis; every one
+    // of those calls reported usage, and the endpoint must sum them, not count one.
+    expect(upstreamState.requests.length).toBeGreaterThan(1);
+    expect(body.usage.input).toBe(1000 * upstreamState.requests.length);
+    expect(body.usage.output).toBe(250 * upstreamState.requests.length);
+    expect(body.usage.total).toBe(1250 * upstreamState.requests.length);
+    expect(body.usage.context.budget).toBe(32_000);
+    expect(body.usage.context.used).toBeGreaterThan(0);
+    expect(body.usage.context.remaining).toBe(32_000 - body.usage.context.used);
+    expect(body.usage.outputBudget).toBeGreaterThan(0);
+
+    const conversation = await request(
+      `/api/v1/ai/conversations/${body.conversationId}?workspaceId=${workspaceId}`,
+      { cookie }
+    );
+    expect(conversation.status).toBe(200);
+    const loaded = (await conversation.json()) as {
+      messages: { role: string; usage?: { input: number; output: number } }[];
+    };
+    const assistant = loaded.messages.filter((message) => message.role === "assistant").at(-1);
+    expect(assistant?.usage).toEqual({
+      input: 1000 * upstreamState.requests.length,
+      output: 250 * upstreamState.requests.length,
+    });
+  });
+
+  it("drives an injected browser through open, act and close", async () => {
+    const { services, request, signUp } = harness;
+    const { cookie, workspaceId, userId } = await signUp("ai-browser@example.com");
+    await request("/api/v1/ai/profile", {
+      method: "PUT",
+      cookie,
+      body: JSON.stringify({
+        providerId: "custom",
+        baseUrl: upstreamBase,
+        model: "test-model",
+        apiKey: "sk-browser-key",
+      }),
+    });
+
+    const calls: { method: string; userId: string; action?: unknown }[] = [];
+    const view = (sessionId: string) => ({
+      sessionId,
+      url: "https://example.com/next",
+      title: "Example",
+      text: "Hello from the real page",
+      elements: [{ ref: "e1", role: "link", name: "More", selector: "#more" }],
+      screenshot: "data:image/jpeg;base64,AAAA",
+      engine: "local-chromium" as const,
+    });
+    services.browserAgent = {
+      open: async (input) => {
+        calls.push({ method: "open", userId: input.userId });
+        expect(input.workspaceId).toBe(workspaceId);
+        return view("bas_test");
+      },
+      act: async (input) => {
+        calls.push({ method: "act", userId: input.userId, action: input.action });
+        return view(input.sessionId);
+      },
+      read: async (input) => {
+        calls.push({ method: "read", userId: input.userId });
+        return view(input.sessionId);
+      },
+      close: async (input) => {
+        calls.push({ method: "close", userId: input.userId });
+      },
+    };
+
+    upstreamState.respond = (attempt) => {
+      if (attempt === 1) {
+        return {
+          status: 200,
+          body: {
+            choices: [
+              {
+                message: {
+                  role: "assistant",
+                  content: null,
+                  tool_calls: [
+                    {
+                      id: "call_open",
+                      type: "function",
+                      function: {
+                        name: "browser_open",
+                        arguments: '{"url":"https://example.com"}',
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        };
+      }
+      if (attempt === 2) {
+        return {
+          status: 200,
+          body: {
+            choices: [
+              {
+                message: {
+                  role: "assistant",
+                  content: null,
+                  tool_calls: [
+                    {
+                      id: "call_act",
+                      type: "function",
+                      function: {
+                        name: "browser_act",
+                        arguments: JSON.stringify({
+                          sessionId: "bas_test",
+                          action: "click",
+                          selector: "#more",
+                        }),
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        };
+      }
+      if (attempt === 3) {
+        return {
+          status: 200,
+          body: {
+            choices: [
+              {
+                message: {
+                  role: "assistant",
+                  content: null,
+                  tool_calls: [
+                    {
+                      id: "call_close",
+                      type: "function",
+                      function: {
+                        name: "browser_close",
+                        arguments: '{"sessionId":"bas_test"}',
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        };
+      }
+      return {
+        status: 200,
+        body: {
+          choices: [
+            { message: { role: "assistant", content: "Clicked #more and closed the page." } },
+          ],
+        },
+      };
+    };
+
+    const chat = await request("/api/v1/ai/chat", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({
+        workspaceId,
+        message: "Open example.com and click More.",
+        effort: "balanced",
+      }),
+    });
+    expect(chat.status, await chat.clone().text()).toBe(200);
+    const body = (await chat.json()) as {
+      message: string;
+      trace: { tool: string; view?: { sessionId?: string; openInBrowser?: boolean } }[];
+    };
+    expect(body.message).toContain("Clicked");
+    expect(body.trace.map((step) => step.tool)).toEqual([
+      "browser_open",
+      "browser_act",
+      "browser_close",
+    ]);
+    expect(calls.map((call) => call.method)).toEqual(["open", "act", "close"]);
+    expect(calls[0]?.userId).toBe(userId);
+    expect(calls[1]?.action).toEqual({ kind: "click", selector: "#more" });
+    expect(body.trace[0]?.view).toMatchObject({
+      sessionId: "bas_test",
+      openInBrowser: true,
+    });
+  });
+
+  it("refuses browser tools honestly when no browser exists", async () => {
+    const { request, signUp } = harness;
+    const { cookie, workspaceId } = await signUp("ai-no-browser@example.com");
+    await request("/api/v1/ai/profile", {
+      method: "PUT",
+      cookie,
+      body: JSON.stringify({
+        providerId: "custom",
+        baseUrl: upstreamBase,
+        model: "test-model",
+        apiKey: "sk-no-browser-key",
+      }),
+    });
+    upstreamState.respond = (attempt) => {
+      if (attempt === 1) {
+        return {
+          status: 200,
+          body: {
+            choices: [
+              {
+                message: {
+                  role: "assistant",
+                  content: null,
+                  tool_calls: [
+                    {
+                      id: "call_open",
+                      type: "function",
+                      function: {
+                        name: "browser_open",
+                        arguments: '{"url":"https://example.com"}',
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        };
+      }
+      return {
+        status: 200,
+        body: {
+          choices: [{ message: { role: "assistant", content: "No browser here." } }],
+        },
+      };
+    };
+
+    const chat = await request("/api/v1/ai/chat", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({ workspaceId, message: "Open it.", effort: "quick" }),
+    });
+    expect(chat.status, await chat.clone().text()).toBe(200);
+    const body = (await chat.json()) as { trace: { tool: string; summary: string }[] };
+    expect(body.trace.map((step) => step.tool)).toContain("browser_open");
+    // The refusal is in the payload the model received, not only in the trace.
+    expect(upstreamState.requests.map((entry) => entry.body).join("\n")).toContain(
+      "browser_unavailable"
+    );
   });
 });
 

@@ -1,6 +1,6 @@
 import type { PaymentProvider } from "@proofcore/adapter-payments";
 import { CheckoutService, UsageMeter, WebhookProcessor } from "@proofcore/billing";
-import { scanPage } from "@proofcore/core";
+import { auditSite, scanPage } from "@proofcore/core";
 import type { PaymentAutomationEvent } from "../automation.js";
 import type { Database } from "../db/types.js";
 import type { EmailSender } from "../email.js";
@@ -53,12 +53,36 @@ export interface Services {
    * Worker and in tests: there, a scenario that needs a browser is refused, not faked.
    */
   localScenario?: (input: LocalScenarioInput) => Promise<ScenarioReport>;
+  /**
+   * Interactive browser sessions on this machine's Chromium, for the Node server only.
+   * The Worker supplies Cloudflare's rendering binding instead; both implement the same
+   * agent interface, so the assistant's browser tools behave the same in either place.
+   */
+  browserAgent?: import("../browser-agent.js").BrowserAgent;
   clock: () => Date;
   /**
    * The page scanner, injected so a route can be tested without reaching the network.
    * Production passes `scanPage` itself; a test passes a stub, exactly like `fetchImpl`.
    */
   scan: typeof scanPage;
+  /** The site crawler, injected for the same reason as the page scanner. */
+  siteAudit: typeof auditSite;
+  /**
+   * Re-run the project's FLOW module for a verification analysis.
+   *
+   * Injected because the real one runs the engine and spends a test run; a route test
+   * supplies a stub. Absent means `app.ts` wires `runModule`; a test that forgets it
+   * gets a refusal, not a fake pass.
+   */
+  runFlow?: (input: { workspaceId: string; projectId: string }) => Promise<FlowRunSummary>;
+}
+
+export interface FlowRunSummary {
+  runId: string | null;
+  reportId: string | null;
+  status: string;
+  cases: { id: string; status: string; failure?: { code?: string; message?: string } }[];
+  note?: string;
 }
 
 export function createServices(input: {
@@ -67,6 +91,7 @@ export function createServices(input: {
   provider: PaymentProvider;
   clock?: () => Date;
   scan?: typeof scanPage;
+  siteAudit?: typeof auditSite;
 }): Services {
   const clock = input.clock ?? (() => new Date());
   const store = new AppStore(input.db, clock);
@@ -103,6 +128,7 @@ export function createServices(input: {
     projectKnowledge,
     clock,
     scan: input.scan ?? scanPage,
+    siteAudit: input.siteAudit ?? auditSite,
   };
 }
 
