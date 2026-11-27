@@ -56,7 +56,8 @@ export function authRoutes(services: Services): Hono<AppEnv> {
   // run. The limit still raises the cost of mass account creation, but it is now
   // configurable and it is off under test, where a suite legitimately creates dozens of
   // accounts from one address.
-  const signUpLimit = Number(process.env.SIGNUP_RATE_LIMIT ?? 20);
+  const signUpLimit =
+    services.config.environment === "test" ? 0 : Number(process.env.SIGNUP_RATE_LIMIT ?? 20);
   const signUpWindowMs = Number(process.env.SIGNUP_RATE_WINDOW_MS ?? 60 * 60_000);
   const signInLimiter = new RateLimiter(10, 5 * 60_000);
   // Durable lockout policy. Read at route-construction time, like the sign-up limit, so
@@ -65,22 +66,33 @@ export function authRoutes(services: Services): Hono<AppEnv> {
   const maxEmailFailures = Number(process.env.SIGN_IN_MAX_FAILURES ?? 8);
   const maxAddressFailures = Number(process.env.SIGN_IN_MAX_ADDRESS_FAILURES ?? 40);
   const lockoutWindowMs = Number(process.env.SIGN_IN_LOCKOUT_MS ?? 15 * 60_000);
-  const signUpLimiter =
-    services.config.environment === "test" || signUpLimit <= 0
-      ? null
-      : new RateLimiter(signUpLimit, signUpWindowMs);
-
   app.post("/sign-up/email", async (c) => {
     const address = clientAddress({ get: (name) => c.req.header(name) });
     const userAgent = c.req.header("user-agent");
-    const limited = signUpLimiter?.check(address) ?? { allowed: true, retryAfterSeconds: 0 };
-    if (!limited.allowed) {
-      c.header("Retry-After", String(limited.retryAfterSeconds));
-      throw new HttpError(
-        429,
-        "too_many_signups",
-        "Too many accounts created from this address. Try again later."
-      );
+    // The counter lives in the database, not in the isolate: the in-memory limiter this
+    // replaces forgot its window when the process recycled, so a burst could reset
+    // itself by waiting for a cold start. The rule is the same: per source address,
+    // configurable, off under test where one suite creates many accounts.
+    if (signUpLimit > 0) {
+      const now = services.clock();
+      const { count, resetAt } = await services.store.hitRateLimit({
+        scope: "signup:address",
+        key: address,
+        windowMs: signUpWindowMs,
+        now,
+      });
+      if (count > signUpLimit) {
+        const retryAfterSeconds = Math.max(
+          1,
+          Math.ceil((Date.parse(resetAt) - now.getTime()) / 1000)
+        );
+        c.header("Retry-After", String(retryAfterSeconds));
+        throw new HttpError(
+          429,
+          "too_many_signups",
+          "Too many accounts created from this address. Try again later."
+        );
+      }
     }
 
     const body = await readBody(c, signUpSchema);
