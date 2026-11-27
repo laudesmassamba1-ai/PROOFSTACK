@@ -401,7 +401,7 @@ export function ScanPage(): React.ReactElement {
   const [authMode, setAuthMode] = useState<"account" | "cookie">("account");
   /** Read the site, not just the address. Off by default: it costs the target requests. */
   const [readSite, setReadSite] = useState(false);
-  const [maxPages, setMaxPages] = useState(25);
+  const [maxPages, setMaxPages] = useState(200);
   /** Overrides for sites whose form cannot be read from the page. */
   const [loginEndpoint, setLoginEndpoint] = useState("");
   const [loginVerify, setLoginVerify] = useState("");
@@ -881,7 +881,7 @@ export function ScanPage(): React.ReactElement {
               aria-label={fr ? "Nombre de pages" : "Number of pages"}
               className="scan-crawl-pages"
             >
-              {[10, 25, 50, 100].map((value) => (
+              {[10, 25, 50, 100, 200].map((value) => (
                 <option key={value} value={value}>
                   {value} {fr ? "pages" : "pages"}
                 </option>

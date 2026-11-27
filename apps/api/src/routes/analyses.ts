@@ -424,9 +424,9 @@ export function analysisRoutes(services: Services): Hono<AppEnv> {
           url: target.toString(),
           allowPrivate: false,
           timeoutMs: 15_000,
-          // A site analysis describes the site, not the first ten pages: read the same
-          // surface the audit reads, then measure every answered page from the crawl.
-          crawl: { maxPages: 25, maxDepth: 2 },
+          // A site analysis describes the site, not the first ten pages: read up to the
+          // 200-page ceiling the crawl accepts, then measure every answered page.
+          crawl: { maxPages: 200, maxDepth: 2 },
         });
       } catch (error) {
         throw new HttpError(

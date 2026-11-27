@@ -202,7 +202,7 @@ export function StartPage(): React.ReactElement {
   const [url, setUrl] = useState(() => search.get("target") ?? "");
   const [choice, setChoice] = useState<TargetChoice>("page");
   /** A crawl asks the target for several pages: the budget is chosen, not guessed. */
-  const [maxPages, setMaxPages] = useState(10);
+  const [maxPages, setMaxPages] = useState(200);
   const [scan, setScan] = useState<GuidedScan | null>(null);
   const [preview, setPreview] = useState<ScanPreview | null>(null);
   const [auditId, setAuditId] = useState<string | null>(null);
@@ -396,10 +396,10 @@ export function StartPage(): React.ReactElement {
                 id="start-max-pages"
                 type="number"
                 min={1}
-                max={50}
+                max={200}
                 value={maxPages}
                 onChange={(event) =>
-                  setMaxPages(Math.max(1, Math.min(50, Number(event.target.value) || 1)))
+                  setMaxPages(Math.max(1, Math.min(200, Number(event.target.value) || 1)))
                 }
                 className="app-input start-budget-input"
               />
