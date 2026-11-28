@@ -145,7 +145,7 @@ There is no code path in which a configured command is parsed as a shell string.
   become a large upload.
 - Evidence blobs (screenshots, traces) are never sent: they are referenced by id, not
   inlined.
-- A local provider (Ollama, vLLM) keeps everything on the machine. That is the
+- A self-hosted provider (vLLM, LM Studio) keeps everything on the machine. That is the
   recommended default for anyone handling real data.
 
 ### T2.3 A provider returns malformed tool arguments

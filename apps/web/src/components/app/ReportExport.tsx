@@ -92,7 +92,7 @@ export function ReportExport({
           flash("pdf");
         }}
       >
-        <Printer size={13} aria-hidden /> PDF
+        <Printer size={13} aria-hidden /> {fr ? "Rapport complet HTML" : "Full HTML report"}
       </button>
       <button
         type="button"
@@ -128,14 +128,14 @@ export function ReportExport({
             <Download size={12} aria-hidden />{" "}
             {done === "pdf"
               ? fr
-                ? "fenêtre d'impression ouverte"
-                : "print window opened"
+                ? "rapport HTML téléchargé · Imprimer → PDF"
+                : "HTML report downloaded · Print → PDF"
               : `${stem}.${done}`}
           </>
         ) : fr ? (
-          "Rapport complet : synthèse, structure, pages, graphes, constats"
+          "Rapport complet : synthèse, 5 modules, graphes, couleurs, tableaux, pages, constats, glossaire"
         ) : (
-          "Full report: summary, structure, pages, charts, findings"
+          "Full report: summary, 5 modules, charts, colors, tables, pages, findings, glossary"
         )}
       </span>
     </fieldset>

@@ -99,6 +99,8 @@ interface ChatMessage {
   trace?: AgentTraceStep[];
   /** Reviewer notes as the server reported them, failures included. */
   reviews?: { id: string; label: string; ok: boolean; note: string }[];
+  /** Angles the chosen effort level never ran, so the panel is not read as complete. */
+  skippedReviews?: { id: string; label: string }[];
   error?: string;
 }
 
@@ -160,7 +162,6 @@ const PROVIDER_HINTS: Record<string, { fr: string; en: string }> = {
   groq: { fr: "très rapide, gratuit", en: "very fast, free tier" },
   openrouter: { fr: "tous les modèles", en: "every model" },
   cerebras: { fr: "le plus rapide", en: "the fastest" },
-  ollama: { fr: "100 % local", en: "100% local" },
   anthropic: { fr: "Claude", en: "Claude" },
   google: { fr: "Gemini", en: "Gemini" },
 };
@@ -169,7 +170,6 @@ interface ProviderOption {
   id: string;
   label: string;
   kind: string;
-  keyOptional?: boolean;
 }
 
 /**
@@ -499,9 +499,11 @@ function EffortPicker({
  */
 function ReviewPanel({
   reviews,
+  skipped = [],
   fr,
 }: {
   reviews: { id: string; label: string; ok: boolean; note: string }[];
+  skipped?: { id: string; label: string }[];
   fr: boolean;
 }): React.ReactElement {
   const failed = reviews.filter((review) => !review.ok).length;
@@ -515,6 +517,11 @@ function ReviewPanel({
         {failed > 0 ? (
           <span className="chat-review-warn">{fr ? "· certains ont échoué" : "· some failed"}</span>
         ) : null}
+        {skipped.length > 0 ? (
+          <span className="chat-review-warn">
+            {fr ? `· ${skipped.length} non exécutées` : `· ${skipped.length} not run`}
+          </span>
+        ) : null}
       </summary>
       <ul className="chat-review-list">
         {reviews.map((review) => (
@@ -526,6 +533,16 @@ function ReviewPanel({
                 : fr
                   ? "Ce relecteur n'a pas répondu (fournisseur indisponible). La réponse n'a pas été recoupée sur cet angle."
                   : "This reviewer did not answer (provider unavailable), so that angle was not cross-checked."}
+            </span>
+          </li>
+        ))}
+        {skipped.map((lens) => (
+          <li key={lens.id} className="is-skipped">
+            <span className="chat-review-label">{lens.label}</span>
+            <span className="chat-review-note">
+              {fr
+                ? "Non exécutée : le niveau d'effort choisi ne lance que les premières lentilles, donc cet angle n'a pas été vérifié."
+                : "Not run: the chosen effort level only runs the first lenses, so this angle was not cross-checked."}
             </span>
           </li>
         ))}
@@ -1361,6 +1378,9 @@ export function AiChatPage(): React.ReactElement {
         role: "user" | "assistant";
         content: string;
         trace?: AgentTraceStep[];
+        reviews?: { id: string; label?: string; ok?: boolean; note?: string }[];
+        skippedSubagents?: { id: string; label: string }[];
+        usage?: TurnUsage;
       }[];
       effort: EffortLevel["id"];
     };
@@ -1371,7 +1391,17 @@ export function AiChatPage(): React.ReactElement {
         role: message.role,
         content: message.content,
         trace: message.trace,
-        usage: (message as { usage?: TurnUsage }).usage,
+        usage: message.usage,
+        // Reloaded turns keep the review panel exactly as it was reported, including
+        // the lenses that never ran. Rows stored before this field existed kept only the
+        // reviewers that answered, so a missing `ok` means "answered" for them.
+        reviews: (message.reviews ?? []).map((review) => ({
+          id: review.id,
+          label: review.label ?? review.id,
+          ok: review.ok ?? true,
+          note: review.note ?? "",
+        })),
+        skippedReviews: message.skippedSubagents,
       }))
     );
     // A freshly opened conversation reads newest-first: pin to the bottom.
@@ -1729,6 +1759,7 @@ export function AiChatPage(): React.ReactElement {
         message?: string;
         trace?: AgentTraceStep[];
         subagents?: { id: string; label: string; ok: boolean; note: string }[];
+        skippedSubagents?: { id: string; label: string }[];
         memory?: {
           facts: number;
           added?: { kind: string; text: string; created: boolean }[];
@@ -1759,6 +1790,7 @@ export function AiChatPage(): React.ReactElement {
                 content: data.message ?? "",
                 trace: data.trace,
                 reviews: data.subagents,
+                skippedReviews: data.skippedSubagents,
                 usage: data.usage,
               }
             : item
@@ -2236,7 +2268,11 @@ export function AiChatPage(): React.ReactElement {
                                 />
                               ))}
                             {message.reviews && message.reviews.length > 0 && (
-                              <ReviewPanel reviews={message.reviews} fr={fr} />
+                              <ReviewPanel
+                                reviews={message.reviews}
+                                skipped={message.skippedReviews}
+                                fr={fr}
+                              />
                             )}
                             {message.error ? (
                               <div className="chat-error">{message.error}</div>
@@ -2429,7 +2465,7 @@ export function AiChatPage(): React.ReactElement {
                       value={keyDraft}
                       onChange={(event) => setKeyDraft(event.target.value)}
                       className="app-input font-mono"
-                      placeholder={activePreset === "ollama" ? "ollama" : "sk-…"}
+                      placeholder="sk-…"
                       autoComplete="off"
                       spellCheck={false}
                     />

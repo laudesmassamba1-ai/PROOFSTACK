@@ -96,8 +96,8 @@ proofcore agent "..." --json                # one JSON object, exit code 0/2/3
   provider key stays encrypted on the server. The desktop sidecar refreshes that profile at
   startup and before each turn, so a model connected or changed on the site takes effect in
   the open app without another key prompt or a restart.
-- **A fully local model is still possible**: `proofcore agent --configure` writes
-  `~/.config/proofcore/provider.json` in mode `0600` for providers such as Ollama. That
+- **A self-hosted model is still possible**: `proofcore agent --configure` writes
+  `~/.config/proofcore/provider.json` in mode `0600` for any OpenAI-compatible provider. That
   local configuration is left alone when the account has no model; an account model
   replaces it on the next login.
 - **The account session is separate**: `~/.config/proofcore/session.json`, written by

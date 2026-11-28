@@ -74,6 +74,8 @@ export interface AppConfig {
    * where only a runaway client can reach it.
    */
   aiRateLimitPerHour: number;
+  /** Wall-clock budget for one assistant turn. 25 s by default; raised for slow endpoints. */
+  aiTurnDeadlineMs: number;
   /** Requests per minute allowed to one machine API key (`/v1/*`). */
   machineRateLimitPerMinute: number;
   /** Failed `psk_` authentications per minute allowed from one client address. */
@@ -105,6 +107,13 @@ export interface AppConfig {
 }
 
 export type Env = Record<string, string | undefined>;
+
+/** A positive integer clamped to an explicit range, or the default when unset. */
+function boundedInt(raw: string | undefined, fallback: number, min: number, max: number): number {
+  const value = Number(raw);
+  if (raw === undefined || raw.trim() === "" || !Number.isFinite(value)) return fallback;
+  return Math.min(Math.max(Math.round(value), min), max);
+}
 
 /** A bounded positive integer from the environment, or the default. */
 function positiveInt(raw: string | undefined, fallback: number): number {
@@ -170,6 +179,9 @@ export function readConfig(env: Env): AppConfig {
     supportEmail: env.SUPPORT_EMAIL ?? "support@proofcore.dev",
     cfAccountId: env.CF_ACCOUNT_ID?.trim() || undefined,
     aiRateLimitPerHour: positiveInt(env.AI_RATE_LIMIT_PER_HOUR, 5000),
+    // The turn deadline is a product guarantee (25 s) for hosted providers. An operator
+    // running a slow self-hosted endpoint can raise it explicitly.
+    aiTurnDeadlineMs: boundedInt(env.AI_TURN_DEADLINE_MS, 25_000, 5_000, 1_800_000),
     machineRateLimitPerMinute: positiveInt(env.MACHINE_RATE_LIMIT_PER_MINUTE, 120),
     machineAuthFailuresPerMinute: positiveInt(env.MACHINE_AUTH_FAILURES_PER_MINUTE, 20),
     managedAi: readManagedAi(env),

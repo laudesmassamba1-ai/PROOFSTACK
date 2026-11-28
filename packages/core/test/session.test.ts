@@ -123,6 +123,19 @@ describe("login wall detection", () => {
     const wall = await detectLoginWall(base, { allowPrivate: true });
     expect(wall.detected).toBe(false);
   });
+
+  it("does not treat an ordinary /auth route or a marketing login link as proof of a login wall", async () => {
+    const base = await serve((request, response) => {
+      response.writeHead(200, { "content-type": "text/html" });
+      response.end(
+        request.url === "/auth"
+          ? "<h1>Authentication architecture</h1><p>Public documentation</p>"
+          : '<a href="/auth">Read about account authentication</a><h1>Public home</h1>'
+      );
+    });
+    const wall = await detectLoginWall(base, { allowPrivate: true });
+    expect(wall.detected).toBe(false);
+  });
 });
 describe("cookie jar", () => {
   const jar = new CookieJar();

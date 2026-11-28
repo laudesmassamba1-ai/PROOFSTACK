@@ -2,6 +2,7 @@ import { ArrowRight, Info, Loader2, ScanLine } from "lucide-react";
 import type React from "react";
 import { useCallback, useState } from "react";
 import { Link, useSearchParams } from "react-router";
+import { ReportExport } from "../../components/app/ReportExport.js";
 import { Card, ErrorState } from "../../components/app/ui.js";
 import { useI18n } from "../../i18n/index.js";
 import { PageHeader } from "../../layouts/AppLayout.js";
@@ -69,11 +70,13 @@ interface ScanSite {
 }
 
 interface GuidedScan {
+  id?: string;
   url: string;
   finalUrl: string;
   status: number;
   bytes: number;
   durationMs: number;
+  scannedAt?: string;
   findings: GuidedFinding[];
   /** Absent on a free analysis: module scores would reveal the withheld 40 %. */
   modules?: GuidedModule[];
@@ -509,6 +512,33 @@ export function StartPage(): React.ReactElement {
                     {fr ? "Ouvrir le rapport complet" : "Open the full report"}{" "}
                     <ArrowRight size={14} aria-hidden />
                   </Link>
+                ) : null}
+                {scan ? (
+                  <ReportExport
+                    scan={{
+                      ...scan,
+                      modules: scan.modules ?? [],
+                      scannedAt: scan.scannedAt ?? new Date().toISOString(),
+                      site: scan.site
+                        ? {
+                            ...scan.site,
+                            pages: scan.site.pages.map((page) => ({
+                              ...page,
+                              finalUrl: page.url,
+                              title: null,
+                              bytes: 0,
+                              durationMs: 0,
+                            })),
+                            robots: null,
+                            sitemap: null,
+                            durationMs: 0,
+                            findings: [],
+                          }
+                        : undefined,
+                    }}
+                    controls={{}}
+                    fr={fr}
+                  />
                 ) : null}
               </div>
             </Card>

@@ -2,6 +2,7 @@ import {
   ArrowRight,
   BadgeCheck,
   Brain,
+  Download,
   Globe2,
   MessageSquare,
   PackageOpen,
@@ -68,6 +69,7 @@ type ModuleId = keyof typeof MODULES;
 
 interface ModuleRun {
   id: string;
+  reportId?: string;
   projectId: string;
   projectName: string;
   status: string;
@@ -338,6 +340,7 @@ export function ModulePage() {
                     <th>{t("ws.module.started")}</th>
                     <th>{t("ws.module.duration")}</th>
                     <th>{t("ws.module.passFail")}</th>
+                    <th>{fr ? "Rapport" : "Report"}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -353,6 +356,20 @@ export function ModulePage() {
                         <td className="text-muted">{duration(run.durationMs)}</td>
                         <td className="tabular-nums">
                           {totals.passed} / {totals.failed}
+                        </td>
+                        <td>
+                          {run.reportId ? (
+                            <a
+                              className="inline-flex items-center gap-1 text-primary hover:underline"
+                              href={`/api/v1/reports/${run.reportId}?workspaceId=${workspaceId}&format=download`}
+                              download
+                            >
+                              <Download size={13} />
+                              {fr ? "rapport" : "report"}
+                            </a>
+                          ) : (
+                            <span className="text-muted">—</span>
+                          )}
                         </td>
                       </tr>
                     );

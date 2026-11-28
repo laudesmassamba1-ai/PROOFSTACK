@@ -269,7 +269,7 @@ export const workspaceEn = {
   "ai.model": "Model",
   "ai.apiKey": "API key",
   "ai.keyStored":
-    "Examples: https://api.openai.com/v1, https://generativelanguage.googleapis.com/v1beta/openai, https://openrouter.ai/api/v1, a local Ollama.",
+    "Examples: https://api.openai.com/v1, https://generativelanguage.googleapis.com/v1beta/openai, https://openrouter.ai/api/v1.",
   "ai.needKey": "Add your API key first. The AI is yours; PROOFCORE does not provide one.",
   "ai.empty": "Ask about your quality data.",
   "ai.emptyHint":
@@ -673,7 +673,7 @@ export const workspaceFr: Record<WorkspaceKey, string> = {
   "ai.model": "Modèle",
   "ai.apiKey": "Clé API",
   "ai.keyStored":
-    "Exemples : https://api.openai.com/v1, https://generativelanguage.googleapis.com/v1beta/openai, https://openrouter.ai/api/v1, un Ollama local.",
+    "Exemples : https://api.openai.com/v1, https://generativelanguage.googleapis.com/v1beta/openai, https://openrouter.ai/api/v1.",
   "ai.needKey": "Ajoutez d'abord votre clé API. L'IA est la vôtre ; PROOFCORE n'en fournit pas.",
   "ai.empty": "Posez une question sur vos données qualité.",
   "ai.emptyHint":

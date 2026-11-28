@@ -1,6 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { serve } from "@hono/node-server";
+import { Agent, setGlobalDispatcher } from "undici";
 import { createApp } from "./app.js";
 import { migrate } from "./db/d1.js";
 import { migrationFiles, NodeSqliteDatabase } from "./db/node-sqlite.js";
@@ -15,6 +16,11 @@ import { createLocalBrowserAgent } from "./local-browser-agent.js";
  * product runs with zero paid infrastructure — not as a mock of the production path.
  */
 async function main(): Promise<void> {
+  // The turn deadline (AI_TURN_DEADLINE_MS, default 25 s) is the single time authority
+  // for a model call. The transport must not impose a second, shorter one on a slow
+  // self-hosted endpoint.
+  setGlobalDispatcher(new Agent({ headersTimeout: 0, bodyTimeout: 0 }));
+
   // `:memory:` is a SQLite sentinel, not a path. Resolving it first turns it into
   // `/abs/path/:memory:`, which SQLite happily creates as a *file* — so a run meant to
   // be throwaway silently persists to disk. Keep the sentinel intact.

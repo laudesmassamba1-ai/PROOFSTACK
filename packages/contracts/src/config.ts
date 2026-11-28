@@ -335,7 +335,7 @@ export type SyncConfig = z.infer<typeof syncConfigSchema>;
  *     user configures (filesystem, GitHub, a database) and their tools become
  *     available to PROOFCORE's own agent. Transport is stdio or HTTP.
  *   - **AI providers** — an OpenAI-compatible chat-completions endpoint. Perch, OpenAI,
- *     a local Ollama, vLLM, LM Studio: all speak the same shape, so one adapter covers
+ *     self-hosted vLLM or LM Studio: all speak the same shape, so one adapter covers
  *     them and the base URL is the only thing that changes.
  *   - **CLI agents** — an external coding agent invoked as an argv array (never a shell
  *     string), given a prompt on stdin, expected to answer on stdout. This is how you
@@ -388,8 +388,8 @@ export const aiProviderSchema = z
     /** Stable name used by `--provider`. */
     name: z.string().min(1).max(40),
     /**
-     * OpenAI-compatible chat completions. One shape covers Perch, OpenAI, Ollama,
-     * vLLM and LM Studio; only the base URL and the model name change.
+     * OpenAI-compatible chat completions. One shape covers Perch, OpenAI, vLLM
+     * and LM Studio; only the base URL and the model name change.
      */
     kind: z.enum(["openai-compatible"]).default("openai-compatible"),
     baseUrl: z.string().url(),

@@ -7,6 +7,7 @@ import {
 import {
   ArrowDown,
   ArrowUp,
+  Download,
   MessageSquare,
   Play,
   Plus,
@@ -21,6 +22,7 @@ import { useI18n } from "../../i18n/index.js";
 import { PageHeader } from "../../layouts/AppLayout.js";
 import { type ApiError, apiFetch, clearApiCache } from "../../lib/api.js";
 import { relativeTime } from "../../lib/format.js";
+import { downloadText } from "../../lib/report-export.js";
 import { useSession } from "../../lib/session.js";
 
 /**
@@ -791,6 +793,46 @@ export function FlowStudioPage() {
                     {fr ? "Ouvrir l'analyse" : "Open the analysis"} <RouteIcon size={13} />
                   </Link>
                 ) : null}
+                <button
+                  type="button"
+                  className="app-btn app-btn-sm"
+                  onClick={() => {
+                    const stem = `proofcore-flow-${draft.id ?? "scenario"}`;
+                    const payload = { scenario: draft, report: report.report };
+                    downloadText(
+                      `${stem}.json`,
+                      JSON.stringify(payload, null, 2),
+                      "application/json;charset=utf-8"
+                    );
+                    downloadText(
+                      `${stem}.md`,
+                      [
+                        `# ${draft.name}`,
+                        "",
+                        `- Cible : ${draft.target}`,
+                        `- Étapes : ${report.report.stepsRun} exécutées, ${report.report.stepsSkipped} ignorées`,
+                        "",
+                        ...report.report.findings.flatMap((finding) => [
+                          `## ${finding.status} — ${finding.id}`,
+                          "",
+                          finding.observed,
+                          "",
+                          finding.why,
+                          "",
+                        ]),
+                        ...(report.report.final
+                          ? ["## Page finale", "", report.report.final.url]
+                          : []),
+                      ].join("\n"),
+                      "text/markdown;charset=utf-8"
+                    );
+                  }}
+                  aria-label={
+                    fr ? "Télécharger le rapport du parcours" : "Download the journey report"
+                  }
+                >
+                  <Download size={13} /> {fr ? "Télécharger" : "Download"}
+                </button>
               </header>
               {report.report.final ? (
                 <p className="flow-report-final">

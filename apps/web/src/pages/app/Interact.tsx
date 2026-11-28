@@ -1,9 +1,10 @@
-import { ArrowRight, Loader2, Play, ScanLine } from "lucide-react";
+import { ArrowRight, Download, Loader2, Play, ScanLine } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Link } from "react-router";
 import { Empty, ErrorState, StatusBadge } from "../../components/app/ui.js";
 import { PageHeader } from "../../layouts/AppLayout.js";
 import { type ApiError, apiFetch } from "../../lib/api.js";
+import { downloadText } from "../../lib/report-export.js";
 import { useSession } from "../../lib/session.js";
 
 /**
@@ -142,6 +143,59 @@ export function InteractPage() {
             <section className="mt-5">
               <div className="mb-3 flex flex-wrap items-center gap-3">
                 <h2 className="text-base font-semibold">{report.name}</h2>
+                <button
+                  type="button"
+                  className="app-btn app-btn-sm"
+                  onClick={() => {
+                    const stem = `proofcore-scenario-${report.scenarioId}`;
+                    downloadText(
+                      `${stem}.json`,
+                      JSON.stringify(report, null, 2),
+                      "application/json;charset=utf-8"
+                    );
+                    downloadText(
+                      `${stem}.md`,
+                      [
+                        `# ${report.name}`,
+                        "",
+                        `- Scénario : ${report.scenarioId}`,
+                        `- URL : ${report.url}`,
+                        `- Étapes : ${report.stepsRun} exécutées, ${report.stepsSkipped} ignorées`,
+                        `- Durée : ${report.durationMs} ms`,
+                        ...(report.unavailable
+                          ? ["- Navigateur indisponible : aucun parcours exécuté."]
+                          : []),
+                        "",
+                        ...report.findings.flatMap((finding) => [
+                          `## ${finding.status} — ${finding.id}`,
+                          "",
+                          finding.observed,
+                          "",
+                          finding.why,
+                          ...(finding.reproduce ? ["", finding.reproduce] : []),
+                          "",
+                        ]),
+                        ...(report.final
+                          ? [
+                              "## État final",
+                              "",
+                              `- URL : ${report.final.url}`,
+                              `- Titre : ${report.final.title}`,
+                              `- Titres : ${report.final.headings.join(" · ")}`,
+                              `- Éléments : ${report.final.elementCount}`,
+                              `- Formulaires : ${report.final.formCount}`,
+                            ]
+                          : []),
+                      ].join("\n"),
+                      "text/markdown;charset=utf-8"
+                    );
+                  }}
+                  aria-label={
+                    fr ? "Télécharger les résultats du scénario" : "Download the scenario results"
+                  }
+                >
+                  <Download size={14} /> {fr ? "Télécharger" : "Download"}
+                </button>
                 <StatusBadge
                   status={
                     report.unavailable

@@ -105,7 +105,7 @@ describe("account AI sync", () => {
 
   it("does not erase a local provider when the account has no AI profile", async () => {
     const local = {
-      baseUrl: "http://localhost:11434/v1",
+      baseUrl: "http://localhost:8765/v1",
       model: "local-model",
       apiKey: "local-key",
       source: "local" as const,

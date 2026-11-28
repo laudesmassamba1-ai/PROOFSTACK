@@ -261,7 +261,7 @@ async function fetchFollowing(
 }
 
 const LOGIN_PATH =
-  /(?:^|\/)(?:login|log-in|signin|sign-in|connect|connexion|se-connecter|auth)(?:\/|$)/i;
+  /(?:^|\/)(?:login|log-in|signin|sign-in|connect|connexion|se-connecter)(?:\/|$)/i;
 const LOGIN_LINK_TEXT =
   /\b(?:log\s*in|sign\s*in|connexion|se connecter|s.identifier|login|account|mon compte|espace client|my account|portal|member)\b/i;
 

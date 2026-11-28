@@ -40,6 +40,12 @@ export interface SiteAuditOptions {
   url: string;
   /** Present only when the product is behind a login. */
   login?: Omit<SignInOptions, "fetchImpl" | "timeoutMs">;
+  /**
+   * Headers supplied by the caller, typically a session cookie copied from a browser.
+   * They are sent to the named page and to every crawled page, so a caller that cannot
+   * submit a login form can still audit the whole authenticated surface. Never stored.
+   */
+  headers?: Record<string, string>;
   crawl?: {
     maxPages?: number;
     maxDepth?: number;
@@ -127,6 +133,10 @@ export async function auditSite(options: SiteAuditOptions): Promise<SiteAuditRes
   let loginReport: SignInReport | null = null;
   let cookieHeader: ((url: string) => string | null) | undefined;
   let authorization: string | null = null;
+  const suppliedHeaders = options.headers ?? {};
+  const suppliedCookie = Object.entries(suppliedHeaders).find(
+    ([name]) => name.toLowerCase() === "cookie"
+  )?.[1];
   if (options.login) {
     options.onProgress?.({ step: "login", message: "signing in" });
     const attempt = await signIn({
@@ -158,9 +168,10 @@ export async function auditSite(options: SiteAuditOptions): Promise<SiteAuditRes
 
   /** Headers for a request to `url`: the session cookie and the bearer token, when present. */
   const headersFor = (url: string): Record<string, string> => {
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = { ...suppliedHeaders };
     if (authorization !== null) headers.authorization = authorization;
-    const cookie = cookieHeader?.(url) ?? null;
+    // A fresh session from a successful form login wins over a stale pasted cookie.
+    const cookie = cookieHeader?.(url) ?? suppliedCookie ?? null;
     if (cookie !== null && cookie.length > 0) headers.cookie = cookie;
     return headers;
   };
@@ -183,8 +194,10 @@ export async function auditSite(options: SiteAuditOptions): Promise<SiteAuditRes
     fetchImpl: doFetch,
     guard,
     timeoutMs: options.timeoutMs ?? 12_000,
-    headers: authorization === null ? {} : { authorization },
-    ...(cookieHeader === undefined ? {} : { cookieHeader }),
+    headers: headersFor(start.toString()),
+    ...(cookieHeader === undefined && suppliedCookie === undefined
+      ? {}
+      : { cookieHeader: (url: string) => cookieHeader?.(url) ?? suppliedCookie ?? null }),
     ...(options.crawl?.maxPages === undefined ? {} : { maxPages: options.crawl.maxPages }),
     ...(options.crawl?.maxDepth === undefined ? {} : { maxDepth: options.crawl.maxDepth }),
     ...(options.crawl?.pathPrefix === undefined ? {} : { pathPrefix: options.crawl.pathPrefix }),

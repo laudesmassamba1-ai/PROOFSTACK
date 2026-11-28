@@ -2,6 +2,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Brain,
+  Download,
   FileJson,
   KeyRound,
   MessageSquare,
@@ -349,6 +350,16 @@ export function ProjectDetail() {
                           >
                             <FileJson size={13} /> {fr ? "ouvrir" : "open"}
                           </a>
+                          {run.reportId ? (
+                            <a
+                              className="inline-flex items-center gap-1 text-primary hover:underline"
+                              href={`${API_BASE}/api/v1/reports/${run.reportId}?workspaceId=${workspaceId}&format=download`}
+                              download
+                            >
+                              <Download size={13} />
+                              {fr ? "télécharger" : "download"}
+                            </a>
+                          ) : null}
                         </td>
                       </tr>
                     ))}

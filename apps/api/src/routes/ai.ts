@@ -481,6 +481,31 @@ function toAnthropicMessages(
   return out;
 }
 
+/**
+ * The catalogue as it goes on the wire.
+ *
+ * Every tool stays advertised with its full description, but the argument schema keeps
+ * only what a correct call needs: the required parameters with their type, enum and item
+ * shape. Optional parameters (the executor defaults them) and parameter prose are left
+ * off the wire. Measured on the real catalogue: 20 630 → 15 507 characters, about 1 250
+ * fewer input tokens per call — the difference between 10 900 and 6 700 tokens for a
+ * two-call tool turn on an 8 000 TPM key.
+ */
+function wireParameters(parameters: Record<string, unknown>): Record<string, unknown> {
+  const required = Array.isArray(parameters.required) ? parameters.required.map(String) : [];
+  const properties = (parameters.properties ?? {}) as Record<string, Record<string, unknown>>;
+  const kept: Record<string, unknown> = {};
+  for (const name of required) {
+    const source = properties[name] ?? {};
+    const entry: Record<string, unknown> = {};
+    if (source.type !== undefined) entry.type = source.type;
+    if (source.enum !== undefined) entry.enum = source.enum;
+    if (source.items !== undefined) entry.items = source.items;
+    kept[name] = entry;
+  }
+  return { type: "object", properties: kept, ...(required.length > 0 ? { required } : {}) };
+}
+
 /** Calls the provider once. Throws HttpError with an actionable code on failure. */
 async function callUpstream(input: {
   kind: string;
@@ -520,7 +545,7 @@ async function callUpstream(input: {
               tools: TOOLS.map((tool) => ({
                 name: tool.name,
                 description: tool.description,
-                input_schema: tool.parameters,
+                input_schema: wireParameters(tool.parameters),
               })),
             }),
       }
@@ -540,7 +565,7 @@ async function callUpstream(input: {
                 function: {
                   name: tool.name,
                   description: tool.description,
-                  parameters: tool.parameters,
+                  parameters: wireParameters(tool.parameters),
                 },
               })),
             }),
@@ -1549,7 +1574,6 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
         label: provider.label,
         kind: provider.kind,
         docsUrl: provider.docsUrl ?? null,
-        keyOptional: provider.keyOptional === true,
       })),
     })
   );
@@ -1888,7 +1912,8 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
     // is, not after each tool independently allowed itself one more call.
     const scanBudget = new AnalysisBudget();
     let finalContent = "";
-    const deadline = Date.now() + 25_000;
+    // Configurable for a slow self-hosted endpoint. Hosted deployments keep the 25 s default.
+    const deadline = Date.now() + services.config.aiTurnDeadlineMs;
     for (let turn = 0; turn < tuning.maxTurns; turn += 1) {
       const remaining = deadline - Date.now();
       if (remaining < 3_000) break;
@@ -1900,7 +1925,10 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
         system: prompt,
         messages,
         maxTokens: tuning.maxTokens,
-        timeoutMs: Math.min(remaining, 25_000),
+        timeoutMs: Math.min(remaining, services.config.aiTurnDeadlineMs),
+        // `quick` promises at most one tool, so the call that answers after it does not
+        // re-send 3 900 tokens of catalogue; the tool result is already in the messages.
+        tools: effort === "quick" && trace.length > 0 ? false : undefined,
         usage,
       });
 
@@ -1968,7 +1996,7 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
         timedOut ? 504 : 502,
         timedOut ? "ai_timeout" : "ai_turn_budget",
         timedOut
-          ? `Le modèle n'a pas conclu en 25 secondes (${trace.length} outil(s) appelé(s)). Baisse le niveau d'effort ou précise la question.`
+          ? `Le modèle n'a pas conclu en ${Math.round(services.config.aiTurnDeadlineMs / 1000)} secondes (${trace.length} outil(s) appelé(s)). Baisse le niveau d'effort ou précise la question.`
           : `Le modèle a enchaîné plus de ${tuning.maxTurns} tours d'outils. Précise la question.`
       );
     }
@@ -2012,6 +2040,8 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
               ],
               maxTokens: tuning.lensTokens,
               timeoutMs: 12_000,
+              // A reviewer reads evidence and answers one question; it never calls a tool.
+              tools: false,
               usage,
             });
             return {
@@ -2058,6 +2088,8 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
           ],
           maxTokens: tuning.maxTokens,
           timeoutMs: 20_000,
+          // Synthesis folds text it already has; the catalogue would only cost tokens.
+          tools: false,
           usage,
         });
         if (synthesis.text.trim().length > 0) finalContent = synthesis.text.trim();
@@ -2128,6 +2160,8 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
           ],
           maxTokens: 320,
           timeoutMs: 10_000,
+          // The curator returns JSON facts; it never calls a tool.
+          tools: false,
           usage,
         });
         const json = curated.text.slice(
@@ -2166,8 +2200,22 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
         role: "assistant" as const,
         content: finalContent,
         ...(trace.length > 0 ? { trace } : {}),
-        ...(usable.length > 0
-          ? { reviews: usable.map((review) => ({ id: review.id, note: review.note })) }
+        // The panel is stored whole — failures and lenses this effort never bought
+        // included. A conversation reopened tomorrow must show the same "not run" the
+        // turn showed, not a review that looks complete because the gaps were dropped.
+        ...(reviews.length > 0
+          ? {
+              reviews: reviews.map((review) => ({
+                id: review.id,
+                label: review.label,
+                ok: review.ok,
+                note: review.ok ? review.note.slice(0, 600) : "",
+              })),
+              skippedSubagents: LENSES.slice(lenses.length).map((lens) => ({
+                id: lens.id,
+                label: lens.label,
+              })),
+            }
           : {}),
         // Kept with the message so a reload shows the same cost the answer carried.
         usage: { input: usage.input, output: usage.output },
@@ -2220,6 +2268,13 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
         label: review.label,
         ok: review.ok,
         note: review.ok ? review.note.slice(0, 600) : "",
+      })),
+      // The lenses this effort did not buy. Naming them is the difference between
+      // "2 reviewers answered" and "2 of the 5 angles were checked": omitting them let
+      // the panel read as a complete review when it was a partial one.
+      skippedSubagents: LENSES.slice(lenses.length).map((lens) => ({
+        id: lens.id,
+        label: lens.label,
       })),
       memory: {
         facts: memory.length + remembered.filter((fact) => fact.created).length,

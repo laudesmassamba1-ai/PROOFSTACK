@@ -278,80 +278,78 @@ async function streamScan(
   comparison: ScanComparison | null;
   preview: ScanPreview | null;
 }> {
+  // A site audit can measure 200 pages. A fixed 60 s timer aborted a scan that was
+  // still sending real progress, so the app reported a failure for work the server
+  // completed. The server owns the scan budget; the browser only lets the user stop.
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 60_000);
-  try {
-    const response = await fetch(`${API_BASE}/api/v1/audits/stream`, {
-      method: "POST",
-      headers: { accept: "text/event-stream", "content-type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
-    if (!response.ok) {
-      const text = await response.text();
-      let parsed: { error?: { message?: string; code?: string } } | null = null;
-      try {
-        parsed = JSON.parse(text) as { error?: { message?: string; code?: string } };
-      } catch {
-        // A non-JSON refusal is still a refusal; the status is the reliable part.
-      }
-      throw new ApiError(
-        parsed?.error?.message ?? `HTTP ${response.status}`,
-        response.status,
-        parsed?.error?.code ?? `http_${response.status}`
-      );
+  const response = await fetch(`${API_BASE}/api/v1/audits/stream`, {
+    method: "POST",
+    headers: { accept: "text/event-stream", "content-type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(payload),
+    signal: controller.signal,
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    let parsed: { error?: { message?: string; code?: string } } | null = null;
+    try {
+      parsed = JSON.parse(text) as { error?: { message?: string; code?: string } };
+    } catch {
+      // A non-JSON refusal is still a refusal; the status is the reliable part.
     }
-    if (!response.body) throw new ApiError("The scan stream is unavailable.", 502, "no_stream");
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let final: StreamMessage | null = null;
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const chunks = buffer.split("\n\n");
-      buffer = chunks.pop() ?? "";
-      for (const chunk of chunks) {
-        const line = chunk.split("\n").find((entry) => entry.startsWith("data:"));
-        if (!line) continue;
-        let message: StreamMessage;
-        try {
-          message = JSON.parse(line.slice(5).trim()) as StreamMessage;
-        } catch {
-          continue;
-        }
-        if (message.type === "step" && message.id && message.label) {
-          onStep({
-            id: message.id,
-            label: message.label,
-            status: typeof message.status === "string" ? message.status : "running",
-            ...(message.detail ? { detail: message.detail } : {}),
-          });
-        } else if (message.type === "error") {
-          throw new ApiError(
-            message.message ?? "The scan could not run.",
-            typeof message.status === "number" ? message.status : 502,
-            message.code ?? "scan_failed"
-          );
-        } else if (message.type === "result" && message.audit) {
-          final = message;
-        }
-      }
-    }
-    if (!final?.audit) {
-      throw new ApiError("The scan stream ended without a result.", 502, "stream_incomplete");
-    }
-    return {
-      audit: final.audit,
-      comparison: final.comparison ?? null,
-      preview: final.preview ?? null,
-    };
-  } finally {
-    clearTimeout(timer);
+    throw new ApiError(
+      parsed?.error?.message ?? `HTTP ${response.status}`,
+      response.status,
+      parsed?.error?.code ?? `http_${response.status}`
+    );
   }
+  if (!response.body) throw new ApiError("The scan stream is unavailable.", 502, "no_stream");
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let final: StreamMessage | null = null;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const chunks = buffer.split("\n\n");
+    buffer = chunks.pop() ?? "";
+    for (const chunk of chunks) {
+      const line = chunk.split("\n").find((entry) => entry.startsWith("data:"));
+      if (!line) continue;
+      let message: StreamMessage;
+      try {
+        message = JSON.parse(line.slice(5).trim()) as StreamMessage;
+      } catch {
+        continue;
+      }
+      if (message.type === "step" && message.id && message.label) {
+        onStep({
+          id: message.id,
+          label: message.label,
+          status: typeof message.status === "string" ? message.status : "running",
+          ...(message.detail ? { detail: message.detail } : {}),
+        });
+      } else if (message.type === "error") {
+        throw new ApiError(
+          message.message ?? "The scan could not run.",
+          typeof message.status === "number" ? message.status : 502,
+          message.code ?? "scan_failed"
+        );
+      } else if (message.type === "result" && message.audit) {
+        final = message;
+      }
+    }
+  }
+  if (!final?.audit) {
+    throw new ApiError("The scan stream ended without a result.", 502, "stream_incomplete");
+  }
+  return {
+    audit: final.audit,
+    comparison: final.comparison ?? null,
+    preview: final.preview ?? null,
+  };
 }
 
 interface AuditSummary {
@@ -407,6 +405,8 @@ export function ScanPage(): React.ReactElement {
   const [loginEndpoint, setLoginEndpoint] = useState("");
   const [loginVerify, setLoginVerify] = useState("");
   const [loginUrl, setLoginUrl] = useState("");
+  const [emailField, setEmailField] = useState("");
+  const [passwordField, setPasswordField] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   /** Why the dialog opened: a detected wall, or the site refusing the credentials. */
@@ -693,6 +693,10 @@ export function ScanPage(): React.ReactElement {
       setBusy(false);
       if (wall?.detected) {
         if (wall.loginUrl) setLoginUrl(wall.loginUrl);
+        // The names the real form uses are worth keeping: an unusual field name is a
+        // common reason a login is refused, and the advanced panel can now name it.
+        if (wall.emailField) setEmailField(wall.emailField);
+        if (wall.passwordField) setPasswordField(wall.passwordField);
         setReadSite(true);
         setLoginNotice(
           fr
@@ -744,6 +748,8 @@ export function ScanPage(): React.ReactElement {
                   password,
                   ...(loginEndpoint.trim() ? { endpoint: loginEndpoint.trim() } : {}),
                   ...(loginVerify.trim() ? { verifyUrl: loginVerify.trim() } : {}),
+                  ...(emailField.trim() ? { emailField: emailField.trim() } : {}),
+                  ...(passwordField.trim() ? { passwordField: passwordField.trim() } : {}),
                 },
               }
             : {}),
@@ -1167,6 +1173,34 @@ export function ScanPage(): React.ReactElement {
                             value={loginVerify}
                             onChange={(event) => setLoginVerify(event.target.value)}
                             placeholder="https://ton-site.com/dashboard"
+                            className="app-input"
+                            spellCheck={false}
+                            autoComplete="off"
+                          />
+                        </label>
+                        <label className="scan-field">
+                          <span>
+                            {fr
+                              ? "Nom du champ identifiant (si le formulaire est inhabituel)"
+                              : "Identifier field name (if the form is unusual)"}
+                          </span>
+                          <input
+                            type="text"
+                            value={emailField}
+                            onChange={(event) => setEmailField(event.target.value)}
+                            placeholder="username"
+                            className="app-input"
+                            spellCheck={false}
+                            autoComplete="off"
+                          />
+                        </label>
+                        <label className="scan-field">
+                          <span>{fr ? "Nom du champ mot de passe" : "Password field name"}</span>
+                          <input
+                            type="text"
+                            value={passwordField}
+                            onChange={(event) => setPasswordField(event.target.value)}
+                            placeholder="password"
                             className="app-input"
                             spellCheck={false}
                             autoComplete="off"

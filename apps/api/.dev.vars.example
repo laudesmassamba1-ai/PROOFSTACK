@@ -31,6 +31,9 @@ MANAGED_AI_MODEL=
 MANAGED_AI_API_KEY=
 # Optional: override the provider base URL (self-hosted or OpenAI-compatible gateway).
 MANAGED_AI_BASE_URL=
+# Wall-clock budget for one assistant turn. Default 25000 (the product guarantee).
+# Raise it only for a slow self-hosted OpenAI-compatible endpoint.
+AI_TURN_DEADLINE_MS=
 # Assistant turns allowed per account per rolling month on the managed key. Default 300.
 MANAGED_AI_CALLS_PER_MONTH=300
 

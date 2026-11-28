@@ -67,6 +67,78 @@ function page() {
   };
 }
 
+describe("analysis exports", () => {
+  it("exports every engine finding and the full stored evidence in all three formats", async () => {
+    const who = await signUp("export@example.com");
+    const created = await harness.request("/api/v1/analyses", {
+      method: "POST",
+      headers: { cookie: who.cookie },
+      body: JSON.stringify({
+        ...page(),
+        workspaceId: who.workspaceId,
+        targetType: "WORKFLOW",
+        source: "API",
+        status: "running",
+        engine: "proofcore",
+        engineVersion: "test",
+        environment: "test",
+      }),
+    });
+    expect(created.status).toBe(201);
+    const { analysis } = (await created.json()) as { analysis: { id: string } };
+    const evidence = {
+      moduleRuns: [
+        {
+          module: "flow",
+          status: "COMPLETED",
+          cases: [
+            {
+              id: "flow-checkout",
+              name: "Checkout",
+              status: "BLOCKED",
+              evidence: [{ detail: "no browser available" }],
+            },
+          ],
+        },
+      ],
+      findings: [
+        {
+          id: "flow-checkout",
+          module: "flow",
+          status: "FAILED",
+          detail: "checkout returned HTTP 500",
+        },
+      ],
+    };
+    const finished = await harness.request(
+      `/api/v1/analyses/${analysis.id}?workspaceId=${who.workspaceId}`,
+      {
+        method: "PATCH",
+        headers: { cookie: who.cookie },
+        body: JSON.stringify({ status: "completed", result: evidence }),
+      }
+    );
+    expect(finished.status).toBe(200);
+
+    for (const format of ["json", "html", "md"] as const) {
+      const response = await harness.request(
+        `/api/v1/analyses/${analysis.id}/report?workspaceId=${who.workspaceId}&format=${format}`,
+        { headers: { cookie: who.cookie } }
+      );
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-disposition")).toContain(
+        `proofcore-analysis-${analysis.id}.${format}`
+      );
+      const text = await response.text();
+      // The engine finding uses `detail` and the long status; both must survive.
+      expect(text).toContain("flow-checkout");
+      expect(text).toContain("checkout returned HTTP 500");
+      // The BLOCKED case is not a finding-shaped object, but it is part of the evidence.
+      expect(text).toContain("no browser available");
+    }
+  });
+});
+
 describe("analyses", () => {
   it("creates one analysis and replays a retried create", async () => {
     const who = await signUp("analyst@example.com");

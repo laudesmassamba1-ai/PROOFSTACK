@@ -4,10 +4,10 @@ import { ProofCoreError } from "@proofcore/core";
  * AI provider adapters.
  *
  * One shape: OpenAI-compatible chat completions. That is not a shortcut, it is the
- * de-facto standard — Perch, OpenAI, Ollama, vLLM, LM Studio, Together and most
- * gateways all accept the same request body. Supporting one shape correctly is worth
- * more than supporting five badly, and it means a local model works with no code
- * change: point `baseUrl` at `http://localhost:11434/v1`.
+ * de-facto standard — Perch, OpenAI, vLLM, LM Studio, Together and most gateways all
+ * accept the same request body. Supporting one shape correctly is worth more than
+ * supporting five badly, and it means a self-hosted model works with no code change:
+ * point `baseUrl` at its OpenAI-compatible endpoint.
  *
  * What this file does NOT do: assume a provider supports tool calling. Some do, some
  * do not, and a local model may not. `supportsTools` is a per-provider fact the caller

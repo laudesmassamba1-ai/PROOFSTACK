@@ -195,6 +195,8 @@ async function runScan(
     url: target.toString(),
     allowPrivate: false,
     timeoutMs: 15_000,
+    // A pasted session cookie must follow the crawl too, not just the first page.
+    ...(body.headers === undefined ? {} : { headers: body.headers }),
     ...(body.ownershipToken === undefined ? {} : { ownershipToken: body.ownershipToken }),
     ...(body.login
       ? {

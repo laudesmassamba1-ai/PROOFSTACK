@@ -21,8 +21,6 @@ export interface ProviderDefinition {
   /** Some providers expose the catalogue at a different path. */
   modelsPath?: string;
   docsUrl?: string;
-  /** True when the provider accepts an empty key (local runtime). */
-  keyOptional?: boolean;
 }
 
 export const PROVIDERS: ProviderDefinition[] = [
@@ -51,13 +49,6 @@ export const PROVIDERS: ProviderDefinition[] = [
   },
   { id: "together", label: "Together", kind: "openai", baseUrl: "https://api.together.xyz/v1" },
   { id: "cerebras", label: "Cerebras", kind: "openai", baseUrl: "https://api.cerebras.ai/v1" },
-  {
-    id: "ollama",
-    label: "Ollama (local)",
-    kind: "openai",
-    baseUrl: "http://localhost:11434/v1",
-    keyOptional: true,
-  },
   { id: "custom", label: "Autre (compatible OpenAI)", kind: "openai", baseUrl: "" },
 ];
 

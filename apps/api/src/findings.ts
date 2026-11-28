@@ -3,8 +3,8 @@ import {
   compareFindings,
   type Finding,
   type FindingComparison,
+  type FindingStatus,
   findingKey,
-  type ScanStatus,
 } from "@proofcore/core";
 import type { Services } from "./http/services.js";
 import type { AnalysisRecord } from "./store/app-store.js";
@@ -22,25 +22,65 @@ import type { AnalysisRecord } from "./store/app-store.js";
 interface RawMeasurement {
   module?: unknown;
   id?: unknown;
+  testCaseId?: unknown;
   controlId?: unknown;
   status?: unknown;
   observed?: unknown;
+  /** The engine's own findings carry `detail` where a page scan carries `observed`. */
+  detail?: unknown;
   why?: unknown;
   url?: unknown;
   pages?: unknown;
 }
 
+/**
+ * A stored object shaped like a measurement.
+ *
+ * Two producers exist and both must be readable: the page scanner writes
+ * `{id, status, observed}` with the short statuses, and the engine writes
+ * `{testCaseId, status, detail}` with the long ones. Accepting only the first shape is
+ * how a module run exported an empty report while its evidence sat in the same row.
+ */
 function isMeasurement(value: unknown): value is RawMeasurement {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
-  return (
-    typeof record.status === "string" &&
-    (typeof record.id === "string" || typeof record.controlId === "string") &&
-    typeof record.observed === "string"
-  );
+  if (typeof record.status !== "string") return false;
+  const named =
+    typeof record.id === "string" ||
+    typeof record.controlId === "string" ||
+    typeof record.testCaseId === "string";
+  return named && (typeof record.observed === "string" || typeof record.detail === "string");
 }
 
-const CONTAINER_KEYS = ["findings", "site", "results", "modules", "report", "checks", "controls"];
+const CONTAINER_KEYS = [
+  "findings",
+  "site",
+  "results",
+  "modules",
+  "moduleRuns",
+  "cases",
+  "report",
+  "checks",
+  "controls",
+];
+
+/**
+ * Both vocabularies are reported: the scanner's short one and the engine's long one.
+ * A status outside this set is not a verdict and must not be invented as one.
+ */
+const REPORTABLE_STATUSES = new Set([
+  "PASS",
+  "WARN",
+  "FAIL",
+  "SKIPPED",
+  "PASSED",
+  "WARNING",
+  "FAILED",
+  "BLOCKED",
+  "ERROR",
+  "NOT_APPLICABLE",
+  "NOT_CONFIGURED",
+]);
 
 function collect(value: unknown, out: RawMeasurement[], depth: number): void {
   if (depth > 6 || value === null) return;
@@ -81,10 +121,21 @@ export function findingsFromPayload(
         ? item.controlId
         : typeof item.id === "string"
           ? item.id
-          : "";
+          : typeof item.testCaseId === "string"
+            ? item.testCaseId
+            : "";
     if (!controlId) continue;
-    const status = String(item.status) as ScanStatus;
-    if (!["PASS", "WARN", "FAIL", "SKIPPED"].includes(status)) continue;
+    const status = String(item.status) as FindingStatus;
+    // Every terminal status is kept. BLOCKED, ERROR, NOT_APPLICABLE and NOT_CONFIGURED
+    // are answers too, and dropping them made a report look complete when it had
+    // silently discarded a third of the evidence.
+    if (!REPORTABLE_STATUSES.has(status)) continue;
+    const observed =
+      typeof item.observed === "string"
+        ? item.observed
+        : typeof item.detail === "string"
+          ? item.detail
+          : "";
     const pages = Array.isArray(item.pages)
       ? item.pages.filter((page): page is string => typeof page === "string")
       : undefined;
@@ -94,7 +145,7 @@ export function findingsFromPayload(
       module,
       controlId,
       status,
-      observed: String(item.observed),
+      observed,
       ...(typeof item.why === "string" ? { why: item.why } : {}),
       url,
       detectedAt: analysis.endedAt ?? analysis.startedAt,
@@ -111,7 +162,14 @@ function severityWorse(candidate: Finding, current: Finding): boolean {
   const candidateRank = order[candidate.severity];
   const currentRank = order[current.severity];
   if (candidateRank !== currentRank) return candidateRank > currentRank;
-  const statusRank: Record<string, number> = { FAILED: 0, WARNING: 1 };
+  const statusRank: Record<string, number> = {
+    FAILED: 0,
+    FAIL: 0,
+    ERROR: 0,
+    BLOCKED: 0,
+    WARNING: 1,
+    WARN: 1,
+  };
   return (statusRank[candidate.status] ?? 9) < (statusRank[current.status] ?? 9);
 }
 

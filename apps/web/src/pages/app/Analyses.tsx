@@ -247,7 +247,7 @@ export function AnalysesPage() {
     [list, selected]
   );
   const downloadReport = useCallback(
-    async (format: "html" | "json") => {
+    async (format: "html" | "json" | "md") => {
       if (!session.workspaceId || !selected) return;
       setBusy(true);
       setCompareError(null);
@@ -417,6 +417,19 @@ export function AnalysesPage() {
                         disabled={busy}
                       >
                         JSON
+                      </button>
+                      <button
+                        type="button"
+                        className="app-btn"
+                        onClick={() => void downloadReport("md")}
+                        disabled={busy}
+                        aria-label={
+                          fr
+                            ? "Télécharger le rapport Markdown complet"
+                            : "Download the full Markdown report"
+                        }
+                      >
+                        Markdown
                       </button>
                       <p className="w-full text-right text-[0.68rem] text-muted">{current.id}</p>
                     </div>

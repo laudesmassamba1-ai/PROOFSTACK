@@ -8,7 +8,7 @@
  *                    PROOFCORE consumes MCP servers; their tools become the agent's
  *                    tools, namespaced `mcp__<server>__<tool>`.
  *   - `provider`   — OpenAI-compatible chat completions. One adapter covers Perch,
- *                    OpenAI, Ollama, vLLM and LM Studio; only the base URL changes.
+ *                    OpenAI, vLLM and LM Studio; only the base URL changes.
  *   - `cli-agent`  — hand a prompt to an external agent as an argv array and read its
  *                    answer. argv, never a shell string.
  *

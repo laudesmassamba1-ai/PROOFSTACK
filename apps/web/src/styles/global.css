@@ -8127,6 +8127,12 @@ p {
   border-left-color: #fbbf24;
 }
 
+/* A lens the effort never ran: visibly present, visibly not evidence. */
+.chat-review-list li.is-skipped {
+  border-left-color: var(--border);
+  opacity: 0.72;
+}
+
 .chat-review-label {
   font-family: var(--font-mono);
   font-size: 8.5px;

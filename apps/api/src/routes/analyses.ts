@@ -164,6 +164,14 @@ const REPORT_STATUSES = [
   "NOT_CONFIGURED",
 ] as const;
 
+function safeParseReport(raw: string): unknown {
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return null;
+  }
+}
+
 function escapeReportHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -778,6 +786,29 @@ export function analysisRoutes(services: Services): Hono<AppEnv> {
       ])
     ) as Record<(typeof REPORT_STATUSES)[number], number>;
     const findingCount = findings.length;
+    // The findings are the derived view. The stored payload is the evidence they came
+    // from: keep it verbatim so a reader can check every claim, including the cases that
+    // are not shaped like a finding. No credential is ever part of an analysis payload.
+    let evidence: unknown = null;
+    let evidenceSource: string | null = null;
+    if (analysis.pageAuditId) {
+      const row = await services.store.getPageAudit(workspace.id, analysis.pageAuditId);
+      if (row) {
+        evidence = typeof row.payload === "string" ? safeParseReport(row.payload) : row.payload;
+        evidenceSource = "page_audit";
+      }
+    }
+    if (evidence === null && analysis.runId) {
+      const run = await services.store.getReportByRunId(workspace.id, analysis.runId);
+      if (run) {
+        evidence = run;
+        evidenceSource = "run";
+      }
+    }
+    if (evidence === null && analysis.result !== null) {
+      evidence = analysis.result;
+      evidenceSource = "analysis";
+    }
     const report = {
       product: "PROOFCORE",
       generatedAt: services.clock().toISOString(),
@@ -786,6 +817,8 @@ export function analysisRoutes(services: Services): Hono<AppEnv> {
       statusCounts,
       findingCount,
       coverage: analysis.coverage,
+      evidence,
+      evidenceSource,
     };
     const format = c.req.query("format") ?? "html";
     if (format === "json") {
@@ -797,6 +830,56 @@ export function analysisRoutes(services: Services): Hono<AppEnv> {
       c.header("cache-control", "private, no-store");
       return c.body(JSON.stringify(report, null, 2));
     }
+    if (format === "md") {
+      const lines = [
+        `# PROOFCORE — ${analysis.target}`,
+        "",
+        `- Analyse : ${analysis.id}`,
+        `- Statut : ${analysis.status}`,
+        `- Source : ${analysis.source} · cible : ${analysis.targetType}`,
+        `- Moteur : ${analysis.engine} ${analysis.engineVersion}`,
+        `- Démarré : ${analysis.startedAt}`,
+        `- Généré : ${report.generatedAt}`,
+        "",
+        "## Couverture",
+        "",
+        `- Demandés : ${analysis.coverage.requestedModules.join(", ") || "aucun"}`,
+        `- Applicables : ${analysis.coverage.applicableModules.join(", ") || "aucun"}`,
+        `- Mesurés : ${analysis.coverage.measuredModules.join(", ") || "aucun"}`,
+        ...analysis.coverage.skipped.map(
+          (entry) => `- Non mesuré : ${entry.module} — ${entry.reason}`
+        ),
+        "",
+        "## Constats",
+        "",
+        ...findings.flatMap((finding) => [
+          `### ${finding.status} — ${finding.title}`,
+          "",
+          `- Module : ${finding.module} · contrôle : ${finding.controlId}`,
+          `- Gravité : ${finding.severity} · priorité : ${finding.priority}`,
+          `- Preuve (${finding.evidence.method}) : ${finding.evidence.observed}`,
+          `- Fait : ${finding.explanation.fact}`,
+          `- Impact : ${finding.explanation.impact}`,
+          `- Correction : ${finding.explanation.fix}`,
+          `- Vérification : ${finding.explanation.verification}`,
+          ...(finding.url ? [`- URL : ${finding.url}`] : []),
+          "",
+        ]),
+        "## Preuve brute",
+        "",
+        evidence === null
+          ? "Aucune preuve brute persistée pour cette analyse."
+          : `\`\`\`json\n${JSON.stringify(evidence, null, 2)}\n\`\`\``,
+        "",
+      ];
+      c.header("content-type", "text/markdown; charset=utf-8");
+      c.header(
+        "content-disposition",
+        `attachment; filename="proofcore-analysis-${analysis.id}.md"`
+      );
+      c.header("cache-control", "private, no-store");
+      return c.body(lines.join("\n"));
+    }
     if (format === "pdf") {
       throw new HttpError(
         501,
@@ -805,7 +888,7 @@ export function analysisRoutes(services: Services): Hono<AppEnv> {
       );
     }
     if (format !== "html") {
-      throw new HttpError(400, "unsupported_format", "Formats disponibles : html, json.");
+      throw new HttpError(400, "unsupported_format", "Formats disponibles : html, json, md.");
     }
     const coverageItems = [
       ...analysis.coverage.measuredModules.map((module) => ({ module, status: "MESURÉ" })),
@@ -860,12 +943,18 @@ export function analysisRoutes(services: Services): Hono<AppEnv> {
       )
       .join("");
     const target = escapeReportHtml(analysis.target);
+    // The evidence appendix is the full stored payload, not a summary. It is embedded as
+    // inert text inside <pre>: a target site cannot inject markup into the report.
+    const evidenceBlock =
+      evidence === null
+        ? "<p class='muted'>Aucune preuve brute persistée pour cette analyse.</p>"
+        : `<pre class="evidence">${escapeReportHtml(JSON.stringify(evidence, null, 2))}</pre>`;
     const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rapport PROOFCORE — ${escapeReportHtml(analysis.id)}</title><style>
-:root{color-scheme:light;--paper:#f3f0e8;--ink:#171715;--muted:#68665f;--rule:#d8d4c9}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}main{max-width:1050px;margin:auto;padding:clamp(20px,5vw,64px)}header{border-bottom:2px solid var(--ink);padding-bottom:22px;margin-bottom:26px}.brand{font:700 12px ui-monospace,monospace;letter-spacing:.2em}.eyebrow{font:11px ui-monospace,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}h1{font-size:clamp(32px,6vw,60px);line-height:.98;letter-spacing:-.05em;margin:14px 0}.meta,.muted{color:var(--muted);font-size:13px;overflow-wrap:anywhere}.actions{display:flex;justify-content:flex-end;margin:18px 0}button{border:0;border-radius:999px;background:var(--ink);color:white;padding:10px 16px;font:inherit;cursor:pointer}button:focus-visible{outline:3px solid #0b8379;outline-offset:3px}.overview{display:grid;grid-template-columns:1.2fr 1fr;gap:16px}.panel{border:1px solid var(--rule);background:#faf8f3;padding:18px;margin:12px 0}.panel h2{font-size:18px;margin:0 0 12px}.status-line{display:grid;grid-template-columns:140px 34px 1fr;gap:10px;align-items:center;margin:8px 0;font-size:12px}.track{height:8px;background:#e7e3d9}.track i{display:block;height:100%}.table-wrap{overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:400px}td,th{text-align:left;padding:9px;border-bottom:1px solid var(--rule);font-size:13px;vertical-align:top}th{font:11px ui-monospace,monospace;text-transform:uppercase;color:var(--muted)}.finding{border-top:1px solid var(--rule);padding:17px 0;break-inside:avoid}.finding h3{font-size:18px;margin:8px 0}.finding-kicker{display:flex;gap:14px;font:11px ui-monospace,monospace;text-transform:uppercase;color:var(--muted)}dl{display:grid;grid-template-columns:minmax(100px,160px) 1fr;gap:5px 12px;font-size:13px}dt{font-weight:650}dd{margin:0}.url{font:12px ui-monospace,monospace;overflow-wrap:anywhere;color:var(--muted)}footer{margin-top:28px;border-top:1px solid var(--rule);padding-top:12px;color:var(--muted);font-size:12px}@media(max-width:680px){.overview{grid-template-columns:1fr}.status-line{grid-template-columns:100px 28px 1fr}dl{grid-template-columns:1fr;gap:2px}.finding dd{margin-bottom:8px}}@media print{body{background:white}main{max-width:none;padding:0}.actions{display:none}.panel{break-inside:avoid}.overview{grid-template-columns:1.2fr 1fr}.table-wrap{overflow:visible}}
+:root{color-scheme:light;--paper:#f3f0e8;--ink:#171715;--muted:#68665f;--rule:#d8d4c9}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}main{max-width:1050px;margin:auto;padding:clamp(20px,5vw,64px)}header{border-bottom:2px solid var(--ink);padding-bottom:22px;margin-bottom:26px}.brand{font:700 12px ui-monospace,monospace;letter-spacing:.2em}.eyebrow{font:11px ui-monospace,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}h1{font-size:clamp(32px,6vw,60px);line-height:.98;letter-spacing:-.05em;margin:14px 0}.meta,.muted{color:var(--muted);font-size:13px;overflow-wrap:anywhere}.actions{display:flex;justify-content:flex-end;margin:18px 0}button{border:0;border-radius:999px;background:var(--ink);color:white;padding:10px 16px;font:inherit;cursor:pointer}button:focus-visible{outline:3px solid #0b8379;outline-offset:3px}.overview{display:grid;grid-template-columns:1.2fr 1fr;gap:16px}.panel{border:1px solid var(--rule);background:#faf8f3;padding:18px;margin:12px 0}.panel h2{font-size:18px;margin:0 0 12px}.status-line{display:grid;grid-template-columns:140px 34px 1fr;gap:10px;align-items:center;margin:8px 0;font-size:12px}.track{height:8px;background:#e7e3d9}.track i{display:block;height:100%}.table-wrap{overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:400px}td,th{text-align:left;padding:9px;border-bottom:1px solid var(--rule);font-size:13px;vertical-align:top}th{font:11px ui-monospace,monospace;text-transform:uppercase;color:var(--muted)}.finding{border-top:1px solid var(--rule);padding:17px 0;break-inside:avoid}.finding h3{font-size:18px;margin:8px 0}.finding-kicker{display:flex;gap:14px;font:11px ui-monospace,monospace;text-transform:uppercase;color:var(--muted)}dl{display:grid;grid-template-columns:minmax(100px,160px) 1fr;gap:5px 12px;font-size:13px}dt{font-weight:650}dd{margin:0}.url{font:12px ui-monospace,monospace;overflow-wrap:anywhere;color:var(--muted)}pre.evidence{white-space:pre-wrap;overflow-wrap:anywhere;background:#faf8f3;border:1px solid var(--rule);padding:14px;font:11px/1.5 ui-monospace,monospace;max-height:none}footer{margin-top:28px;border-top:1px solid var(--rule);padding-top:12px;color:var(--muted);font-size:12px}@media(max-width:680px){.overview{grid-template-columns:1fr}.status-line{grid-template-columns:100px 28px 1fr}dl{grid-template-columns:1fr;gap:2px}.finding dd{margin-bottom:8px}}@media print{body{background:white}main{max-width:none;padding:0}.actions{display:none}.panel{break-inside:avoid}.overview{grid-template-columns:1.2fr 1fr}.table-wrap{overflow:visible}}
 </style></head><body><main><header><div class="brand">PROOFCORE</div><p class="eyebrow">Rapport d'analyse · ${escapeReportHtml(analysis.status)} · couverture ${Math.round(coverageRatio(analysis.coverage) * 100)}%</p><h1>Résultats du diagnostic</h1><p class="meta">${target}<br>ID ${escapeReportHtml(analysis.id)} · ${escapeReportHtml(analysis.source)} · ${escapeReportHtml(analysis.targetType)} · ${escapeReportHtml(analysis.engine)} ${escapeReportHtml(analysis.engineVersion)}<br>Démarré ${escapeReportHtml(analysis.startedAt)}${analysis.durationMs === null ? "" : ` · ${Math.round(analysis.durationMs / 1000)} s`} · Généré ${escapeReportHtml(report.generatedAt)}</p></header><div class="actions"><button type="button" onclick="window.print()">Imprimer / enregistrer en PDF</button></div>
 <div class="overview"><section class="panel"><h2>Répartition des constats · ${findingCount} total</h2>${bars || "<p class='muted'>Aucun constat enregistré pour cette analyse.</p>"}</section><section class="panel"><h2>Constats par module</h2><div class="table-wrap"><table><thead><tr><th>Module</th><th>Constats</th><th>Échecs / erreurs</th></tr></thead><tbody>${moduleRows || "<tr><td colspan='3'>Aucun constat</td></tr>"}</tbody></table></div></section></div>
 <section class="panel"><h2>Périmètre et couverture</h2><p class="muted">Demandés : ${analysis.coverage.requestedModules.map(escapeReportHtml).join(", ") || "aucun"} · Applicables : ${analysis.coverage.applicableModules.map(escapeReportHtml).join(", ") || "aucun"} · Mesurés : ${analysis.coverage.measuredModules.map(escapeReportHtml).join(", ") || "aucun"}</p>${analysis.coverage.pages ? `<p class="muted">Pages découvertes : ${analysis.coverage.pages.discovered} · pages analysées : ${analysis.coverage.pages.scanned}</p>` : ""}<div class="table-wrap"><table><thead><tr><th>Module</th><th>État observé</th></tr></thead><tbody>${coverageRows || "<tr><td colspan='2'>Pas de détail de couverture</td></tr>"}</tbody></table></div></section>
-<section class="panel"><h2>Constats et actions</h2>${findingRows || "<p class='muted'>Aucun constat n'a été enregistré. Cela ne signifie pas que des contrôles non exécutés ont réussi.</p>"}</section><footer>Document généré à partir des données persistées de cette analyse. Les éléments non mesurés ne sont pas présentés comme réussis.</footer></main></body></html>`;
+<section class="panel"><h2>Constats et actions</h2>${findingRows || "<p class='muted'>Aucun constat n'a été enregistré. Cela ne signifie pas que des contrôles non exécutés ont réussi.</p>"}</section><section class="panel"><h2>Preuve brute (${escapeReportHtml(evidenceSource ?? "aucune")})</h2>${evidenceBlock}</section><footer>Document généré à partir des données persistées de cette analyse. Les éléments non mesurés ne sont pas présentés comme réussis.</footer></main></body></html>`;
     c.header(
       "content-disposition",
       `attachment; filename="proofcore-analysis-${analysis.id}.html"`

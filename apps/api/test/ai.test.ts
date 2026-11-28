@@ -420,6 +420,26 @@ describe("anthropic wire format", () => {
     expect(payload.tools?.[0]?.name).toBe("workspace_overview");
     expect(payload.tools?.[0]).toHaveProperty("input_schema");
     expect(payload.max_tokens).toBe(500);
+
+    // The wire schema keeps the required arguments (with their enum) and drops the
+    // optional ones and the parameter prose, which the executor defaults or explains.
+    const moduleConfig = payload.tools?.find((tool) => tool.name === "module_config") as
+      | {
+          input_schema?: { properties?: Record<string, { enum?: unknown }>; required?: string[] };
+        }
+      | undefined;
+    expect(moduleConfig?.input_schema?.required).toEqual(["projectId", "module"]);
+    expect(Object.keys(moduleConfig?.input_schema?.properties ?? {}).sort()).toEqual([
+      "module",
+      "projectId",
+    ]);
+    expect(moduleConfig?.input_schema?.properties?.module?.enum).toEqual([
+      "world",
+      "flow",
+      "exit",
+      "fail",
+      "clean",
+    ]);
   });
 });
 
@@ -517,11 +537,86 @@ describe("ai chat", () => {
     expect(loadedBody.messages).toHaveLength(2);
     expect(JSON.stringify(loadedBody.messages[1])).toContain("**Shop**");
 
+    // The review panel survives the reload, gaps included: deep buys 4 of 5 lenses.
+    const persistedAssistant = loadedBody.messages[1] as {
+      reviews?: { id: string; label?: string; ok?: boolean }[];
+      skippedSubagents?: { id: string; label: string }[];
+    };
+    expect(persistedAssistant.skippedSubagents?.map((lens) => lens.id)).toEqual(["reader"]);
+    // Failures are stored too, with their label, so the reopened panel still names them.
+    expect(
+      persistedAssistant.reviews?.every(
+        (review) => Boolean(review.label) && typeof review.ok === "boolean"
+      )
+    ).toBe(true);
+
     // The effort reached the upstream.
     const firstBody = JSON.parse(upstreamState.requests[0]?.body ?? "{}") as {
       max_tokens?: number;
     };
     expect(firstBody.max_tokens).toBe(1600); // deep
+  });
+
+  it("stops re-sending the tool catalogue in quick mode once a tool has answered", async () => {
+    const { request, signUp } = harness;
+    const { cookie, workspaceId } = await signUp("ai-quick-wire@example.com");
+    const profile = await request("/api/v1/ai/profile", {
+      method: "PUT",
+      cookie,
+      body: JSON.stringify({
+        providerId: "custom",
+        baseUrl: upstreamBase,
+        model: "test-model",
+        apiKey: "sk-quick-key-123",
+      }),
+    });
+    expect(profile.status).toBe(200);
+
+    // Only the turn's own calls matter here; the profile check already used the upstream.
+    upstreamState.calls.length = 0;
+    upstreamState.respond = (attempt) =>
+      attempt === 1
+        ? {
+            status: 200,
+            body: {
+              choices: [
+                {
+                  message: {
+                    role: "assistant",
+                    content: null,
+                    tool_calls: [
+                      {
+                        id: "call_quick_1",
+                        type: "function",
+                        function: { name: "workspace_overview", arguments: "{}" },
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          }
+        : {
+            status: 200,
+            body: { choices: [{ message: { role: "assistant", content: "One workspace." } }] },
+          };
+
+    const chat = await request("/api/v1/ai/chat", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({ workspaceId, message: "What do I have?", effort: "quick" }),
+    });
+    expect(chat.status, await chat.clone().text()).toBe(200);
+
+    const posts = upstreamState.calls
+      .filter((entry) => entry.method === "POST")
+      .map((entry) => JSON.parse(entry.body) as { tools?: unknown[] });
+    expect(posts.length).toBeGreaterThanOrEqual(2);
+    expect(posts[0]?.tools?.length).toBeGreaterThan(0);
+    // Quick buys one tool; the answering call does not need the catalogue again.
+    expect(posts[1]?.tools).toBeUndefined();
+    // Reviewers, synthesis and the memory curator answer in text or JSON: no catalogue.
+    expect(posts.slice(1).every((post) => post.tools === undefined)).toBe(true);
   });
 
   it("validates a FLOW scenario with the editor's rules and saves nothing", async () => {
@@ -2125,10 +2220,26 @@ describe("ai memory and sub-agents", () => {
     const body = (await response.json()) as {
       message: string;
       subagents: { id: string; ok: boolean }[];
+      skippedSubagents: { id: string; label: string }[];
     };
     expect(body.message).toBe("Answer.");
     expect(body.subagents).toHaveLength(3); // balanced
     expect(body.subagents.filter((agent) => !agent.ok)).toHaveLength(2);
+    // The two angles balanced does not buy are named, so the panel cannot read as a
+    // full review when only three of five lenses ran.
+    expect(body.skippedSubagents.map((lens) => lens.id)).toEqual(["coverage", "reader"]);
+    expect(body.skippedSubagents.every((lens) => lens.label.length > 0)).toBe(true);
+  });
+
+  it("lets an operator raise the turn deadline for a slow local model, within bounds", async () => {
+    const slow = await bootstrap({ ...ENV, AI_TURN_DEADLINE_MS: "600000" });
+    expect(slow.services.config.aiTurnDeadlineMs).toBe(600_000);
+
+    const tooHigh = await bootstrap({ ...ENV, AI_TURN_DEADLINE_MS: "99999999" });
+    expect(tooHigh.services.config.aiTurnDeadlineMs).toBe(1_800_000);
+
+    const fallback = await bootstrap({ ...ENV });
+    expect(fallback.services.config.aiTurnDeadlineMs).toBe(25_000);
   });
 
   it("counts a module-reading turn as an audit once, and a plain question as none", async () => {

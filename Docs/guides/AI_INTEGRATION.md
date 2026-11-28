@@ -20,7 +20,7 @@ all three.
 | Shape            | What it is                                                                                                                            | What it is for                                                  |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
 | **MCP servers**  | PROOFCORE acts as a Model Context Protocol **client**. It connects to servers you configure and their tools become the agent's tools. | Give the agent hands: read a repo, query a database, open a PR. |
-| **AI providers** | An OpenAI-compatible chat-completions endpoint.                                                                                       | Give the agent a brain: Perch, OpenAI, Ollama, vLLM, LM Studio. |
+| **AI providers** | An OpenAI-compatible chat-completions endpoint.                                                                                       | Give the agent a brain: Perch, OpenAI, vLLM, LM Studio.         |
 | **CLI agents**   | An external agent invoked as an argv array, prompt on stdin.                                                                          | Hand a failing run to the agent your team already uses.         |
 
 The distinction matters. An MCP server gives the agent _capabilities_; a provider gives
@@ -52,8 +52,8 @@ const config: ProofCoreConfig = {
     providers: [
       {
         name: "local",
-        baseUrl: "http://localhost:11434", // Ollama; /v1 is added automatically
-        model: "qwen3-coder:30b",
+        baseUrl: "https://api.openai.com/v1",
+        model: "gpt-4.1",
         default: true,
       },
       {
@@ -86,7 +86,7 @@ const config: ProofCoreConfig = {
     agents: [
       {
         name: "local-coder",
-        command: ["ollama", "run", "qwen3-coder:30b"],
+        command: ["codex", "exec", "-"],
         promptDelivery: "stdin",
         allowFileWrites: false,
       },
@@ -290,13 +290,12 @@ One adapter covers every OpenAI-compatible endpoint. Only `baseUrl` and `model` 
 | ----------------- | ----------------------------- | ------------------ |
 | Perch             | `https://api.perchai.app/v1`  | `PERCH_API_KEY`    |
 | OpenAI            | `https://api.openai.com/v1`   | `OPENAI_API_KEY`   |
-| Ollama (local)    | `http://localhost:11434`      | _(none)_           |
 | vLLM (local)      | `http://localhost:8000/v1`    | _(none)_           |
 | LM Studio (local) | `http://localhost:1234/v1`    | _(none)_           |
 | Together          | `https://api.together.xyz/v1` | `TOGETHER_API_KEY` |
 
-A local model needs no key and no account. That is the cheapest way to try this: run
-Ollama, point `baseUrl` at it, and the agent works with no external service.
+A self-hosted OpenAI-compatible endpoint needs no third-party account. Point `baseUrl`
+at it and the agent works without an external provider.
 
 ### Tool calling is a per-provider fact
 
@@ -311,7 +310,7 @@ loop that never calls anything.
 ```json
 {
   "name": "local-coder",
-  "command": ["ollama", "run", "qwen3-coder:30b"],
+  "command": ["codex", "exec", "-"],
   "promptDelivery": "stdin",
   "allowFileWrites": false,
   "timeoutMs": 300000

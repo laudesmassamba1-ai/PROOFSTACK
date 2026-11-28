@@ -205,7 +205,7 @@ describe("provider resolution", () => {
       sessionCookie: "ps_session=account-cookie",
     });
     const provider = await resolveProvider({
-      baseUrl: "http://localhost:11434/v1",
+      baseUrl: "http://localhost:8765/v1",
       model: "local",
       apiKey: "local-key",
     });

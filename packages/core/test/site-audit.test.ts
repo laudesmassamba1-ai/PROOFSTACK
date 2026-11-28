@@ -162,6 +162,20 @@ describe("auditing a site behind a login", () => {
     expect(result.scores.some((score) => score.verdict === "fail")).toBe(true);
   });
 
+  it("carries a supplied session cookie through the whole crawl", async () => {
+    const base = await serve();
+    const result = await auditSite({
+      url: `${base}/dashboard`,
+      allowPrivate: true,
+      crawl: { maxPages: 10, maxDepth: 2 },
+      headers: { cookie: "sid=ok" },
+    });
+    const paths = result.site.pages.map((page) => new URL(page.url).pathname);
+    expect(paths).toContain("/dashboard");
+    expect(paths).toContain("/settings");
+    expect(result.login).toBeNull();
+  });
+
   it("refuses to call the scan signed in when the password is wrong, and says why", async () => {
     const base = await serve();
     const result = await auditSite({

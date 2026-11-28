@@ -156,7 +156,7 @@ function controlFor(
 
 /** A Markdown table cell: one line, pipes escaped, bounded. */
 const MD_PIPE = `${String.fromCharCode(92)}|`;
-function mdCell(value: string, max = 220): string {
+function mdCell(value: string, max = Number.POSITIVE_INFINITY): string {
   return value.split("|").join(MD_PIPE).replace(/\r?\n/g, " ").slice(0, max);
 }
 
@@ -515,8 +515,7 @@ export function buildReportMarkdown(
       out.push("");
       out.push(`| URL | ${fr ? "Raison" : "Reason"} |`);
       out.push("| --- | --- |");
-      for (const sk of site.skipped.slice(0, 40))
-        out.push(`| ${mdCell(sk.url, 100)} | ${mdCell(sk.reason)} |`);
+      for (const sk of site.skipped) out.push(`| ${mdCell(sk.url, 100)} | ${mdCell(sk.reason)} |`);
       out.push("");
     }
     if (site.findings.length) {
@@ -524,7 +523,7 @@ export function buildReportMarkdown(
       out.push("");
       for (const f of site.findings) {
         out.push(
-          `- **[${normStatus(f.status).toUpperCase()}]** ${t(f.module)} — ${f.id} : ${mdCell(f.observed, 240)} — ${mdCell(f.why, 240)}${f.pages.length ? ` (${f.pages.length} ${fr ? "pages" : "pages"})` : ""}`
+          `- **[${normStatus(f.status).toUpperCase()}]** ${t(f.module)} — ${f.id} : ${mdCell(f.observed)} — ${mdCell(f.why)}${f.pages.length ? ` (${f.pages.length} ${fr ? "pages" : "pages"})` : ""}`
         );
       }
       out.push("");
@@ -616,7 +615,7 @@ export function buildReportMarkdown(
         ? ` <br>_${fr ? "Vérification" : "Verification"} : ${mdCell(copy.verify, 160)}_`
         : "";
       out.push(
-        `| ${f.id} — ${mdCell(title, 100)} | ${labelFor(f.status)} | ${mdCell(f.observed, 160)} | ${mdCell(copy?.objective ?? f.why, 180)}${cons}${fix}${verify} |`
+        `| ${f.id} — ${mdCell(title, 100)} | ${labelFor(f.status)} | ${mdCell(f.observed)} | ${mdCell(copy?.objective ?? f.why)}${cons}${fix}${verify} |`
       );
     }
     out.push("");
@@ -673,7 +672,7 @@ export function buildReportMarkdown(
       for (const f of nonPass) {
         const copy = controlFor(controls, f.module, f.id);
         out.push(
-          `| ${f.id} — ${mdCell(copy?.title ?? f.id, 100)} | ${labelFor(f.status)} | ${mdCell(f.observed, 200)} | ${mdCell(copy?.objective ?? f.why, 220)} |`
+          `| ${f.id} — ${mdCell(copy?.title ?? f.id, 100)} | ${labelFor(f.status)} | ${mdCell(f.observed)} | ${mdCell(copy?.objective ?? f.why)} |`
         );
       }
       out.push("");
@@ -1151,9 +1150,9 @@ function pageDetailsHtml(
             "</td><td>" +
             statusChip(f.status, fr) +
             "</td><td>" +
-            escapeHtml(f.observed.slice(0, 230)) +
+            escapeHtml(f.observed) +
             "</td><td>" +
-            escapeHtml((copy?.objective ?? f.why).slice(0, 230)) +
+            escapeHtml(copy?.objective ?? f.why) +
             "</td></tr>"
           );
         })
@@ -1636,23 +1635,23 @@ export function buildReportHtml(
           const title = copy?.title ? escapeHtml(copy.title) : escapeHtml(f.id);
           const lines = [
             `<p class="f-head"><span class="mono">${escapeHtml(f.id)}</span> ${title} ${statusChip(f.status, fr)}</p>`,
-            `<p class="f-row"><b>${fr ? "Observé" : "Seen"}</b> ${escapeHtml(f.observed.slice(0, 220))}</p>`,
+            `<p class="f-row"><b>${fr ? "Observé" : "Seen"}</b> ${escapeHtml(f.observed)}</p>`,
             copy?.objective
-              ? `<p class="f-row"><b>${fr ? "Ce que ça veut dire" : "What it means"}</b> ${escapeHtml(copy.objective.slice(0, 260))}</p>`
+              ? `<p class="f-row"><b>${fr ? "Ce que ça veut dire" : "What it means"}</b> ${escapeHtml(copy.objective)}</p>`
               : f.why
-                ? `<p class="f-row"><b>${fr ? "Ce que ça veut dire" : "What it means"}</b> ${escapeHtml(f.why.slice(0, 260))}</p>`
+                ? `<p class="f-row"><b>${fr ? "Ce que ça veut dire" : "What it means"}</b> ${escapeHtml(f.why)}</p>`
                 : "",
             copy?.consequence
-              ? `<p class="f-row"><b>${fr ? "Conséquence" : "Consequence"}</b> ${escapeHtml(copy.consequence.slice(0, 260))}</p>`
+              ? `<p class="f-row"><b>${fr ? "Conséquence" : "Consequence"}</b> ${escapeHtml(copy.consequence)}</p>`
               : "",
             copy?.fix
-              ? `<p class="f-row f-fix"><b>${fr ? "✎ Solution" : "✎ Fix"}</b> ${escapeHtml(copy.fix.slice(0, 400))}</p>`
+              ? `<p class="f-row f-fix"><b>${fr ? "✎ Solution" : "✎ Fix"}</b> ${escapeHtml(copy.fix)}</p>`
               : "",
             copy?.fixes && copy.fixes.length > 0 && copy.fixes[0]
-              ? `<p class="f-row"><b>${fr ? "Exemple de code" : "Code example"}</b></p><pre class="f-code">${escapeHtml((copy.fixes[0].code ?? "").slice(0, 300))}</pre><p class="f-tag">${escapeHtml(copy.fixes[0].stack ?? "")}</p>`
+              ? `<p class="f-row"><b>${fr ? "Exemple de code" : "Code example"}</b></p><pre class="f-code">${escapeHtml(copy.fixes[0].code ?? "")}</pre><p class="f-tag">${escapeHtml(copy.fixes[0].stack ?? "")}</p>`
               : "",
             copy?.verify
-              ? `<p class="f-row"><b>${fr ? "Comment vérifier" : "How to verify"}</b> ${escapeHtml(copy.verify.slice(0, 220))}</p>`
+              ? `<p class="f-row"><b>${fr ? "Comment vérifier" : "How to verify"}</b> ${escapeHtml(copy.verify)}</p>`
               : "",
             copy
               ? `<p class="f-tag">${fr ? "Complexité" : "Complexity"} ${escapeHtml(String(copy.complexity ?? ""))} · ${fr ? "Risque" : "Risk"} ${escapeHtml(String(copy.risk ?? ""))}</p>`
@@ -1708,7 +1707,6 @@ export function buildReportHtml(
     ${
       site.skipped.length
         ? `<h3>${fr ? "Pages ignorées" : "Skipped pages"}</h3><table><thead><tr><th>URL</th><th>${fr ? "Raison" : "Reason"}</th></tr></thead><tbody>${site.skipped
-            .slice(0, 30)
             .map(
               (sk) =>
                 `<tr><td class="mono">${escapeHtml(sk.url.slice(0, 70))}</td><td>${escapeHtml(sk.reason)}</td></tr>`
@@ -1861,6 +1859,9 @@ export function openPrintReport(
   fr: boolean
 ): void {
   const html = buildReportHtml(result, controls, fr);
+  // The complete document is downloaded first: a print dialog is not a deliverable,
+  // and a blocked popup used to leave the visitor with nothing at all.
+  downloadText(`${reportFileStem(result)}-full.html`, html, "text/html;charset=utf-8");
   const win = window.open("", "_blank");
   if (!win) {
     window.alert(

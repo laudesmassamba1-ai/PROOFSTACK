@@ -81,7 +81,7 @@ ai: {
 ```
 
 Works with any OpenAI-compatible endpoint (OpenAI, Gemini compatibility mode,
-OpenRouter, a local Ollama). Commands:
+OpenRouter, a self-hosted vLLM). Commands:
 
 ```bash
 proofcore ai status    # what is configured, whether the key is present
@@ -155,4 +155,4 @@ Le modèle enregistré dans l’espace `/app/ai` n’a pas à être reconnecté 
 La clé du fournisseur **ne quitte jamais le serveur**. Le relais déchiffre la clé stockée
 côté site uniquement pour l’appel amont, et refuse de laisser le client choisir un autre
 modèle ou fournisseur. `proofcore agent --configure` reste disponible pour un modèle
-local (Ollama, par exemple) qui n’est pas enregistré sur le compte.
+auto-hébergé (vLLM, par exemple) qui n’est pas enregistré sur le compte.

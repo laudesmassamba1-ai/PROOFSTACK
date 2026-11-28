@@ -26,6 +26,7 @@
     "@proofcore/module-flow": "workspace:*",
     "@proofcore/module-world": "workspace:*",
     "hono": "4.13.19",
+    "undici": "^8.13.1",
     "zod": "4.6.7"
   },
   "devDependencies": {
