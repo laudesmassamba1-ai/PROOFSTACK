@@ -49,6 +49,27 @@ export interface PageRenderer {
     /** How it was rendered, written into the report so nothing is claimed silently. */
     basis: "rendered_dom";
   } | null>;
+  /**
+   * Sign in through the page itself, in the browser.
+   *
+   * A form with no `action` and no `method` is not an HTTP form: it is a JavaScript form
+   * (Firebase, Supabase, a custom fetch). Posting it as HTML cannot work, and reporting a
+   * refusal would be wrong — the credentials were never submitted. A renderer that can
+   * drive a browser implements this; the others leave it out and the engine says so.
+   */
+  signIn?(input: {
+    url: string;
+    email: string;
+    password: string;
+    emailField?: string;
+    passwordField?: string;
+    timeoutMs?: number;
+  }): Promise<{
+    ok: boolean;
+    landedOn: string | null;
+    cookie: string | null;
+    reason: string | null;
+  }>;
 }
 
 /** True when the response is a client-rendered shell whose DOM needs a browser. */
@@ -382,9 +403,28 @@ export async function detectLoginWall(
         const found = await fetchFollowing(next, options, 3);
         const foundBody = await readBody(found.response, 1_500_000);
         const foundType = found.response.headers.get("content-type") ?? "";
-        const foundHtml =
+        let foundHtml =
           /html|xml/i.test(foundType) || /^\s*</.test(foundBody.text) ? foundBody.text : "";
-        const form = foundHtml ? loginWallFromHtml(foundHtml, found.url.toString()) : null;
+        let foundPage = found.url.toString();
+        // A login link on a SPA serves the same shell for every route: its form exists
+        // only after JavaScript runs. Render the link target before concluding there is
+        // no wall, otherwise the credential popup never opens for those sites.
+        if (foundHtml && options.renderer && isClientShell(foundHtml)) {
+          try {
+            const view = await options.renderer.render({
+              url: foundPage,
+              headers: options.headers,
+              timeoutMs: options.timeoutMs,
+            });
+            if (view && view.html.length > foundHtml.length) {
+              foundHtml = view.html;
+              foundPage = view.finalUrl;
+            }
+          } catch {
+            // An unrendered link is not a wall; the server response stays authoritative.
+          }
+        }
+        const form = foundHtml ? loginWallFromHtml(foundHtml, foundPage) : null;
         if (form) return form;
         if (
           candidate === null &&
@@ -991,6 +1031,43 @@ async function performLogin(
   result: ScanLoginResult;
   cookie: string | null;
 }> {
+  // A JavaScript form has no HTTP action: submitting it as HTML would never reach the
+  // site's auth code. When the renderer can drive a browser, use it and keep the real
+  // outcome; otherwise the HTTP ladder reports exactly why it could not sign in.
+  if (options.renderer?.signIn) {
+    try {
+      const browserAttempt = await options.renderer.signIn({
+        url: login.url,
+        email: login.email,
+        password: login.password,
+        ...(login.emailField === undefined ? {} : { emailField: login.emailField }),
+        ...(login.passwordField === undefined ? {} : { passwordField: login.passwordField }),
+        timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+      });
+      return {
+        result: {
+          attempted: true,
+          ok: browserAttempt.ok,
+          status: null,
+          ...(browserAttempt.ok
+            ? {}
+            : { reason: browserAttempt.reason ?? "the browser sign-in failed" }),
+        },
+        cookie: browserAttempt.cookie,
+      };
+    } catch (error) {
+      return {
+        result: {
+          attempted: true,
+          ok: false,
+          status: null,
+          reason: `browser sign-in failed: ${error instanceof Error ? error.message : String(error)}`,
+        },
+        cookie: null,
+      };
+    }
+  }
+
   const attempt = await signIn({
     // `url` is the endpoint this option has always meant; giving it as both the endpoint and
     // the page lets discovery run when the address happens to be a form page.

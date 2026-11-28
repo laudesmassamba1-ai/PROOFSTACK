@@ -110,6 +110,57 @@ describe("browser rendering for client-side sites", () => {
     expect(wall.loginUrl).toContain("/login");
   });
 
+  it("renders the login link target when a SPA serves a shell for /login", async () => {
+    const base = await serve();
+    const calls: string[] = [];
+    // Every server route is the same shell; only the renderer knows which URL shows a form.
+    const wall = await detectLoginWall(`${base}/`, {
+      allowPrivate: true,
+      timeoutMs: 10_000,
+      renderer: {
+        async render(input) {
+          calls.push(input.url);
+          if (input.url.endsWith("/login")) {
+            return {
+              html: RENDERED,
+              finalUrl: input.url,
+              status: 200,
+              basis: "rendered_dom",
+            };
+          }
+          return {
+            html: `<!doctype html><html><body><iframe src="/home.html"></iframe><script src="/app.js"></script></body></html>`,
+            finalUrl: input.url,
+            status: 200,
+            basis: "rendered_dom",
+          };
+        },
+      },
+    });
+    expect(calls.some((url) => url.endsWith("/login"))).toBe(true);
+    expect(wall.detected).toBe(true);
+    expect(wall.loginUrl).toContain("/login");
+  });
+
+  it("uses the browser sign-in path when the renderer provides one", async () => {
+    const base = await serve();
+    let signed = false;
+    const result = await scanPage(`${base}/`, {
+      allowPrivate: true,
+      renderer: {
+        ...renderer(SHELL, []),
+        async signIn(input) {
+          signed = true;
+          expect(input.email).toBe("user@example.com");
+          return { ok: true, landedOn: `${base}/dashboard`, cookie: "sid=ok", reason: null };
+        },
+      },
+      login: { url: `${base}/login`, email: "user@example.com", password: "secret" },
+    });
+    expect(signed).toBe(true);
+    expect(result.login?.ok).toBe(true);
+  });
+
   it("keeps the server response when no renderer is available", async () => {
     const base = await serve();
     const result = await scanPage(`${base}/`, { allowPrivate: true });

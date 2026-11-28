@@ -256,11 +256,19 @@ function fieldList(formHtml: string): LoginField[] {
   const fields: LoginField[] = [];
   for (const match of formHtml.matchAll(pattern)) {
     const attrs = match[2] ?? "";
-    const name = attributeOf(attrs, "name");
+    const type = (attributeOf(attrs, "type") ?? "text").toLowerCase();
+    // A React/Vue form often has no `name`: it reads values from state and uses only a
+    // placeholder or an id. Deriving the field name from those attributes is the only way
+    // to recognise the form and to tell the visitor which field the popup is asking for.
+    const name =
+      attributeOf(attrs, "name") ??
+      attributeOf(attrs, "id") ??
+      attributeOf(attrs, "placeholder") ??
+      type;
     if (!name || name.trim().length === 0) continue;
     fields.push({
       name,
-      type: (attributeOf(attrs, "type") ?? "text").toLowerCase(),
+      type,
       value: attributeOf(attrs, "value") ?? "",
     });
   }
