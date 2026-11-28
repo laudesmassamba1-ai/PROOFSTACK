@@ -68,6 +68,12 @@ export interface Services {
   /** The site crawler, injected for the same reason as the page scanner. */
   siteAudit: typeof auditSite;
   /**
+   * Browser renderer for JavaScript-rendered pages. The Node server injects its local
+   * Chromium; the Worker has none and leaves it absent, so a scan there measures the
+   * server response and says so instead of inventing a DOM.
+   */
+  renderer?: import("@proofcore/core").PageRenderer;
+  /**
    * Re-run the project's FLOW module for a verification analysis.
    *
    * Injected because the real one runs the engine and spends a test run; a route test

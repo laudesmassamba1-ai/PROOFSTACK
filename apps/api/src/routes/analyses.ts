@@ -432,6 +432,7 @@ export function analysisRoutes(services: Services): Hono<AppEnv> {
           url: target.toString(),
           allowPrivate: false,
           timeoutMs: 15_000,
+          ...(services.renderer === undefined ? {} : { renderer: services.renderer }),
           // A site analysis describes the site, not the first ten pages: read up to the
           // 200-page ceiling the crawl accepts, then measure every answered page.
           crawl: { maxPages: 200, maxDepth: 2 },

@@ -17,6 +17,8 @@
  *     was skipped by a limit is reported as such, never counted as passing.
  */
 
+import { isClientShell, type PageRenderer } from "./page-scan.js";
+
 export interface CrawlPage {
   url: string;
   /** Final URL after redirects. */
@@ -67,6 +69,15 @@ export interface CrawlOptions {
   cookieHeader?: (url: string) => string | null;
   /** SSRF guard, injected so the CLI can allow a local target and the API cannot. */
   guard?: (url: URL) => void;
+  /**
+   * Browser renderer, injected by a deployment that has one.
+   *
+   * A single-page application serves one HTML shell for every route and puts its real
+   * links in the DOM. Reading only the server response finds no link, so the crawl stops
+   * at one page and the report claims a site it never walked. When a renderer is present
+   * and the response is a shell, the DOM is read instead — links included.
+   */
+  renderer?: PageRenderer;
   onPage?: (page: CrawlPage, discovered: number) => void;
 }
 
@@ -212,7 +223,30 @@ export async function crawlSite(
       error: response.status >= 400 ? `HTTP ${response.status}` : null,
     };
     if (isHtml) {
-      const { internal, external } = readLinks(text, response.url || url, origin);
+      let documentHtml = text;
+      // A single-page application serves the same shell for every route and keeps its
+      // links in the JavaScript-rendered DOM. Without a browser the crawl sees no link
+      // and stops at one page; with one, read the real document and follow its routes.
+      if (options.renderer && isClientShell(text)) {
+        try {
+          const view = await options.renderer.render({
+            url: response.url || url,
+            headers,
+            timeoutMs,
+          });
+          if (view && view.html.length > text.length) {
+            documentHtml = view.html;
+            page.html = view.html;
+            page.finalUrl = view.finalUrl;
+            page.status = view.status;
+            page.title = readTitle(view.html) ?? page.title;
+            page.assets = readAssets(view.html, view.finalUrl);
+          }
+        } catch {
+          // A renderer failure keeps the server document; the crawl stays honest.
+        }
+      }
+      const { internal, external } = readLinks(documentHtml, page.finalUrl, origin);
       page.links = internal;
       page.externalLinks = external;
     }
@@ -246,7 +280,7 @@ export async function crawlSite(
 
   // -------------------------------------------------------------------- sitemap
   let sitemap: CrawlResult["sitemap"] = null;
-  const seeds = new Set<string>([start.toString(), ...(options.seedUrls ?? [])]);
+  const rawSeeds = new Set<string>([start.toString(), ...(options.seedUrls ?? [])]);
   try {
     requests += 1;
     const response = await doFetch(`${origin}/sitemap.xml`, {
@@ -263,8 +297,8 @@ export async function crawlSite(
           return parsed !== null && (parsed.protocol === "https:" || parsed.protocol === "http:");
         });
       sitemap = { found: true, urls: urls.length };
-      // A sitemap is the site's own list of pages: better seeds than guesswork.
-      for (const url of urls.slice(0, maxPages * 2)) seeds.add(url);
+      // A sitemap is input, not authority to widen the requested crawl boundary.
+      for (const url of urls.slice(0, maxPages * 2)) rawSeeds.add(url);
     } else {
       sitemap = { found: false, urls: 0 };
     }
@@ -275,6 +309,28 @@ export async function crawlSite(
   // ---------------------------------------------------------------------- crawl
   const pages: CrawlPage[] = [];
   const skipped: { url: string; reason: string }[] = [];
+  const seeds = new Set<string>();
+  const prefix = options.pathPrefix;
+  for (const seed of rawSeeds) {
+    const parsed = safeUrl(seed);
+    if (!parsed || (parsed.protocol !== "http:" && parsed.protocol !== "https:")) {
+      skipped.push({ url: seed, reason: "unsupported or invalid URL" });
+      continue;
+    }
+    if (parsed.origin !== origin && !options.allowExternal) {
+      skipped.push({ url: seed, reason: "outside crawl origin" });
+      continue;
+    }
+    if (
+      prefix &&
+      normalizePrefixPath(parsed.pathname) !== normalizePrefixPath(prefix) &&
+      !normalizePrefixPath(parsed.pathname).startsWith(`${normalizePrefixPath(prefix)}/`)
+    ) {
+      skipped.push({ url: seed, reason: "outside path prefix" });
+      continue;
+    }
+    seeds.add(parsed.toString());
+  }
   const seen = new Set<string>();
   // `maxDepth` counts link hops from the start URL. Extra seeds (a sitemap, an explicit list)
   // are pages the site itself declared: they are read for measurement, but they do not
@@ -335,7 +391,13 @@ export async function crawlSite(
       }
       for (const link of page.links) {
         if (seen.has(normalizeUrl(link))) continue;
-        if (options.pathPrefix && !(safeUrl(link)?.pathname ?? "").startsWith(options.pathPrefix)) {
+        const path = safeUrl(link)?.pathname ?? "";
+        if (
+          prefix &&
+          normalizePrefixPath(path) !== normalizePrefixPath(prefix) &&
+          !normalizePrefixPath(path).startsWith(`${normalizePrefixPath(prefix)}/`)
+        ) {
+          skipped.push({ url: link, reason: "outside path prefix" });
           continue;
         }
         frontier.push({ url: link, depth: page.depth + 1 });
@@ -398,9 +460,14 @@ function shouldSkip(url: string, exclude: RegExp[] | undefined): boolean {
   return (exclude ?? []).some((pattern) => pattern.test(url));
 }
 
-function safeUrl(raw: string): URL | null {
+function normalizePrefixPath(path: string): string {
+  const normalized = path.startsWith("/") ? path : `/${path}`;
+  return normalized.length > 1 ? normalized.replace(/\/+$/, "") : normalized;
+}
+
+function safeUrl(value: string): URL | null {
   try {
-    return new URL(raw);
+    return new URL(value);
   } catch {
     return null;
   }

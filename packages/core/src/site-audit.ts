@@ -22,6 +22,7 @@ import type { CrawlOptions, CrawlPage, CrawlResult } from "./crawl.js";
 import { crawlSite } from "./crawl.js";
 import {
   assertScannableUrl,
+  type PageRenderer,
   type ScanFinding,
   type ScanOptions,
   type ScanResult,
@@ -56,6 +57,8 @@ export interface SiteAuditOptions {
   /** How many crawled pages get the control set beyond the named one. */
   maxMeasuredPages?: number;
   fetchImpl?: typeof fetch;
+  /** Browser renderer for JavaScript-rendered sites, forwarded to the scan and the crawl. */
+  renderer?: PageRenderer;
   allowPrivate?: boolean;
   timeoutMs?: number;
   /**
@@ -185,6 +188,7 @@ export async function auditSite(options: SiteAuditOptions): Promise<SiteAuditRes
     ownershipHint: options.allowPrivate ? "local" : "remote",
     ...(options.ownershipToken === undefined ? {} : { ownershipToken: options.ownershipToken }),
     headers: headersFor(start.toString()),
+    ...(options.renderer === undefined ? {} : { renderer: options.renderer }),
     ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
   };
   const scan = await scanPage(start.toString(), scanOptions);
@@ -195,6 +199,7 @@ export async function auditSite(options: SiteAuditOptions): Promise<SiteAuditRes
     guard,
     timeoutMs: options.timeoutMs ?? 12_000,
     headers: headersFor(start.toString()),
+    ...(options.renderer === undefined ? {} : { renderer: options.renderer }),
     ...(cookieHeader === undefined && suppliedCookie === undefined
       ? {}
       : { cookieHeader: (url: string) => cookieHeader?.(url) ?? suppliedCookie ?? null }),
@@ -277,6 +282,7 @@ export async function auditSite(options: SiteAuditOptions): Promise<SiteAuditRes
           fetchImpl: doFetch,
           allowPrivate: options.allowPrivate,
           ownershipHint: options.allowPrivate ? "local" : "remote",
+          ...(options.renderer === undefined ? {} : { renderer: options.renderer }),
           // One request per page: the crawl already read this document and its headers.
           light: true,
           document: {

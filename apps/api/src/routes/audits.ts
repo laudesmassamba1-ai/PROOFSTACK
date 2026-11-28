@@ -173,7 +173,10 @@ async function runScan(
     ownershipToken?: string;
   },
   target: URL,
-  onProgress?: (event: { step: string; message: string; done?: number; total?: number }) => void
+  onProgress:
+    | ((event: { step: string; message: string; done?: number; total?: number }) => void)
+    | undefined,
+  renderer: Services["renderer"]
 ): Promise<{
   result: Awaited<ReturnType<typeof scanPage>>;
   site: Awaited<ReturnType<typeof auditSite>> | null;
@@ -184,6 +187,7 @@ async function runScan(
       allowPrivate: false,
       maxBytes: 1_500_000,
       timeoutMs: 15_000,
+      ...(renderer === undefined ? {} : { renderer }),
       // A remote site is only ever "verified" by publishing the token: the API has no way to
       // know who is asking, and an unproven report must not name locations.
       ownershipHint: "remote",
@@ -195,6 +199,7 @@ async function runScan(
     url: target.toString(),
     allowPrivate: false,
     timeoutMs: 15_000,
+    ...(renderer === undefined ? {} : { renderer }),
     // A pasted session cookie must follow the crawl too, not just the first page.
     ...(body.headers === undefined ? {} : { headers: body.headers }),
     ...(body.ownershipToken === undefined ? {} : { ownershipToken: body.ownershipToken }),
@@ -474,7 +479,10 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
       );
     }
     try {
-      const login = await detectLoginWall(target.toString(), { timeoutMs: 10_000 });
+      const login = await detectLoginWall(target.toString(), {
+        timeoutMs: 10_000,
+        ...(services.renderer === undefined ? {} : { renderer: services.renderer }),
+      });
       return c.json({ login });
     } catch (error) {
       throw new HttpError(
@@ -560,7 +568,7 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
     let result: Awaited<ReturnType<typeof scanPage>>;
     let site: Awaited<ReturnType<typeof auditSite>> | null = null;
     try {
-      const run = await runScan(body, target);
+      const run = await runScan(body, target, undefined, services.renderer);
       result = run.result;
       site = run.site;
     } catch (error) {
@@ -817,11 +825,18 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
         await step("fetch", fetchLabel, "running");
         // Each phase below is emitted when the engine actually reaches it: a crawl that takes
         // four seconds shows four seconds of real work, not a timer filling the gap.
-        const run = await runScan(body, target, (event) => {
-          void step("fetch", `  ${progressLine(event, body.login !== undefined)}`, "running").catch(
-            () => undefined
-          );
-        });
+        const run = await runScan(
+          body,
+          target,
+          (event) => {
+            void step(
+              "fetch",
+              `  ${progressLine(event, body.login !== undefined)}`,
+              "running"
+            ).catch(() => undefined);
+          },
+          services.renderer
+        );
         const fullResult = run.result;
         const report = isFree ? buildPreview(fullResult) : fullResult;
         const preview = isFree ? (report as ReturnType<typeof buildPreview>).preview : null;

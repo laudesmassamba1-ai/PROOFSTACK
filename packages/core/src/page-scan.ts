@@ -24,13 +24,39 @@
  *     response, so a scan costs one request plus whatever it deliberately probes.
  */
 
-import { cleanFindings } from "@proofcore/module-clean";
+import { cleanFindings, imageFindings } from "@proofcore/module-clean";
 import { failFindings } from "@proofcore/module-fail";
 import { isAlias } from "./controls.js";
 import { discoverLoginForm, signIn } from "./session.js";
 
 export type ScanModule = "fail" | "clean" | "flow" | "world" | "exit";
 export type ScanStatus = "PASS" | "WARN" | "FAIL" | "SKIPPED";
+
+/**
+ * A browser that renders JavaScript for the scanner.
+ *
+ * A server response can be a shell (`<div id="root"></div>`) whose real content, links
+ * and login form only exist after JavaScript runs. The scanner calls this renderer only
+ * when it detects such a shell; the caller decides whether a browser is available. A
+ * renderer that fails returns null and the scan stays honest about the server HTML.
+ */
+export interface PageRenderer {
+  render(input: { url: string; headers?: Record<string, string>; timeoutMs?: number }): Promise<{
+    /** The rendered document, including same-origin iframe content. */
+    html: string;
+    finalUrl: string;
+    status: number;
+    /** How it was rendered, written into the report so nothing is claimed silently. */
+    basis: "rendered_dom";
+  } | null>;
+}
+
+/** True when the response is a client-rendered shell whose DOM needs a browser. */
+export function isClientShell(html: string): boolean {
+  return (
+    visibleText(html).length < 300 && /<script\b[^>]*\bsrc=/i.test(html) && !/<main\b/i.test(html)
+  );
+}
 
 export interface ScanFinding {
   module: ScanModule;
@@ -130,6 +156,11 @@ export interface ScanOptions {
   timeoutMs?: number;
   /** `fetch` injection, for tests. */
   fetchImpl?: typeof fetch;
+  /**
+   * Browser renderer, injected by a deployment that has one. Called only for client-rendered
+   * shells; absent means the scan measures the server response and says so.
+   */
+  renderer?: PageRenderer;
   /** Skip the extra probes (exposed files, checkout entry) — one request, no more. */
   light?: boolean;
   /** Credentials for a product behind a login. Used for this scan only. */
@@ -263,7 +294,7 @@ async function fetchFollowing(
 const LOGIN_PATH =
   /(?:^|\/)(?:login|log-in|signin|sign-in|connect|connexion|se-connecter)(?:\/|$)/i;
 const LOGIN_LINK_TEXT =
-  /\b(?:log\s*in|sign\s*in|connexion|se connecter|s.identifier|login|account|mon compte|espace client|my account|portal|member)\b/i;
+  /\b(?:log\s*in|sign\s*in|connexion|se connecter|s.identifier|login|mon compte|espace client|my account)\b/i;
 
 function loginWallFromHtml(html: string, pageUrl: string): LoginWall | null {
   const form = discoverLoginForm(html, pageUrl);
@@ -312,19 +343,40 @@ function loginLinks(html: string, base: string): string[] {
  */
 export async function detectLoginWall(
   rawUrl: string,
-  options: Pick<ScanOptions, "allowPrivate" | "fetchImpl" | "headers" | "timeoutMs"> = {}
+  options: Pick<
+    ScanOptions,
+    "allowPrivate" | "fetchImpl" | "headers" | "timeoutMs" | "renderer"
+  > = {}
 ): Promise<LoginWall> {
   const target = assertScannableUrl(rawUrl, { allowPrivate: options.allowPrivate });
   const fetched = await fetchFollowing(target, options, 5);
   const body = await readBody(fetched.response, 1_500_000);
   const contentType = fetched.response.headers.get("content-type") ?? "";
-  const html = /html|xml/i.test(contentType) || /^\s*</.test(body.text) ? body.text : "";
-  const direct = html ? loginWallFromHtml(html, fetched.url.toString()) : null;
+  let html = /html|xml/i.test(contentType) || /^\s*</.test(body.text) ? body.text : "";
+  let pageUrl = fetched.url.toString();
+  // A SPA serves an empty shell: its login link and form are in the rendered DOM. Render
+  // it before deciding there is no wall, so the credential popup opens for those sites too.
+  if (html && options.renderer && isClientShell(html)) {
+    try {
+      const view = await options.renderer.render({
+        url: pageUrl,
+        headers: options.headers,
+        timeoutMs: options.timeoutMs,
+      });
+      if (view && view.html.length > html.length) {
+        html = view.html;
+        pageUrl = view.finalUrl;
+      }
+    } catch {
+      // No renderer verdict: keep reading the server response.
+    }
+  }
+  const direct = html ? loginWallFromHtml(html, pageUrl) : null;
   if (direct) return direct;
 
   let candidate: LoginWall | null = null;
   if (html) {
-    for (const link of loginLinks(html, fetched.url.toString())) {
+    for (const link of loginLinks(html, pageUrl)) {
       try {
         const next = assertScannableUrl(link, { allowPrivate: options.allowPrivate });
         const found = await fetchFollowing(next, options, 3);
@@ -336,9 +388,7 @@ export async function detectLoginWall(
         if (form) return form;
         if (
           candidate === null &&
-          (found.response.status === 401 ||
-            found.response.status === 403 ||
-            LOGIN_PATH.test(found.url.pathname))
+          (found.response.status === 401 || found.response.status === 403)
         ) {
           candidate = {
             detected: true,
@@ -357,7 +407,7 @@ export async function detectLoginWall(
 
   // A JavaScript menu often hides the login link from an HTML-only read. Probe the three
   // conventional paths once: a form there is real evidence, and a 200 marketing page is not.
-  const seen = new Set([fetched.url.toString()]);
+  const seen = new Set([pageUrl]);
   for (const path of ["/login", "/signin", "/connexion"]) {
     const probeUrl = new URL(path, fetched.url);
     if (seen.has(probeUrl.toString())) continue;
@@ -368,7 +418,24 @@ export async function detectLoginWall(
       const probeType = probe.response.headers.get("content-type") ?? "";
       const probeHtml =
         /html|xml/i.test(probeType) || /^\s*</.test(probeBody.text) ? probeBody.text : "";
-      const form = probeHtml ? loginWallFromHtml(probeHtml, probe.url.toString()) : null;
+      let probeDocument = probeHtml;
+      let probePage = probe.url.toString();
+      if (probeDocument && options.renderer && isClientShell(probeDocument)) {
+        try {
+          const view = await options.renderer.render({
+            url: probePage,
+            headers: options.headers,
+            timeoutMs: options.timeoutMs,
+          });
+          if (view && view.html.length > probeDocument.length) {
+            probeDocument = view.html;
+            probePage = view.finalUrl;
+          }
+        } catch {
+          // An unrendered probe is not a wall; keep the server response.
+        }
+      }
+      const form = probeDocument ? loginWallFromHtml(probeDocument, probePage) : null;
       if (form) return form;
     } catch {
       // An absent conventional path proves nothing; keep reading the public site.
@@ -384,15 +451,7 @@ export async function detectLoginWall(
       reason: `the site answered HTTP ${fetched.response.status}`,
     };
   }
-  if (LOGIN_PATH.test(fetched.url.pathname)) {
-    return {
-      detected: true,
-      loginUrl: fetched.url.toString(),
-      emailField: null,
-      passwordField: null,
-      reason: "the address is a login page",
-    };
-  }
+
   return { detected: false, loginUrl: null, emailField: null, passwordField: null, reason: null };
 }
 function readBody(response: Response, maxBytes: number): Promise<{ text: string; bytes: number }> {
@@ -527,6 +586,8 @@ function analyse(body: {
   // finding ids and their order are unchanged.
   findings.push(...failFindings({ html, headers, url, text }));
   findings.push(...cleanFindings({ html, text, bytes: body.bytes }));
+  // Image quality without a vision model: markup and bytes answer what a visitor feels.
+  findings.push(...imageFindings({ html, baseUrl: url.toString() }));
 
   const links = attrTags(html, "a");
 
@@ -1011,6 +1072,28 @@ export async function scanPage(rawUrl: string, options: ScanOptions = {}): Promi
     responseHeaders = response.headers;
   }
 
+  // A client-rendered shell has no interface to measure. When this deployment has a
+  // browser, render it and measure the real DOM instead of an empty div. The renderer is
+  // called at most once, only for shells, and a failure keeps the server response.
+  let rendered = false;
+  if (html && options.renderer && isClientShell(html)) {
+    try {
+      const view = await options.renderer.render({
+        url: finalUrl.toString(),
+        headers: withLogin.headers,
+        timeoutMs: options.timeoutMs,
+      });
+      if (view && view.html.length > html.length) {
+        html = view.html;
+        finalUrl = assertScannableUrl(view.finalUrl, { allowPrivate: options.allowPrivate });
+        status = view.status;
+        rendered = true;
+      }
+    } catch {
+      // A renderer that fails is not a verdict: the server response is still measured.
+    }
+  }
+
   const analysis = html
     ? analyse({
         html,
@@ -1034,6 +1117,22 @@ export async function scanPage(rawUrl: string, options: ScanOptions = {}): Promi
         checkoutUrl: null as URL | null,
       };
   const findings = analysis.findings;
+  if (rendered) {
+    // The shell-only checks were recorded as SKIPPED by the HTML pass. Replace that one
+    // verdict with the real observation: the page was rendered, so it was measured.
+    const index = findings.findIndex(
+      (item) => item.module === "clean" && item.id === "rendered_dom"
+    );
+    const observed = finding(
+      "clean",
+      "rendered_dom",
+      "PASS",
+      "measured from the JavaScript-rendered document",
+      "The server sent a shell; the browser-rendered DOM is the page a visitor actually sees."
+    );
+    if (index >= 0) findings[index] = observed;
+    else findings.push(observed);
+  }
 
   // One extra request, and only when the page actually advertises a journey entry point:
   // "the checkout link exists" and "the checkout link answers" are different facts, and

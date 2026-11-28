@@ -1216,6 +1216,233 @@ const controls: Control[] = [
       },
     ],
   },
+  {
+    id: "image_alt_present",
+    module: "clean",
+    fr: {
+      title: "Images annoncées",
+      objective: "Établit combien d'images n'ont aucun attribut alt.",
+      consequence: "Une image sans attribut alt est un silence complet pour un lecteur d'écran.",
+      fix: 'Ajouter un attribut alt à chaque image ; alt="" pour une image décorative.',
+      verify: "Le scan ne trouve plus d'image sans attribut alt.",
+    },
+    en: {
+      title: "Announced images",
+      objective: "Establishes how many images carry no alt attribute.",
+      consequence: "An image with no alt attribute is complete silence to a screen reader.",
+      fix: 'Add an alt attribute to every image; alt="" for a decorative one.',
+      verify: "The scan finds no image without an alt attribute.",
+    },
+    complexity: "low",
+    risk: "medium",
+    method: "Présence de l'attribut alt sur chaque balise img.",
+    result: "« n sur m sans alt »",
+    fixes: [{ stack: "HTML", code: '<img src="/photo.png" alt="Équipe sur le stand">' }],
+  },
+  {
+    id: "image_alt_quality",
+    module: "clean",
+    fr: {
+      title: "Qualité du texte alternatif",
+      objective:
+        "Établit si les textes alternatifs décrivent l'image ou ne sont que des noms de fichiers répétés.",
+      consequence:
+        "Un nom de fichier ou un libellé copié dix fois ne remplace pas une description : l'image reste invisible pour qui ne la voit pas.",
+      fix: "Écrire un alt qui porte l'information de l'image, différent pour chaque image.",
+      verify: "Le scan ne signale plus de nom de fichier ni de texte répété.",
+    },
+    en: {
+      title: "Alternative text quality",
+      objective:
+        "Establishes whether alt texts describe the picture or are filenames and repeated labels.",
+      consequence:
+        "A filename or one label copied ten times is not a description: the picture stays invisible to anyone who cannot see it.",
+      fix: "Write an alt that carries the image's information, different for each image.",
+      verify: "The scan reports no filename-like or repeated alt text.",
+    },
+    complexity: "low",
+    risk: "medium",
+    method: "Détection des noms de fichiers et des textes répétés au moins trois fois.",
+    result: "Nombre de textes problématiques",
+    fixes: [{ stack: "HTML", code: '<img src="/team.jpg" alt="L\'équipe au salon Tech 2026">' }],
+  },
+  {
+    id: "image_dimensions",
+    module: "clean",
+    fr: {
+      title: "Dimensions déclarées des images",
+      objective: "Établit combien d'images n'ont ni largeur ni hauteur déclarées.",
+      consequence:
+        "Sans dimensions, la page se réorganise pendant le chargement : le visiteur clique sur un bouton qui bouge.",
+      fix: "Déclarer width et height (ou aspect-ratio en CSS) sur chaque image.",
+      verify: "Le scan ne trouve plus d'image sans dimensions.",
+    },
+    en: {
+      title: "Declared image dimensions",
+      objective: "Establishes how many images declare neither width nor height.",
+      consequence:
+        "Without dimensions the page reflows while loading: a visitor clicks a button that moves.",
+      fix: "Declare width and height (or a CSS aspect-ratio) on every image.",
+      verify: "The scan finds no image without dimensions.",
+    },
+    complexity: "low",
+    risk: "medium",
+    method: "Attributs width/height des balises img.",
+    result: "« n sur m sans dimensions »",
+    fixes: [{ stack: "HTML", code: '<img src="/hero.webp" width="1200" height="630" alt="…">' }],
+  },
+  {
+    id: "image_loading",
+    module: "clean",
+    fr: {
+      title: "Chargement différé des images",
+      objective: 'Établit combien d\'images manquent de loading="lazy".',
+      consequence:
+        "Charger toutes les images d'un coup retarde le texte que le visiteur est venu lire.",
+      fix: 'Ajouter loading="lazy" aux images hors du premier écran.',
+      verify: "Le scan montre la majorité des images en chargement différé.",
+    },
+    en: {
+      title: "Lazy image loading",
+      objective: 'Establishes how many images lack loading="lazy".',
+      consequence: "Loading every image at once delays the text the visitor came for.",
+      fix: 'Add loading="lazy" to images below the first screen.',
+      verify: "The scan shows most images lazy-loaded.",
+    },
+    complexity: "low",
+    risk: "low",
+    method: "Attribut loading des balises img, pour les pages d'au moins quatre images.",
+    result: "« n sur m sans lazy »",
+    fixes: [{ stack: "HTML", code: '<img src="/card.png" loading="lazy" alt="…">' }],
+  },
+  {
+    id: "image_reachable",
+    module: "clean",
+    fr: {
+      title: "Images joignables",
+      objective: "Établit combien d'images répondent réellement quand on les demande.",
+      consequence: "Une image qui ne charge pas laisse un trou là où le contenu devrait être.",
+      fix: "Corriger les URL, les permissions et les règles de hotlinking des images cassées.",
+      verify: "Le scan ne trouve plus d'image en erreur HTTP.",
+    },
+    en: {
+      title: "Reachable images",
+      objective: "Establishes how many images actually answer when requested.",
+      consequence: "An image that does not load leaves a hole where content should be.",
+      fix: "Fix the URLs, permissions and hotlinking rules of broken images.",
+      verify: "The scan finds no image in HTTP error.",
+    },
+    complexity: "medium",
+    risk: "medium",
+    method: "Requête sur chaque URL d'image, quand le scanner sonde les ressources.",
+    result: "« n sur m en erreur »",
+    fixes: [
+      { stack: "HTML", code: "<!-- Servir l'image depuis le même origine ou un CDN autorisé -->" },
+    ],
+  },
+  {
+    id: "image_not_empty",
+    module: "clean",
+    fr: {
+      title: "Images non vides",
+      objective: "Établit si une image répond avec zéro octet.",
+      consequence:
+        "Une réponse vide est une image cassée que le serveur annonce pourtant comme réussie.",
+      fix: "Renvoyer le fichier image réel et vérifier le pipeline de génération.",
+      verify: "Le scan ne trouve plus de réponse d'image à zéro octet.",
+    },
+    en: {
+      title: "Non-empty images",
+      objective: "Establishes whether an image answers with zero bytes.",
+      consequence: "An empty response is a broken picture the server still reports as successful.",
+      fix: "Return the real image file and check the generation pipeline.",
+      verify: "The scan finds no zero-byte image response.",
+    },
+    complexity: "medium",
+    risk: "high",
+    method: "Nombre d'octets renvoyés par l'URL de l'image.",
+    result: "« n image(s) vides »",
+    fixes: [
+      { stack: "Nginx", code: "# Vérifier try_files et les permissions du répertoire d'images" },
+    ],
+  },
+  {
+    id: "image_tracking_pixels",
+    module: "clean",
+    fr: {
+      title: "Pixels de suivi",
+      objective: "Établit si une image fait 1 à 2 pixels.",
+      consequence: "Une image invisible est souvent une balise qui transmet la visite à un tiers.",
+      fix: "Retirer le pixel ou documenter la finalité et obtenir le consentement requis.",
+      verify: "Le scan ne trouve plus d'image de 1 à 2 pixels.",
+    },
+    en: {
+      title: "Tracking pixels",
+      objective: "Establishes whether an image is 1–2 pixels.",
+      consequence: "An invisible picture is often a beacon reporting the visitor to a third party.",
+      fix: "Remove the pixel or document its purpose and obtain the required consent.",
+      verify: "The scan finds no 1–2 pixel image.",
+    },
+    complexity: "medium",
+    risk: "medium",
+    method: "Dimensions lues dans l'en-tête du fichier image sondé.",
+    result: "« n pixel(s) »",
+    fixes: [{ stack: "HTML", code: "<!-- Supprimer l'img 1x1 et son script de suivi -->" }],
+  },
+  {
+    id: "image_weight",
+    module: "clean",
+    fr: {
+      title: "Poids des images",
+      objective: "Établit combien d'images dépassent 500 ko.",
+      consequence:
+        "Une seule image trop lourde coûte plus que toute la page autour sur un réseau mobile.",
+      fix: "Redimensionner, convertir en WebP/AVIF et servir la taille adaptée au viewport.",
+      verify: "Le scan ne trouve plus d'image au-dessus de 500 ko.",
+    },
+    en: {
+      title: "Image weight",
+      objective: "Establishes how many images exceed 500 kB.",
+      consequence:
+        "One oversized picture costs more than the whole page around it on a mobile network.",
+      fix: "Resize, convert to WebP/AVIF and serve the size the viewport needs.",
+      verify: "The scan finds no image above 500 kB.",
+    },
+    complexity: "medium",
+    risk: "medium",
+    method: "Octets renvoyés par l'URL de l'image.",
+    result: "« n image(s) au-dessus de 500 ko »",
+    fixes: [
+      {
+        stack: "HTML",
+        code: '<picture><source srcset="/hero.avif" type="image/avif"><img src="/hero.webp" alt="…"></picture>',
+      },
+    ],
+  },
+  {
+    id: "image_content_type",
+    module: "clean",
+    fr: {
+      title: "Type des images",
+      objective: "Établit si une URL d'image répond avec un type qui n'est pas une image.",
+      consequence:
+        "Le navigateur demande une image et reçoit autre chose : elle ne peut pas s'afficher.",
+      fix: "Corriger le Content-Type et l'URL de la ressource.",
+      verify: "Le scan ne trouve plus d'URL d'image servant du HTML ou du JSON.",
+    },
+    en: {
+      title: "Image content type",
+      objective: "Establishes whether an image URL answers with a non-image type.",
+      consequence: "The browser asks for an image and gets something else: it cannot render.",
+      fix: "Fix the Content-Type and the resource URL.",
+      verify: "The scan finds no image URL serving HTML or JSON.",
+    },
+    complexity: "low",
+    risk: "medium",
+    method: "En-tête Content-Type de la réponse de l'image.",
+    result: "« n réponse(s) non-image »",
+    fixes: [{ stack: "Nginx", code: "types { image/webp webp; image/avif avif; }" }],
+  },
 
   // ------------------------------------------------------------------- FLOW
   {

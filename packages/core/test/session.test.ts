@@ -136,6 +136,15 @@ describe("login wall detection", () => {
     const wall = await detectLoginWall(base, { allowPrivate: true });
     expect(wall.detected).toBe(false);
   });
+
+  it("does not infer a login wall from a public /login page without a form", async () => {
+    const base = await serve((_request, response) => {
+      response.writeHead(200, { "content-type": "text/html" });
+      response.end("<h1>Login integration guide</h1><p>This route documents login.</p>");
+    });
+    const wall = await detectLoginWall(`${base}/login`, { allowPrivate: true });
+    expect(wall.detected).toBe(false);
+  });
 });
 describe("cookie jar", () => {
   const jar = new CookieJar();

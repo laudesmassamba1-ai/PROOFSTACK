@@ -3,6 +3,7 @@ import { createApp } from "./app.js";
 import { d1Database } from "./db/d1.js";
 import type { Env } from "./env.js";
 import { createPaymentProvider } from "./providers.js";
+import { workerRenderer } from "./worker-renderer.js";
 
 type WorkerEnv = {
   DB: Parameters<typeof d1Database>[0];
@@ -26,7 +27,11 @@ function build(env: WorkerEnv) {
     cachedProvider = createPaymentProvider(bindings);
     cachedProviderKind = kind;
   }
-  return createApp({ db: d1Database(env.DB), env: bindings, provider: cachedProvider });
+  const app = createApp({ db: d1Database(env.DB), env: bindings, provider: cachedProvider });
+  // The Worker's Browser Rendering binding lets a site audit read the DOM of a SPA;
+  // without it the scan would see one empty shell and call it a one-page site.
+  app.services.renderer = workerRenderer(env.BROWSER, env as Record<string, string | undefined>);
+  return app;
 }
 
 export default {

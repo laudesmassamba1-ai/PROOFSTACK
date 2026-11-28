@@ -158,6 +158,66 @@ describe("crawling a real site", () => {
     expect(result.robots?.disallowed).toContain("/private");
   });
 
+  it("does not fetch sitemap seeds outside the origin or path prefix", async () => {
+    const base = await serveSite();
+    const requested: string[] = [];
+    const result = await crawlSite(base, {
+      maxDepth: 0,
+      maxPages: 10,
+      pathPrefix: "/",
+      fetchImpl: (async (input: RequestInfo | URL, init?: RequestInit) => {
+        requested.push(String(input));
+        if (String(input) === `${base}/sitemap.xml`) {
+          return new Response(
+            `<urlset><url><loc>${base}/guide</loc></url><url><loc>${base}/about</loc></url><url><loc>https://external.example/steal</loc></url></urlset>`,
+            { status: 200, headers: { "content-type": "application/xml" } }
+          );
+        }
+        return fetch(input, init);
+      }) as typeof fetch,
+    });
+
+    expect(result.pages.map((page) => page.url)).toContain(`${base}/`);
+    expect(result.pages.some((page) => page.url.endsWith("/about"))).toBe(false);
+    expect(requested).not.toContain(`${base}/about`);
+    expect(requested).not.toContain("https://external.example/steal");
+    expect(result.skipped).toEqual(
+      expect.arrayContaining([
+        { url: `${base}/about`, reason: "outside path prefix" },
+        { url: "https://external.example/steal", reason: "outside crawl origin" },
+      ])
+    );
+    expect(result.truncated).toBe(true);
+  });
+
+  it("applies origin and path-prefix boundaries to explicit seeds", async () => {
+    const base = await serveSite();
+    const requested: string[] = [];
+    const result = await crawlSite(base, {
+      maxDepth: 0,
+      maxPages: 10,
+      pathPrefix: "/docs",
+      seedUrls: [`${base}/about`, "https://external.example/page"],
+      fetchImpl: (async (input: RequestInfo | URL, init?: RequestInit) => {
+        requested.push(String(input));
+        return fetch(input, init);
+      }) as typeof fetch,
+    });
+
+    // The start URL is outside /docs, so it is skipped too: a prefix is a boundary,
+    // not a hint. Nothing outside it may be fetched.
+    expect(result.pages).toHaveLength(0);
+    expect(requested).not.toContain(`${base}/about`);
+    expect(requested).not.toContain("https://external.example/page");
+    expect(result.skipped).toEqual(
+      expect.arrayContaining([
+        { url: `${base}/about`, reason: "outside path prefix" },
+        { url: "https://external.example/page", reason: "outside crawl origin" },
+      ])
+    );
+    expect(result.truncated).toBe(true);
+  });
+
   it("sends the session cookie of a signed-in crawl", async () => {
     const base = await serveSite();
     const seen: string[] = [];
