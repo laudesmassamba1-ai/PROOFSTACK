@@ -69,116 +69,156 @@ async function settle(page: {
             try { const d = f.contentDocument; return !!d && !!d.body && d.body.children.length > 0; }
             catch { return false; }
           });
-          return { frames: frames.length, filled: filled.length, main: !!document.body && document.body.children.length > 0 };
+          return { frames: frames.length, filled: filled.length };
         })()`
       )
-      .catch(() => null)) as { frames?: number; filled?: number; main?: boolean } | null;
+      .catch(() => null)) as { frames?: number; filled?: number } | null;
     if (!state || state.frames === 0 || state.filled === state.frames) return;
     await delay(POLL_MS);
   }
 }
 
+/**
+ * One tab kept open for the length of an audit.
+ *
+ * A JavaScript auth provider (Firebase, Supabase) keeps its session in the page's own
+ * storage, not in a cookie. Opening a fresh tab per page therefore loses the session and
+ * every private page silently falls back to the login screen — which is exactly how 23
+ * pages ended up measured as 23 copies of `/login`. Reusing one tab keeps the session and
+ * makes each page the page it claims to be.
+ */
+interface SharedTab {
+  id: string;
+  page: Awaited<ReturnType<typeof browsers.open>>["page"];
+  lastUsed: number;
+}
+
+let shared: SharedTab | null = null;
+const SHARED_IDLE_MS = 5 * 60_000;
+
+async function tab(): Promise<SharedTab> {
+  if (shared && Date.now() - shared.lastUsed < SHARED_IDLE_MS) {
+    shared.lastUsed = Date.now();
+    return shared;
+  }
+  if (shared) await browsers.close(shared.id).catch(() => undefined);
+  const opened = await browsers.open({ url: "about:blank", headless: true, timeoutMs: 25_000 });
+  shared = { id: opened.id, page: opened.page, lastUsed: Date.now() };
+  return shared;
+}
+
+/** Releases the shared tab once the audit is over. */
+export async function closeRendererTab(): Promise<void> {
+  if (!shared) return;
+  const id = shared.id;
+  shared = null;
+  await browsers.close(id).catch(() => undefined);
+}
+
 /** The renderer injected into the scanner by the local Node server. */
 export const localRenderer: PageRenderer = {
   async render(input) {
-    const opened = await browsers.open({
-      url: input.url,
-      headless: true,
+    const current = await tab();
+    const state = await current.page.navigate(input.url, {
       timeoutMs: input.timeoutMs ?? 20_000,
+      settle: true,
     });
-    try {
-      // Give the application time to mount, and its iframes time to fill. Bounded on
-      // purpose: a site that never finishes still gets measured, with what was observed.
-      await settle(opened.page);
-      const raw = (await opened.page.evaluateScript(RENDERED_DOM_SCRIPT)) as {
-        html?: string;
-        url?: string;
-        readyState?: string;
-      };
-      const html = typeof raw.html === "string" ? raw.html : "";
-      if (!html) return null;
-      return {
-        html,
-        finalUrl: typeof raw.url === "string" && raw.url ? raw.url : input.url,
-        status: 200,
-        basis: "rendered_dom",
-      };
-    } finally {
-      // A tab per page: leaving it open would leak sessions across crawled pages.
-      await browsers.close(opened.id).catch(() => undefined);
-    }
+    await settle(current.page);
+    const raw = (await current.page.evaluateScript(RENDERED_DOM_SCRIPT)) as {
+      html?: string;
+      url?: string;
+    };
+    const html = typeof raw.html === "string" ? raw.html : "";
+    if (!html) return null;
+    return {
+      html,
+      finalUrl: typeof raw.url === "string" && raw.url ? raw.url : (state.url ?? input.url),
+      status: state.status ?? 200,
+      basis: "rendered_dom",
+    };
   },
 
   async signIn(input) {
-    const opened = await browsers.open({
-      url: input.url,
-      headless: true,
+    const current = await tab();
+    await current.page.navigate(input.url, {
       timeoutMs: input.timeoutMs ?? 20_000,
+      settle: true,
     });
-    try {
-      await settle(opened.page);
-      const snapshot = (await opened.page.snapshot({ maxElements: 200 })) as {
-        elements?: { selector: string; type?: string; name: string; role: string }[];
-      };
-      const elements = snapshot.elements ?? [];
-      const email =
-        elements.find((field) => field.type === "email") ??
-        elements.find((field) => /email|identifiant|mail/i.test(field.name));
-      const password =
-        elements.find((field) => field.type === "password") ??
-        elements.find((field) => /mot de passe|password/i.test(field.name));
-      if (!email || !password) {
-        return {
-          ok: false,
-          landedOn: opened.page.url,
-          cookie: null,
-          reason: "no email/password field in the rendered form",
-        };
-      }
-      await opened.page.evaluateScript(
-        buildSetValueExpression({ selector: email.selector, value: input.email })
-      );
-      await opened.page.evaluateScript(
-        buildSetValueExpression({ selector: password.selector, value: input.password })
-      );
-      const submit =
-        elements.find(
-          (element) =>
-            element.role === "button" && /se connecter|sign in|login|connexion/i.test(element.name)
-        ) ?? elements.find((element) => element.role === "button");
-      if (!submit) {
-        return {
-          ok: false,
-          landedOn: opened.page.url,
-          cookie: null,
-          reason: "no submit button in the rendered form",
-        };
-      }
-      await opened.page.click({ selector: submit.selector });
-      await delay(2_000);
-      const landedOn = opened.page.url;
-      const cookies = await opened.page.cookies().catch(() => []);
-      const cookie = cookies
-        .filter((item) => !/^_ga|^_gid|^_fbp/i.test(item.name))
-        .map((item) => `${item.name}=${item.value}`)
-        .join("; ");
-      const stillForm = (await opened.page.evaluateScript(
-        `!!document.querySelector('input[type=password]')
-      `
-      )) as boolean;
-      const ok = !stillForm && cookies.length > 0;
+    await settle(current.page);
+    const snapshot = (await current.page.snapshot({ maxElements: 200 })) as {
+      elements?: { selector: string; type?: string; name: string; role: string }[];
+    };
+    const elements = snapshot.elements ?? [];
+    const email =
+      elements.find((field) => field.type === "email") ??
+      elements.find((field) => /email|identifiant|mail/i.test(field.name));
+    const password =
+      elements.find((field) => field.type === "password") ??
+      elements.find((field) => /mot de passe|password/i.test(field.name));
+    if (!email || !password) {
       return {
-        ok,
-        landedOn,
-        cookie: cookie || null,
-        reason: ok
-          ? null
-          : stillForm
-            ? "the page still shows a password form after submitting: credentials refused or JavaScript auth did not complete"
-            : "no session cookie was set after submitting",
+        ok: false,
+        landedOn: current.page.url,
+        cookie: null,
+        reason: "no email/password field in the rendered form",
       };
-    } finally {
-      await browsers.close(opened.id).catch(() => undefined);
     }
+    await current.page.evaluateScript(
+      buildSetValueExpression({ selector: email.selector, value: input.email })
+    );
+    await current.page.evaluateScript(
+      buildSetValueExpression({ selector: password.selector, value: input.password })
+    );
+    const submit =
+      elements.find(
+        (element) =>
+          element.role === "button" && /se connecter|sign in|login|connexion/i.test(element.name)
+      ) ?? elements.find((element) => element.role === "button");
+    if (!submit) {
+      return {
+        ok: false,
+        landedOn: current.page.url,
+        cookie: null,
+        reason: "no submit button in the rendered form",
+      };
+    }
+    await current.page.click({ selector: submit.selector });
+    await delay(3_000);
+    const landedOn = current.page.url;
+    const cookies = await current.page.cookies().catch(() => []);
+    const cookie = cookies
+      .filter((item) => !/^_ga|^_gid|^_fbp/i.test(item.name))
+      .map((item) => `${item.name}=${item.value}`)
+      .join("; ");
+    const after = (await current.page.evaluateScript(
+      `(() => ({
+        hasPassword: !!document.querySelector('input[type=password]'),
+        text: (document.body ? document.body.innerText : '').slice(0, 4000),
+        storage: (() => {
+          const out = [];
+          try { for (let i = 0; i < localStorage.length; i += 1) out.push(localStorage.key(i) ?? ''); } catch {}
+          try { for (let i = 0; i < sessionStorage.length; i += 1) out.push(sessionStorage.key(i) ?? ''); } catch {}
+          return out;
+        })(),
+      }))()`
+    )) as { hasPassword: boolean; text: string; storage: string[] };
+    // Firebase and other JavaScript auth providers keep the session in browser storage,
+    // not in an HTTP cookie. A cookie is one proof among three, not a requirement: a
+    // password form that disappeared, a dashboard that appeared, or an auth token in
+    // storage each proves the visitor is signed in.
+    const leftLogin = !/\/login|\/signin|\/connexion/i.test(new URL(landedOn).pathname);
+    const dashboard = /dashboard|mon profil|d\u00e9connexion|sign out|logout/i.test(after.text);
+    const authStorage = after.storage.some((key) => /firebase|auth|token|session|user/i.test(key));
+    const ok = !after.hasPassword && (leftLogin || dashboard || authStorage || cookies.length > 0);
+    return {
+      ok,
+      landedOn,
+      cookie: cookie || null,
+      reason: ok
+        ? null
+        : after.hasPassword
+          ? "the page still shows a password form after submitting: credentials refused or JavaScript auth did not complete"
+          : "no proof of a session: no cookie, no auth storage and the login page did not change",
+    };
   },
 };

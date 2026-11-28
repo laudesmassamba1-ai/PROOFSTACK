@@ -55,6 +55,12 @@ export interface CrawlOptions {
   allowExternal?: boolean;
   /** Extra URLs to read before following links (a sitemap, a known path). */
   seedUrls?: string[];
+  /**
+   * Seeds that are part of the authenticated application, not a sitemap declaration.
+   * Unlike ordinary seeds they expand the frontier, so a signed-in landing page can
+   * reveal the private pages a public home page never links to.
+   */
+  expandSeeds?: boolean;
   /** Only URLs matching this path prefix are crawled. */
   pathPrefix?: string;
   /** URLs matching any of these patterns are skipped (logout, delete, …). */
@@ -241,6 +247,10 @@ export async function crawlSite(
             page.status = view.status;
             page.title = readTitle(view.html) ?? page.title;
             page.assets = readAssets(view.html, view.finalUrl);
+            // `bytes` is what the page actually weighs to a visitor. Keeping the server
+            // shell size reported "1 kB of HTML" for a 33 kB rendered dashboard, which is
+            // a measurement of the wrong document.
+            page.bytes = Buffer.byteLength(view.html, "utf8");
           }
         } catch {
           // A renderer failure keeps the server document; the crawl stays honest.
@@ -339,7 +349,10 @@ export async function crawlSite(
   for (const seed of seeds) {
     frontier.push({
       url: seed,
-      depth: normalizeUrl(seed) === normalizeUrl(start.toString()) ? 0 : maxDepth,
+      // A sitemap seed is read but not followed; a signed-in landing page is the entry
+      // point of the application and must expand, or the crawl stops at its front door.
+      depth:
+        options.expandSeeds || normalizeUrl(seed) === normalizeUrl(start.toString()) ? 0 : maxDepth,
     });
   }
   let truncatedBy: CrawlResult["truncatedBy"] = null;

@@ -136,36 +136,112 @@ export async function auditSite(options: SiteAuditOptions): Promise<SiteAuditRes
   let loginReport: SignInReport | null = null;
   let cookieHeader: ((url: string) => string | null) | undefined;
   let authorization: string | null = null;
+  /** Where the sign-in actually landed: a private home the public page cannot link to. */
+  let signedInLanding: string | null = null;
   const suppliedHeaders = options.headers ?? {};
   const suppliedCookie = Object.entries(suppliedHeaders).find(
     ([name]) => name.toLowerCase() === "cookie"
   )?.[1];
   if (options.login) {
     options.onProgress?.({ step: "login", message: "signing in" });
-    const attempt = await signIn({
-      ...options.login,
-      fetchImpl: doFetch,
-      timeoutMs: options.timeoutMs ?? 15_000,
-    });
-    loginReport = attempt.report;
-    if (attempt.report.ok) {
-      cookieHeader = (url: string) => attempt.jar.header(new URL(url));
-      authorization = attempt.authorization;
-      options.onProgress?.({
-        step: "login",
-        message: `signed in with the ${attempt.report.method} flow`,
-        ok: true,
-        ...(attempt.report.status === null ? {} : { status: attempt.report.status }),
-      });
+    // A JavaScript form (Firebase, Supabase, a custom fetch) has no HTTP action. When the
+    // renderer can drive a browser, let it sign in and carry its session into the crawl;
+    // otherwise the HTTP ladder reports exactly why it could not establish a session.
+    if (options.renderer?.signIn) {
+      try {
+        const browserAttempt = await options.renderer.signIn({
+          // `url` is the field every caller already fills (the API maps `login.url` to it);
+          // `loginPageUrl`/`loginUrl` are the finer-grained overrides.
+          url:
+            options.login.loginPageUrl ??
+            options.login.loginUrl ??
+            (options.login as { url?: string }).url ??
+            start.toString(),
+          email: options.login.email,
+          password: options.login.password,
+          ...(options.login.emailField === undefined
+            ? {}
+            : { emailField: options.login.emailField }),
+          ...(options.login.passwordField === undefined
+            ? {}
+            : { passwordField: options.login.passwordField }),
+          timeoutMs: options.timeoutMs ?? 15_000,
+        });
+        if (browserAttempt.ok && browserAttempt.landedOn) {
+          signedInLanding = browserAttempt.landedOn;
+        }
+        loginReport = {
+          ok: browserAttempt.ok,
+          landedOn: browserAttempt.landedOn,
+          status: null,
+          method: "form",
+          emailField: options.login.emailField ?? null,
+          passwordField: options.login.passwordField ?? null,
+          csrf: false,
+          cookies: browserAttempt.cookie
+            ? browserAttempt.cookie.split(";").map((c) => c.split("=")[0] ?? "")
+            : [],
+          reason: browserAttempt.reason,
+          mfaRequired: false,
+          requests: 0,
+        };
+        if (browserAttempt.ok && browserAttempt.cookie) {
+          const pasted = browserAttempt.cookie;
+          cookieHeader = (url: string) => {
+            const target = new URL(url);
+            // A browser-storage session cannot be replayed as an HTTP cookie. Never send
+            // a Firebase token to a different host; only the same-origin cookie is safe.
+            return target.origin === start.origin ? pasted : null;
+          };
+        }
+        options.onProgress?.({
+          step: "login",
+          message: browserAttempt.ok
+            ? "signed in with the browser-rendered form"
+            : `login refused: ${browserAttempt.reason ?? "unknown reason"}`,
+          ok: browserAttempt.ok,
+        });
+      } catch (error) {
+        loginReport = {
+          ok: false,
+          landedOn: null,
+          status: null,
+          method: "none",
+          emailField: null,
+          passwordField: null,
+          csrf: false,
+          cookies: [],
+          reason: `browser sign-in failed: ${error instanceof Error ? error.message : String(error)}`,
+          mfaRequired: false,
+          requests: 0,
+        };
+      }
     } else {
-      // The crawl still runs, on the public surface, and the report carries the reason. A
-      // caller that needs a session must check `login.ok`; the engine never pretends.
-      options.onProgress?.({
-        step: "login",
-        message: `login refused: ${attempt.report.reason ?? "unknown reason"}`,
-        ok: false,
-        ...(attempt.report.status === null ? {} : { status: attempt.report.status }),
+      const attempt = await signIn({
+        ...options.login,
+        fetchImpl: doFetch,
+        timeoutMs: options.timeoutMs ?? 15_000,
       });
+      loginReport = attempt.report;
+      if (attempt.report.ok) {
+        cookieHeader = (url: string) => attempt.jar.header(new URL(url));
+        authorization = attempt.authorization;
+        options.onProgress?.({
+          step: "login",
+          message: `signed in with the ${attempt.report.method} flow`,
+          ok: true,
+          ...(attempt.report.status === null ? {} : { status: attempt.report.status }),
+        });
+      } else {
+        // The crawl still runs, on the public surface, and the report carries the reason. A
+        // caller that needs a session must check `login.ok`; the engine never pretends.
+        options.onProgress?.({
+          step: "login",
+          message: `login refused: ${attempt.report.reason ?? "unknown reason"}`,
+          ok: false,
+          ...(attempt.report.status === null ? {} : { status: attempt.report.status }),
+        });
+      }
     }
   }
 
@@ -200,6 +276,9 @@ export async function auditSite(options: SiteAuditOptions): Promise<SiteAuditRes
     timeoutMs: options.timeoutMs ?? 12_000,
     headers: headersFor(start.toString()),
     ...(options.renderer === undefined ? {} : { renderer: options.renderer }),
+    // A signed-in landing page is a seed, not a link from the public home: without it a
+    // private application is invisible to the crawl even though the session is valid.
+    ...(signedInLanding === null ? {} : { seedUrls: [signedInLanding], expandSeeds: true }),
     ...(cookieHeader === undefined && suppliedCookie === undefined
       ? {}
       : { cookieHeader: (url: string) => cookieHeader?.(url) ?? suppliedCookie ?? null }),
