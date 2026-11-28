@@ -81,6 +81,7 @@ describe("assistant tool catalogue", () => {
     expect(names).toContain("analysis_findings");
     expect(names).toContain("open_remediation");
     expect(names).toContain("validate_scenario");
+    expect(names).toContain("save_scenario");
     expect(names).toContain("suggest_analysis_profile");
     expect(names).toContain("validate_configuration");
     expect(names).toContain("prepare_code_patch");
@@ -111,6 +112,7 @@ describe("assistant tool catalogue", () => {
     expect(permissionOf("a_tool_nobody_classified")).toBe("sensitive");
     expect(permissionOf("analysis_findings")).toBe("read");
     expect(permissionOf("validate_scenario")).toBe("read");
+    expect(permissionOf("save_scenario")).toBe("write");
     expect(permissionOf("suggest_analysis_profile")).toBe("read");
     expect(permissionOf("validate_configuration")).toBe("read");
     expect(permissionOf("prepare_code_patch")).toBe("read");

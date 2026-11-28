@@ -4,6 +4,7 @@ import {
   Brain,
   FileJson,
   KeyRound,
+  MessageSquare,
   Play,
   Settings2,
   Trash2,
@@ -195,6 +196,12 @@ export function ProjectDetail() {
                   ? "Scanner le site"
                   : "Scan the site"}
             </button>
+            <Link
+              to={`/app/ai?context=project&project=${encodeURIComponent(project.id)}&label=${encodeURIComponent(project.name)}`}
+              className="app-btn"
+            >
+              <MessageSquare size={14} /> {fr ? "Demander à l’assistant" : "Ask the assistant"}
+            </Link>
             <Link to={`/app/projects/${project.id}/config`} className="app-btn">
               <Settings2 size={14} /> {fr ? "Configurer" : "Configure"}
             </Link>

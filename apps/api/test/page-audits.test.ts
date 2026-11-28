@@ -763,4 +763,142 @@ describe("page audit quota (monthly_ai_audits)", () => {
     const snapshot = await harness.services.meter.snapshot(workspaceId);
     expect(snapshot.usage.ai_audit ?? 0).toBe(0);
   });
+
+  describe("site stream", () => {
+    it("sends the crawled pages and the sign-in outcome in the result event", async () => {
+      const { cookie, workspaceId } = await signUp("stream-site@example.com");
+      const loginForm =
+        '<form method="post" action="/login"><input name="email" type="email"><input name="password" type="password"></form>';
+      const privatePage =
+        '<!doctype html><html lang="en"><head><title>Dashboard</title><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><main><h1>Dashboard</h1><a href="/settings">Settings</a><a href="/reports">Reports</a></main></body></html>';
+      const otherPage =
+        '<!doctype html><html lang="en"><head><title>Settings</title><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><main><h1>Settings</h1><a href="/reports">Reports</a></main></body></html>';
+      vi.stubGlobal("fetch", (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(String(input));
+        const signedIn = new Headers(init?.headers).get("cookie")?.includes("sid=ok") ?? false;
+        if (url.pathname === "/login" && init?.method === "POST") {
+          return new Response(null, {
+            status: 302,
+            headers: { location: "/dashboard", "set-cookie": "sid=ok; Path=/; HttpOnly" },
+          });
+        }
+        if (url.pathname === "/login") {
+          return new Response(loginForm, {
+            status: 200,
+            headers: { "content-type": "text/html" },
+          });
+        }
+        if (url.pathname === "/robots.txt" || url.pathname === "/sitemap.xml") {
+          return new Response("not found", { status: 404 });
+        }
+        if (!signedIn) {
+          return new Response(null, { status: 302, headers: { location: "/login" } });
+        }
+        if (url.pathname === "/settings" || url.pathname === "/reports") {
+          return new Response(otherPage, {
+            status: 200,
+            headers: { "content-type": "text/html" },
+          });
+        }
+        if (url.pathname === "/dashboard" || url.pathname === "/") {
+          return new Response(privatePage, {
+            status: 200,
+            headers: { "content-type": "text/html" },
+          });
+        }
+        return new Response("not found", { status: 404 });
+      }) as unknown as typeof fetch);
+      try {
+        const response = await harness.request("/api/v1/audits/stream", {
+          method: "POST",
+          headers: { cookie },
+          body: JSON.stringify({
+            workspaceId,
+            url: "https://example.com/dashboard",
+            login: {
+              url: "https://example.com/login",
+              email: "audit@example.com",
+              password: "secret",
+            },
+            crawl: { maxPages: 5, maxDepth: 1 },
+          }),
+        });
+        expect(response.status).toBe(200);
+        const text = await response.text();
+        const result = text
+          .split("\n\n")
+          .map((chunk) => chunk.split("\n").find((line) => line.startsWith("data:")))
+          .filter((line): line is string => Boolean(line))
+          .map((line) => JSON.parse(line.slice(5).trim()) as Record<string, unknown>)
+          .find((event) => event.type === "result") as
+          | {
+              audit: {
+                site?: { pages: { url: string; measured: boolean }[] };
+                login?: { attempted: boolean; ok: boolean; status: number };
+              };
+            }
+          | undefined;
+        expect(result).toBeDefined();
+        expect(result?.audit.login).toEqual({ attempted: true, ok: true, status: 200 });
+        const pages = result?.audit.site?.pages ?? [];
+        expect(pages.some((page) => page.url.endsWith("/settings") && page.measured)).toBe(true);
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+  });
+
+  describe("login wall check", () => {
+    it("reports the real form and creates no audit", async () => {
+      const { cookie, workspaceId } = await signUp("login-check@example.com");
+      vi.stubGlobal(
+        "fetch",
+        (async () =>
+          new Response(
+            '<form method="post" action="/session"><input type="hidden" name="_csrf" value="t"><input name="email" type="email"><input name="password" type="password"></form>',
+            { headers: { "content-type": "text/html" } }
+          )) as unknown as typeof fetch
+      );
+      try {
+        const response = await harness.request("/api/v1/audits/login-check", {
+          method: "POST",
+          headers: { cookie },
+          body: JSON.stringify({ workspaceId, url: "https://example.com/login" }),
+        });
+        expect(response.status).toBe(200);
+        const body = (await response.json()) as {
+          login: { detected: boolean; loginUrl: string; emailField: string; passwordField: string };
+        };
+        expect(body.login.detected).toBe(true);
+        expect(body.login.loginUrl).toBe("https://example.com/login");
+        expect(body.login.emailField).toBe("email");
+        expect(body.login.passwordField).toBe("password");
+        const list = (await (
+          await harness.request(`/api/v1/audits?workspaceId=${workspaceId}`, {
+            headers: { cookie },
+          })
+        ).json()) as { total: number };
+        expect(list.total).toBe(0);
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it("refuses an internal address without fetching it", async () => {
+      const { cookie, workspaceId } = await signUp("login-check-internal@example.com");
+      const fetch = vi.fn();
+      vi.stubGlobal("fetch", fetch as unknown as typeof fetch);
+      try {
+        const response = await harness.request("/api/v1/audits/login-check", {
+          method: "POST",
+          headers: { cookie },
+          body: JSON.stringify({ workspaceId, url: "http://127.0.0.1:8787/login" }),
+        });
+        expect(response.status).toBe(400);
+        expect(fetch).not.toHaveBeenCalled();
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+  });
 });

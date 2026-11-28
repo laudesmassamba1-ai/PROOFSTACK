@@ -29,6 +29,7 @@
     "@proofcore/engine": "workspace:*",
     "@proofcore/module-exit": "workspace:*",
     "@proofcore/module-flow": "workspace:*",
-    "@proofcore/module-world": "workspace:*"
+    "@proofcore/module-world": "workspace:*",
+    "@proofcore/sdk": "workspace:*"
   }
 }

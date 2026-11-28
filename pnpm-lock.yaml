@@ -430,6 +430,9 @@ importers:
       '@proofcore/module-world':
         specifier: workspace:*
         version: link:../modules/world
+      '@proofcore/sdk':
+        specifier: workspace:*
+        version: link:../sdk
 
   packages/config:
     dependencies:
@@ -509,6 +512,15 @@ importers:
       libphonenumber-js:
         specifier: 1.13.16
         version: 1.13.16
+
+  packages/sdk:
+    dependencies:
+      '@proofcore/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
 
   tooling/shot:
     dependencies:

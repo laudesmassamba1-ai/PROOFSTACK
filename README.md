@@ -293,7 +293,8 @@ packages/adapters/payments  SasPay + sandbox provider adapters
 packages/adapters/reporting JSON / JUnit / HTML / text renderers
 packages/adapters/ai        MCP / AI provider configuration (optional)
 packages/billing plans, entitlements, usage, state machines, checkout
-packages/cli | cli | developer surface (no SDK package is published)
+packages/sdk    typed client for the machine API (`/v1/project`, `/v1/runs`); private, not published
+packages/cli    developer CLI, local MCP server and agent runtime
 Docs/ + docs/ research, guides and operational documentation
 ```
 

@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
+import { detectLoginWall } from "../src/page-scan.js";
 import { CookieJar, discoverLoginForm, signIn } from "../src/session.js";
 
 /**
@@ -62,6 +63,67 @@ describe("login form discovery", () => {
   });
 });
 
+describe("login wall detection", () => {
+  it("follows a protected URL to the form and names its fields", async () => {
+    const base = await serve((request, response) => {
+      if (request.url === "/dashboard") {
+        response.writeHead(302, { location: "/login" });
+        response.end();
+        return;
+      }
+      response.writeHead(200, { "content-type": "text/html" });
+      response.end(LOGIN_PAGE);
+    });
+    const wall = await detectLoginWall(`${base}/dashboard`, { allowPrivate: true });
+    expect(wall.detected).toBe(true);
+    expect(wall.loginUrl).toBe(`${base}/login`);
+    expect(wall.emailField).toBe("user[email]");
+    expect(wall.passwordField).toBe("user[password]");
+  });
+
+  it("follows a sign-in link from a public homepage", async () => {
+    const base = await serve((request, response) => {
+      response.writeHead(200, { "content-type": "text/html" });
+      response.end(
+        request.url === "/login" ? LOGIN_PAGE : '<a href="/login">Se connecter</a><h1>Public</h1>'
+      );
+    });
+    const wall = await detectLoginWall(`${base}/`, { allowPrivate: true });
+    expect(wall.detected).toBe(true);
+    expect(wall.loginUrl).toBe(`${base}/login`);
+  });
+
+  it("probes /login when the menu hides the link from HTML", async () => {
+    const base = await serve((request, response) => {
+      response.writeHead(200, { "content-type": "text/html" });
+      response.end(
+        request.url === "/login" ? LOGIN_PAGE : "<h1>Public</h1><script>openLogin()</script>"
+      );
+    });
+    const wall = await detectLoginWall(base, { allowPrivate: true });
+    expect(wall.detected).toBe(true);
+    expect(wall.loginUrl).toBe(`${base}/login`);
+  });
+
+  it("reports a 401 as a wall even without a readable form", async () => {
+    const base = await serve((_request, response) => {
+      response.writeHead(401, { "content-type": "text/html" });
+      response.end("<h1>Authentication required</h1>");
+    });
+    const wall = await detectLoginWall(base, { allowPrivate: true });
+    expect(wall.detected).toBe(true);
+    expect(wall.reason).toContain("401");
+  });
+
+  it("does not invent a wall on a public page", async () => {
+    const base = await serve((_request, response) => {
+      response.writeHead(200, { "content-type": "text/html" });
+      response.end("<h1>Public catalogue</h1>");
+    });
+    const wall = await detectLoginWall(base, { allowPrivate: true });
+    expect(wall.detected).toBe(false);
+  });
+});
 describe("cookie jar", () => {
   const jar = new CookieJar();
   const response = new Response(null, {

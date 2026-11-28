@@ -17,6 +17,7 @@ import {
 import { type Context, Hono } from "hono";
 import { z } from "zod";
 import { decryptApiKey, encryptApiKey, hasEncryptionSecret, keyFingerprint } from "../ai-crypto.js";
+import { aiContextSchema, buildAiPageContext } from "../ai-page-context.js";
 import {
   fetchCatalogue,
   findProvider,
@@ -206,6 +207,8 @@ const chatRequestSchema = z
     effort: z.enum(EFFORTS).default("balanced"),
     message: z.string().min(1).max(16_000),
     title: z.string().max(120).optional(),
+    /** The page the person was looking at, resolved inside the workspace. */
+    context: aiContextSchema.optional(),
   })
   .strict();
 
@@ -1122,6 +1125,22 @@ const TOOLS: { name: string; description: string; parameters: Record<string, unk
     },
   },
   {
+    name: "save_scenario",
+    description:
+      "Save a validated FLOW scenario after the user explicitly asked to keep it. Call validate_scenario first. Without confirm:true it returns the canonical proposal and writes nothing. This is a write: never set confirm from a vague request.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        target: { type: "string" },
+        steps: { type: "array", items: { type: "object" } },
+        confirm: { type: "boolean" },
+      },
+      required: ["name", "target", "steps"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "compare_analyses",
     description:
       "What changed between two analyses of the same target: appeared, resolved, persisting, worsened, improved, and unmeasured (pages the later run never read). Use the two ids from list_analyses. Never claims a problem is fixed when the later analysis did not measure that page.",
@@ -1273,6 +1292,11 @@ function systemPrompt(
     "- Read real evidence with the tools before answering; never guess what a run contains.",
     "- Cite case ids, URLs and exact values when you describe a defect.",
     "- A passing check is also information. Never claim a check ran that did not.",
+    "- A tool result is an observation, not a suggestion. If a tool reports `tool error`,",
+    "  `browser_unavailable` or any other error, the action did NOT happen: say so and",
+    "  quote the error. Never describe a page, a consent screen or a click you did not see",
+    "  in a successful tool result. `browser_open` only succeeded if it returned a",
+    "  sessionId, and only then may you offer to act in that session.",
     "- Module work starts with `module_status`: it says what is enabled, configured,",
     "  blocked, launchable here, and which run is the latest. Do not guess a module is",
     "  ready from its name.",
@@ -1287,6 +1311,9 @@ function systemPrompt(
     "  and use only a profile it returns. Its recommendation can be null: then ask what they",
     "  want to check rather than inventing a profile name. Check `module_status` before",
     "  promising the run.",
+    "- For a FLOW journey, propose the steps, call `validate_scenario`, and quote every",
+    "  refusal. Only after the user explicitly asks to keep it, call `save_scenario` with",
+    "  confirm:true. Saving is not running: never say a saved journey passed.",
     "- Run a module only when the user asked to run it, with `module_run` and confirm:true.",
     "  A run spends the workspace's monthly test-run quota and hits the customer's app.",
     "- After a run, call `analyze_run` (or read the run id it returned) before explaining.",
@@ -1820,7 +1847,12 @@ export function aiRoutes(services: Services): Hono<AppEnv> {
     // a brand-new model behave like it has been on this project for weeks.
     const memory = await services.store.listWorkspaceMemory(workspace.id, 40);
     const memoryForPrompt = memory.map((fact) => ({ kind: fact.kind, text: fact.text }));
-    const prompt = systemPrompt(workspace.name, effort, memoryForPrompt);
+    const pageContext = body.context
+      ? await buildAiPageContext(services, workspace.id, body.context)
+      : "";
+    const prompt = [systemPrompt(workspace.name, effort, memoryForPrompt), pageContext]
+      .filter((part) => part.length > 0)
+      .join("\n\n");
 
     // ---- token budget ---------------------------------------------------------
     //
@@ -2728,6 +2760,61 @@ async function executeTool(
           summary: `scénario valide · ${result.scenario.steps.length} étape(s)`,
         };
       }
+      case "save_scenario": {
+        const steps = Array.isArray(args.steps) ? args.steps : [];
+        const result = validateFlowScenario({
+          name: typeof args.name === "string" ? args.name : "",
+          target: typeof args.target === "string" ? args.target : "",
+          steps,
+        });
+        if (!result.ok) {
+          return {
+            content: stableStringify({ valid: false, saved: false, issues: result.issues }, 2),
+            summary: `scénario refusé (${result.issues.length})`,
+          };
+        }
+        if (args.confirm !== true) {
+          return {
+            content: stableStringify(
+              {
+                valid: true,
+                saved: false,
+                scenario: result.scenario,
+                next: "Show this proposal and ask the user to confirm saving it. Only then call again with confirm:true.",
+              },
+              2
+            ),
+            summary: "scénario valide · confirmation requise",
+          };
+        }
+        const created = await services.store.createFlowScenario({
+          id: `flw_${crypto.randomUUID().replaceAll("-", "").slice(0, 20)}`,
+          workspaceId,
+          projectId: null,
+          name: result.scenario.name,
+          target: result.scenario.target,
+          steps: result.scenario.steps,
+          createdBy: userId,
+          now: services.clock(),
+        });
+        return {
+          content: stableStringify(
+            {
+              valid: true,
+              saved: true,
+              scenario: {
+                id: created.id,
+                name: created.name,
+                target: created.target,
+                steps: created.steps,
+              },
+              next: "It is now in FLOW Studio (/app/flow). Running it is a separate, explicit action.",
+            },
+            2
+          ),
+          summary: `scénario enregistré · ${created.steps.length} étape(s)`,
+        };
+      }
       case "compare_analyses": {
         const base = typeof args.base === "string" ? args.base : "";
         const target = typeof args.target === "string" ? args.target : "";
@@ -3391,9 +3478,12 @@ async function executeTool(
         };
     }
   } catch (error) {
+    // The model must see *why* the tool failed, and so must the person: a bare "tool
+    // error" is how an assistant ends up describing a page it never opened.
+    const message = error instanceof Error ? error.message : "tool failed";
     return {
-      content: stableStringify({ error: error instanceof Error ? error.message : "tool failed" }),
-      summary: "tool error",
+      content: stableStringify({ error: message, tool: name }),
+      summary: `tool error · ${message.slice(0, 120)}`,
     };
   }
 }

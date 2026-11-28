@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router";
 import { BrowserPanel } from "../../components/app/BrowserPanel.js";
 import {
   ChatMarkdown,
@@ -1036,9 +1037,53 @@ function ChatToolsPanel({
 
 /* ---------- the page ---------- */
 
+type PageContext =
+  | { kind: "analysis"; analysisId: string }
+  | { kind: "finding"; analysisId: string; findingKey: string }
+  | { kind: "module"; module: "world" | "flow" | "exit" | "fail" | "clean" }
+  | { kind: "project"; projectId: string };
+
+/**
+ * Read the object the person was looking at from the URL. Only identifiers travel;
+ * the server re-resolves them inside the workspace, so this is focus, never authority.
+ */
+function readPageContext(search: URLSearchParams): { context: PageContext; label: string } | null {
+  const label = (search.get("label") ?? "").slice(0, 140);
+  if (search.get("context") === "analysis" && search.get("analysis")) {
+    return { context: { kind: "analysis", analysisId: search.get("analysis") ?? "" }, label };
+  }
+  if (search.get("context") === "finding" && search.get("analysis") && search.get("finding")) {
+    return {
+      context: {
+        kind: "finding",
+        analysisId: search.get("analysis") ?? "",
+        findingKey: search.get("finding") ?? "",
+      },
+      label,
+    };
+  }
+  const module = search.get("module");
+  if (
+    search.get("context") === "module" &&
+    (module === "world" ||
+      module === "flow" ||
+      module === "exit" ||
+      module === "fail" ||
+      module === "clean")
+  ) {
+    return { context: { kind: "module", module }, label };
+  }
+  if (search.get("context") === "project" && search.get("project")) {
+    return { context: { kind: "project", projectId: search.get("project") ?? "" }, label };
+  }
+  return null;
+}
+
 export function AiChatPage(): React.ReactElement {
   const { locale } = useI18n();
   const { user, workspaces, workspaceId: activeWorkspaceId } = useSession();
+  const [search, setSearch] = useSearchParams();
+  const pageContext = useMemo(() => readPageContext(search), [search]);
   const fr = locale === "fr";
 
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -1047,7 +1092,7 @@ export function AiChatPage(): React.ReactElement {
   const [conversationFilter, setConversationFilter] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState(() => (search.get("prompt") ?? "").slice(0, 4_000));
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   // Values unused for now (the notice UI is not wired yet); the setters are, so the
   // attachment flow can report progress without a second refactor.
@@ -1674,6 +1719,7 @@ export function AiChatPage(): React.ReactElement {
           ...(activeId ? { conversationId: activeId } : {}),
           message: outgoing,
           effort,
+          ...(pageContext ? { context: pageContext.context } : {}),
         }),
       });
       const raw = await response.text();
@@ -1747,7 +1793,18 @@ export function AiChatPage(): React.ReactElement {
     } finally {
       setBusy(false);
     }
-  }, [draft, attachments, busy, activeWorkspaceId, profile, activeId, effort, fr, loadMemory]);
+  }, [
+    draft,
+    attachments,
+    busy,
+    activeWorkspaceId,
+    profile,
+    activeId,
+    effort,
+    fr,
+    loadMemory,
+    pageContext,
+  ]);
 
   /** Reads each dropped/selected file, keeps successes, surfaces failures honestly. */
   const handleAttach = useCallback(
@@ -2070,6 +2127,24 @@ export function AiChatPage(): React.ReactElement {
           </button>
         </header>
 
+        {pageContext ? (
+          <div className="chat-context" role="status">
+            <ScanSearch size={14} aria-hidden />
+            <span className="chat-context-label">
+              {fr ? "Contexte de la page" : "Page context"}
+              {pageContext.label ? ` · ${pageContext.label}` : ""}
+            </span>
+            <button
+              type="button"
+              className="chat-context-clear"
+              onClick={() => setSearch({}, { replace: true })}
+              aria-label={fr ? "Retirer le contexte de la page" : "Remove page context"}
+            >
+              <X size={13} />
+            </button>
+          </div>
+        ) : null}
+
         <div className="chat-split">
           <div className="chat-column">
             {/* empty state: centered greeting + composer, like the reference */}
@@ -2135,7 +2210,7 @@ export function AiChatPage(): React.ReactElement {
                                   return (
                                     <span
                                       key={`${step.tool}:${step.summary}`}
-                                      className="chat-trace-chip"
+                                      className={`chat-trace-chip${step.summary.startsWith("tool error") ? " is-error" : ""}`}
                                     >
                                       <Icon size={10} /> {step.tool} · {step.summary}
                                     </span>

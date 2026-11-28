@@ -1,0 +1,28 @@
+{
+  "name": "@proofcore/sdk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MPL-2.0",
+  "description": "Typed HTTP client for the PROOFCORE machine API: project identity and idempotent run upload, authenticated by a project token. Nothing is published to npm.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@proofcore/contracts": "workspace:*",
+    "zod": "4.6.7"
+  }
+}

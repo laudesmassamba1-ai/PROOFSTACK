@@ -2,6 +2,7 @@ import { plansForDisplay, resolveEntitlements } from "@proofcore/billing";
 import {
   assertScannableUrl,
   auditSite,
+  detectLoginWall,
   hmacSha256Hex,
   scanPage,
   VERIFICATION_META_NAME,
@@ -106,7 +107,8 @@ const loginSchema = z
   .object({
     /** The page holding the form, or the JSON endpoint when the site is an API. */
     url: absoluteHttpUrl,
-    email: z.string().email().max(320),
+    /** A username is a valid identifier too: do not force an email shape on a login. */
+    email: z.string().min(1).max(320),
     password: z.string().min(1).max(200),
     /** The form's action, when it cannot be read from the page (a SPA, a separate host). */
     endpoint: absoluteHttpUrl.optional(),
@@ -125,6 +127,13 @@ const crawlSchema = z
     maxDepth: z.number().int().min(0).max(6).optional(),
     pathPrefix: z.string().max(200).optional(),
     allowExternal: z.boolean().optional(),
+  })
+  .strict();
+
+const loginCheckSchema = z
+  .object({
+    workspaceId: z.string().min(1),
+    url: z.string().min(4).max(2000),
   })
   .strict();
 
@@ -221,6 +230,22 @@ async function runScan(
   return { result: site.scan, site };
 }
 
+/**
+ * The login outcome the browser reads: one stable shape whether the scan was a page or a
+ * whole site. The engine's richer sign-in report stays in the engine.
+ */
+function loginOutcome(
+  report: { ok: boolean; status: number | null; reason: string | null } | null
+): { attempted: true; ok: boolean; status: number | null; reason?: string } | null {
+  if (report === null) return null;
+  return {
+    attempted: true,
+    ok: report.ok,
+    status: report.status,
+    ...(report.ok ? {} : { reason: report.reason ?? "the session could not be established" }),
+  };
+}
+
 type LoginInput = {
   url: string;
   email: string;
@@ -290,6 +315,8 @@ function safePath(url: string): string {
 }
 
 const MAX_SCANS_PER_HOUR = 20;
+/** A login probe is one read, but it is still a fetch service: cap it separately. */
+const MAX_LOGIN_CHECKS_PER_HOUR = 60;
 
 const correctionSchema = z
   .object({
@@ -413,6 +440,50 @@ async function verificationToken(secret: string, workspaceId: string): Promise<s
 export function auditRoutes(services: Services): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
   const limiter = new RateLimiter(MAX_SCANS_PER_HOUR, 60 * 60_000);
+  const loginCheckLimiter = new RateLimiter(MAX_LOGIN_CHECKS_PER_HOUR, 60 * 60_000);
+
+  // Asked before a scan when the person has not offered credentials yet. It reads one page
+  // and reports what kind of login it found; it never submits anything and never stores the
+  // target. A separate limiter keeps it from becoming a general-purpose fetch proxy.
+  app.post("/audits/login-check", async (c) => {
+    const user = c.get("user");
+    const limited = loginCheckLimiter.check(user.id);
+    if (!limited.allowed) {
+      c.header("Retry-After", String(limited.retryAfterSeconds));
+      const minutes = Math.max(1, Math.ceil(limited.retryAfterSeconds / 60));
+      throw new HttpError(
+        429,
+        "login_check_rate_limited",
+        `Trop de vérifications de connexion sur cette heure. Réessaie dans ${minutes} min.`,
+        { retryAfterSeconds: limited.retryAfterSeconds }
+      );
+    }
+
+    const body = await readBody(c, loginCheckSchema);
+    await requireWorkspace(c, services, body.workspaceId);
+    let target: URL;
+    try {
+      target = assertScannableUrl(body.url.trim());
+    } catch (error) {
+      throw new HttpError(
+        400,
+        "url_not_scannable",
+        error instanceof Error ? error.message : "This URL cannot be scanned."
+      );
+    }
+    try {
+      const login = await detectLoginWall(target.toString(), { timeoutMs: 10_000 });
+      return c.json({ login });
+    } catch (error) {
+      throw new HttpError(
+        502,
+        "login_check_failed",
+        `Could not read ${target.hostname}: ${
+          error instanceof Error ? error.message : "unknown error"
+        }`
+      );
+    }
+  });
 
   app.post("/audits", async (c) => {
     const user = c.get("user");
@@ -555,7 +626,12 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
         ...report,
         ...(site === null
           ? {}
-          : { site: site.site, scores: site.scores, score: site.score, login: site.login }),
+          : {
+              site: site.site,
+              scores: site.scores,
+              score: site.score,
+              login: loginOutcome(site.login),
+            }),
       }),
       ownership: result.ownership,
       redacted: result.redacted,
@@ -639,7 +715,12 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
           ...report,
           ...(site === null
             ? {}
-            : { site: site.site, scores: site.scores, score: site.score, login: site.login }),
+            : {
+                site: site.site,
+                scores: site.scores,
+                score: site.score,
+                login: loginOutcome(site.login),
+              }),
         },
         ...(preview ? { preview } : {}),
         comparison,
@@ -803,7 +884,7 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
                   site: run.site.site,
                   scores: run.site.scores,
                   score: run.site.score,
-                  login: run.site.login,
+                  login: loginOutcome(run.site.login),
                 }),
           }),
           ownership: result.ownership,
@@ -882,7 +963,21 @@ export function auditRoutes(services: Services): Hono<AppEnv> {
         );
         await emit({
           type: "result",
-          audit: { id, projectId: body.projectId ?? null, ...report },
+          audit: {
+            id,
+            projectId: body.projectId ?? null,
+            ...report,
+            // The UI renders the site section and the login outcome from this event, not
+            // from the stored row: omit them and a crawl looks like a single-page scan.
+            ...(run.site === null
+              ? {}
+              : {
+                  site: run.site.site,
+                  scores: run.site.scores,
+                  score: run.site.score,
+                  login: loginOutcome(run.site.login),
+                }),
+          },
           ...(preview ? { preview } : {}),
           comparison,
         });

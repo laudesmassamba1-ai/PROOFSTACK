@@ -503,3 +503,44 @@ pnpm cloud:deploy --dry-run
 - **WORLD** : 7e catégorie `email` — 4 adresses valides qu'un motif ASCII refuse (point, +tag, apostrophe, TLD long), 2 cas souples (SMTPUTF8, local part entre guillemets) et 13 invalides (double @, point initial/double, label vide ou commençant par un tiret, dépassements 64/63/254 octets, injection d'en-tête, NUL, bidi).
 - **Preuves** : `fail` 15/15, `clean` 14/14, `exit` 28/28, `flow` 20/20, `world` 17/17, `controls` 7/7, `page-scan` 21/21 ; suite complète 1081/1081 et `pnpm typecheck` vert le 2026-11-28.
 - **Limites** : la couverture FAIL/CLEAN reste passive (ni injection ni exploitation) ; les cas email SMTPUTF8 et local part entre guillemets sont souples, leur refus est un avertissement documenté.
+
+## 2026-11-28 (suite) — paquet `@proofcore/sdk` et alias vitest mort retiré
+
+- **Paquet** : `packages/sdk` (`@proofcore/sdk`, privé, non publié) parle uniquement l'API machine réelle — `GET /v1/project` et `POST /v1/runs` avec `Authorization: Bearer psk_…`. Le reste (workspaces, projets, rapports, analyses, assistant) est session + CSRF : hors SDK plutôt que réimplémenté avec la mauvaise authentification.
+- **Honnêteté** : les réponses sont validées par des schémas qui reproduisent la route (`invalid_response` si la forme change, jamais un cast) ; le jeton vient de `tokenEnvVar`, lu à chaque appel (rotation sans nouveau client) ; un jeton littéral est vérifié à la construction ; `Idempotency-Key` dérivé `sync:<run.id>` ou fourni ; aucun retry automatique et `retryAfterSeconds` exposé sur `429` ; un cookie de session est refusé comme credential.
+- **Alias** : l'entrée `@proofcore/sdk` de `vitest.config.ts` pointait vers un fichier inexistant ; elle est retirée, les tests importent la source directement.
+- **Preuves** : `packages/sdk/test/sdk.test.ts` 8/8 contre les routes réelles via le harness (identité, upload idempotent, en-tête transmis, 403 `scope_missing`, 401 `invalid_api_key`, rotation de variable, refus du cookie, refus d'un corps 2xx inconnu) ; `pnpm --filter @proofcore/sdk typecheck` et `pnpm typecheck` verts ; `biome check` vert.
+- **Docs** : table du README ; `docs/PRODUCT_CAPABILITY_MATRIX.md` remplace « SDK public absent » par deux lignes exactes (publication npm absente ; serveur MCP hébergé absent, `proofcore mcp` local) ; `AGENTS.md` et `Docs/guides/AI_INTEGRATION.md` nomment `proofcore mcp` comme serveur MCP local officiel (MCP 2025-06-18, stdio, tools/resources/prompts, aucun endpoint hébergé). `AGENTS.md` était déjà aligné sur disque : le bloc d'instructions du début de session était périmé.
+
+## 2026-11-28 (suite) — parcours assistant IA réel : bloqué à la frontière du fournisseur
+
+- **Tentative réelle** : serveur Node local (`DATA_PATH=:memory: PORT=8799`), inscription réelle, puis `GET /api/v1/ai/profile` → `{"configured":false,"reason":"key_storage_unavailable"}` ; `PUT /api/v1/ai/profile` → **HTTP 503** `key_storage_unavailable` (refuse d'écrire une clé sans `AI_KEYS_SECRET`) ; `POST /api/v1/ai/chat` → **HTTP 400** `ai_not_configured` avec `managed:false, personal:false, deterministic:true`.
+- **Cause** : aucun credential de modèle dans l'environnement — `AI_KEYS_SECRET`, `MANAGED_AI_API_KEY`, `MANAGED_AI_PROVIDER/MODEL`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` et `NEON_DATABASE_URL` sont absents ; `.env.local` ne contient que `VERCEL_OIDC_TOKEN`. Le parcours n'a donc pas atteint de modèle : **NON VÉRIFIÉ de bout en bout**, et aucun tour n'a été simulé pour laisser croire le contraire.
+- **Mesures réelles au passage** : `GET /api/v1/ai/tools` → 37 outils, `maxAnalysisCallsPerTurn: 3` — la limite est réelle, « sans limites » est faux.
+- **Preuves existantes** : l'assistant reste prouvé avec un upstream simulé (48/48 sur `ai`, `ai-tools`, `local-browser-agent`, `module-copilot`) ; le refus honnête est maintenant prouvé sur un vrai serveur HTTP.
+- **Déblocage** : fournir `MANAGED_AI_API_KEY` (+ provider/modèle) ou `AI_KEYS_SECRET` + une clé fournisseur, puis rejouer le même parcours et consigner la réponse du modèle, ses jetons et l'outil réellement appelé.
+
+## 2026-11-28 (suite) — `proofcore mcp` vérifié par un vrai client MCP
+
+- **Client** : `connectMcp` de `packages/adapters/ai/src/mcp.ts` (le client du produit), transport stdio, `node packages/cli/dist/index.js mcp`, script jetable `.proofcore/mcp-smoke.ts` (dossier ignoré par git).
+- **Ce que le serveur annonce réellement** : `serverInfo` `proofcore` 0.1.0, protocole **2025-06-18**, capacités tools/resources/prompts ; **50 outils**, dont **22** annotés `readOnlyHint: true` ; 3 resources (`proofcore://project/summary`, `report/latest`, `instructions`) ; 4 prompts (`audit_target`, `explain_findings`, `fix_finding`, `release_check`).
+- **Appel réel** : `project_summary` → `isError:false`, configuration lue sur disque (modules world/flow/exit, `http://localhost:3000`, sortie `.proofcore/reports`, sync désactivée, aucun avertissement).
+- **Limite** : un seul outil de lecture appelé ; `run_tests`, les outils navigateur et les outils d'écriture ne sont pas exercés ici (couverts par `packages/cli/test/mcp-server.test.ts` 12/12 et `mcp-resources.test.ts` 11/11).
+
+## 2026-11-28 (suite) — la synchro du CLI consomme `@proofcore/sdk`
+
+- **Refactor** : `uploadScanRun` (`scan-sync.ts`) et la commande `sync` (`index.ts`) n'ont plus de `fetch` ni de construction d'en-têtes : les deux passent par `createProofcoreClient(...).uploadRun(...)`, qui porte l'auth `Bearer psk_…`, l'`Idempotency-Key` dérivé du run et la validation de la réponse. `resolveSyncIdentity` passe par `getProject()`. Les erreurs sont formatées par `describeSyncError` (`HTTP <status> <category> <code>: message`).
+- **Dépendance** : `@proofcore/sdk` ajouté aux dépendances du CLI ; l'alias vitest `@proofcore/sdk` est rétabli, cette fois vers un fichier qui existe et que du code importe réellement (l'entrée morte avait été supprimée, pas remplacée à l'identique).
+- **Fixture corrigée, pas affaiblie** : les stubs `/v1/runs` de `cli.test.ts` ne renvoyaient que `{runId, recorded}`, une forme que la vraie route ne produit jamais (elle ajoute `reportId`, `retainedUntil`, `usage`), et `/v1/project` n'avait ni `plan` ni `usage`. Le SDK strict les a refusés ; les stubs ont été alignés sur la route réelle.
+- **Piège attrapé** : le premier passage 59/59 utilisait un `dist` antérieur au refactor et ne prouvait donc rien ; après `pnpm typecheck` (qui réémet `dist`), le test ciblé a échoué et a révélé la fixture périmée. Preuve finale après correction : `cli.test.ts` + `sdk.test.ts` = **42/42**, dont « sync uploads real totals » et « audit --sync uploads the scan » exécutés contre un serveur HTTP local réel.
+- **Limites** : aucun essai contre l'API hébergée ; le délai de 30 s du SDK s'applique désormais à la synchro (auparavant aucun timeout).
+
+## 2026-11-28 (suite) — parcours assistant IA réel : un tour abouti chez Groq, boucle d'outils non prouvée
+
+- **Ce qui a réellement tourné** : serveur Node local (`DATA_PATH=:memory: PORT=8799`) avec fournisseur géré Groq (`MANAGED_AI_PROVIDER=groq`), inscription réelle, puis `POST /api/v1/ai/chat` avec `effort: "quick"` → **HTTP 200**. Réponse du modèle : « Cet espace de travail s'appelle « Qwen E2E ». » (`ai.mode: "managed"`, `provider: "groq"`, `model: "qwen/qwen3.8-27b"`, `managedCallsRemaining: 299`).
+- **Jetons réels mesurés par le produit** : `input 6703`, `output 16`, `total 6719` ; contexte `used 1282 / 16000`, `trimmed 0`.
+- **Ce qui n'a PAS été prouvé** : `trace: []` — aucun outil appelé (la question n'en exigeait pas) ; `turns: 0` ; les deux lentilles `evidence` et `consequence` sont revenues `ok:false` avec une note vide, donc **la vérification multi-passes n'a pas tourné**. Un second tour demandant explicitement `workspace_overview` a été refusé par Groq : **HTTP 429** `provider_rate_limited`, ITPM 7000 avec 4900 déjà consommés — le prompt produit (~6,7 k jetons d'entrée pour 37 outils) ne laisse pas la place à un second appel dans la même minute.
+- **Tentatives antérieures** : `openai/gpt-oss-120b` puis `openai/gpt-oss-20b` → 429 TPM 8000, compteur déjà à ~4 800 ; bascule sur `qwen/qwen3.8-27b` pour obtenir le tour réussi. Quota gratuit Groq : 8 000 TPM sur gpt-oss, 7 000 ITPM sur qwen, 6 000 sur `allam-2-7b`.
+- **Conclusion honnête** : le chemin réel jusqu'à la réponse du modèle est prouvé une fois ; **la boucle d'outils, les lentilles et la synthèse restent NON VÉRIFIÉES** avec cette clé gratuite. Aucun tour n'a été simulé.
+- **Sécurité** : la clé n'a été utilisée qu'en variable d'environnement du processus, n'est écrite ni dans le dépôt ni dans ce journal ; elle reste dans l'historique de conversation et doit être révoquée.
+- **Déblocage pour prouver la boucle** : une clé avec un quota plus large (ou un fournisseur géré payant), puis rejouer la même question avec un outil imposé et consigner `trace`, `turns` et `usage` du tour.

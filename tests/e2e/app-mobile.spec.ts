@@ -104,6 +104,18 @@ test("the assistant fits a 320px phone and shows the real catalogue", async ({
   await dialog.getByRole("button", { name: "Fermer", exact: true }).click();
   await expect(dialog).toHaveCount(0);
 
+  // A page can hand the assistant the object it is looking at. The banner names the
+  // context and stays on one line at 320px; the composer opens with the request.
+  await page.goto(
+    "/app/ai?context=module&module=flow&label=FLOW&prompt=Propose%20un%20sc%C3%A9nario%20FLOW"
+  );
+  const banner = page.locator(".chat-context");
+  await expect(banner).toBeVisible({ timeout: 20_000 });
+  await expect(banner).toContainText("Contexte de la page · FLOW");
+  await expect(page.locator(".chat-composer-input")).toHaveValue(/Propose un scénario FLOW/);
+  await banner.getByRole("button", { name: "Retirer le contexte de la page" }).click();
+  await expect(banner).toHaveCount(0);
+
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth
   );

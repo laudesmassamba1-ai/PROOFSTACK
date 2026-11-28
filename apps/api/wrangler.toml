@@ -1,6 +1,10 @@
 name = "proofcore-api"
 main = "src/worker.ts"
 compatibility_date = "2026-11-01"
+# `@cloudflare/puppeteer` reaches for `node:fs` and `node:path` while loading its
+# transports. Without the Node compatibility flag the Worker throws at import time, so
+# `browser_open` silently degrades to a tool error instead of opening Chromium.
+compatibility_flags = ["nodejs_compat"]
 # D1 is the production database. Local development uses the same SQL through
 # node:sqlite (see src/node.ts), so a migration that works locally works on D1.
 #

@@ -6890,6 +6890,112 @@ p {
   padding: 14px 16px;
 }
 
+.scan-auth-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  padding: 24px;
+  background: color-mix(in srgb, #000 58%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.scan-auth-dialog {
+  width: min(560px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  border-radius: var(--radius);
+  /* The dialog lives in a body portal, outside the app shell: restore the theme's text
+     colour so a light dialog does not inherit the marketing body's near-white ink. */
+  color: var(--text-primary);
+  box-shadow: 0 24px 80px color-mix(in srgb, #000 45%, transparent);
+}
+
+.scan-auth-dialog .scan-auth {
+  margin: 0;
+}
+
+.scan-auth-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.scan-auth-head h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.scan-auth-head p {
+  margin: 4px 0 0;
+  max-width: 44ch;
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.scan-auth-close {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: none;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+
+.scan-auth-close:hover {
+  color: var(--foreground);
+  border-color: color-mix(in srgb, var(--foreground) 30%, var(--border));
+}
+
+.scan-auth-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 9px 11px;
+  border: 1px solid color-mix(in srgb, var(--warning) 42%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--warning) 9%, var(--surface));
+  color: var(--foreground);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.scan-auth-notice svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--warning);
+}
+
+.scan-auth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+@media (max-width: 640px) {
+  .scan-auth-backdrop {
+    align-items: end;
+    padding: 0;
+  }
+
+  .scan-auth-dialog {
+    width: 100%;
+    max-height: 92vh;
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
+}
+
 .scan-auth-modes {
   display: inline-flex;
   gap: 4px;

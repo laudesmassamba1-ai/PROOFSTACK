@@ -217,14 +217,15 @@ la note est marquée `provisional` et l'interface l'affiche.
 Ces points sont volontairement listés ici pour qu'aucune surface ne les présente comme
 disponibles. Ils sont identiques à `docs/DEVELOPMENT_STATUS.md`, section « Known gaps ».
 
-| Annoncé                                                                                   | État réel                                                                             |
-| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Intégration GitHub, partage client, rapports avancés, support prioritaire (plans payants) | **Absent** — la table tarifaire les marque « bientôt »                                |
-| Récupération de mot de passe par e-mail                                                   | **Absent** — pas de fournisseur d'e-mail branché (`email_outbox` existe, aucun envoi) |
-| OAuth, 2FA                                                                                | **Absent**                                                                            |
-| Publication npm de `@proofcore/cli`                                                       | **Absent** — installation par tarball                                                 |
-| Jobs de rétention, sauvegardes                                                            | **Absent**                                                                            |
-| SDK public                                                                                | **Absent** — seuls les contrats internes existent                                     |
+| Annoncé                                                                                   | État réel                                                                                                                             |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Intégration GitHub, partage client, rapports avancés, support prioritaire (plans payants) | **Absent** — la table tarifaire les marque « bientôt »                                                                                |
+| Récupération de mot de passe par e-mail                                                   | **Absent** — pas de fournisseur d'e-mail branché (`email_outbox` existe, aucun envoi)                                                 |
+| OAuth, 2FA                                                                                | **Absent**                                                                                                                            |
+| Publication npm de `@proofcore/cli`                                                       | **Absent** — installation par tarball                                                                                                 |
+| Jobs de rétention, sauvegardes                                                            | **Absent**                                                                                                                            |
+| Publication npm du SDK                                                                    | **Absent** — `@proofcore/sdk` existe (privé : `/v1/project`, `/v1/runs` par jeton `psk_…`), non publié                                |
+| Serveur MCP hébergé                                                                       | **Absent** — seul `proofcore mcp` existe, serveur stdio **local** (50 outils, 3 resources, 4 prompts) ; aucun endpoint MCP dans l'API |
 
 ---
 

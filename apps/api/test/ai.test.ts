@@ -1154,6 +1154,232 @@ describe("ai chat", () => {
     ]);
   });
 
+  it("scopes the assistant to the analysis or finding the person opened", async () => {
+    const { request, signUp, services } = harness;
+    const { cookie, workspaceId, userId } = await signUp("ai-context@example.com");
+    await request("/api/v1/ai/profile", {
+      method: "PUT",
+      cookie,
+      body: JSON.stringify({
+        providerId: "custom",
+        baseUrl: upstreamBase,
+        model: "test-model",
+        apiKey: "sk-context-key",
+      }),
+    });
+
+    const now = new Date().toISOString();
+    const analysis = await services.store.createAnalysis({
+      id: "ana_context_test",
+      workspaceId,
+      projectId: null,
+      createdBy: userId,
+      source: "WEB",
+      targetType: "PAGE",
+      target: "https://context.example/",
+      scope: "PAGE",
+      requestedModules: ["fail"],
+      applicableModules: ["fail"],
+      engine: "scan",
+      engineVersion: "1",
+      environment: "server",
+      status: "completed",
+      coverage: {
+        requestedModules: ["fail"],
+        applicableModules: ["fail"],
+        measuredModules: ["fail"],
+        skipped: [],
+      },
+      startedAt: now,
+      correlationId: "corr_context_test",
+    });
+    await services.store.updateAnalysis({
+      workspaceId,
+      id: analysis.id,
+      patch: {
+        status: "completed",
+        result: {
+          findings: [
+            {
+              module: "fail",
+              id: "hsts",
+              status: "FAIL",
+              observed: "absent",
+              why: "HSTS prevents a protocol downgrade.",
+            },
+          ],
+        },
+      },
+    });
+    const key = findingKey("fail", "hsts", "https://context.example/");
+
+    upstreamState.respond = () => ({
+      status: 200,
+      body: { choices: [{ message: { role: "assistant", content: "Contexte lu." } }] },
+    });
+
+    const analysisChat = await request("/api/v1/ai/chat", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({
+        workspaceId,
+        message: "Que dit cette analyse ?",
+        effort: "quick",
+        context: { kind: "analysis", analysisId: analysis.id },
+      }),
+    });
+    expect(analysisChat.status, await analysisChat.clone().text()).toBe(200);
+    const contextCall = [...upstreamState.calls]
+      .reverse()
+      .find((call) => call.body.includes("PAGE CONTEXT"));
+    const analysisPrompt = JSON.parse(contextCall?.body ?? "{}") as {
+      messages: { role: string; content: string }[];
+    };
+    const system =
+      analysisPrompt.messages.find((message) => message.role === "system")?.content ?? "";
+    expect(system).toContain("PAGE CONTEXT");
+    expect(system).toContain("ana_context_test");
+    expect(system).toContain("https://context.example/");
+    expect(system).toContain("HSTS");
+    expect(system).toContain("absent");
+
+    const findingChat = await request("/api/v1/ai/chat", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({
+        workspaceId,
+        message: "Explique ce constat.",
+        effort: "quick",
+        context: { kind: "finding", analysisId: analysis.id, findingKey: key },
+      }),
+    });
+    expect(findingChat.status, await findingChat.clone().text()).toBe(200);
+    const findingCall = [...upstreamState.calls]
+      .reverse()
+      .find((call) => call.body.includes("OPEN FINDING"));
+    const findingPrompt = JSON.parse(findingCall?.body ?? "{}") as {
+      messages: { role: string; content: string }[];
+    };
+    const findingSystem =
+      findingPrompt.messages.find((message) => message.role === "system")?.content ?? "";
+    expect(findingSystem).toContain("OPEN FINDING");
+    expect(findingSystem).toContain("Observed: absent");
+
+    // The same id from another workspace is a 404, never somebody else's data.
+    const other = await signUp("ai-context-other@example.com");
+    await request("/api/v1/ai/profile", {
+      method: "PUT",
+      cookie: other.cookie,
+      body: JSON.stringify({
+        providerId: "custom",
+        baseUrl: upstreamBase,
+        model: "test-model",
+        apiKey: "sk-context-other",
+      }),
+    });
+    const denied = await request("/api/v1/ai/chat", {
+      method: "POST",
+      cookie: other.cookie,
+      body: JSON.stringify({
+        workspaceId: other.workspaceId,
+        message: "Lis cette analyse.",
+        effort: "quick",
+        context: { kind: "analysis", analysisId: analysis.id },
+      }),
+    });
+    expect(denied.status).toBe(404);
+    const deniedBody = (await denied.json()) as { error: { code: string } };
+    expect(deniedBody.error.code).toBe("context_not_found");
+  });
+  it("saves a validated FLOW scenario only on an explicit confirmation", async () => {
+    const { request, signUp } = harness;
+    const { cookie, workspaceId } = await signUp("ai-scenario@example.com");
+    await request("/api/v1/ai/profile", {
+      method: "PUT",
+      cookie,
+      body: JSON.stringify({
+        providerId: "custom",
+        baseUrl: upstreamBase,
+        model: "test-model",
+        apiKey: "sk-scenario-key",
+      }),
+    });
+    const scenario = {
+      name: "Ouverture de la page",
+      target: "https://example.com/",
+      steps: [
+        {
+          id: "step-1",
+          kind: "navigate",
+          label: "Ouvrir la page",
+          value: "https://example.com/",
+          expect: { urlContains: "example.com" },
+        },
+      ],
+    };
+    const toolCall = (id: string, confirm: boolean) => ({
+      id,
+      type: "function",
+      function: {
+        name: "save_scenario",
+        arguments: JSON.stringify({ ...scenario, confirm }),
+      },
+    });
+    upstreamState.respond = (attempt) => {
+      if (attempt === 1) {
+        return {
+          status: 200,
+          body: {
+            choices: [
+              {
+                message: {
+                  role: "assistant",
+                  content: null,
+                  tool_calls: [toolCall("call_propose", false)],
+                },
+              },
+            ],
+          },
+        };
+      }
+      if (attempt === 2) {
+        return {
+          status: 200,
+          body: {
+            choices: [
+              {
+                message: {
+                  role: "assistant",
+                  content: null,
+                  tool_calls: [toolCall("call_save", true)],
+                },
+              },
+            ],
+          },
+        };
+      }
+      return {
+        status: 200,
+        body: { choices: [{ message: { role: "assistant", content: "Scénario enregistré." } }] },
+      };
+    };
+
+    const chat = await request("/api/v1/ai/chat", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({
+        workspaceId,
+        message: "Crée et enregistre ce scénario.",
+        effort: "quick",
+      }),
+    });
+    expect(chat.status, await chat.clone().text()).toBe(200);
+    const list = await request(`/api/v1/flow/scenarios?workspaceId=${workspaceId}`, { cookie });
+    const body = (await list.json()) as { scenarios: { name: string; steps: unknown[] }[] };
+    expect(body.scenarios).toHaveLength(1);
+    expect(body.scenarios[0]?.name).toBe("Ouverture de la page");
+    expect(body.scenarios[0]?.steps).toHaveLength(1);
+  });
   it("reads uploaded project code through a tenant-scoped tool", async () => {
     const { request, signUp, services } = harness;
     const { cookie, workspaceId } = await signUp("ai-code@example.com");
@@ -1567,6 +1793,77 @@ describe("token accounting and browser tools", () => {
     // The refusal is in the payload the model received, not only in the trace.
     expect(upstreamState.requests.map((entry) => entry.body).join("\n")).toContain(
       "browser_unavailable"
+    );
+  });
+  it("returns the real browser failure to the model instead of a bare tool error", async () => {
+    const { request, signUp, services } = harness;
+    const { cookie, workspaceId } = await signUp("ai-browser-error@example.com");
+    await request("/api/v1/ai/profile", {
+      method: "PUT",
+      cookie,
+      body: JSON.stringify({
+        providerId: "custom",
+        baseUrl: upstreamBase,
+        model: "test-model",
+        apiKey: "sk-browser-error",
+      }),
+    });
+    services.browserAgent = {
+      open: async () => {
+        throw new Error("browser_launch_failed: Chromium did not start (nodejs_compat missing)");
+      },
+      act: async () => {
+        throw new Error("unused");
+      },
+      read: async () => {
+        throw new Error("unused");
+      },
+      close: async () => undefined,
+    };
+    upstreamState.respond = (attempt) => {
+      if (attempt === 1) {
+        return {
+          status: 200,
+          body: {
+            choices: [
+              {
+                message: {
+                  role: "assistant",
+                  content: null,
+                  tool_calls: [
+                    {
+                      id: "call_open",
+                      type: "function",
+                      function: {
+                        name: "browser_open",
+                        arguments: '{"url":"https://example.com"}',
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        };
+      }
+      return {
+        status: 200,
+        body: {
+          choices: [{ message: { role: "assistant", content: "Le navigateur n'a pas démarré." } }],
+        },
+      };
+    };
+    const chat = await request("/api/v1/ai/chat", {
+      method: "POST",
+      cookie,
+      body: JSON.stringify({ workspaceId, message: "Ouvre example.com", effort: "quick" }),
+    });
+    expect(chat.status, await chat.clone().text()).toBe(200);
+    const body = (await chat.json()) as { trace: { tool: string; summary: string }[] };
+    expect(body.trace[0]?.tool).toBe("browser_open");
+    expect(body.trace[0]?.summary).toContain("nodejs_compat missing");
+    expect(upstreamState.requests.map((entry) => entry.body).join("\n")).toContain(
+      "nodejs_compat missing"
     );
   });
 });

@@ -25,6 +25,7 @@ export const AI_TOOL_PERMISSIONS: Record<string, PermissionClass> = {
   analysis_findings: "read",
   compare_analyses: "read",
   validate_scenario: "read",
+  save_scenario: "write",
   list_remediations: "read",
   finding_details: "read",
   suggest_analysis_profile: "read",

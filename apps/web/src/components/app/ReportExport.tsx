@@ -83,11 +83,7 @@ export function ReportExport({
   };
 
   return (
-    <div
-      className="scan-export"
-      role="group"
-      aria-label={fr ? "Exporter le rapport" : "Export report"}
-    >
+    <fieldset className="scan-export" aria-label={fr ? "Exporter le rapport" : "Export report"}>
       <button
         type="button"
         className="app-btn app-btn-ghost"
@@ -142,6 +138,6 @@ export function ReportExport({
           "Full report: summary, structure, pages, charts, findings"
         )}
       </span>
-    </div>
+    </fieldset>
   );
 }

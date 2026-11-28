@@ -1,6 +1,6 @@
 # PROOFCORE — progression de la transformation
 
-État : 25 novembre 2026. Une étape n'est « terminée » que si son résultat est mesuré.
+État : 27 novembre 2026. Une étape n'est « terminée » que si son résultat est mesuré.
 Les statuts utilisés : **FAIT**, **PARTIEL**, **BLOQUÉ**, **NON COMMENCÉ**.
 
 ## Étape A — Stabilisation
@@ -48,16 +48,19 @@ Les statuts utilisés : **FAIT**, **PARTIEL**, **BLOQUÉ**, **NON COMMENCÉ**.
 
 ## Étape E — Intelligence artificielle
 
-| Élément                                               | État        | Limite                                                        |
-| ----------------------------------------------------- | ----------- | ------------------------------------------------------------- |
-| Routage fournisseur + catalogue                       | FAIT        | tests avec fournisseur simulé                                 |
-| Contexte autorisé par workspace                       | FAIT        | tests d'isolation                                             |
-| 19 outils, modules lisibles/configurables/exécutables | FAIT        | `routes/ai.ts`, `module-copilot.ts`, `module-copilot.test.ts` |
-| FLOW navigateur réel                                  | FAIT        | Chromium local, `journey-browser.test.ts`                     |
-| Fencing des contenus non fiables                      | FAIT        | 6 tests dédiés                                                |
-| Mémoire curatée, auditable, supprimable               | FAIT        | API + tests                                                   |
-| Appel réel à un fournisseur                           | NON VÉRIFIÉ | aucun credential dans cette passe                             |
-| Effort/sous-agents                                    | PARTIEL     | niveaux côté CLI/api ; preuve de coût non mesurée             |
+| Élément                                               | État        | Limite                                                                                                         |
+| ----------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------- |
+| Routage fournisseur + catalogue                       | FAIT        | tests avec fournisseur simulé                                                                                  |
+| Contexte autorisé par workspace                       | FAIT        | tests d'isolation                                                                                              |
+| 37 outils, modules lisibles/configurables/exécutables | FAIT        | `routes/ai.ts`, `module-copilot.ts`, `module-copilot.test.ts`, catalogue `GET /api/v1/ai/tools`                |
+| Contexte de page (analyse, constat, module, projet)   | FAIT        | `ai-page-context.ts` ; test API 404 cross-tenant ; bannière mobile 320 px                                      |
+| Scénario FLOW proposé, validé puis enregistré         | FAIT        | `validate_scenario` → `save_scenario` avec `confirm:true` ; test API réel                                      |
+| FLOW navigateur réel                                  | PARTIEL     | Chromium **local** prouvé ; chemin Cloudflare Browser Rendering corrigé (`nodejs_compat`) mais **non déployé** |
+| Fencing des contenus non fiables                      | FAIT        | 6 tests dédiés                                                                                                 |
+| Mémoire curatée, auditable, supprimable               | FAIT        | API + tests                                                                                                    |
+| Appel réel à un fournisseur                           | NON VÉRIFIÉ | aucun credential dans cette passe ; les 42 tests IA utilisent le fournisseur simulé                            |
+| Échec d’outil non maquillé                            | FAIT        | un `browser_launch_failed` revient dans la trace et le prompt ; test dédié                                     |
+| Effort/sous-agents                                    | PARTIEL     | niveaux côté CLI/api ; preuve de coût non mesurée                                                              |
 
 ## Étape F — Moteurs
 
@@ -71,14 +74,14 @@ Les statuts utilisés : **FAIT**, **PARTIEL**, **BLOQUÉ**, **NON COMMENCÉ**.
 
 ## Étape G — Interface
 
-| Élément               | État        | Limite                                                     |
-| --------------------- | ----------- | ---------------------------------------------------------- |
-| Ink & Object conservé | FAIT        | aucune refonte                                             |
-| Marque PROOFCORE      | FAIT        | textes et coquille                                         |
-| Anti-AI design        | FAIT        | règles écrites, pas de fausses métriques                   |
-| Responsive            | PARTIEL     | desktop + Pixel 7 prouvés ; matrice 14 tailles non rejouée |
-| Accessibilité         | NON VÉRIFIÉ | pas d'axe-core ni parcours clavier exhaustif               |
-| Défaut mobile corrigé | FAIT        | DPR du fond WebGL plafonné, E2E mobile vert                |
+| Élément               | État | Limite                                                                                             |
+| --------------------- | ---- | -------------------------------------------------------------------------------------------------- |
+| Ink & Object conservé | FAIT | aucune refonte                                                                                     |
+| Marque PROOFCORE      | FAIT | textes et coquille                                                                                 |
+| Anti-AI design        | FAIT | règles écrites, pas de fausses métriques                                                           |
+| Responsive            | FAIT | matrice 13 tailles × 7 routes verte (27 nov.) ; assistant 320×700 rejoué après le contexte de page |
+| Accessibilité         | FAIT | axe-core WCAG 2.2 AA sur 8 routes, dont l’assistant : 1/1 ; parcours clavier exhaustif non refait  |
+| Défaut mobile corrigé | FAIT | DPR du fond WebGL plafonné, E2E mobile vert                                                        |
 
 ## Étape H — Commercial
 
@@ -111,17 +114,17 @@ Les statuts utilisés : **FAIT**, **PARTIEL**, **BLOQUÉ**, **NON COMMENCÉ**.
 
 ## Étape J — Recette
 
-| Parcours                   | État             | Preuve                                                       |
-| -------------------------- | ---------------- | ------------------------------------------------------------ |
-| Débutant (web mobile)      | FAIT             | E2E `app-mobile.spec.ts`                                     |
-| Compte/session/facturation | FAIT             | E2E `journey.spec.ts`                                        |
-| IA contextuelle            | PARTIEL          | tests API avec fournisseur simulé                            |
-| IA ↔ modules               | FAIT (hors prod) | config → run → historique → analyse, 5 tests                 |
-| WORLD/FLOW/EXIT/FAIL/CLEAN | PARTIEL          | tests des cinq familles ; parcours navigateur CLI non rejoué |
-| FAIL/CLEAN                 | FAIT             | tests page-scan + audits                                     |
-| Sécurité multi-comptes     | FAIT             | `tenant-isolation.test.ts`                                   |
-| Responsive                 | FAIT             | 13 viewports (320→2560), 78 combinaisons, 0 débordement      |
-| Production readiness       | BLOQUÉ           | sauvegarde distante/Neon non exercées + credentials externes |
+| Parcours                   | État             | Preuve                                                                      |
+| -------------------------- | ---------------- | --------------------------------------------------------------------------- |
+| Débutant (web mobile)      | FAIT             | E2E `app-mobile.spec.ts`                                                    |
+| Compte/session/facturation | FAIT             | E2E `journey.spec.ts`                                                       |
+| IA contextuelle            | FAIT (hors prod) | contexte analyse/constat/module/projet ; 404 cross-tenant ; bannière 320 px |
+| IA ↔ modules               | FAIT (hors prod) | config → run → historique → analyse, 5 tests                                |
+| WORLD/FLOW/EXIT/FAIL/CLEAN | PARTIEL          | tests des cinq familles ; parcours navigateur CLI non rejoué                |
+| FAIL/CLEAN                 | FAIT             | tests page-scan + audits                                                    |
+| Sécurité multi-comptes     | FAIT             | `tenant-isolation.test.ts`                                                  |
+| Responsive                 | FAIT             | 13 viewports (320→2560), 78 combinaisons, 0 débordement                     |
+| Production readiness       | BLOQUÉ           | sauvegarde distante/Neon non exercées + credentials externes                |
 
 ## Ce qui change le verdict
 

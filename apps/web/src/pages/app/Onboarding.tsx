@@ -431,6 +431,49 @@ export function OnboardingPage() {
             </p>
           )}
 
+          <details className="mt-5 border-t border-line pt-4 text-sm">
+            <summary className="cursor-pointer text-xs font-medium text-muted">
+              {fr
+                ? "Voir à quoi ressemble un rapport (exemple fictif)"
+                : "See what a report looks like (fictional example)"}
+            </summary>
+            <div className="mt-3 rounded-[var(--radius)] border border-dashed border-line p-3">
+              <p className="text-[0.68rem] font-medium uppercase tracking-wide text-warning">
+                {fr
+                  ? "Données fictives · aucune analyse réelle"
+                  : "Fictional data · no real analysis"}
+              </p>
+              <p className="mt-2 text-xs text-muted">
+                {fr
+                  ? "Exemple : boutique.example — 2 constats sur une page. Les chiffres ci-dessous sont inventés pour montrer la forme du rapport, pas votre site."
+                  : "Example: shop.example — 2 findings on one page. The numbers below are invented to show the report shape, not your site."}
+              </p>
+              <ul className="mt-3 space-y-2 text-xs">
+                <li>
+                  <span className="font-medium text-danger">FAILED · FAIL / hsts</span>
+                  <p className="text-muted">
+                    {fr
+                      ? "L’en-tête HSTS est absent. Preuve : observed « absent », attendu « max-age ≥ 31536000 »."
+                      : "The HSTS header is missing. Evidence: observed “absent”, expected “max-age ≥ 31536000”."}
+                  </p>
+                </li>
+                <li>
+                  <span className="font-medium text-warning">WARNING · CLEAN / contrast</span>
+                  <p className="text-muted">
+                    {fr
+                      ? "Un texte gris sur fond clair mesure 3,2:1. Correction proposée : utiliser la couleur ink-soft (≥ 4,5:1)."
+                      : "Grey text on a light background measures 3.2:1. Suggested fix: use ink-soft (≥ 4.5:1)."}
+                  </p>
+                </li>
+              </ul>
+              <p className="mt-3 text-[0.68rem] text-muted">
+                {fr
+                  ? "Un rapport réel cite l’URL, la méthode, la valeur observée et l’identifiant de l’analyse."
+                  : "A real report cites the URL, method, observed value and analysis id."}
+              </p>
+            </div>
+          </details>
+
           {data.onboarding.completed ? (
             <div className="mt-5 border-t border-line pt-4">
               <p className="flex items-center gap-1.5 text-sm text-success">

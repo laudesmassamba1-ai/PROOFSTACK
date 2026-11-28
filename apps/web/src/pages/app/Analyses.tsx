@@ -1,6 +1,6 @@
-import { Activity, Download, GitCompare, RefreshCw } from "lucide-react";
+import { Activity, Download, GitCompare, MessageSquare, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { FindingRemediation, type Remediation } from "../../components/app/FindingRemediation.js";
 import { Empty, ErrorState, Loading } from "../../components/app/ui.js";
 import { useI18n } from "../../i18n/index.js";
@@ -390,6 +390,13 @@ export function AnalysesPage() {
                     </div>
                     <div className="flex flex-wrap items-center justify-end gap-2">
                       <StatusPill status={current.status} />
+                      <Link
+                        className="app-btn"
+                        to={`/app/ai?context=analysis&analysis=${encodeURIComponent(current.id)}&label=${encodeURIComponent(current.target)}`}
+                      >
+                        <MessageSquare size={14} />
+                        {fr ? "Demander à l’assistant" : "Ask the assistant"}
+                      </Link>
                       <button
                         type="button"
                         className="app-btn"
@@ -613,6 +620,13 @@ export function AnalysesPage() {
                               </div>
                             </dl>
                           </details>
+                          <Link
+                            className="app-btn mt-2"
+                            to={`/app/ai?context=finding&analysis=${encodeURIComponent(finding.analysisId)}&finding=${encodeURIComponent(finding.key)}&label=${encodeURIComponent(finding.title)}`}
+                          >
+                            <MessageSquare size={13} />
+                            {fr ? "Expliquer avec l’assistant" : "Explain with the assistant"}
+                          </Link>
                           <FindingRemediation
                             workspaceId={workspaceId}
                             analysisId={finding.analysisId}

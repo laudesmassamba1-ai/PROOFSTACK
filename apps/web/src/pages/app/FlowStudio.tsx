@@ -7,6 +7,7 @@ import {
 import {
   ArrowDown,
   ArrowUp,
+  MessageSquare,
   Play,
   Plus,
   RefreshCw,
@@ -367,6 +368,19 @@ export function FlowStudioPage() {
           fr
             ? "Chaque étape est une action réelle : ouvrir, cliquer, remplir, vérifier. Le serveur revalide ce que l'éditeur accepte, et un déploiement sans navigateur le dit au lieu de simuler un parcours."
             : "Each step is a real action: open, click, fill, assert. The server re-validates what the editor accepts, and a deployment without a browser says so instead of simulating a journey."
+        }
+        actions={
+          <Link
+            className="app-btn"
+            to={`/app/ai?context=module&module=flow&label=FLOW&prompt=${encodeURIComponent(
+              fr
+                ? "Propose un scénario FLOW à partir de mon objectif, valide-le avec validate_scenario, puis demande-moi confirmation avant de l'enregistrer."
+                : "Propose a FLOW scenario from my goal, validate it with validate_scenario, then ask for my confirmation before saving it."
+            )}`}
+          >
+            <MessageSquare size={14} />
+            {fr ? "Créer avec l'assistant" : "Create with the assistant"}
+          </Link>
         }
       />
 

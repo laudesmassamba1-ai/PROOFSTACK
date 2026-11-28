@@ -392,7 +392,14 @@ describe("CLI", () => {
         response.end(
           JSON.stringify({
             workspace: { id: "ws_from_key", name: "Sync test" },
-            project: { id: "prj_from_key", name: "Sync test" },
+            project: {
+              id: "prj_from_key",
+              name: "Sync test",
+              baseUrl: "http://localhost:3000",
+              environment: "local",
+            },
+            plan: { key: "developer", entitled: true },
+            usage: { monthlyTestRuns: 0, limit: 100, remaining: 100 },
           })
         );
         return;
@@ -413,7 +420,17 @@ describe("CLI", () => {
           }
         );
         response.writeHead(200, { "content-type": "application/json" });
-        response.end(JSON.stringify({ runId: "run_test", recorded: true }));
+        // The real route answers this exact shape (retention + usage included); a thinner
+        // stub would let the SDK's response validation go untested.
+        response.end(
+          JSON.stringify({
+            runId: "run_test",
+            reportId: "rep_test",
+            recorded: true,
+            retainedUntil: null,
+            usage: { monthlyTestRuns: 1, limit: 100, remaining: 99 },
+          })
+        );
       });
     });
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -489,8 +506,15 @@ describe("CLI", () => {
         response.writeHead(200, { "content-type": "application/json" });
         response.end(
           JSON.stringify({
-            workspace: { id: "ws_from_key" },
-            project: { id: "prj_from_key" },
+            workspace: { id: "ws_from_key", name: "Audit test" },
+            project: {
+              id: "prj_from_key",
+              name: "Audit test",
+              baseUrl: "http://127.0.0.1:9",
+              environment: "local",
+            },
+            plan: { key: "developer", entitled: true },
+            usage: { monthlyTestRuns: 0, limit: 100, remaining: 100 },
           })
         );
         return;
@@ -531,7 +555,15 @@ describe("CLI", () => {
             findingCount: parsed.run?.findings?.length,
           });
           response.writeHead(200, { "content-type": "application/json" });
-          response.end(JSON.stringify({ runId: parsed.run?.id, recorded: true }));
+          response.end(
+            JSON.stringify({
+              runId: parsed.run?.id,
+              reportId: "rep_audit",
+              recorded: true,
+              retainedUntil: null,
+              usage: { monthlyTestRuns: 1, limit: 100, remaining: 99 },
+            })
+          );
         });
         return;
       }

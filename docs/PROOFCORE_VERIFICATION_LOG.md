@@ -4,6 +4,36 @@ Ce journal consigne les commandes exécutées, leur date et leur résultat. Les 
 ci-dessous ne sont pas recopiés d'une documentation : ils proviennent de la session
 indiquée. Ils deviennent obsolètes à chaque modification du dépôt.
 
+## Session du 2026-11-27 (UTC 14:02) — contexte de page, navigateur, scénario
+
+Commit de base : `921d216`, branche `master`. Cette passe ajoute le contexte de page de
+l’assistant, le correctif de compatibilité du navigateur Cloudflare, l’enregistrement
+confirmé d’un scénario FLOW et une démonstration explicitement fictive.
+
+| Commande                                                                        | Résultat observé                                                                                                                                                              |
+| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npx vitest run apps/api/test/ai.test.ts apps/api/test/ai-tools.test.ts`        | **42/42** réussis, 2 fichiers, 11,59 s. Inclut le contexte analyse/constat, le 404 cross-tenant, le message d’échec navigateur réel et la sauvegarde FLOW après confirmation. |
+| `npx vitest run apps/api/test/local-browser-agent.test.ts`                      | **1/1** réussi (5,18 s) : Chromium local, navigation et lecture réelles.                                                                                                      |
+| `npx playwright test … app-mobile.spec.ts --project=mobile -g "assistant fits"` | **1/1** réussi (45,7 s) : 320×700, bannière de contexte, composeur prérempli, retrait du contexte, zéro débordement.                                                          |
+| `npx playwright test … a11y.spec.ts --project=desktop`                          | **1/1** réussi (1,2 min) : axe WCAG 2.2 AA sur 8 routes, dont `/app/ai`.                                                                                                      |
+| `npx tsc --noEmit -p apps/api` et `-p apps/web`                                 | Sortie 0 pour les deux.                                                                                                                                                       |
+| `pnpm --filter @proofcore/web build`                                            | Sortie 0 ; avertissement Vite non bloquant sur des chunks > 500 kB.                                                                                                           |
+| `npx wrangler deploy --dry-run --outdir /tmp/proofcore-worker-dry`              | Sortie 0 ; **aucun** avertissement `node:fs`/`node:path`. Bundle 3609,19 KiB (720,65 KiB gzip), bindings `DB` et `BROWSER` présents.                                          |
+
+Limites :
+
+- **Aucun déploiement de production n’a été fait** dans cette passe. Le Worker live
+  tourne encore la version sans `nodejs_compat` ; `browser_open` peut donc y échouer.
+  Le correctif est vérifié par le bundle et le dry-run, pas par une session Cloudflare
+  réelle de bout en bout.
+- Le test d’échec navigateur injecte un agent qui lève une erreur : il prouve la
+  propagation du message et la consigne anti-mensonge, pas le lancement Chromium.
+- Le fournisseur IA réel n’a pas été appelé ; les boucles d’outils utilisent le
+  fournisseur simulé du harnais.
+- La suite complète `npx vitest run` et la campagne 13 viewports n’ont pas été
+  relancées après ces changements. Les résultats antérieurs restent dans les sections
+  ci-dessous et ne doivent pas être présentés comme ceux de ce commit.
+
 ## Session du 2026-11-27 (UTC 09:09 pour le premier relevé)
 
 Commit de base : `41ee5a3`, branche `master`. Le dépôt contenait déjà des modifications

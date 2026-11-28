@@ -3,6 +3,7 @@ import {
   BadgeCheck,
   Brain,
   Globe2,
+  MessageSquare,
   PackageOpen,
   Route as RouteIcon,
   ScanLine,
@@ -280,6 +281,13 @@ export function ModulePage() {
               : `AI reads the project files, names the line and proposes the change. The ${meta.name} result stays the measurement of record.`}
           </p>
         </div>
+        <Link
+          to={`/app/ai?context=module&module=${module}&label=${encodeURIComponent(meta.name)}`}
+          className="app-btn app-btn-sm"
+        >
+          <MessageSquare size={13} />
+          {fr ? "Questionner ce module" : "Ask about this module"}
+        </Link>
         <Link
           to={latest?.projectId ? `/app/projects/${latest.projectId}?tab=ai` : "/app/projects"}
           className="app-btn app-btn-primary app-btn-sm"

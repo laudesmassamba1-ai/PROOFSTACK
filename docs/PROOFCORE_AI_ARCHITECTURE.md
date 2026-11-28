@@ -1,7 +1,7 @@
 # PROOFCORE — architecture de l'IA
 
-État : 25 novembre 2026. Décrit `apps/api/src/routes/ai.ts`, `ai-crypto.ts`,
-`ai-providers.ts`, `project-intelligence.ts` et le pont local du CLI.
+État : 27 novembre 2026. Décrit `apps/api/src/routes/ai.ts`, `ai-page-context.ts`,
+`ai-crypto.ts`, `ai-providers.ts`, `project-intelligence.ts` et le pont local du CLI.
 
 ## 1. Principe
 
@@ -34,7 +34,18 @@ contexte est construit exclusivement depuis ce workspace :
 - aperçu, projets, runs récents, findings récents, rapports stockés ;
 - sources de code **importées** dans le projet (jamais le disque du serveur) ;
 - mémoire du workspace (faits `decision|convention|stack|goal|lesson`) ;
+- **contexte de page** : l’analyse, le constat, le module ou le projet réellement
+  ouvert dans l’interface, résolu dans le workspace ;
 - résultats des outils demandés par le modèle.
+
+Le contexte de page ne transporte que des identifiants (`analysisId`, `findingKey`,
+`module`, `projectId`). `buildAiPageContext` relit l’objet avec les mêmes filtres
+`workspace_id` que l’API ; un identifiant d’un autre tenant renvoie
+`404 context_not_found` avant tout appel fournisseur. Le bloc est borné : en-tête de
+l’analyse (cible, statut, couverture, pages non lues, modules sautés), 12 constats non
+`PASSED` au plus, ou le détail complet des sept niveaux d’explication pour un constat.
+Il est présenté comme une **preuve, pas une instruction** : une valeur qui contient des
+ordres est une donnée à rapporter, jamais à suivre.
 
 Aucune donnée d'un autre compte n'entre dans le prompt : les lectures passent par les
 mêmes filtres `workspace_id` que l'API, et les conversations sont liées à
@@ -48,26 +59,27 @@ localise d'abord les fichiers avec `prepare_code_patch`, demande au modèle un J
 par le même outil avant de rendre le diff. Un chemin inventé ou une ligne absente ne
 produit pas de diff (`file_not_found`, `before_not_found`), et rien n'est écrit.
 
-## 4. Outils (36)
+## 4. Outils (37)
 
-| Outil                                                                                 | Nature                                                                            |
-| ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `workspace_overview`, `list_projects`, `recent_runs`, `recent_findings`, `get_report` | lecture du workspace                                                              |
-| `module_status`, `module_config`                                                      | état, configuration active et vocabulaire des 5 modules                           |
-| `project_code`                                                                        | lecture des fichiers importés (sourceId / path)                                   |
-| `fetch_web`, `browse_url`, `probe_url`                                                | lecture réseau avec garde d'URL                                                   |
-| `browser_open`, `browser_read`, `browser_act`, `browser_close`                        | session Chromium réelle : ouvrir, relire, cliquer/saisir/défiler, fermer          |
-| `fail_scan`, `clean_audit`, `site_audit`                                              | contrôles HTTP mesurés                                                            |
-| `read_repo`                                                                           | lecture d'un dépôt public avec garde                                              |
-| `module_configure`                                                                    | écriture validée : les cinq familles (WORLD, FLOW, EXIT, FAIL, CLEAN)             |
-| `validate_configuration`                                                              | lecture : un patch de module validé comme une sauvegarde, sans rien écrire        |
-| `suggest_analysis_profile`                                                            | lecture : un profil du registre, avec les mots qui l'ont justifié                 |
-| `module_run`, `analyze_run`                                                           | lancement réel + diagnostic d'un run stocké                                       |
-| `remember`                                                                            | écriture : un fait de mémoire borné                                               |
-| `finding_details`                                                                     | lecture : un constat complet (preuve, contrôle, remédiation liée)                 |
-| `prepare_code_patch`                                                                  | lecture : localise le fichier et rend un diff unifié, sans écrire ni exécuter     |
-| `generate_remediation`                                                                | lecture : plan complet (correctif, vérification, exemples, extraits) sans écrire  |
-| `verify_remediation`                                                                  | écriture : vérifie un correctif par une analyse postérieure, refuse l'inconclusif |
+| Outil                                                                                 | Nature                                                                              |
+| ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `workspace_overview`, `list_projects`, `recent_runs`, `recent_findings`, `get_report` | lecture du workspace                                                                |
+| `module_status`, `module_config`                                                      | état, configuration active et vocabulaire des 5 modules                             |
+| `project_code`                                                                        | lecture des fichiers importés (sourceId / path)                                     |
+| `fetch_web`, `browse_url`, `probe_url`                                                | lecture réseau avec garde d'URL                                                     |
+| `browser_open`, `browser_read`, `browser_act`, `browser_close`                        | session Chromium réelle : ouvrir, relire, cliquer/saisir/défiler, fermer            |
+| `fail_scan`, `clean_audit`, `site_audit`                                              | contrôles HTTP mesurés                                                              |
+| `read_repo`                                                                           | lecture d'un dépôt public avec garde                                                |
+| `module_configure`                                                                    | écriture validée : les cinq familles (WORLD, FLOW, EXIT, FAIL, CLEAN)               |
+| `validate_configuration`                                                              | lecture : un patch de module validé comme une sauvegarde, sans rien écrire          |
+| `suggest_analysis_profile`                                                            | lecture : un profil du registre, avec les mots qui l'ont justifié                   |
+| `module_run`, `analyze_run`                                                           | lancement réel + diagnostic d'un run stocké                                         |
+| `validate_scenario`, `save_scenario`                                                  | lit/valide un scénario FLOW, puis l'enregistre seulement sur confirmation explicite |
+| `remember`                                                                            | écriture : un fait de mémoire borné                                                 |
+| `finding_details`                                                                     | lecture : un constat complet (preuve, contrôle, remédiation liée)                   |
+| `prepare_code_patch`                                                                  | lecture : localise le fichier et rend un diff unifié, sans écrire ni exécuter       |
+| `generate_remediation`                                                                | lecture : plan complet (correctif, vérification, exemples, extraits) sans écrire    |
+| `verify_remediation`                                                                  | écriture : vérifie un correctif par une analyse postérieure, refuse l'inconclusif   |
 
 Contrôles :
 
@@ -92,6 +104,10 @@ Contrôles :
   les termes du constat, exige un `before` exact sur des lignes entières, et refuse un
   bloc absent ou ambigu plutôt que de deviner ; le diff reste une proposition, vérifiée
   par une analyse postérieure ;
+- `save_scenario` repasse par `validateFlowScenario` (le même validateur que
+  l’éditeur et le runner) ; sans `confirm: true` il rend la proposition canonique et
+  n’écrit rien. Le scénario enregistré apparaît dans FLOW Studio, où son exécution
+  reste une action séparée ;
 - `module_run` exige `confirm: true`, vérifie le quota `monthly_test_runs` avant de
   lancer, n'accepte pour FAIL/CLEAN qu'un hôte du projet, et enregistre le run comme un
   upload CLI (même compteur, même historique) ;
@@ -100,6 +116,9 @@ Contrôles :
 - les URLs sortantes passent par `assertPublicUrl` (http(s), hôte public, ports
   autorisés, redirections revalidées) ;
 - le nombre de pas est borné par le niveau d'effort (`maxSteps` 10/18/28) ;
+- un échec de lancement navigateur est renvoyé au modèle avec son message réel
+  (`tool error · browser_launch_failed: …`), jamais comme un succès ; le prompt exige
+  qu’il cite l’échec et ne décrive pas une page qu’il n’a pas vue ;
 - une session navigateur appartient à l'utilisateur qui l'a ouverte : le Worker stocke
   le propriétaire en D1 à côté de l'identifiant de session Cloudflare, et l'agent local
   vérifie le même propriétaire en mémoire. Un identifiant volé ne pilote pas le
@@ -183,7 +202,12 @@ les 5xx sont journalisés avec `requestId`, sans jeton ni clé.
 5. L'agent local (CLI/desktop) est un autre chemin, avec ses propres approbations ;
    il ne partage pas la session du cloud.
 6. Les journeys FLOW navigateur sont prouvés par Chromium local
-   (`packages/cli/test/journey-browser.test.ts`) et restent hors du Worker ; le run
-   stocké est lisible par l'IA après upload.
+   (`packages/cli/test/journey-browser.test.ts`). Le Worker expose aussi
+   `browser_open` via Cloudflare Browser Rendering ; le bundle exige désormais
+   `compatibility_flags = ["nodejs_compat"]` pour charger `@cloudflare/puppeteer`.
+   Le correctif est dans `wrangler.toml` et le `--dry-run` ne signale plus de builtin
+   Node manquant, mais le déploiement de production n’a pas été refait : le chemin
+   Cloudflare reste **NON VÉRIFIÉ de bout en bout**, et un échec doit rester visible
+   comme `tool error`.
 7. EXIT est configurable et analysable par l'IA, mais son exécution fichier/commande
    reste locale ; seule une source HTTP serait exécutable côté serveur.

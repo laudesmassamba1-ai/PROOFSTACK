@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router";
 import { ReportExport } from "../../components/app/ReportExport.js";
 import { Card, ErrorState } from "../../components/app/ui.js";
@@ -408,6 +409,8 @@ export function ScanPage(): React.ReactElement {
   const [loginUrl, setLoginUrl] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  /** Why the dialog opened: a detected wall, or the site refusing the credentials. */
+  const [loginNotice, setLoginNotice] = useState<string | null>(null);
   const [showVerify, setShowVerify] = useState(false);
   const [verify, setVerify] = useState<{
     metaTag: string;
@@ -594,6 +597,45 @@ export function ScanPage(): React.ReactElement {
     });
   }, [loadHistory, session.workspaceId, requestedAudit, requestedProject, loadCorrections]);
 
+  useEffect(() => {
+    if (!showAuth) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setShowAuth(false);
+      setLoginNotice(null);
+      setPassword("");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showAuth]);
+
+  /**
+   * One read, before any credential is asked: does this address put a password form in
+   * front of the visitor? The answer comes from the server, which reads the real page.
+   */
+  const detectLogin = async (target: string) => {
+    if (!session.workspaceId) return null;
+    try {
+      const body = await apiFetch<{
+        login: {
+          detected: boolean;
+          loginUrl: string | null;
+          emailField: string | null;
+          passwordField: string | null;
+          reason: string | null;
+        };
+      }>("/api/v1/audits/login-check", {
+        method: "POST",
+        body: { workspaceId: session.workspaceId, url: target },
+        timeoutMs: 20_000,
+      });
+      return body.login;
+    } catch {
+      // Detection is an addition, never a gate: a failed probe lets the ordinary scan
+      // run and report what it could actually see.
+      return null;
+    }
+  };
   const run = async () => {
     if (!session.workspaceId || busy) return;
     const target = url.trim();
@@ -605,26 +647,63 @@ export function ScanPage(): React.ReactElement {
       );
       return;
     }
+    let effectiveLoginUrl = loginUrl.trim();
+    // Signing in is only useful if the scan then walks what the login unlocked: without
+    // this, a manually-opened login panel would measure one page and call it a site.
+    const hasSession =
+      (authMode === "account" && Boolean(email.trim() && password)) ||
+      (authMode === "cookie" && Boolean(cookie.trim()));
+    const effectiveReadSite = readSite || hasSession;
+    if (effectiveReadSite && !readSite) setReadSite(true);
     if (authMode === "account" && (email.trim() || password)) {
-      if (!/^https?:\/\/\S+/i.test(loginUrl.trim())) {
+      if (!effectiveLoginUrl) {
+        const wall = await detectLogin(target);
+        if (wall?.loginUrl) {
+          effectiveLoginUrl = wall.loginUrl;
+          setLoginUrl(wall.loginUrl);
+        }
+      }
+      if (!email.trim() || password.length === 0) {
         setError(
           new Error(
             fr
-              ? "Donne l'adresse complète de la page de connexion du site, ou laisse les identifiants vides."
-              : "Give the full URL of the site's login endpoint, or leave the credentials empty."
+              ? "Identifiant (ou email) et mot de passe sont nécessaires."
+              : "Username (or email) and password are needed."
           )
         );
         return;
       }
-      if (!email.includes("@") || password.length === 0) {
+      if (!/^https?:\/\/\S+/i.test(effectiveLoginUrl)) {
         setError(
           new Error(
-            fr ? "Email et mot de passe sont nécessaires." : "Email and password are needed."
+            fr
+              ? "Donne l'adresse complète de la page de connexion du site."
+              : "Give the full URL of the site's login page."
           )
         );
         return;
       }
     }
+    // No credentials yet: read the target once and ask before spending a scan on a page
+    // that will only show the login form. A detected wall also turns on the site crawl,
+    // because the point of signing in is to reach what is behind it.
+    if (authMode === "account" && !(email.trim() && password)) {
+      setBusy(true);
+      const wall = await detectLogin(target);
+      setBusy(false);
+      if (wall?.detected) {
+        if (wall.loginUrl) setLoginUrl(wall.loginUrl);
+        setReadSite(true);
+        setLoginNotice(
+          fr
+            ? "Ce site protège une partie de son contenu derrière une connexion. Saisis l'identifiant (ou l'email) et le mot de passe de ton compte sur ce site : l'analyse se connectera, puis parcourra l'application derrière le formulaire."
+            : "This site puts part of its content behind a login. Enter the username (or email) and password of your account on this site: the scan will sign in, then walk the application behind the form."
+        );
+        setShowAuth(true);
+        return;
+      }
+    }
+    setShowAuth(false);
     setBusy(true);
     setError(null);
     setScan(null);
@@ -656,11 +735,11 @@ export function ScanPage(): React.ReactElement {
           url: target,
           ...(scanProjectId ? { projectId: scanProjectId } : {}),
           ...(authMode === "cookie" && cookie.trim() ? { headers: { cookie: cookie.trim() } } : {}),
-          ...(readSite ? { crawl: { maxPages, maxDepth: 2 } } : {}),
+          ...(effectiveReadSite ? { crawl: { maxPages, maxDepth: 2 } } : {}),
           ...(authMode === "account" && email.trim() && password
             ? {
                 login: {
-                  url: loginUrl.trim(),
+                  url: effectiveLoginUrl,
                   email: email.trim(),
                   password,
                   ...(loginEndpoint.trim() ? { endpoint: loginEndpoint.trim() } : {}),
@@ -681,8 +760,23 @@ export function ScanPage(): React.ReactElement {
       setAuditId(body.audit.id);
       const project = body.audit.projectId ?? scanProjectId;
       if (project) setScanProjectId(project);
-      // The password exists to be used once: it leaves the form as soon as the scan starts.
-      setPassword("");
+      const login = body.audit.login;
+      if (login?.ok === false) {
+        // The scan ran, but only over the public surface. Say it and ask again instead of
+        // presenting an incomplete report as the whole site.
+        setLoginNotice(
+          fr
+            ? `La connexion a échoué : le site n'a montré que ses pages publiques.${login.reason ? ` Motif : ${login.reason}` : ""} Vérifie l'adresse de la page de connexion et les identifiants, puis réessaie.`
+            : `Sign-in failed: the site only showed its public pages.${login.reason ? ` Reason: ${login.reason}` : ""} Check the login page URL and the credentials, then try again.`
+        );
+        setShowAuth(true);
+      } else {
+        // The password exists to be used once; a failed attempt keeps it so a typo can be
+        // corrected without retyping the whole form.
+        setPassword("");
+        setShowAuth(false);
+        setLoginNotice(null);
+      }
       // The server already compared this scan to the previous one; reloading the board
       // shows the same comparison next to the four workflow states.
       await Promise.all([loadHistory(), loadCorrections(project)]);
@@ -912,140 +1006,233 @@ export function ScanPage(): React.ReactElement {
         </button>
       </Card>
 
-      {showAuth ? (
-        <Card className="scan-auth">
-          <div
-            className="scan-auth-modes"
-            role="tablist"
-            aria-label={fr ? "Méthode de connexion" : "Sign-in method"}
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={authMode === "account"}
-              className={authMode === "account" ? "is-active" : ""}
-              onClick={() => setAuthMode("account")}
+      {showAuth
+        ? createPortal(
+            // biome-ignore lint/a11y/noStaticElementInteractions: the backdrop only dismisses the dialog; the dialog itself is a labelled modal and Escape works too.
+            <div
+              className="scan-auth-backdrop"
+              role="presentation"
+              onMouseDown={(event) => {
+                if (event.target !== event.currentTarget) return;
+                setShowAuth(false);
+                setLoginNotice(null);
+                setPassword("");
+              }}
             >
-              {fr ? "Compte du site" : "Site account"}
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={authMode === "cookie"}
-              className={authMode === "cookie" ? "is-active" : ""}
-              onClick={() => setAuthMode("cookie")}
-            >
-              Cookie
-            </button>
-          </div>
+              <div
+                className="scan-auth-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="scan-auth-title"
+              >
+                <Card className="scan-auth">
+                  <div className="scan-auth-head">
+                    <div>
+                      <h2 id="scan-auth-title">
+                        {fr ? "Connexion au site" : "Sign in to the site"}
+                      </h2>
+                      <p>
+                        {fr
+                          ? "L'analyse utilise ces identifiants une seule fois, pour lire ce qui se trouve derrière le formulaire. Ils ne sont pas enregistrés."
+                          : "The scan uses these credentials once, to read what is behind the form. They are not stored."}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="scan-auth-close"
+                      aria-label={fr ? "Fermer" : "Close"}
+                      onClick={() => {
+                        setShowAuth(false);
+                        setLoginNotice(null);
+                        setPassword("");
+                      }}
+                    >
+                      <X size={16} aria-hidden />
+                    </button>
+                  </div>
+                  {loginNotice ? (
+                    <p className="scan-auth-notice" role="status">
+                      <AlertTriangle size={14} aria-hidden />
+                      <span>{loginNotice}</span>
+                    </p>
+                  ) : null}
+                  <div
+                    className="scan-auth-modes"
+                    role="tablist"
+                    aria-label={fr ? "Méthode de connexion" : "Sign-in method"}
+                  >
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={authMode === "account"}
+                      className={authMode === "account" ? "is-active" : ""}
+                      onClick={() => setAuthMode("account")}
+                    >
+                      {fr ? "Compte du site" : "Site account"}
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={authMode === "cookie"}
+                      className={authMode === "cookie" ? "is-active" : ""}
+                      onClick={() => setAuthMode("cookie")}
+                    >
+                      Cookie
+                    </button>
+                  </div>
 
-          {authMode === "account" ? (
-            <div className="scan-auth-grid">
-              <p className="scan-auth-hint">
-                {fr
-                  ? "Crée de préférence un compte dédié à l'audit sur le site, avec un rôle de lecture. L'app s'en sert pour voir les pages derrière le login, puis oublie tout : rien n'est stocké."
-                  : "Preferably create an account dedicated to the audit on the site, with a read-only role. The app uses it to see the pages behind the login, then forgets it: nothing is stored."}
-              </p>
-              <label className="scan-field">
-                <span>{fr ? "Page de connexion" : "Login page"}</span>
-                <input
-                  type="url"
-                  value={loginUrl}
-                  onChange={(event) => setLoginUrl(event.target.value)}
-                  placeholder="https://ton-site.com/login"
-                  className="app-input"
-                  spellCheck={false}
-                  autoComplete="off"
-                />
-              </label>
-              <label className="scan-field">
-                <span>{fr ? "Email du compte d'audit" : "Audit account email"}</span>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="audit@ton-site.com"
-                  className="app-input"
-                  spellCheck={false}
-                  autoComplete="off"
-                />
-              </label>
-              <label className="scan-field">
-                <span>{fr ? "Mot de passe" : "Password"}</span>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  className="app-input"
-                  autoComplete="off"
-                />
-              </label>
-              <details className="scan-auth-advanced">
-                <summary>
-                  {fr
-                    ? "Le site ne suit pas le standard ? (formulaire en JavaScript, autre domaine)"
-                    : "The site does not follow the standard? (JavaScript form, other domain)"}
-                </summary>
-                <p className="scan-auth-hint">
-                  {fr
-                    ? "Le scan lit la page, trouve le formulaire, son action et son jeton anti-CSRF, puis vérifie la session sur une page qui l'exige. Renseigne ces deux champs seulement si l'une de ces étapes échoue : la raison exacte est alors affichée."
-                    : "The scan reads the page, finds the form, its action and its anti-CSRF token, then proves the session on a page that requires it. Fill these two fields only if one of those steps fails: the exact reason is then shown."}
-                </p>
-                <label className="scan-field">
-                  <span>
-                    {fr ? "URL de soumission (si différente)" : "Submission URL (if different)"}
-                  </span>
-                  <input
-                    type="url"
-                    value={loginEndpoint}
-                    onChange={(event) => setLoginEndpoint(event.target.value)}
-                    placeholder="https://ton-site.com/api/auth/sign-in"
-                    className="app-input"
-                    spellCheck={false}
-                    autoComplete="off"
-                  />
-                </label>
-                <label className="scan-field">
-                  <span>
-                    {fr
-                      ? "Page qui exige la session (preuve du login)"
-                      : "Page that requires the session (proof of login)"}
-                  </span>
-                  <input
-                    type="url"
-                    value={loginVerify}
-                    onChange={(event) => setLoginVerify(event.target.value)}
-                    placeholder="https://ton-site.com/dashboard"
-                    className="app-input"
-                    spellCheck={false}
-                    autoComplete="off"
-                  />
-                </label>
-              </details>
-            </div>
-          ) : (
-            <div className="scan-auth-grid">
-              <p className="scan-auth-hint">
-                {fr
-                  ? "Colle l'en-tête Cookie de ton navigateur. Il sert à la requête, n'est pas stocké et n'apparaît pas dans l'historique."
-                  : "Paste your browser's Cookie header. It is used for the request, not stored, and not shown in history."}
-              </p>
-              <label className="scan-field">
-                <span>{fr ? "Cookie de session" : "Session cookie"}</span>
-                <input
-                  type="text"
-                  value={cookie}
-                  onChange={(event) => setCookie(event.target.value)}
-                  placeholder="session=…; other=…"
-                  className="app-input"
-                  spellCheck={false}
-                  autoComplete="off"
-                />
-              </label>
-            </div>
-          )}
-        </Card>
-      ) : null}
+                  {authMode === "account" ? (
+                    <div className="scan-auth-grid">
+                      <p className="scan-auth-hint">
+                        {fr
+                          ? "Crée de préférence un compte dédié à l'audit sur le site, avec un rôle de lecture. L'app s'en sert pour voir les pages derrière le login, puis oublie tout : rien n'est stocké."
+                          : "Preferably create an account dedicated to the audit on the site, with a read-only role. The app uses it to see the pages behind the login, then forgets it: nothing is stored."}
+                      </p>
+                      <label className="scan-field">
+                        <span>{fr ? "Page de connexion" : "Login page"}</span>
+                        <input
+                          type="url"
+                          value={loginUrl}
+                          onChange={(event) => setLoginUrl(event.target.value)}
+                          placeholder="https://ton-site.com/login"
+                          className="app-input"
+                          spellCheck={false}
+                          autoComplete="off"
+                        />
+                      </label>
+                      <label className="scan-field">
+                        <span>
+                          {fr ? "Email ou identifiant du compte" : "Account email or username"}
+                        </span>
+                        <input
+                          type="text"
+                          value={email}
+                          onChange={(event) => setEmail(event.target.value)}
+                          placeholder={
+                            fr
+                              ? "audit@ton-site.com ou mon-identifiant"
+                              : "audit@site.com or my-username"
+                          }
+                          className="app-input"
+                          spellCheck={false}
+                          autoComplete="off"
+                          autoCapitalize="none"
+                        />
+                      </label>
+                      <label className="scan-field">
+                        <span>{fr ? "Mot de passe" : "Password"}</span>
+                        <input
+                          type="password"
+                          value={password}
+                          onChange={(event) => setPassword(event.target.value)}
+                          className="app-input"
+                          autoComplete="off"
+                        />
+                      </label>
+                      <details className="scan-auth-advanced">
+                        <summary>
+                          {fr
+                            ? "Le site ne suit pas le standard ? (formulaire en JavaScript, autre domaine)"
+                            : "The site does not follow the standard? (JavaScript form, other domain)"}
+                        </summary>
+                        <p className="scan-auth-hint">
+                          {fr
+                            ? "Le scan lit la page, trouve le formulaire, son action et son jeton anti-CSRF, puis vérifie la session sur une page qui l'exige. Renseigne ces deux champs seulement si l'une de ces étapes échoue : la raison exacte est alors affichée."
+                            : "The scan reads the page, finds the form, its action and its anti-CSRF token, then proves the session on a page that requires it. Fill these two fields only if one of those steps fails: the exact reason is then shown."}
+                        </p>
+                        <label className="scan-field">
+                          <span>
+                            {fr
+                              ? "URL de soumission (si différente)"
+                              : "Submission URL (if different)"}
+                          </span>
+                          <input
+                            type="url"
+                            value={loginEndpoint}
+                            onChange={(event) => setLoginEndpoint(event.target.value)}
+                            placeholder="https://ton-site.com/api/auth/sign-in"
+                            className="app-input"
+                            spellCheck={false}
+                            autoComplete="off"
+                          />
+                        </label>
+                        <label className="scan-field">
+                          <span>
+                            {fr
+                              ? "Page qui exige la session (preuve du login)"
+                              : "Page that requires the session (proof of login)"}
+                          </span>
+                          <input
+                            type="url"
+                            value={loginVerify}
+                            onChange={(event) => setLoginVerify(event.target.value)}
+                            placeholder="https://ton-site.com/dashboard"
+                            className="app-input"
+                            spellCheck={false}
+                            autoComplete="off"
+                          />
+                        </label>
+                      </details>
+                    </div>
+                  ) : (
+                    <div className="scan-auth-grid">
+                      <p className="scan-auth-hint">
+                        {fr
+                          ? "Colle l'en-tête Cookie de ton navigateur. Il sert à la requête, n'est pas stocké et n'apparaît pas dans l'historique."
+                          : "Paste your browser's Cookie header. It is used for the request, not stored, and not shown in history."}
+                      </p>
+                      <label className="scan-field">
+                        <span>{fr ? "Cookie de session" : "Session cookie"}</span>
+                        <input
+                          type="text"
+                          value={cookie}
+                          onChange={(event) => setCookie(event.target.value)}
+                          placeholder="session=…; other=…"
+                          className="app-input"
+                          spellCheck={false}
+                          autoComplete="off"
+                        />
+                      </label>
+                    </div>
+                  )}
+                  <div className="scan-auth-actions">
+                    <button
+                      type="button"
+                      className="app-btn app-btn-primary"
+                      onClick={() => void run()}
+                      disabled={busy}
+                    >
+                      {busy ? (
+                        <Loader2 size={14} className="animate-spin" aria-hidden />
+                      ) : (
+                        <ScanLine size={14} aria-hidden />
+                      )}
+                      {authMode === "account"
+                        ? fr
+                          ? "Se connecter et analyser"
+                          : "Sign in and scan"
+                        : fr
+                          ? "Utiliser ce cookie et analyser"
+                          : "Use this cookie and scan"}
+                    </button>
+                    <button
+                      type="button"
+                      className="app-btn app-btn-sm"
+                      onClick={() => {
+                        setShowAuth(false);
+                        setLoginNotice(null);
+                        setPassword("");
+                      }}
+                    >
+                      {fr ? "Annuler" : "Cancel"}
+                    </button>
+                  </div>
+                </Card>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
 
       {!scan && steps.length === 0 ? (
         <Card className="scan-preview">
@@ -1195,12 +1382,12 @@ export function ScanPage(): React.ReactElement {
 
           <ReportExport scan={scan} controls={controls} fr={fr} />
 
-          {scan.login?.attempted && !scan.login.ok ? (
+          {scan.login?.ok === false ? (
             <p className="scan-notice">
               <AlertTriangle size={13} aria-hidden />
               {fr
-                ? `Le site a refusé les identifiants : le scan n'a vu que les pages publiques.${scan.login.reason ? " (connexion impossible)" : ""}`
-                : `The site refused the credentials, so the scan only saw public pages.${scan.login.reason ? ` (${scan.login.reason})` : ""}`}
+                ? `Le site a refusé les identifiants : le scan n'a vu que les pages publiques.${scan.login.reason ? ` Motif : ${scan.login.reason}` : ""}`
+                : `The site refused the credentials, so the scan only saw public pages.${scan.login.reason ? ` Reason: ${scan.login.reason}` : ""}`}
             </p>
           ) : null}
 

@@ -48,7 +48,7 @@ indépendants continuent.
 
 ## AI integration (MCP, providers, agents)
 
-- PROOFCORE consumes MCP servers, and the CLI also ships an optional **local stdio** server (`proofcore mcp`) for Claude Code, Gemini CLI and other MCP clients. There is no hosted MCP endpoint: never claim the API is an MCP server. The stdio server exposes analysis tools and, when the client asks, write tools whose `annotations` state `readOnlyHint` / `destructiveHint` honestly.
+- PROOFCORE consumes MCP servers, and the CLI ships the **official local stdio** server (`proofcore mcp`) for Claude Code, Gemini CLI and other MCP clients: MCP `2025-06-18` over stdio, with tools, resources and prompts. There is no hosted MCP endpoint: never claim the API is an MCP server. The stdio server's write tools carry honest `readOnlyHint` / `destructiveHint` annotations.
 - Every credential is read from an environment variable at call time. `apiKeyEnvVar` holds the NAME, never the key.
 - Commands are argv arrays passed to `spawn`/`execFile` with `shell: false`. Never build a shell string.
 - A tool is `read` only when the server annotates it `readOnlyHint: true`. Everything else is `write`.

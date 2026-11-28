@@ -27,6 +27,7 @@ import {
   type TestRun,
 } from "@proofcore/contracts";
 import { type ScanResult, type ScanStatus, stableStringify } from "@proofcore/core";
+import { createProofcoreClient, ProofcoreApiError } from "@proofcore/sdk";
 
 /** Same vocabulary as index.ts — duplicated here to keep the entry point acyclic. */
 export interface SyncFlags {
@@ -287,24 +288,14 @@ export async function uploadScanRun(
   }
 
   try {
-    const response = await fetch(`${apiUrl.replace(/\/+$/, "")}/v1/runs`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${token}`,
-        "idempotency-key": run.idempotencyKey ?? `sync:${run.id}`,
-      },
-      body: payload,
-    });
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      errSync(flags, red(flags, `Sync failed: HTTP ${response.status} ${text.slice(0, 400)}`));
-      return 2;
-    }
-    const body = (await response.json().catch(() => ({}))) as {
-      runId?: string;
-      recorded?: boolean;
-    };
+    // One HTTP client for the machine API: auth, Idempotency-Key and response validation
+    // live in @proofcore/sdk, so `proofcore scan --sync` and `proofcore sync` cannot
+    // drift from each other or from the published contract.
+    const client = createProofcoreClient({ baseUrl: apiUrl, token });
+    const body = await client.uploadRun(
+      { run, summary },
+      { idempotencyKey: run.idempotencyKey ?? `sync:${run.id}` }
+    );
     if (flags.json) {
       stdout.write(`${stableStringify({ ok: true, ...body }, 2)}\n`);
     } else {
@@ -315,10 +306,16 @@ export async function uploadScanRun(
     }
     return 0;
   } catch (error) {
-    errSync(
-      flags,
-      red(flags, `Sync failed: ${error instanceof Error ? error.message : String(error)}`)
-    );
+    errSync(flags, red(flags, `Sync failed: ${describeSyncError(error)}`));
     return 2;
   }
+}
+
+/** An API refusal says which rule it broke, not just that something went wrong. */
+export function describeSyncError(error: unknown): string {
+  if (error instanceof ProofcoreApiError) {
+    const category = error.category ? ` ${error.category}` : "";
+    return `HTTP ${error.status}${category} ${error.code}: ${error.message}`;
+  }
+  return error instanceof Error ? error.message : String(error);
 }

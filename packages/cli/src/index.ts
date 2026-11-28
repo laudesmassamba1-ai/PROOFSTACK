@@ -33,6 +33,7 @@ import {
   stableStringify,
 } from "@proofcore/core";
 import { ENGINE_VERSION, type EngineEvent, runEngine } from "@proofcore/engine";
+import { createProofcoreClient } from "@proofcore/sdk";
 import {
   buildSemanticIndex,
   completeCode,
@@ -84,6 +85,7 @@ import {
 import { assembleProviders, blockingSafetyWarnings } from "./providers.js";
 import { describeSandbox, runInSandbox } from "./sandbox.js";
 import {
+  describeSyncError,
   saveScanRun,
   scanRunFromScanResult,
   summarizeScanRun,
@@ -1922,29 +1924,12 @@ async function commandSync(flags: GlobalFlags, args: string[]): Promise<number> 
   }
 
   try {
-    // The API requires an Idempotency-Key so a retried upload is recorded once. It must
-    // derive from the run identity, not from a fresh uuid: a second attempt after a
-    // network blip has to present the *same* key or the run is counted twice and the
-    // customer is billed twice for one test run.
+    // The Idempotency-Key comes from the run identity, never a fresh uuid: a retry after
+    // a network blip must present the same key or the customer is billed twice for one
+    // run. The SDK enforces the header, the auth and the response shape.
     const idempotencyKey = run.idempotencyKey ?? `sync:${run.id}`;
-    const response = await fetch(`${config.sync.apiUrl.replace(/\/+$/, "")}/v1/runs`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${token}`,
-        "idempotency-key": idempotencyKey,
-      },
-      body: payload,
-    });
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      err(flags, red(flags, `Sync failed: HTTP ${response.status} ${text.slice(0, 400)}`));
-      return 2;
-    }
-    const body = (await response.json().catch(() => ({}))) as {
-      runId?: string;
-      recorded?: boolean;
-    };
+    const client = createProofcoreClient({ baseUrl: config.sync.apiUrl, token });
+    const body = await client.uploadRun({ run: scopedRun, summary }, { idempotencyKey });
     if (flags.json) {
       stdout.write(`${stableStringify({ ok: true, ...body }, 2)}\n`);
     } else {
@@ -1955,7 +1940,7 @@ async function commandSync(flags: GlobalFlags, args: string[]): Promise<number> 
     }
     return 0;
   } catch (error) {
-    err(flags, red(flags, `Sync failed: ${describeError(error).message}`));
+    err(flags, red(flags, `Sync failed: ${describeSyncError(error)}`));
     return 2;
   }
 }
@@ -2501,19 +2486,11 @@ async function resolveSyncIdentity(
   token: string
 ): Promise<{ workspaceId: string; projectId?: string } | null> {
   try {
-    const response = await fetch(`${apiUrl.replace(/\/+$/, "")}/v1/project`, {
-      headers: { accept: "application/json", authorization: `Bearer ${token}` },
-    });
-    if (!response.ok) return null;
-    const body = (await response.json()) as {
-      workspace?: { id?: string };
-      project?: { id?: string } | null;
-    };
-    const workspaceId = body.workspace?.id;
-    if (!workspaceId) return null;
+    const client = createProofcoreClient({ baseUrl: apiUrl, token });
+    const identity = await client.getProject();
     return {
-      workspaceId,
-      ...(body.project?.id ? { projectId: body.project.id } : {}),
+      workspaceId: identity.workspace.id,
+      ...(identity.project?.id ? { projectId: identity.project.id } : {}),
     };
   } catch {
     return null;

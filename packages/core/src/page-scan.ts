@@ -27,7 +27,7 @@
 import { cleanFindings } from "@proofcore/module-clean";
 import { failFindings } from "@proofcore/module-fail";
 import { isAlias } from "./controls.js";
-import { signIn } from "./session.js";
+import { discoverLoginForm, signIn } from "./session.js";
 
 export type ScanModule = "fail" | "clean" | "flow" | "world" | "exit";
 export type ScanStatus = "PASS" | "WARN" | "FAIL" | "SKIPPED";
@@ -101,6 +101,18 @@ export interface ScanLoginResult {
   status: number | null;
   /** Why it failed, in one line. Never the password, never the cookie value. */
   reason?: string;
+}
+
+/** What a public read can establish about a login wall, without asking for credentials. */
+export interface LoginWall {
+  detected: boolean;
+  /** The page that shows the form, or the protected page that redirected to it. */
+  loginUrl: string | null;
+  /** Field names the form actually uses, so the prompt can be precise. */
+  emailField: string | null;
+  passwordField: string | null;
+  /** Why this looked like a login wall: HTTP 401, a password form, a login path. */
+  reason: string | null;
 }
 
 /** The meta tag a site can publish to prove ownership. */
@@ -248,6 +260,141 @@ async function fetchFollowing(
   throw new Error(`Too many redirects (more than ${limit}).`);
 }
 
+const LOGIN_PATH =
+  /(?:^|\/)(?:login|log-in|signin|sign-in|connect|connexion|se-connecter|auth)(?:\/|$)/i;
+const LOGIN_LINK_TEXT =
+  /\b(?:log\s*in|sign\s*in|connexion|se connecter|s.identifier|login|account|mon compte|espace client|my account|portal|member)\b/i;
+
+function loginWallFromHtml(html: string, pageUrl: string): LoginWall | null {
+  const form = discoverLoginForm(html, pageUrl);
+  if (!form) return null;
+  return {
+    detected: true,
+    loginUrl: pageUrl,
+    emailField: form.emailField?.name ?? null,
+    passwordField: form.passwordField.name,
+    reason: "the page shows a password form",
+  };
+}
+
+/** Login-looking links, so a public homepage can lead to the form instead of hiding it. */
+function loginLinks(html: string, base: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const pattern = /<a\b[^>]*href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))[^>]*>([\s\S]*?)<\/a>/gi;
+  for (const match of html.matchAll(pattern)) {
+    const href = match[1] ?? match[2] ?? match[3] ?? "";
+    if (!href) continue;
+    let url: URL;
+    try {
+      url = new URL(href, base);
+    } catch {
+      continue;
+    }
+    if (url.protocol !== "http:" && url.protocol !== "https:") continue;
+    const text = visibleText(match[4] ?? "").slice(0, 80);
+    if (!LOGIN_PATH.test(url.pathname) && !LOGIN_LINK_TEXT.test(text)) continue;
+    const key = url.toString();
+    if (key === base || seen.has(key)) continue;
+    seen.add(key);
+    out.push(key);
+    if (out.length >= 3) break;
+  }
+  return out;
+}
+
+/**
+ * Looks for a login wall before asking for a password.
+ *
+ * It reads the page the visitor would get, follows a redirect to the login form, and
+ * otherwise follows one obvious "Sign in" link. It never submits anything and never sees a
+ * credential: the caller uses the returned field names to ask the right question.
+ */
+export async function detectLoginWall(
+  rawUrl: string,
+  options: Pick<ScanOptions, "allowPrivate" | "fetchImpl" | "headers" | "timeoutMs"> = {}
+): Promise<LoginWall> {
+  const target = assertScannableUrl(rawUrl, { allowPrivate: options.allowPrivate });
+  const fetched = await fetchFollowing(target, options, 5);
+  const body = await readBody(fetched.response, 1_500_000);
+  const contentType = fetched.response.headers.get("content-type") ?? "";
+  const html = /html|xml/i.test(contentType) || /^\s*</.test(body.text) ? body.text : "";
+  const direct = html ? loginWallFromHtml(html, fetched.url.toString()) : null;
+  if (direct) return direct;
+
+  let candidate: LoginWall | null = null;
+  if (html) {
+    for (const link of loginLinks(html, fetched.url.toString())) {
+      try {
+        const next = assertScannableUrl(link, { allowPrivate: options.allowPrivate });
+        const found = await fetchFollowing(next, options, 3);
+        const foundBody = await readBody(found.response, 1_500_000);
+        const foundType = found.response.headers.get("content-type") ?? "";
+        const foundHtml =
+          /html|xml/i.test(foundType) || /^\s*</.test(foundBody.text) ? foundBody.text : "";
+        const form = foundHtml ? loginWallFromHtml(foundHtml, found.url.toString()) : null;
+        if (form) return form;
+        if (
+          candidate === null &&
+          (found.response.status === 401 ||
+            found.response.status === 403 ||
+            LOGIN_PATH.test(found.url.pathname))
+        ) {
+          candidate = {
+            detected: true,
+            loginUrl: found.url.toString(),
+            emailField: null,
+            passwordField: null,
+            reason: `HTTP ${found.response.status} on a login-looking page`,
+          };
+        }
+      } catch {
+        // A dead or refused login link is not a reason to fail the public read.
+      }
+    }
+  }
+  if (candidate) return candidate;
+
+  // A JavaScript menu often hides the login link from an HTML-only read. Probe the three
+  // conventional paths once: a form there is real evidence, and a 200 marketing page is not.
+  const seen = new Set([fetched.url.toString()]);
+  for (const path of ["/login", "/signin", "/connexion"]) {
+    const probeUrl = new URL(path, fetched.url);
+    if (seen.has(probeUrl.toString())) continue;
+    seen.add(probeUrl.toString());
+    try {
+      const probe = await fetchFollowing(probeUrl, options, 3);
+      const probeBody = await readBody(probe.response, 1_500_000);
+      const probeType = probe.response.headers.get("content-type") ?? "";
+      const probeHtml =
+        /html|xml/i.test(probeType) || /^\s*</.test(probeBody.text) ? probeBody.text : "";
+      const form = probeHtml ? loginWallFromHtml(probeHtml, probe.url.toString()) : null;
+      if (form) return form;
+    } catch {
+      // An absent conventional path proves nothing; keep reading the public site.
+    }
+  }
+
+  if (fetched.response.status === 401 || fetched.response.status === 403) {
+    return {
+      detected: true,
+      loginUrl: fetched.url.toString(),
+      emailField: null,
+      passwordField: null,
+      reason: `the site answered HTTP ${fetched.response.status}`,
+    };
+  }
+  if (LOGIN_PATH.test(fetched.url.pathname)) {
+    return {
+      detected: true,
+      loginUrl: fetched.url.toString(),
+      emailField: null,
+      passwordField: null,
+      reason: "the address is a login page",
+    };
+  }
+  return { detected: false, loginUrl: null, emailField: null, passwordField: null, reason: null };
+}
 function readBody(response: Response, maxBytes: number): Promise<{ text: string; bytes: number }> {
   const reader = response.body?.getReader();
   if (!reader) return response.text().then((text) => ({ text, bytes: text.length }));
